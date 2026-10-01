@@ -4,9 +4,15 @@ These assert the facade's contract — accepts arrays, tolerates empties,
 validates shapes, isolates xy — not xy's rendering, which is xy's concern.
 """
 
+import hashlib
+import importlib.metadata
+import json
+
 import numpy as np
 import pytest
+import xy.channel
 
+from helao.core.tests._plate_photo_fakes import EXTENT, top_row_red
 from helao.ui.reflex import plots
 
 
@@ -418,4 +424,173 @@ def test_ternary_rejects_a_values_array_of_the_wrong_length() -> None:
     with pytest.raises(ValueError):
         plots.ternary(
             [1.0, 1.0], [1.0, 1.0], [1.0, 1.0], labels=("a", "b", "c"), values=[1.0]
+        )
+
+
+# -- plate-photo underlay -------------------------------------------------------
+
+#: Pinned from the unmodified ``scatter_map`` (parent cec43b68, xy 0.0.7).
+#: Recompute on the pre-change commit only if xy itself is upgraded.
+GOLDEN_SPEC_SHA256 = "f1d75f6f5e0b6e4f0aaeea8a083f23ea48af4496b838714dcaeec9f4a8f6b27d"
+GOLDEN_FRAME_SHA256 = "704f01fa8cd000608e9735c4ecdc9833f06cf49053d0e770d5cb1619a799f2dc"
+GOLDEN_LAYOUT = "0:scatter:v|1:scatter:selected_0|size=6.0(-6.5, 26.5)(-1.5, 31.5)True"
+
+
+def _golden(panel_id, **extra):
+    return plots.scatter_map(
+        [0.0, 10.0, 20.0, 5.0],
+        [0.0, 5.0, 30.0, 12.0],
+        values=[1.0, 2.0, 3.0, 4.0],
+        x_label="x (mm)",
+        y_label="y (mm)",
+        value_label="v",
+        square=True,
+        colormap="viridis",
+        colorbar=True,
+        rings=[(10.0, 5.0, 0)],
+        size=6.0,
+        panel_id=panel_id,
+        version=7,
+        **extra,
+    )
+
+
+@pytest.mark.parametrize("extra", [{}, {"underlay": None}], ids=["omitted", "none"])
+def test_scatter_map_without_an_underlay_is_byte_identical_to_before(extra):
+    """Spec, column buffers and layout token all match the pre-underlay
+    output, so every existing plate map is untouched until a photo is
+    chosen."""
+    panel = f"golden-{len(extra)}"
+    payload = _golden(panel, **extra)
+    spec_digest = hashlib.sha256(
+        json.dumps(payload.spec, sort_keys=True).encode()
+    ).hexdigest()
+    frame_digest = hashlib.sha256(plots.STORE.get(panel, 7)).hexdigest()
+    assert spec_digest == GOLDEN_SPEC_SHA256
+    assert frame_digest == GOLDEN_FRAME_SHA256
+    assert payload.layout == GOLDEN_LAYOUT
+
+
+def _rgba_planes(panel_id, version, trace):
+    """The heatmap's four f32 planes, decoded from the published frame."""
+    frame = xy.channel.decode_frame(plots.STORE.get(panel_id, version))
+    h, w = trace["heatmap"]["h"], trace["heatmap"]["w"]
+    return [
+        np.frombuffer(frame.buffers[i], dtype=np.float32).reshape(h, w)
+        for i in trace["heatmap"]["rgba_bufs"]
+    ]
+
+
+def test_underlay_is_trace_zero_a_truecolor_heatmap_spanning_the_extent():
+    payload = plots.scatter_map(
+        [0.0, 1.0],
+        [0.0, 1.0],
+        values=[1.0, 2.0],
+        value_label="v",
+        colorbar=True,
+        square=True,
+        underlay=(top_row_red(), EXTENT),
+        panel_id="u-trace",
+        version=1,
+    )
+    first = payload.spec["traces"][0]
+    assert first["kind"] == "heatmap" and first["name"] == "photo"
+    # Load-bearing for hover: xy 0.0.7's client skips hover on truecolor
+    # heatmaps (_hoverAt needs _cpuHeatmap, built only for non-truecolor), so
+    # the figure-level tooltip never labels photo pixels as the measurement.
+    # Re-check on any xy upgrade.
+    assert importlib.metadata.version("xy") == "0.0.7", (
+        "xy was upgraded: re-check that hover skips truecolor heatmaps (hover a "
+        "photo-only region, then a sample point); see the plate-photo note in "
+        "helao/ui/reflex/CLAUDE.md"
+    )
+    assert first["style"]["truecolor"] is True
+    assert first["style"]["opacity"] == pytest.approx(plots.UNDERLAY_OPACITY)
+    assert first["heatmap"]["x_range"] == pytest.approx([-50.0, 50.0])
+    assert first["heatmap"]["y_range"] == pytest.approx([-10.0, 90.0])
+    assert payload.spec["traces"][1]["kind"] == "scatter"
+    # The colour scale still describes the points, not the photo.
+    assert payload.spec["colorbar"]["domain"] == pytest.approx([1.0, 2.0])
+
+
+def test_underlay_opacity_reaches_the_photo_mark():
+    payload = plots.scatter_map(
+        [0.0],
+        [0.0],
+        underlay=(top_row_red(), EXTENT),
+        underlay_opacity=0.3,
+        panel_id="u-opacity",
+        version=1,
+    )
+    assert payload.spec["traces"][0]["style"]["opacity"] == pytest.approx(0.3)
+
+
+def test_underlay_rows_are_flipped_so_the_image_top_lands_at_y_max():
+    payload = plots.scatter_map(
+        [0.0],
+        [0.0],
+        underlay=(top_row_red(rows=8, cols=6), EXTENT),
+        panel_id="u-flip",
+        version=1,
+    )
+    red, _green, _blue, alpha = _rgba_planes("u-flip", 1, payload.spec["traces"][0])
+    # xy's rows run upward from y_min, so the image's top row is xy's last.
+    assert red[-1].tolist() == [1.0] * 6
+    assert red[:-1].max() == 0.0
+    assert alpha[-1].tolist() == [1.0] * 6
+    assert alpha[:-1].max() == 0.0
+
+
+def test_underlay_scales_alpha_as_well_as_colour():
+    """xy never divides alpha by 255; handed uint8, 128 would clip to 1.0."""
+    img = np.zeros((2, 2, 4), dtype=np.uint8)
+    img[..., 3] = 128
+    payload = plots.scatter_map(
+        [0.0], [0.0], underlay=(img, EXTENT), panel_id="u-alpha", version=1
+    )
+    alpha = _rgba_planes("u-alpha", 1, payload.spec["traces"][0])[3]
+    assert alpha == pytest.approx(np.full((2, 2), 128 / 255), abs=1e-6)
+
+
+def test_square_domain_contains_the_extent_as_well_as_the_points():
+    """The points sit off the extent's centre on both axes, so dropping the
+    extent from either axis's domain leaves part of the wafer outside it."""
+    payload = plots.scatter_map(
+        [40.0, 41.0],
+        [0.0, 1.0],
+        square=True,
+        underlay=(top_row_red(), EXTENT),
+        panel_id="u-dom",
+        version=1,
+    )
+    x_lo, x_hi = payload.spec["x_axis"]["domain"]
+    y_lo, y_hi = payload.spec["y_axis"]["domain"]
+    assert x_lo <= -50.0 and x_hi >= 50.0
+    assert y_lo <= -10.0 and y_hi >= 90.0
+    assert x_hi - x_lo == pytest.approx(y_hi - y_lo)  # still square
+
+
+def test_layout_token_changes_with_the_photo_and_its_opacity():
+    def token(**kwargs):
+        return plots.scatter_map(
+            [0.0], [0.0], square=True, panel_id="u-tok", version=1, **kwargs
+        ).layout
+
+    other = top_row_red()
+    other[1] = (0, 0, 255, 255)  # same shape and extent, different photo
+    photo = token(underlay=(top_row_red(), EXTENT))
+    assert photo == token(underlay=(top_row_red(), EXTENT))
+    tokens = {
+        photo,
+        token(underlay=(other, EXTENT)),
+        token(underlay=(top_row_red(), EXTENT), underlay_opacity=0.3),
+        token(),
+    }
+    assert len(tokens) == 4
+
+
+def test_underlay_rejects_an_image_that_is_not_rgba():
+    with pytest.raises(ValueError, match="RGBA"):
+        plots.scatter_map(
+            [0.0], [0.0], underlay=(np.zeros((4, 4, 3), dtype=np.uint8), EXTENT)
         )

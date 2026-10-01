@@ -25,6 +25,7 @@ __all__ = [
     "ternary",
 ]
 
+import hashlib
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -267,6 +268,9 @@ def _chart(marks, axes, **kwargs) -> Any:
 
 #: xy's own default scatter marker size, in pixels.
 DEFAULT_POINT_SIZE = 4.0
+
+#: Opacity of a plate-photo underlay unless the page says otherwise.
+UNDERLAY_OPACITY = 0.6
 
 #: Plot margins ``[top, right, bottom, left]`` for a square chart. Fixed, so the
 #: plot rectangle is the host size minus known gutters. Each must cover what xy
@@ -562,6 +566,8 @@ def scatter_map(
     square: bool = False,
     colormap: str = "",
     colorbar: bool = False,
+    underlay=None,
+    underlay_opacity: float = UNDERLAY_OPACITY,
     panel_id: str = "scatter",
     version: int = 0,
 ):
@@ -584,6 +590,11 @@ def scatter_map(
             bound with :func:`square_width`.
         colormap: xy colormap name for ``values``; xy's default when empty.
         colorbar: Show a colour scale for ``values``, titled ``value_label``.
+        underlay: ``(rgba, extent)`` to draw underneath the points, or
+            ``None``. ``rgba`` is a ``(rows, cols, 4)`` uint8 image whose row 0
+            is its top edge; ``extent`` is ``((x_min, x_max), (y_min, y_max))``,
+            the image's outer edges in data units. See :func:`_underlay_mark`.
+        underlay_opacity: Opacity of the underlay, 0-1.
         panel_id: Stable panel identity for the buffer route.
         version: Monotonic data version.
 
@@ -591,8 +602,8 @@ def scatter_map(
         ChartPayload: Assign into the panel state vars bound by :func:`chart`.
 
     Raises:
-        ValueError: If ``x`` and ``y`` differ in length, or ``values`` does not
-            match them.
+        ValueError: If ``x`` and ``y`` differ in length, ``values`` does not
+            match them, or ``underlay`` is not an RGBA image.
     """
     xs = _as_float_array(x)
     ys = _as_float_array(y)
@@ -628,9 +639,74 @@ def scatter_map(
     if show_bar:
         marks.append(xy.colorbar(title=value_label))
     marks.extend(_ring_marks(rings, size))
+    dom_xs, dom_ys, photo_token = xs, ys, ""
+    if underlay is not None:
+        photo, photo_token, ex, ey = _underlay_mark(underlay, underlay_opacity)
+        # First, so it draws underneath every point and ring.
+        marks.insert(0, photo)
+        # The square domain covers the photo too, so the wafer is never clipped.
+        dom_xs = np.concatenate([xs, ex])
+        dom_ys = np.concatenate([ys, ey])
     return _publish_selectable(
-        marks, xs, ys, x_label, y_label, square, panel_id, version, show_bar, size
+        marks,
+        dom_xs,
+        dom_ys,
+        x_label,
+        y_label,
+        square,
+        panel_id,
+        version,
+        show_bar,
+        size,
+        extra_token=photo_token,
     )
+
+
+def _underlay_mark(underlay, opacity: float) -> tuple:
+    """A photo as an xy truecolor heatmap, plus what identifies it.
+
+    Four things here fail silently if changed:
+
+    * Image row 0 is the top edge, but xy's rows run upward from y_min, so the
+      rows are flipped first.
+    * xy takes cell **centres** and derives the edges from them, so the
+      positions passed are centres; passing the extent's edges would shift the
+      photo half a cell.
+    * xy divides RGB by 255 only when it sees a value above 1, and never
+      divides alpha, so all four channels are scaled here. Handed uint8, every
+      partial alpha would clip to opaque.
+    * The truecolor flag (a 4-channel ``z``) is load-bearing for hover. xy
+      0.0.7's client skips hover on truecolor heatmaps (``_hoverAt`` needs
+      ``_cpuHeatmap``, built only for non-truecolor), so the figure-level
+      tooltip never labels photo pixels as the measurement. Re-check this on
+      any xy upgrade.
+
+    Returns:
+        tuple: ``(mark, layout_token_suffix, (x_min, x_max), (y_min, y_max))``.
+        The token carries a content digest, the shape, the extent and the
+        opacity: the in-place update path swaps columns only, so a different
+        photo or opacity has to force a rebuild.
+    """
+    rgba, ((x0, x1), (y0, y1)) = underlay
+    img = np.asarray(rgba)
+    if img.ndim != 3 or img.shape[2] != 4:
+        raise ValueError(
+            f"underlay must be an RGBA (rows, cols, 4) image, got shape {img.shape}"
+        )
+    rows, cols = img.shape[:2]
+    z = np.flipud(img).astype(np.float64) / 255.0
+    xc = x0 + (np.arange(cols) + 0.5) * (x1 - x0) / cols
+    yc = y0 + (np.arange(rows) + 0.5) * (y1 - y0) / rows
+    digest = hashlib.blake2b(
+        np.ascontiguousarray(img).tobytes(), digest_size=8
+    ).hexdigest()
+    token = (
+        f"|photo={digest}:{rows}x{cols}:{x0:g},{x1:g},{y0:g},{y1:g}"
+        f":{float(opacity):g}"
+    )
+    # Truecolor (4-channel z) must stay: see the hover note above.
+    mark = xy.heatmap(z, x=xc, y=yc, opacity=float(opacity), name="photo")
+    return mark, token, (float(x0), float(x1)), (float(y0), float(y1))
 
 
 def series_color(index: int) -> str:
@@ -672,6 +748,7 @@ def _publish_selectable(
     version,
     colorbar=False,
     size=DEFAULT_POINT_SIZE,
+    extra_token: str = "",
 ):
     """Publish a click-selectable point chart, optionally square.
 
@@ -680,6 +757,8 @@ def _publish_selectable(
     ``xy.colorbar``, which a square chart needs to know to size its margin.
     *size* joins the layout token: a constant marker size is spec, not
     column data, so the in-place update path would not apply a new one.
+    *extra_token* is appended to the layout token as given (the underlay's
+    identity); empty leaves the token as it always was.
     """
     axes = _axes(x_label, y_label, False)
     kwargs: dict[str, Any] = {"click": True}
@@ -697,6 +776,7 @@ def _publish_selectable(
         right += 0 if colorbar else _COLORBAR_ROOM
         kwargs["padding"] = [top, right, bottom, left]
         extra += f"{x_dom}{y_dom}{colorbar}"
+    extra += extra_token
     figure = _chart(marks, axes, **kwargs)
     return _publish(figure, panel_id, version, layout_extra=extra)
 
