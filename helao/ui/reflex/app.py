@@ -601,6 +601,26 @@ def build_app(world_cfg: dict, server_key: str):
     return application
 
 
+def _install_backend_logger(cfg: dict) -> None:
+    """Send this child process's logs to ``<root>/LOGS/<key>_backend.log``.
+
+    ``make_logger`` defaults to a fresh temp directory, so without this every
+    panel warning raised in the Reflex backend lands somewhere no operator
+    looks. Its own file rather than the launcher's ``<key>.log``: two processes
+    rotating one file collide on Windows. Installed as the global logger before
+    ``build_app`` imports the panel modules, which pick it up at import.
+    """
+    global LOGGER
+    root = (cfg or {}).get("root")
+    if not root or logging.LOGGER is not None:
+        return
+    key = os.environ.get("HELAO_REFLEX_SERVER_KEY", "") or "reflex"
+    logging.LOGGER = logging.make_logger(
+        logger_name=f"{key}_backend", log_dir=os.path.join(root, "LOGS")
+    )
+    LOGGER = logging.LOGGER
+
+
 def _build_from_global_config():
     """Build the app from the installed global config, loading it if needed.
 
@@ -619,6 +639,7 @@ def _build_from_global_config():
             cfg_dict, _validated = config_loader.read_validated_config(conf_arg)
             config_loader.install_global_config(cfg_dict)
             cfg = config_loader.CONFIG
+            _install_backend_logger(cfg)
             # bokeh_launcher sets this in its own process; the Reflex backend is
             # a child that loads the config itself, so it must too. Without it
             # deployment_search_order never tries the config's own deployment
