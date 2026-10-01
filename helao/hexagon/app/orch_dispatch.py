@@ -1094,7 +1094,9 @@ class DispatchRunner:
             await orch.intend_none()
             return ErrorCodes.none
 
-        await self._stage_experiment()
+        rc = await self._stage_experiment()
+        if rc is not None:
+            return rc
 
         rc, staged_acts = await self._expand_experiment_actions()
         if rc is not None:
@@ -1112,7 +1114,7 @@ class DispatchRunner:
 
         return ErrorCodes.none
 
-    async def _stage_experiment(self) -> None:
+    async def _stage_experiment(self) -> Optional[ErrorCodes]:
         """Pop the next experiment, make it active, and register it (:569-642), verbatim."""
         orch = self.orch
         LOGGER.info("action_dq is empty, getting new actions")
@@ -1147,6 +1149,9 @@ class DispatchRunner:
                 }
             }
         )
+        if orch.active_experiment is None:
+            self._log_step_abandoned("experiment")
+            return ErrorCodes.estop
         orch.active_experiment.dummy = orch.world_cfg.get("dummy", False)
         orch.active_experiment.simulation = orch.world_cfg.get("simulation", False)
         if orch.active_experiment.run_type is None:
@@ -1180,6 +1185,7 @@ class DispatchRunner:
         orch.globalstatusmodel.new_experiment(
             exp_uuid=orch.active_experiment.experiment_uuid
         )
+        return None
 
     async def _expand_experiment_actions(
         self,
@@ -1281,6 +1287,12 @@ class DispatchRunner:
         """Gate on plate verification (:748-763); returns ``not_available`` on failure."""
         orch = self.orch
 
+        # an E-STOP that finalized while ``_upload_exp_meta_s3`` was parked
+        # cleared the record; refuse before anything is queued for it
+        if orch.active_experiment is None:
+            self._log_step_abandoned("experiment")
+            return ErrorCodes.estop
+
         if orch.verify_plates and orch_unpack.PLATE_API.has_access:
             plate_found = orch.verify_plate_in_params(
                 orch.active_experiment.experiment_params
@@ -1299,6 +1311,22 @@ class DispatchRunner:
     # =======================================================================
     # sequence coordinator -- migrated S7 body (self.->self.orch.)
     # =======================================================================
+
+    @staticmethod
+    def _log_step_abandoned(kind: str) -> None:
+        LOGGER.info(f"{kind} was finalized by an E-STOP mid-dispatch, abandoning it")
+
+    def _sequence_gone(self, activated) -> bool:
+        """True once the sequence this step activated is no longer the active one.
+
+        ``dispatch_sequence`` parks at awaits (``put_lbuf``, ``write_seq``,
+        ``to_s3``). An E-STOP finalizing meanwhile sets ``active_sequence`` to
+        None, and an operator clear may already have set ``stopped``, so the
+        loop state cannot be trusted to say so; the record can."""
+        if self.orch.active_sequence is activated:
+            return False
+        self._log_step_abandoned("sequence")
+        return True
 
     async def dispatch_sequence(self) -> ErrorCodes:
         """Pop the next sequence, activate/validate it, spawn its unpacker (:405-534), verbatim."""
@@ -1326,6 +1354,8 @@ class DispatchRunner:
                     }
                 }
             )
+            if self._sequence_gone(activated):
+                return ErrorCodes.estop
             orch.active_sequence.dummy = orch.world_cfg.get("dummy", False)
             orch.active_sequence.simulation = orch.world_cfg.get("simulation", False)
             if orch.active_sequence.run_type is None:
@@ -1396,6 +1426,8 @@ class DispatchRunner:
 
             orch.seq_model = orch.active_sequence.get_seq()
             await orch.write_seq(orch.active_sequence)
+            if self._sequence_gone(activated):
+                return ErrorCodes.estop
 
             if orch.use_sync:
                 try:
@@ -1410,6 +1442,9 @@ class DispatchRunner:
                     LOGGER.error(
                         f"Error uploading initial active sequence json to s3: {e}"
                     )
+
+            if self._sequence_gone(activated):
+                return ErrorCodes.estop
 
             if orch.verify_plates and orch_unpack.PLATE_API.has_access:
                 plate_found = orch.verify_plate_in_params(
