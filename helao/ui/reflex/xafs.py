@@ -193,6 +193,7 @@ class XafsState(SpectraPageState, rx.State):
             self._records = records
             self._pm_rows = rows
             self.platemap_note = note
+            self._load_photos(plate_id)
             self.run_use_options = grouping.run_use_options(records)
             self.run_use_choice = (
                 DEFAULT_RUN_USE

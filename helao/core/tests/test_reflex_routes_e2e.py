@@ -333,7 +333,14 @@ def test_composition_state_handlers_are_registered_without_compiling_pages(refle
 
     build_app(reflex_cfg, "UI")
     handlers = app_reflex.CompositionState.event_handlers
-    for name in ("retrieve", "plot", "on_map_select", "set_plate_id"):
+    for name in (
+        "retrieve",
+        "plot",
+        "on_map_select",
+        "set_plate_id",
+        "set_photo_choice",
+        "set_photo_opacity",
+    ):
         assert name in handlers, f"{name} not registered; have {sorted(handlers)}"
 
 
@@ -363,6 +370,8 @@ def test_uvvis_route_is_the_real_page_and_its_handlers_register(reflex_cfg):
         "commit_wl_lo",
         "commit_wl_hi",
         "apply_wl_text",
+        "set_photo_choice",
+        "set_photo_opacity",
     ):
         assert name in handlers, f"{name} not registered; have {sorted(handlers)}"
 
@@ -375,7 +384,15 @@ def test_xafs_route_is_the_real_page_and_its_handlers_register(reflex_cfg):
     build_app(reflex_cfg, "UI")
     assert "/xafs" in SHELL_ROUTES
     handlers = page.XafsState.event_handlers
-    for name in ("retrieve", "plot", "on_map_select", "set_element", "commit_wl_lo"):
+    for name in (
+        "retrieve",
+        "plot",
+        "on_map_select",
+        "set_element",
+        "commit_wl_lo",
+        "set_photo_choice",
+        "set_photo_opacity",
+    ):
         assert name in handlers, f"{name} not registered; have {sorted(handlers)}"
 
 
@@ -387,5 +404,13 @@ def test_xrds_route_is_the_real_page_and_its_handlers_register(reflex_cfg):
     build_app(reflex_cfg, "UI")
     assert "/xrds" in SHELL_ROUTES
     handlers = page.XrdsState.event_handlers
-    for name in ("retrieve", "plot", "on_map_select", "set_file_type", "commit_wl_hi"):
+    for name in (
+        "retrieve",
+        "plot",
+        "on_map_select",
+        "set_file_type",
+        "commit_wl_hi",
+        "set_photo_choice",
+        "set_photo_opacity",
+    ):
         assert name in handlers, f"{name} not registered; have {sorted(handlers)}"

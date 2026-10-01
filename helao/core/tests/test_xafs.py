@@ -131,6 +131,12 @@ class _FakeXafsState:
             setattr(self, f"{name}_spec", {})
             setattr(self, f"{name}_url", "")
             setattr(self, f"{name}_layout", "")
+        # PlatePhotoState's vars, as the real page state carries them.
+        self.photo_options = ["off"]
+        self.photo_choice = "off"
+        self.photo_opacity = 0.6
+        self.photo_note = ""
+        self._photos: list = []
 
     def panel_key(self):
         return "test-xafs"
@@ -159,6 +165,7 @@ class _FakeXafsState:
     set_x = page.XafsState.set_x.fn  # type: ignore[attr-defined]
     set_y = page.XafsState.set_y.fn  # type: ignore[attr-defined]
     on_map_select = page.XafsState.on_map_select.fn  # type: ignore[attr-defined]
+    _underlay_arg = page.XafsState._underlay_arg
 
 
 @pytest.fixture
