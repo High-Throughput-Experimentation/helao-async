@@ -25,11 +25,14 @@ class _ScriptedOrch(_StubOrch):
         self.experiment_dq = [f"e{i}" for i in range(n_exps)]
         self.sequence_dq = [f"s{i}" for i in range(n_seqs)]
         self.block_dispatch: Optional[asyncio.Event] = None  # stall mid-effect
+        self.fail_after_block = False  # the stalled effect crashes on resume
 
     async def loop_task_dispatch_action(self):
         self.calls.append("loop_task_dispatch_action")
         if self.block_dispatch is not None:
             await self.block_dispatch.wait()
+        if self.fail_after_block:
+            raise AttributeError("stale step dereferenced a finalized record")
         self.action_dq.pop(0)
         return ErrorCodes.none
 
@@ -132,6 +135,81 @@ async def test_estop_funnel_race_seed_single_finalizer():
     # SOLE finalizer: the clean finish_active_experiment never ran
     assert orch.calls.count("finish_active_experiment") == 0
     assert orch.globalstatusmodel.loop_state == LoopStatus.estopped  # parked estopped
+    await loop.close()
+
+
+@pytest.mark.asyncio
+async def test_stale_loop_exception_after_estop_and_clear_does_not_relatch():
+    """eche10 2026-09-30: a step parked mid-effect while an E-STOP landed and
+    was cleared crashed on resume; its UncaughtLoopException re-latched the
+    cleared E-STOP (second cascade + alert). It started before the E-STOP, so
+    the reducer must drop it. A crash in a step that started AFTER the clear
+    (below) must still escalate."""
+    from helao.hexagon.domain.orchestration import (
+        ClearEstopRequested,
+        EstopRequested,
+    )
+
+    orch = _ScriptedOrch(n_acts=2)
+    orch.active_experiment = object()
+    orch.block_dispatch = asyncio.Event()
+    orch.fail_after_block = True
+    runtime, loop = _make(orch)
+    loop.start()
+    await runtime.handle(StartRequested())
+    for _ in range(100):
+        if "loop_task_dispatch_action" in orch.calls:
+            break
+        await asyncio.sleep(0.01)
+    await runtime.handle(EstopRequested(reason="stale step"))
+    await runtime.handle(ClearEstopRequested())
+    assert orch.globalstatusmodel.loop_state == LoopStatus.stopped
+    assert orch.calls.count("estop_finish_active") == 1
+    orch.block_dispatch.set()  # the parked step resumes and crashes
+    await asyncio.sleep(0.2)
+    assert orch.globalstatusmodel.loop_state == LoopStatus.stopped  # not re-latched
+    assert orch.calls.count("estop_finish_active") == 1  # one finalizer
+    assert orch.calls.count("estop_actions:True") == 1  # one estop fan-out
+    await loop.close()
+
+
+@pytest.mark.asyncio
+async def test_estop_generation_bumps_on_latch_and_on_clear():
+    from helao.hexagon.domain.orchestration import (
+        ClearEstopRequested,
+        EstopRequested,
+    )
+
+    orch = _ScriptedOrch(n_acts=1)
+    runtime, _ = _make(orch)
+    orch.globalstatusmodel.loop_state = LoopStatus.started
+    assert runtime.estop_gen == 0
+    await runtime.handle(EstopRequested(reason="x"))
+    assert runtime.estop_gen == 1
+    await runtime.handle(ClearEstopRequested())
+    assert runtime.estop_gen == 2
+
+
+@pytest.mark.asyncio
+async def test_loop_exception_in_a_step_started_after_the_clear_still_escalates():
+    from helao.hexagon.domain.orchestration import (
+        ClearEstopRequested,
+        EstopRequested,
+    )
+
+    orch = _ScriptedOrch(n_acts=2)
+    orch.active_experiment = object()
+    orch.fail_after_block = True
+    runtime, loop = _make(orch)
+    await runtime.handle(StartRequested())  # parks nothing: loop not started
+    await runtime.handle(EstopRequested(reason="first"))
+    await runtime.handle(ClearEstopRequested())
+    loop.start()
+    orch.globalstatusmodel.loop_state = LoopStatus.started  # fresh run
+    runtime.loop_wake.set()
+    await asyncio.sleep(0.2)  # the new step crashes
+    assert orch.globalstatusmodel.loop_state == LoopStatus.estopped
+    assert orch.calls.count("estop_finish_active") == 2  # first + the real crash
     await loop.close()
 
 
