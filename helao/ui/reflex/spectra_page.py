@@ -28,6 +28,7 @@ import numpy as np
 import reflex as rx
 
 from helao.ui.reflex import plots
+from helao.ui.reflex.plate_photo import PlatePhotoState, photo_controls
 from helao.ui.reflex.composition import (
     CHART_HEIGHT,
     MAX_POINT_SCALE,
@@ -75,7 +76,7 @@ def detail_rows(
     return rows
 
 
-class SpectraPageState(rx.State, mixin=True):
+class SpectraPageState(PlatePhotoState, rx.State, mixin=True):
     """Everything a plate-spectra page holds, except the spectra themselves."""
 
     #: Set by each page. ``STATS_RANGE`` ``None`` = statistics on the window.
@@ -227,6 +228,14 @@ class SpectraPageState(rx.State, mixin=True):
         self.version += 1
         self._draw()
 
+    def _redraw_photo(self) -> None:
+        """PlatePhotoState's hook for the three spectra pages.
+
+        This mixin inherits PlatePhotoState, so this overrides its raising
+        default by ordinary inheritance.
+        """
+        self._redraw()
+
     # -- window controls ----------------------------------------------------
     # The sliders are controlled: `on_change` only moves the thumb and the
     # readout, and the charts redraw on `on_value_commit` (release), so a drag
@@ -325,6 +334,8 @@ class SpectraPageState(rx.State, mixin=True):
             colorbar=True,
             size=plots.DEFAULT_POINT_SIZE * self.point_scale,
             rings=rings,
+            underlay=self._underlay_arg(),
+            underlay_opacity=self.photo_opacity,
             panel_id=f"{self.panel_key()}-map",
             version=self.version,
         )
@@ -442,7 +453,7 @@ def plate_row(S):
 
 
 def plot_controls(S):
-    """Plot and the point-size slider, to follow a page's grouping selects."""
+    """Plot, point-size slider and photo controls, after a page's grouping selects."""
     return [
         rx.button("Plot", on_click=S.plot("")),
         _muted("point size"),
@@ -454,6 +465,7 @@ def plot_controls(S):
             on_value_commit=S.set_point_scale,
             width="10em",
         ),
+        photo_controls(S),
     ]
 
 

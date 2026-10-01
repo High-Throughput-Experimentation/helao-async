@@ -3,6 +3,8 @@
 import numpy as np
 import pytest
 
+from helao.core.tests._plate_photo_fakes import serving, top_row_red
+from helao.ui.reflex import plate_photo as rpp
 from helao.ui.reflex import plots
 from helao.ui.reflex import uvvis as page
 from helao.ui.shared import uvvis
@@ -61,6 +63,12 @@ class _FakeUvvisState:
             setattr(self, f"{name}_spec", {})
             setattr(self, f"{name}_url", "")
             setattr(self, f"{name}_layout", "")
+        # PlatePhotoState's vars, as the real page state carries them.
+        self.photo_options = ["off"]
+        self.photo_choice = "off"
+        self.photo_opacity = 0.6
+        self.photo_note = ""
+        self._photos: list = []
 
     def panel_key(self):
         return "test-uvvis"
@@ -91,6 +99,10 @@ class _FakeUvvisState:
     apply_wl_text = page.UvvisState.apply_wl_text.fn  # type: ignore[attr-defined]
     on_map_select = page.UvvisState.on_map_select.fn  # type: ignore[attr-defined]
     set_overlay_spectra = page.UvvisState.set_overlay_spectra.fn  # type: ignore[attr-defined]
+    _load_photos = page.UvvisState._load_photos
+    _underlay_arg = page.UvvisState._underlay_arg
+    _redraw_photo = page.UvvisState._redraw_photo
+    set_photo_choice = page.UvvisState.set_photo_choice.fn  # type: ignore[attr-defined]
 
 
 def test_run_use_defaults_to_data_and_selects_within_one_run() -> None:
@@ -185,3 +197,21 @@ def test_overlay_keeps_each_selection_in_its_own_colour(loaded) -> None:
         "average",
         "sample 3 data",
     ]
+
+
+def test_choosing_a_photo_redraws_the_map_and_clicks_still_pick_samples(
+    loaded, monkeypatch
+) -> None:
+    """The photo is trace 0 and covers the map, but a click still resolves to
+    the nearest plotted sample: both pages match on the click's x/y."""
+    monkeypatch.setattr(rpp, "_plate_api", lambda: serving(top_row_red()))
+    state = _FakeUvvisState(loaded)
+    state._draw()
+    state._load_photos(10201)
+    state.set_photo_choice(state.photo_options[1])
+    kinds = [t["kind"] for t in state.map_spec["traces"]]
+    assert kinds[:2] == ["heatmap", "scatter"]
+    state.on_map_select({"x": 2.1, "y": 0.1})
+    assert "sample 2" in state.selected_label
+    state.set_photo_choice("off")
+    assert "heatmap" not in [t["kind"] for t in state.map_spec["traces"]]

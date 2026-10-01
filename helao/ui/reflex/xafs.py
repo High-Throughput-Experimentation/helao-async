@@ -193,6 +193,7 @@ class XafsState(SpectraPageState, rx.State):
             self._records = records
             self._pm_rows = rows
             self.platemap_note = note
+            self._load_photos(plate_id)
             self.run_use_options = grouping.run_use_options(records)
             self.run_use_choice = (
                 DEFAULT_RUN_USE
@@ -286,6 +287,7 @@ def build_page():
             rx.checkbox("read from S3", checked=S.read_s3, on_change=S.set_read_s3),
             spacing="3",
             align="center",
+            flex_wrap="wrap",
         ),
         rx.hstack(
             spectra_page._muted("x"),

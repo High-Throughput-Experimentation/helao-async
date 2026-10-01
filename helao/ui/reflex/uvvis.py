@@ -109,6 +109,7 @@ class UvvisState(SpectraPageState, rx.State):
             self._records = records
             self._pm_rows = rows
             self.platemap_note = note
+            self._load_photos(plate_id)
             run_ids = sorted({r.run_id for r in records if r.run_id}, reverse=True)
             self._runs = {uvvis.run_label(run_id): run_id for run_id in run_ids}
             self.run_options = list(self._runs)
@@ -167,6 +168,7 @@ def build_page():
             *spectra_page.plot_controls(S),
             spacing="3",
             align="center",
+            flex_wrap="wrap",
         ),
         *spectra_page.window_rows(S, "nm"),
         *spectra_page.charts(S),

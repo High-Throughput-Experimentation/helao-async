@@ -104,6 +104,7 @@ class XrdsState(SpectraPageState, rx.State):
             self._records = records
             self._pm_rows = rows
             self.platemap_note = note
+            self._load_photos(plate_id)
             self.run_use_options = grouping.run_use_options(records)
             self.run_use_choice = (
                 DEFAULT_RUN_USE
@@ -170,6 +171,7 @@ def build_page():
             *spectra_page.plot_controls(S),
             spacing="3",
             align="center",
+            flex_wrap="wrap",
         ),
         *spectra_page.window_rows(S, "deg"),
         *spectra_page.charts(S),
