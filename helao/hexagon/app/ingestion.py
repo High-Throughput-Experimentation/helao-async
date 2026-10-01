@@ -20,10 +20,9 @@ the dispatch critical section — nobody else; events are emitted INSIDE the
 lock exactly where the legacy inline block ran, so the interleaving
 guarantees (and the estop cascade running under the lock, as legacy
 ``estop_loop`` did) are unchanged. ``interrupt_q`` is written here (the
-unconditional trailing ``globalstatusmodel`` put) and by the health monitor;
-``globstat_q`` stays on the legacy broadcaster (``ws_globstat``/
-``globstat_broadcast_task`` are NOT rebound). ``clear_nonblocking`` is NOT
-rebound either — its wire behavior is untouched.
+unconditional trailing ``globalstatusmodel`` put) and by the health monitor.
+``clear_nonblocking`` stays on ``StatusIngester``; its wire behavior is
+untouched.
 
 Wire quirks reproduced, not fixed (spec §7.4): ``update_nonblocking``'s
 %-format f-string raises ``TypeError`` on a ``None`` ``action_timestamp``

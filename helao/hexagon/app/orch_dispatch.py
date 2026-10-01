@@ -38,8 +38,6 @@ Lock/queue ownership (rule 4) -- full map (also duplicated verbatim in
   ``DispatchRunner`` (the dispatch critical section).
 - ``interrupt_q`` -- written by ``StatusIngester`` / ``ServerMonitor`` /
   e-stop; read by ``DispatchRunner``.
-- ``globstat_q`` -- written by ``StatusIngester``; drained by its own
-  broadcast task.
 
 Concretely here: ``DispatchRunner`` acquires ``aiolock`` for the dispatch
 critical section noted above (:944-1058 in the original inline loop) -- now
@@ -48,9 +46,7 @@ wrapped around it, because the POST is held for the whole action and holding
 the lock across it starves ``/update_status``; see
 ``_dispatch_action_locked``. It reads ``interrupt_q`` via
 ``Orch.wait_for_interrupt`` (called from the dispatch loop, method body
-remains on ``Orch``, cluster B); it never touches ``globstat_q`` directly --
-that queue is owned end-to-end by ``StatusIngester`` in
-``orch_status_sync.py``.
+remains on ``Orch``, cluster B).
 
 PATCH-SEAM NOTE (B7a, D-B7a.2): ``async_action_dispatcher`` and
 ``PLATE_API`` are read at call time from the modules that own them --

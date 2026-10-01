@@ -67,11 +67,9 @@ class HealthPort(Protocol):
 
 @runtime_checkable
 class NotifyPort(Protocol):
-    """Live buffer put, globstat/WS relay, LOGGER.alert."""
+    """Live buffer put, LOGGER.alert."""
 
     def put_lbuf_nowait(self, payload: dict) -> None: ...
-
-    async def publish_globstat(self, payload: dict) -> None: ...
 
     def alert(self, msg: str) -> None: ...
 

@@ -52,7 +52,6 @@
     "get_sequence",
     "global_params",
     "globalstatusmodel",
-    "globstat_q",
     "heartbeat_interval",
     "helaodirs",
     "ignore_heartbeats",

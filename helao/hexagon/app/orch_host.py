@@ -191,14 +191,11 @@ class OrchHost(ActionHost):
         # --- orch.py:155-176: task handles and wait state ---------------
         self.loop_task = None
         self.status_subscriber = None
-        self.globstat_broadcaster = None
         self.heartbeat_monitor = None
         self.driver_monitor = None
         self.wait_task = None
         self.current_wait_ts = 0
         self.last_wait_ts = 0
-        self.globstat_q = MultisubscriberQueue()
-        self.globstat_clients = set()
         self.current_stop_message = ""
         self.aiolock = asyncio.Lock()
 
@@ -973,17 +970,6 @@ class OrchHost(ActionHost):
         """Subscribe to every action server's status stream."""
         return await self.server_monitor.subscribe_all(retry_limit=retry_limit)
 
-    async def globstat_broadcast_task(self):
-        """Drain globstat_q so subscribers can read eagerly."""
-        return await self.status_ingester.globstat_broadcast_task()
-
-    async def ws_globstat(self, websocket):
-        """Stream global status. NOT registered as a route -- no decorator
-        for it exists anywhere in the tree, on legacy or here. It is the
-        dead sender already recorded in the post-parity backlog, and
-        reproducing legacy means not inventing a route legacy never served."""
-        return await self.status_ingester.ws_globstat(websocket)
-
     async def active_action_monitor(self):
         """Legacy heartbeat monitor. Superseded by HexHealthMonitor when the
         reducer runs, exactly as the graft superseded it."""
@@ -1019,7 +1005,6 @@ class OrchHost(ActionHost):
             interrupt = await self.interrupt_q.get()
             if isinstance(interrupt, GlobalStatusModel):
                 self.incoming = interrupt
-                await self.globstat_q.put(interrupt.as_json())
         if (
             pending_action is not None
             and self.globalstatusmodel.loop_intent == LoopIntent.stop
@@ -1455,9 +1440,6 @@ class OrchHost(ActionHost):
                     action_serv=self, sync_server_name=self._sync_server_key
                 )
             self.status_subscriber = asyncio.create_task(self.subscribe_all())
-            self.globstat_broadcaster = asyncio.create_task(
-                self.globstat_broadcast_task()
-            )
             self.driver_monitor = asyncio.create_task(self.action_server_monitor())
             # health is in ORCH_REQUIRED and wiring.require() runs in
             # __init__, so an unwired health port cannot reach here -- a
@@ -1507,7 +1489,6 @@ class OrchHost(ActionHost):
         self._orch_shutdown_done = True
         for task in (
             self.status_subscriber,
-            self.globstat_broadcaster,
             self.driver_monitor,
             self.heartbeat_monitor,
         ):

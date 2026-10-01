@@ -135,7 +135,6 @@ from helao.core.models.hlostatus import HloStatus
 from helao.core.models.machine import MachineModel
 from helao.core.models.server import ActionServerModel, EndpointModel, GlobalStatusModel
 from helao.helpers.dequedict import DequeDict
-from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.zdeque import zdeque
 from helao.hexagon.adapters.legacy.health import LegacyHealthAdapter
@@ -261,7 +260,6 @@ def _make_orch(tmp_root: Path) -> OrchHost:
     orch.init_success = False
     orch.loop_task = None
     orch.status_subscriber = None
-    orch.globstat_broadcaster = None
     orch.heartbeat_monitor = None
     orch.driver_monitor = None
 
@@ -269,8 +267,6 @@ def _make_orch(tmp_root: Path) -> OrchHost:
     orch.current_wait_ts = 0
     orch.last_wait_ts = 0
 
-    orch.globstat_q = MultisubscriberQueue()
-    orch.globstat_clients = set()
     orch.current_stop_message = ""
 
     orch.step_thru_actions = False
