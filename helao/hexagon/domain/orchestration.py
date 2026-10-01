@@ -20,7 +20,7 @@ serialize estop with the loop — and test both races either way (spec
 """
 
 from dataclasses import dataclass, replace
-from typing import Union
+from typing import Optional, Union
 
 from helao.hexagon.domain.dispatch_policy import (
     DispatchPolicy,
@@ -65,6 +65,10 @@ class OrchestrationState:
     step_thru_actions: bool = False
     step_thru_experiments: bool = False
     step_thru_sequences: bool = False
+    # E-STOP generation: the runtime bumps it on every entry to and exit from
+    # ``estopped``, so an event stamped with an older value began before the
+    # latest E-STOP/clear cycle.
+    estop_gen: int = 0
 
     def snapshot(self) -> DispatchSnapshot:
         return DispatchSnapshot(
@@ -176,9 +180,14 @@ class StatusChanged:
 
 @dataclass(frozen=True)
 class UncaughtLoopException:
-    """run() caught an exception (T13 -> estop)."""
+    """run() caught an exception (T13 -> estop).
+
+    ``estop_gen`` is the E-STOP generation when the failed iterate began; an
+    older one than the state's is stale (see the reducer). ``None`` always
+    escalates."""
 
     reason: str
+    estop_gen: Optional[int] = None
 
 
 @dataclass(frozen=True)
@@ -510,6 +519,15 @@ def step(state: OrchestrationState, event: Event) -> StepResult:
         return _estop_transition(state, event.reason)
 
     if isinstance(event, UncaughtLoopException):  # T13
+        # An iterate that began before the latest E-STOP/clear cycle crashed
+        # against the state that cycle left behind (e.g. a parked dispatch step
+        # dereferencing the record E-STOP finalized). The E-STOP it would
+        # escalate to was already handled and possibly cleared: re-latching
+        # would undo the operator's clear. Not a "started-only" guard (see
+        # ``_estop_transition``): a current-generation crash escalates from any
+        # loop state.
+        if event.estop_gen is not None and event.estop_gen < state.estop_gen:
+            return state, ()
         return _estop_transition(state, event.reason)
 
     if isinstance(event, EstoppedUuidIngested):  # T9 (status source)

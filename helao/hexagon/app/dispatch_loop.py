@@ -20,7 +20,7 @@ from helao.hexagon.app.orch_effects import (
     derive_state,
 )
 from helao.hexagon.domain.dispatch_policy import DispatchPolicy, ExitLoop
-from helao.hexagon.domain.models import ErrorCodes
+from helao.hexagon.domain.models import ErrorCodes, LoopStatus
 from helao.hexagon.domain.orchestration import (
     CreateDispatchLoopTask,
     DriverHealthUnrecovered,
@@ -45,12 +45,33 @@ class HexRuntime:
         self.orch = orch
         self.effects = effects
         self.loop_wake = asyncio.Event()
+        # E-STOP generation: bumped on every entry to and exit from estopped
+        # (latch and clear alike), so a loop step can tell it began before the
+        # latest cycle. Lives here, not on the orch: this runtime is the sole
+        # writer of loop_state transitions (estop_loop and clear_estop both
+        # route through ``handle``).
+        self.estop_gen = 0
 
     async def handle(self, event: Event) -> ErrorCodes:
         return await self._apply_and_execute(derive_state(self.orch), event)
 
     async def _apply_and_execute(self, old, event) -> ErrorCodes:
+        old = replace(old, estop_gen=self.estop_gen)
         new, commands = step(old, event)
+        if (
+            isinstance(event, UncaughtLoopException)
+            and event.estop_gen is not None
+            and event.estop_gen < self.estop_gen
+        ):
+            LOGGER.warning(
+                f"dropping stale loop exception ({event.reason!r}): its step began "
+                f"in E-STOP generation {event.estop_gen}, now {self.estop_gen}"
+            )
+        if new.loop_state != old.loop_state and LoopStatus.estopped in (
+            new.loop_state,
+            old.loop_state,
+        ):
+            self.estop_gen += 1
         skip_loop_state = any(isinstance(c, WaitAllActionsIdle) for c in commands)
         await apply_state_delta(self.orch, old, new, skip_loop_state=skip_loop_state)
         rc = ErrorCodes.none
@@ -123,8 +144,10 @@ class HexDispatchLoop:
         orch = self.runtime.orch
         LOGGER.info("--- started operator orch ---")  # run() :1116 wording
         LOGGER.info(f"current orch status: {orch.globalstatusmodel.orch_state}")
+        gen = 0  # bound for the except arm (pyright); overwritten each iterate
         try:
             while True:
+                gen = self.runtime.estop_gen  # this step's E-STOP generation
                 live = derive_state(orch)
                 exiting = isinstance(_POLICY.next_step(live.snapshot()), ExitLoop)
                 await self.runtime.handle(LoopIterate())
@@ -138,7 +161,9 @@ class HexDispatchLoop:
             LOGGER.error("ERROR: ", exc_info=True)
             try:  # T13: exception -> estop, like DispatchRunner.run
                 await self.runtime.handle(
-                    UncaughtLoopException(reason="dispatch loop exception")
+                    UncaughtLoopException(
+                        reason="dispatch loop exception", estop_gen=gen
+                    )
                 )
             except Exception:
                 LOGGER.error("estop after loop exception failed", exc_info=True)
