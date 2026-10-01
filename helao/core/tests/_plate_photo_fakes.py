@@ -93,3 +93,55 @@ def serving(rgba, **note_kwargs):
     entry = note(**note_kwargs)
     loader = FakeLoader({entry["image_s3_uri"]: png_bytes(rgba)})
     return FakePlateAPI([entry], loader=loader)
+
+
+class FakePhotoState:
+    """Carries ``PlatePhotoState``'s vars; its methods are the mixin's own.
+
+    Not an ``rx.State``: Reflex forwards attribute assignment on a real state
+    to a session that does not exist outside a running app. On a mixin the
+    ``@rx.event`` methods are still plain functions, so they bind directly.
+    The reflex imports are lazy so importing this module has no side effects.
+    """
+
+    def __init__(self):
+        import types
+
+        from helao.ui.reflex import plate_photo as rpp
+        from helao.ui.reflex import plots
+
+        self.photo_options = [rpp.PHOTO_OFF]
+        self.photo_choice = rpp.PHOTO_OFF
+        self.photo_opacity = plots.UNDERLAY_OPACITY
+        self.photo_note = ""
+        self._photos = []
+        self.redraws = 0
+        for name in (
+            "_load_photos",
+            "_underlay_arg",
+            "set_photo_choice",
+            "set_photo_opacity",
+        ):
+            fn = getattr(rpp.PlatePhotoState, name)
+            setattr(self, name, types.MethodType(fn, self))
+
+    def _redraw_photo(self):
+        self.redraws += 1
+
+
+def render_nodes(component) -> list:
+    """*component* and every descendant."""
+    out = [component]
+    for child in getattr(component, "children", []) or []:
+        out.extend(render_nodes(child))
+    return out
+
+
+def bound_events(component) -> set:
+    """``(node type, trigger, handler name)`` for every bound event."""
+    found = set()
+    for node in render_nodes(component):
+        for trigger, chain in (getattr(node, "event_triggers", {}) or {}).items():
+            for event in getattr(chain, "events", None) or []:
+                found.add((type(node).__name__, trigger, event.handler.fn.__name__))
+    return found
