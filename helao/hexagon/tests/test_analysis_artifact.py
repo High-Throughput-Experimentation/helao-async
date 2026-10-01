@@ -35,7 +35,7 @@ UUID_A = "06a77d44-4267-792f-8000-7304487140e5"
 UUID_B = "06a77d44-432e-721e-8000-bebee862c3e7"
 #: A real GM-C3 sequence directory: three ``__``-separated parts, so the
 #: directory suffix comes from its trailing label.
-SEQ_DIR = "115817__XAFS_wafer_grid_multiscan__Zn-100348"
+SEQ_DIR = "115817__XAFS_wafer_grid_multiscan__Zn-543215"
 ACTION_DIR = f"RUNS_FINISHED/26.19/0511/{SEQ_DIR}/260511.115817__XAFS_exp/{UUID_A}"
 
 
@@ -58,7 +58,7 @@ class RecordingUploader:
 def make_model(
     analysis_uuid: str = UUID_A,
     timestamp: str = "2026-08-08 18:13:40.157007",
-    label: str = "legacy__solid__10034_13999",
+    label: str = "legacy__solid__54321_1111",
 ) -> dict:
     """A cleaned analysis-model dict shaped like the GM-C3 golden's."""
     outputs = analysis_output_models(
@@ -109,12 +109,12 @@ def test_sequence_part_accepts_a_windows_separated_path():
 
 
 def test_suffix_prefers_the_sequence_label():
-    assert analysis_suffix(SEQ_DIR, "legacy__solid__10034_13999") == "__Zn-100348"
+    assert analysis_suffix(SEQ_DIR, "legacy__solid__54321_1111") == "__Zn-543215"
 
 
 def test_suffix_falls_back_to_plate_id_plus_check_digit():
     # 1+0+0+3+4 = 8; the check digit is that sum mod 10.
-    assert analysis_suffix("115817__XAFS", "legacy__solid__10034_13999") == "__100348"
+    assert analysis_suffix("115817__XAFS", "legacy__solid__54321_1111") == "__543215"
 
 
 def test_suffix_is_empty_when_neither_rule_applies():
@@ -228,7 +228,7 @@ def test_publish_writes_the_golden_layout(tmp_path):
         / "ANALYSES"
         / "2026"
         / "0808"
-        / "181340__XAFS_normalize_flatten__Zn-100348"
+        / "181340__XAFS_normalize_flatten__Zn-543215"
     )
     assert sorted(p.name for p in d.iterdir()) == [
         f"{UUID_A}.yml",
@@ -304,7 +304,7 @@ def test_a_conversion_straddling_a_second_lands_in_one_directory(tmp_path):
     for ts, uid in STRADDLE:
         asyncio.run(art.publish(make_record(analysis_uuid=uid, timestamp=ts)))
     dirs = sorted(p.name for p in (tmp_path / "ANALYSES" / "2026" / "0808").iterdir())
-    assert dirs == ["202332__XAFS_normalize_flatten__Zn-100348"]
+    assert dirs == ["202332__XAFS_normalize_flatten__Zn-543215"]
 
 
 def test_the_server_shaped_ungrouped_adapter_still_splits(tmp_path):
@@ -314,8 +314,8 @@ def test_the_server_shaped_ungrouped_adapter_still_splits(tmp_path):
         asyncio.run(art.publish(make_record(analysis_uuid=uid, timestamp=ts)))
     dirs = sorted(p.name for p in (tmp_path / "ANALYSES" / "2026" / "0808").iterdir())
     assert dirs == [
-        "202332__XAFS_normalize_flatten__Zn-100348",
-        "202333__XAFS_normalize_flatten__Zn-100348",
+        "202332__XAFS_normalize_flatten__Zn-543215",
+        "202333__XAFS_normalize_flatten__Zn-543215",
     ]
 
 
@@ -332,7 +332,7 @@ def test_enqueue_defers_publication_and_flush_performs_it(tmp_path):
     asyncio.run(run())
     assert art.pending == []
     dirs = sorted(p.name for p in (tmp_path / "ANALYSES" / "2026" / "0808").iterdir())
-    assert dirs == ["202332__XAFS_normalize_flatten__Zn-100348"]
+    assert dirs == ["202332__XAFS_normalize_flatten__Zn-543215"]
 
 
 # --- uploader -------------------------------------------------------------
