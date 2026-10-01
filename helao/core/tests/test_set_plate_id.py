@@ -756,3 +756,35 @@ def test_analyses_still_parse_a_yml_whose_header_lacks_process_uuid(
     assert _ana(pdir, tmp_path, "--dry-run") == 0
     out = capsys.readouterr().out
     assert len([ln for ln in out.splitlines() if ln.startswith("  yml ")]) == 2
+
+
+def test_analyses_search_only_the_named_analysis_dirs(tmp_path, monkeypatch, capsys):
+    pdir, _yml, ana_dir, _loader = build_analysis(tmp_path, monkeypatch)
+    rel = ana_dir.relative_to(tmp_path)  # ANALYSES/2025/1004/<dir>
+    parsed = []
+    real_load = set_plate_id.yml_load
+
+    def counting_load(path, *a, **k):
+        parsed.append(Path(path))
+        return real_load(path, *a, **k)
+
+    monkeypatch.setattr(set_plate_id, "yml_load", counting_load)
+    decoy = tmp_path / "ANALYSES" / "2025" / "1005" / "101012__GRID_normalize__X"
+    decoy.mkdir(parents=True)
+    (decoy / "decoy.yml").write_text(yml_dumps(dict(_ana_yml())))
+    assert _ana(pdir, tmp_path, "--dry-run", "--analysis-dir", str(rel)) == 0
+    assert not any(p.parent == decoy for p in parsed)
+    out = capsys.readouterr().out
+    assert len([ln for ln in out.splitlines() if ln.startswith("  yml ")]) == 2
+
+
+def test_analyses_refuse_a_missing_analysis_dir(tmp_path, monkeypatch, capsys):
+    pdir, yml, _ana_dir, loader = build_analysis(tmp_path, monkeypatch)
+    before = yml.read_bytes()
+    assert _ana(pdir, tmp_path, "--dry-run", "--analysis-dir", "ANALYSES/no/such") == 1
+    assert yml.read_bytes() == before and loader.uploads == 0
+    captured = capsys.readouterr()
+    assert (
+        "--analysis-dir ANALYSES/no/such is not a directory"
+        in captured.out + captured.err
+    )

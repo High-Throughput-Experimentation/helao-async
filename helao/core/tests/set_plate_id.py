@@ -4,7 +4,8 @@
 python -m helao.core.tests.set_plate_id record <RUNS_SYNCED/.../<seq>.zip> --old OLD --new NEW \
     [--dry-run] [--no-reset] [--process-dir DIR] [--allow-serial-mismatch]
 python -m helao.core.tests.set_plate_id analyses <PROCESSES/.../<seq dir>> --sequence-uuid UUID \
-    --old OLD --new NEW --analyses-root DIR [--bucket BUCKET] [--dry-run] \
+    --old OLD --new NEW --analyses-root DIR [--analysis-dir DIR ...] \
+    [--bucket BUCKET] [--dry-run] \
     [--allow-serial-mismatch]
 ```
 
@@ -419,6 +420,23 @@ def _write_yml(path: Path, doc) -> None:
     os.replace(staged, path)
 
 
+def _analysis_candidates(args) -> list:
+    """The analysis ymls to consider: the named directories, else the whole tree."""
+    root = Path(args.analyses_root)
+    dirs = getattr(args, "analysis_dir", None)
+    if not dirs:
+        return sorted(root.glob("*/*/*/*.yml"))
+    found = []
+    for d in dirs:
+        path = Path(d)
+        if not path.is_absolute():
+            path = root.parent / path
+        if not path.is_dir():
+            raise FileNotFoundError(f"--analysis-dir {d} is not a directory")
+        found.extend(sorted(path.glob("*.yml")))
+    return found
+
+
 def _analyses(args) -> int:
     old, new = args.old, args.new
     reason = _check_plate(old, new, args.allow_serial_mismatch)
@@ -433,7 +451,11 @@ def _analyses(args) -> int:
             f"no process of sequence {args.sequence_uuid} under {process_dir}"
         )
     ymls = []
-    for path in sorted(Path(args.analyses_root).glob("*/*/*/*.yml")):
+    try:
+        candidates = _analysis_candidates(args)
+    except FileNotFoundError as exc:
+        return _refuse(str(exc))
+    for path in candidates:
         # A station's ANALYSES tree can hold ~10^5 ymls; parsing each one to
         # read its process_uuid took over half an hour. The uuid is near the
         # top of every analysis yml, so a header without any of this
@@ -561,6 +583,14 @@ def main(argv=None) -> int:
         if name == "analyses":
             p.add_argument("--sequence-uuid", required=True)
             p.add_argument("--analyses-root", required=True)
+            p.add_argument(
+                "--analysis-dir",
+                action="append",
+                default=None,
+                help="search only this analysis directory (repeatable; relative "
+                "to --analyses-root's parent or absolute) instead of the whole "
+                "tree, which on a station holds ~10^5 ymls",
+            )
             p.add_argument("--bucket", default=None)
     args = parser.parse_args(argv)
     if args.old == args.new or args.old <= 0 or args.new <= 0:
