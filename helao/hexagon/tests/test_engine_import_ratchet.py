@@ -4,7 +4,7 @@
 native code still borrowed from it to one home outside it; this ratchet keeps
 it that way and is the first test B7b runs.
 
-Static half. Every tracked ``.py`` outside the engine and outside tests is
+Static half. Every tracked ``.py`` outside the engine, tests included, is
 parsed, and any ``import``/``from`` that names ``helao.core.servers`` -- at
 module top, in a function body, or under ``TYPE_CHECKING`` -- is an offender.
 There is no allowlist: B7b deleted the graft machinery and re-pointed the
@@ -46,13 +46,8 @@ def _is_engine(name: str) -> bool:
     return name == ENGINE or name.startswith(ENGINE + ".")
 
 
-def _is_test_file(rel: str) -> bool:
-    parts = rel.split("/")
-    return "tests" in parts[:-1] or parts[-1].startswith(("test_", "unit_test_"))
-
-
 def swept_files() -> list[str]:
-    """Tracked ``.py`` files outside the engine and outside tests."""
+    """Tracked ``.py`` files outside the engine, tests included."""
     out = subprocess.run(
         ["git", "ls-files", "-z", "*.py"],
         cwd=REPO_ROOT,
@@ -63,7 +58,7 @@ def swept_files() -> list[str]:
     return sorted(
         rel
         for rel in out.split("\0")
-        if rel and not rel.startswith("helao/core/servers/") and not _is_test_file(rel)
+        if rel and not rel.startswith("helao/core/servers/")
         # Tracked but deleted in the working tree and not yet committed.
         and (REPO_ROOT / rel).exists()
     )

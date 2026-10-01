@@ -6,10 +6,10 @@ header + ``FileInfo`` builder, the streamed-file opener (``w+``
 truncate-on-create), the one-shot writers (``a+``, header + ``%%\\n`` +
 payload, FileInfo appended at write, ``save_data`` gate), the
 nt/posix ``_resolve_output_path`` quirk (incl. ``.strip("\\\\")`` -- byte-copied,
-not "fixed"), and the aux-file trackers/relocators. Method bodies are
+not "fixed"), and the aux-file trackers/relocators. Method bodies were
 byte-identical to the legacy engine (source-parity-pinned by
-``test_native_data_file.py``) until B7b deleted it; they have since been
-reformatted by black.
+``test_native_data_file.py``) when B7b deleted it; black left them
+unchanged.
 
 Per-Active collaborator: holds only the ``active`` back-reference and reads
 ``file_conn_dict``/``action``/``action_list``/``base`` at call time

@@ -1,4 +1,4 @@
-"""Status port (spec §4.3.6): push + dual WS stacks + three consumer faces.
+"""Status port (spec §4.3.6): push + one WS mechanism, two producers + three consumer faces.
 
 One WS mechanism, two producers: ``ActionHost`` and ``OrchHost`` both serve
 /ws_status /ws_data /ws_live through ``WsPublisher``, which sends each

@@ -6,8 +6,8 @@ temp-file-then-``os.replace`` write, the three ``write_act``/``write_exp``/
 ``write_seq`` writers (``file_type`` first key, trailing newline,
 manual runs resolved to the ``DIAG`` tree), and the file-connection-key
 helpers. Method bodies were byte-identical to the legacy engine
-(source-parity-pinned by ``test_native_meta_writer.py``) until B7b deleted
-it; they have since been reformatted by black.
+(source-parity-pinned by ``test_native_meta_writer.py``) when B7b deleted it;
+black left them unchanged.
 
 Holds only the ``base`` back-reference and reads ``helaodirs`` etc. through
 it at call time (cache-nothing rule). ``ActionHost`` constructs it as its

@@ -61,14 +61,16 @@ avoids needing to patch ``gen_uuid``/``time.time`` globally the way the PAL
 harness pins ``time.time``/``asyncio.sleep`` -- nothing genuinely random ever
 reaches ``json.dumps``.
 
-One genuine pre-existing quirk (not a harness bug, not to be fixed here):
-``ActionStartCondition.wait_for_previous`` compares ``self.last_action_uuid``
-(a bare *string*, stamped from the dispatcher's returned JSON dict) against
-``self.globalstatusmodel.active_dict.keys()`` (*UUID* objects) -- the type
-mismatch means this predicate can never observe a match and therefore never
-actually blocks in the current code. Scenario 2 drives this branch and
-records the (structurally guaranteed) immediate pass-through faithfully
-rather than fabricating a block that cannot occur.
+Historical note on ``wait_for_previous``. The legacy engine compared
+``last_action_uuid`` (a bare *string*, stamped from the dispatcher's returned
+JSON dict) against ``active_dict.keys()`` (*UUID* objects); the type mismatch
+meant the membership test never matched and the condition never blocked. That
+was fixed in e1a611ce: the native predicate in
+``helao/hexagon/app/orch_dispatch.py`` now compares ``str(...)`` on both
+sides, so ``wait_for_previous`` can block. Scenario 2 seeds no active action
+for this condition (``seed_block`` is ``False``), so its trace records the
+immediate pass-through of an unblocked predicate, not a proof that it cannot
+block.
 
 Provenance of the frozen reference (B7b, D-B7b.5). The nine traces under
 ``helao/core/tests/golden/dispatch/`` are native captures. Each was accepted
@@ -296,7 +298,7 @@ def _make_fake_to_s3():
 
 
 def _install_recording_stubs(orch: OrchHost, trace: list) -> None:
-    """Shadow Base's disk/live-buffer methods with recording no-ops (spec :sec:`5.3`)."""
+    """Shadow the host's disk/live-buffer methods with recording no-ops (spec :sec:`5.3`)."""
 
     # Note: live_dict is keyed by a real (random) action/experiment/sequence
     # uuid -- never logged verbatim (would break determinism); only the

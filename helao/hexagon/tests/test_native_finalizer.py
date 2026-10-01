@@ -79,6 +79,7 @@ async def test_finish_join_drain_close_chain(tmp_path, monkeypatch):
     # hlo_json_dumps compact separators (no spaces)
     assert '{"t_s":2,"value":3.0}' in text  # late row landed before close
     assert active.file_conn_dict == {}  # close-all cleared the dict
+    assert active.data_logger is not None
     assert active.data_logger.cancelled() or active.data_logger.done()
     assert [f for f in os.listdir(out_dir) if f.endswith("-act.yml")]
     assert moved == [active.action.action_uuid]
@@ -128,6 +129,7 @@ async def test_substitute_closes_open_streams(tmp_path):
     # aiofiles handle closed: writing now raises ValueError on closed file
     with pytest.raises(ValueError):
         await active.file_conn_dict[dflt].file.write("x")
+    assert active.data_logger is not None
     active.data_logger.cancel()
     await asyncio.sleep(0.05)
 
@@ -151,6 +153,7 @@ async def test_split_forks_conns_and_resets_counters(tmp_path, monkeypatch):
     assert active.action.action_uuid in active.listen_uuids
     assert active.num_data_queued == 0 and active.num_data_written == 0
     assert active.action.parent_action_uuid == prev_uuid
+    assert active.data_logger is not None
     active.data_logger.cancel()
     await asyncio.sleep(0.05)
 
