@@ -81,6 +81,11 @@ _DOC_KINDS = frozenset({"seq", "exp", "act", "prc", "analysis"})
 _UNCLASSIFIED = "UNCLASSIFIED "
 _LEFT = "LEFT "
 
+#: Bytes of an analysis yml read to pre-filter it on process_uuid (the key sits
+#: near line 23 of ~495 lines). A miss is caught by the refusal on zero matches
+#: and by the dry-run's expected per-record counts.
+_HEADER_BYTES = 8192
+
 
 def _is_int(v) -> bool:
     return isinstance(v, int) and not isinstance(v, bool)
@@ -429,6 +434,15 @@ def _analyses(args) -> int:
         )
     ymls = []
     for path in sorted(Path(args.analyses_root).glob("*/*/*/*.yml")):
+        # A station's ANALYSES tree can hold ~10^5 ymls; parsing each one to
+        # read its process_uuid took over half an hour. The uuid is near the
+        # top of every analysis yml, so a header without any of this
+        # sequence's process uuids is skipped unparsed. A header naming no
+        # process_uuid at all is still parsed, so a reordered yml is not lost.
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            head = fh.read(_HEADER_BYTES)
+        if "process_uuid" in head and not any(u in head for u in uuids):
+            continue
         doc = yml_load(path)
         if isinstance(doc, dict) and str(doc.get("process_uuid")) in uuids:
             ymls.append((path, doc))
