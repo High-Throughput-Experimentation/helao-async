@@ -757,6 +757,14 @@
   {
    "method": "post",
    "params": [],
+   "path": "/get_config",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
    "path": "/get_global_params",
    "tags": [
     "private"
@@ -866,6 +874,14 @@
    "method": "post",
    "params": [],
    "path": "/global_status",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/hotreload_busy",
    "tags": [
     "private"
    ]
@@ -1212,6 +1228,21 @@
     }
    ],
    "path": "/remove_sequence",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "in": "query",
+     "name": "action_uuid",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "path": "/resend_active",
    "tags": [
     "private"
    ]

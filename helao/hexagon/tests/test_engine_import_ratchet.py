@@ -205,3 +205,51 @@ def test_every_native_route_is_built_by_the_host_bound_class(native) -> None:
             host["installed"],
         )
         assert host["api_routes"] > 0 and host["wrong_class"] == [], (name, host)
+
+
+_GONE_PROBE: Final[str] = r"""
+import importlib.util, json
+spec = importlib.util.find_spec("helao.core.servers")
+try:
+    import helao.core.servers.base  # noqa: F401
+    base = "imported"
+except ModuleNotFoundError:
+    base = "ModuleNotFoundError"
+where = None if spec is None else sorted(spec.submodule_search_locations or [spec.origin])
+print("B7B-GONE " + json.dumps({"spec": where, "base": base}))
+"""
+
+
+def test_the_engine_package_cannot_be_imported() -> None:
+    """D-B7b.9: B7b deleted ``helao/core/servers/``, and it must stay unimportable.
+
+    ``helao/core/`` has no ``__init__.py`` and ``__pycache__`` is gitignored, so
+    a ``git pull`` that deletes the tracked files leaves the directory behind
+    on every checkout that ever ran the engine. While it exists,
+    ``import helao.core.servers`` succeeds as a namespace package. Nothing
+    imports it, so at runtime that is harmless, but it is exactly the silent
+    import this ratchet exists to rule out. A fresh interpreter, because this
+    pytest process may have imported anything.
+    """
+    proc = subprocess.run(
+        [sys.executable, "-c", _GONE_PROBE],
+        cwd=REPO_ROOT,
+        env={**os.environ, "PYTHONPATH": str(REPO_ROOT)},
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    lines = [ln for ln in proc.stdout.splitlines() if ln.startswith("B7B-GONE ")]
+    assert (
+        proc.returncode == 0 and len(lines) == 1
+    ), f"probe failed (rc={proc.returncode}):\n{proc.stderr[-4000:]}"
+    report = json.loads(lines[0][len("B7B-GONE ") :])
+    assert report["spec"] is None, (
+        f"helao.core.servers still resolves, to {report['spec']}. The engine's "
+        "tracked files are gone, but git leaves the untracked __pycache__ "
+        "directory behind, and a leftover helao/core/servers/ imports as a "
+        "namespace package. Remove it once in this checkout, from the repo "
+        "root: `rm -rf helao/core/servers` (Linux) or "
+        "`rmdir /s /q helao\\core\\servers` (Windows cmd)."
+    )
+    assert report["base"] == "ModuleNotFoundError", report
