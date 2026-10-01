@@ -7,18 +7,18 @@ it that way and is the first test B7b runs.
 Static half. Every tracked ``.py`` outside the engine and outside tests is
 parsed, and any ``import``/``from`` that names ``helao.core.servers`` -- at
 module top, in a function body, or under ``TYPE_CHECKING`` -- is an offender.
-Three files may keep importing it, and only until B7b deletes them: the graft
-machinery and the harness encoder that produces the legacy bytes the parity
-tests compare against. The allowlist is shrink-only: an entry that stops
-importing the engine fails, so B7b cannot leave a stale one behind.
+There is no allowlist: B7b deleted the graft machinery and re-pointed the
+harness encoder, the last three files B7a allowed.
 
-Runtime half. A fresh interpreter constructs an ``ActionHost`` and an
-``OrchHost`` under the ``goldenhex`` server entries and must end with no
-``helao.core.servers`` module loaded. A subprocess, because this pytest
-process may already hold the engine through other imports. On 415c0bb2 the
-import-time count was 2 and the construction-time count 17: a helper that
-imports the engine lazily is an importer even when no static read of the
-hosts finds it.
+Runtime half. A fresh interpreter constructs an ``ActionHost``, an
+``OrchHost`` and a ``makeActionApp`` composition under the ``goldenhex``
+server entries and must end with no ``helao.core.servers`` module loaded. A
+subprocess, because this pytest process may already hold the engine through
+other imports. On 415c0bb2 the import-time count was 2 and the
+construction-time count 17; on e60d800a ``makeActionApp`` alone still loaded
+12, through its unconditional ``active_graft`` import. A helper that imports
+the engine lazily is an importer even when no static read of the hosts finds
+it.
 
 The route-class tests pin D-B7a.4. ``HelaoFastAPI`` no longer installs
 ``ActionAPIRoute``, so each host installs its own route class before its first
@@ -40,16 +40,6 @@ import pytest
 REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 ENGINE: Final[str] = "helao.core.servers"
 CONFIG: Final[Path] = REPO_ROOT / "helao/deploy/test/configs/goldenhex.yml"
-
-#: B7b's files, and nothing else: B7b deletes the graft (active_graft.py,
-#: factory.py's makeOrchApp) and re-baselines the harness (ws_frames.py).
-ALLOWLIST: Final[frozenset[str]] = frozenset(
-    {
-        "harness/ws_frames.py",
-        "helao/hexagon/app/active_graft.py",
-        "helao/hexagon/app/factory.py",
-    }
-)
 
 
 def _is_engine(name: str) -> bool:
@@ -136,18 +126,9 @@ def test_the_sweep_is_not_vacuous() -> None:
     assert len(files) > 500, f"swept only {len(files)} files"
 
 
-def test_every_allowlisted_file_still_imports_the_engine() -> None:
-    """Shrink-only: an entry whose file stopped importing the engine is stale."""
-    found = offenders()
-    stale = sorted(rel for rel in ALLOWLIST if rel not in found)
-    assert (
-        stale == []
-    ), f"delete these from ALLOWLIST, they no longer import it: {stale}"
-
-
 def test_nothing_outside_the_engine_imports_it() -> None:
-    extra = {rel: sites for rel, sites in offenders().items() if rel not in ALLOWLIST}
-    assert extra == {}, f"engine imports outside helao/core/servers/: {extra}"
+    found = offenders()
+    assert found == {}, f"engine imports outside helao/core/servers/: {found}"
 
 
 _PROBE: Final[str] = r"""
@@ -161,11 +142,18 @@ cfg["root"] = tempfile.mkdtemp(prefix="b7a_ratchet_")
 config_loader.CONFIG = cfg
 if sys.argv[2] == "native":
     from helao.hexagon.app.action_host import ActionHost
+    from helao.hexagon.app.factory import makeActionApp
     from helao.hexagon.app.orch_host import OrchHost
 
     hosts = {
         "ActionHost": ActionHost("SIM", "SIM", "ratchet", 1.0, helao_cfg=cfg),
         "OrchHost": OrchHost("ORCH", "ORCH", "ratchet", version=3.0, helao_cfg=cfg),
+        # B7b: the composition every `deployment: hexagon` action server is
+        # built through. Until B7b it imported active_graft, and with it
+        # twelve engine modules, though no target needed the graft.
+        "makeActionApp": makeActionApp(
+            "SIM", "helao.deploy.test.servers.action.ws_simulator"
+        ),
     }
 else:
     from helao.core.servers.base_api import BaseAPI

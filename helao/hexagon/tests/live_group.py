@@ -1,16 +1,18 @@
 """In-process REAL-transport hexagon group for §10.3 precise-interleaving
 items (P1b2b: items 1, 3, 5).
 
-Boots the REAL makeOrchApp/makeActionApp compositions under uvicorn inside
-the test's event loop — real HTTP routes registered through the real
-registration code, and the co-located ZMQ RPC mirrors HelaoFastAPI
+Boots the REAL compositions under uvicorn inside the test's event loop: the
+OrchHost the orchestrator shim builds, the SIM through makeActionApp, and the
+test deployment's sim_db_server — real HTTP routes registered through the
+real registration code, and the co-located ZMQ RPC mirrors HelaoFastAPI
 auto-registers on http_port+10000 (§10.1 fixture-fidelity; boot pattern
-proven by test_adapter_transport.py). Race injection happens via
-app.hexagon_graft.runtime.handle(event) from a concurrent task (DD-3).
+proven by test_adapter_transport.py). Race injection happens via the host's
+own reducer runtime, orch_app._hex_runtime.handle(event), from a concurrent
+task (DD-3).
 
-NOT a stub orch: the orchestrator is the real legacy Orch wrapped by the
-P1b1 graft; the SIM is the real ws_simulator makeApp, and DB is the real
-legacy sim_db_server (its syncer is on the ORCH finish path). Single
+NOT a stub orch: the orchestrator is the real native OrchHost; the SIM is the
+real ws_simulator makeApp, and DB is the real sim_db_server (its syncer is on
+the ORCH finish path). Single
 process == shared CONFIG dict + logging singleton (a documented deviation
 from launched groups; items 2/4/6/7 run against a real launched group
 instead).
