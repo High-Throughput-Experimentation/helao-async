@@ -11,6 +11,7 @@ from helao.core.tests._plate_photo_fakes import (
     FakePlateAPI,
     bound_events,
     note,
+    png_bytes,
     serving,
     top_row_red,
 )
@@ -98,6 +99,26 @@ def test_underlay_arg_returns_the_chosen_photo_and_its_extent(monkeypatch):
     assert rgba.shape == (8, 6, 4)
     assert np.array_equal(rgba, top_row_red(rows=8, cols=6))
     assert extent == EXTENT
+
+
+def test_underlay_arg_follows_the_choice_among_several_photos(monkeypatch):
+    """Two photos, different images and extents: the choice picks, not order."""
+    extent_b = ((-20.0, 20.0), (0.0, 40.0))
+    img = {"a.png": top_row_red(rows=8, cols=6), "b.png": top_row_red(rows=4, cols=3)}
+    img["b.png"][1, 1] = (0, 255, 0, 255)  # a pixel only photo b has
+    ext = {"a.png": EXTENT, "b.png": extent_b}
+    notes = [note(input_png=n, extent=ext[n]) for n in img]
+    blobs = {e["image_s3_uri"]: png_bytes(img[n]) for e, n in zip(notes, img)}
+    _with_api(monkeypatch, FakePlateAPI(notes, loader=FakeLoader(blobs)))
+    state = FakePhotoState()
+    state._load_photos(10197)
+    assert len(state.photo_options) == 3
+    for option in (state.photo_options[2], state.photo_options[1]):
+        name = "a.png" if "a.png" in option else "b.png"
+        state.set_photo_choice(option)
+        rgba, extent = state._underlay_arg()
+        assert np.array_equal(rgba, img[name])
+        assert extent == ext[name]
 
 
 def test_a_failed_image_fetch_draws_without_a_photo_and_names_it(monkeypatch):
