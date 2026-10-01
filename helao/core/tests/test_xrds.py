@@ -1,5 +1,7 @@
 """Tests for the `/xrds` page: records, pattern choice, window statistics."""
 
+import asyncio
+
 import numpy as np
 import pytest
 
@@ -8,11 +10,11 @@ from helao.ui.shared import spectra, xrds
 from helao.ui.shared.composition import grouping
 
 TTH = np.linspace(10.0, 63.0, 5301)  # 0.01 deg grid
-ORIGINAL = xrds.FILE_TYPES["original"]
-BKGSUB = xrds.FILE_TYPES["background subtracted"]
+ORIGINAL, LEGACY_ORIGINAL = xrds.FILE_TYPES["original"]
+BKGSUB, LEGACY_BKGSUB = xrds.FILE_TYPES["background subtracted"]
 
 
-def _item(n, seq="s1", run_use="data"):
+def _item(n, seq="s1", run_use="data", original=ORIGINAL, bkgsub=BKGSUB):
     return {
         "process_name": "xrds_frame",
         "process_uuid": f"p{n}",
@@ -29,10 +31,15 @@ def _item(n, seq="s1", run_use="data"):
                 "file_name": "f.nxs",
                 "action_uuid": "a",
             },
-            {"file_type": ORIGINAL, "file_name": f"o{n}.hlo", "action_uuid": f"a{n}"},
-            {"file_type": BKGSUB, "file_name": f"b{n}.hlo", "action_uuid": f"a{n}"},
+            {"file_type": original, "file_name": f"o{n}.hlo", "action_uuid": f"a{n}"},
+            {"file_type": bkgsub, "file_name": f"b{n}.hlo", "action_uuid": f"a{n}"},
         ],
     }
+
+
+def _legacy(n, **kw):
+    """A frame from the earlier converter: ``bruker_xy_*`` pattern files."""
+    return _item(n, original=LEGACY_ORIGINAL, bkgsub=LEGACY_BKGSUB, **kw)
 
 
 def test_each_frame_yields_one_record_per_pattern_with_distinct_keys() -> None:
@@ -49,8 +56,68 @@ def test_each_frame_yields_one_record_per_pattern_with_distinct_keys() -> None:
 
 def test_selection_takes_one_pattern_type() -> None:
     records = xrds.records_from_processes([_item(1), _item(2, run_use="ref")])
-    chosen = page.select_records(records, "data", grouping.ALL, BKGSUB)
+    chosen = page.select_records(
+        records, "data", grouping.ALL, xrds.FILE_TYPES["background subtracted"]
+    )
     assert [(r.sample_no, r.file_type) for r in chosen] == [(1, BKGSUB)]
+
+
+def test_earlier_converter_frames_are_found_and_selected_with_current_ones() -> None:
+    # Most plates were converted before bruker_gadds and carry bruker_xy_*
+    # files; matching only the current types showed "no XRD frames found".
+    records = xrds.records_from_processes([_item(1), _legacy(2)])
+    assert [(r.sample_no, r.file_type) for r in records] == [
+        (1, ORIGINAL),
+        (1, BKGSUB),
+        (2, LEGACY_ORIGINAL),
+        (2, LEGACY_BKGSUB),
+    ]
+    chosen = page.select_records(
+        records, "data", grouping.ALL, xrds.FILE_TYPES["original"]
+    )
+    assert [(r.sample_no, r.file_type) for r in chosen] == [
+        (1, ORIGINAL),
+        (2, LEGACY_ORIGINAL),
+    ]
+
+
+def test_a_frame_with_both_converters_files_yields_the_current_one_once() -> None:
+    both = _item(1)
+    both["files"] += _legacy(1)["files"][1:]
+    records = xrds.records_from_processes([both])
+    assert [r.file_type for r in records] == [ORIGINAL, BKGSUB]
+
+
+def test_each_pattern_is_fetched_by_its_own_file_type() -> None:
+    spectra.reset_cache()
+    asked = []
+
+    class _Client:
+        async def read_action(self, action_uuid):
+            return {"action_name": "acquire"}
+
+        async def read_plottable_data(self, request_body):
+            asked.append((request_body["file_name"], request_body["file_type"]))
+            return {"data": {"series": {"twotheta_deg": [1.0], "intensity_au": [2.0]}}}
+
+    records = page.select_records(
+        xrds.records_from_processes([_item(1), _legacy(2)]),
+        "data",
+        grouping.ALL,
+        xrds.FILE_TYPES["original"],
+    )
+    failures = asyncio.run(
+        spectra.load_spectra(
+            _Client(),
+            records,
+            file_type=ORIGINAL,  # the page's fallback; each record overrides it
+            x_key=xrds.X_KEY,
+            y_key=xrds.Y_KEY,
+        )
+    )
+    assert failures == 0
+    assert sorted(asked) == [("o1.hlo", ORIGINAL), ("o2.hlo", LEGACY_ORIGINAL)]
+    spectra.reset_cache()
 
 
 class _FakeXrdsState:

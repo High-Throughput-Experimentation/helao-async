@@ -10,6 +10,11 @@ subtracted -- as separate files with the same series, ``twotheta_deg`` and
 ``intensity_au`` (10600 points). One record per pattern, keyed by process and
 file type, so the page's file-type dropdown picks between them and both can
 sit in the spectrum cache at once.
+
+Two converters wrote these files, under different file types: the current
+``bruker_gadds_xy_*`` and the earlier ``bruker_xy_*``, which covers most plates
+converted before it was replaced. Each dropdown label therefore names both, and
+a record carries the type its file actually has.
 """
 
 from __future__ import annotations
@@ -22,10 +27,18 @@ from helao.ui.shared.composition import api
 #: The process name of one XRD frame.
 PROCESS_NAME = "xrds_frame"
 
-#: Dropdown label -> file type of each integrated pattern.
+#: Dropdown label -> the file types of that integrated pattern, current
+#: converter first. Matching only the current one hid every plate the earlier
+#: converter wrote (160 of 174 XRD plates above 10000 on 2026-10-01).
 FILE_TYPES = {
-    "original": "bruker_gadds_xy_original__helao_file",
-    "background subtracted": "bruker_gadds_xy_bkgsub__helao_file",
+    "original": (
+        "bruker_gadds_xy_original__helao_file",
+        "bruker_xy_original__helao_file",
+    ),
+    "background subtracted": (
+        "bruker_gadds_xy_bkgsub__helao_file",
+        "bruker_xy_bkgsub__helao_file",
+    ),
 }
 
 #: The plottable series holding two-theta and intensity.
@@ -61,7 +74,6 @@ def records_from_processes(items, sequences=None) -> list:
         items: PROCESS search items.
         sequences: ``sequence_uuid -> SEQUENCE item``, for timestamps.
     """
-    wanted = set(FILE_TYPES.values())
     out = []
     for item in items or []:
         if item.get("process_name") != PROCESS_NAME:
@@ -73,8 +85,12 @@ def records_from_processes(items, sequences=None) -> list:
             continue
         sequence_uuid = str(item.get("sequence_uuid") or "")
         stamp = ((sequences or {}).get(sequence_uuid) or {}).get("sequence_timestamp")
-        for f in item.get("files") or []:
-            if f.get("file_type") not in wanted:
+        by_type = {f.get("file_type"): f for f in item.get("files") or []}
+        for file_types in FILE_TYPES.values():
+            # One record per pattern: a frame carrying both converters' files
+            # of it keeps the current converter's.
+            f = next((by_type[t] for t in file_types if t in by_type), None)
+            if f is None:
                 continue
             out.append(
                 XrdsRecord(
