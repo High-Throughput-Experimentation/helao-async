@@ -4,12 +4,14 @@ Pins the first finite spectrum seen for the current ``action_uuid`` in panel
 state (so a long acquire cannot push it out of the ring buffer) and overlays
 the newest spectrum from the ingest window. One chart, two traces.
 
-Wavelengths are not on the wire -- fetch ``/get_wl`` once on mount, same as
-``spec_vis``. Until that lands (or if length disagrees with ``ch_*`` count),
-the x axis is detector channel.
+Wavelengths are not on the wire -- fetch ``/get_wl`` on mount, retrying while
+ANDOR starts, same as ``spec_vis``. Until that lands (or if length disagrees
+with ``ch_*`` count), the x axis is detector channel.
 """
 
 __all__ = ["WS_PATH", "STATE_BASE", "build", "panel_id"]
+
+import asyncio
 
 import numpy as np
 import reflex as rx
@@ -21,10 +23,18 @@ from helao.deploy.hte.servers.reflex._spectra import (
     latest_spectrum,
     spectrum_axis,
 )
+from helao.helpers import helao_logging as logging
 from helao.ui.reflex import plots
 from helao.ui.reflex.state import ActionVisState
 
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
 WS_PATH = "ws_data"
+
+#: ``/get_wl`` attempts, ``FETCH_INTERVAL_S`` apart. ~60 s covers ANDOR still
+#: in ``connect()`` when the page mounts.
+FETCH_ATTEMPTS = 30
+FETCH_INTERVAL_S = 2.0
 
 DOWNSAMPLE = 2
 
@@ -56,9 +66,13 @@ class _State(ActionVisState, mixin=True):
 
     @rx.event(background=True)
     async def load_wavelengths(self):
-        """Ask the action server for its wavelength axis, once."""
+        """Ask the action server for its wavelength axis, retrying while it starts.
+
+        Every way this can fail leaves the panel on the channel axis, which
+        looks like a working plot, so each one is logged.
+        """
         async with self:
-            if self._fetch_attempted:
+            if self._fetch_attempted or self._wavelengths:
                 return
             self._fetch_attempted = True
             server_key = self.server_key
@@ -69,17 +83,36 @@ class _State(ActionVisState, mixin=True):
         server = ((CONFIG or {}).get("servers") or {}).get(server_key) or {}
         host, port = server.get("host"), server.get("port")
         if not host or not port:
-            return
-        try:
-            response, error = await async_private_dispatcher(
-                server_key, host, port, "get_wl", {}, {}
+            LOGGER.warning(
+                f"andor_vis {server_key}: no host/port in config "
+                f"(CONFIG loaded: {CONFIG is not None}); plotting channel index"
             )
-        except Exception:
             return
-        if error != ErrorCodes.none or not isinstance(response, list) or not response:
-            return
-        async with self:
-            self._wavelengths = [float(v) for v in response]
+        last = "no attempt"
+        for _ in range(FETCH_ATTEMPTS):
+            try:
+                response, error = await async_private_dispatcher(
+                    server_key, host, port, "get_wl", {}, {}
+                )
+            except Exception as exc:
+                last = f"raised {exc!r}"
+            else:
+                if error == ErrorCodes.none and isinstance(response, list) and response:
+                    async with self:
+                        self._wavelengths = [float(v) for v in response]
+                    LOGGER.info(
+                        f"andor_vis {server_key}: wavelength axis, {len(response)} px"
+                    )
+                    return
+                last = f"error={error!r}, response={type(response).__name__}"
+                if isinstance(response, list):
+                    last += f" of length {len(response)}"
+            await asyncio.sleep(FETCH_INTERVAL_S)
+        LOGGER.warning(
+            f"andor_vis {server_key}: no wavelength axis from "
+            f"{host}:{port}/get_wl after {FETCH_ATTEMPTS} tries ({last}); "
+            "plotting channel index"
+        )
 
     def pull(self, ingest) -> None:
         """Pin the first spectrum of this action; always redraw with the latest."""
