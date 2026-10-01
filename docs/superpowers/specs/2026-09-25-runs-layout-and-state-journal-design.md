@@ -357,6 +357,19 @@ last position is a real corruption and raises, falling through to §4.5.
 The journal is an **index**, not the source of truth. Delete it and nothing is
 lost.
 
+**As built, it is weaker than that, and §4 above overstates it.** Nothing
+reads the journal for a decision. Its only two consumers call
+`working_set()` and discard the result, as a parse check that triggers a
+rebuild when it raises. Every live decision is made from the `.prg` sidecar
+(pending-filtering and rebuild), `task_queue` (busy), or a `processing/`
+checkpoint (batch recovery).
+
+So the journal currently serves a human diagnosing a station, and a rebuild
+wanting a shortcut — not the pipeline. Making §4's description true requires
+building the reader; the alternative is to describe it as an append-only audit
+log. Plan A39 states both options and the cost of leaving them divergent. Do
+not assume a reader exists.
+
 The `.prg` sidecar moves from `yml.synced_path.with_suffix(".prg")` — under
 `RUNS_SYNCED`, a tree the record is not in — to sitting **beside its own yml**
 inside `RUNS`. It already records per-file sync progress; it now also serves as
@@ -399,8 +412,16 @@ Deleted outright:
 retained only for legacy ones.
 
 Unchanged: the priority queue, the hierarchical locks, upload retry, process
-folding, `finish_pending`, `has_pending_work`. This design moves *where state
-lives*, not how syncing works.
+folding. This design moves *where state lives*, not how syncing works.
+
+**Corrected.** This sentence also listed `finish_pending` and
+`has_pending_work` as unchanged. `finish_pending` is **not** — its three
+`list_pending*` globs built their search root by rewriting `RUNS_ACTIVE` to
+`RUNS_FINISHED`, which becomes the identity once `save_root` is `<root>/RUNS`,
+so the startup sweep would enqueue every record ever written. They are now
+filtered on a complete sibling `.prg` (plan A1). `has_pending_work` genuinely
+is unchanged: it reads `task_queue` and `running_tasks`, never the journal
+(plan A39).
 
 ### 5.1 `sequence_path` (D9)
 
