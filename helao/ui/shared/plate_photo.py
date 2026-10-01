@@ -186,18 +186,21 @@ def load_image(plate_api, underlay: Underlay, max_px: int = UNDERLAY_MAX_PX):
 
     Fetched with the plate API's own credentialed loader and downsampled with
     an area filter so the longer edge is at most *max_px* (never upscaled).
-    Cached per ``(plate_api, image_s3_uri, max_px)``, so a redraw never
+    Cached per ``(plate_api, image_s3_uri, max_px, created_at)``, so a redraw never
     refetches; a failure is not cached, so the next redraw retries.
 
     Raises:
         RuntimeError: When the plate API has no credentials loaded.
         Whatever the fetch or the decode raises.
     """
-    return _fetch_rgba(plate_api, underlay.image_s3_uri, int(max_px))
+    # created_at is in the key: a re-post overwrites the same S3 key.
+    return _fetch_rgba(
+        plate_api, underlay.image_s3_uri, int(max_px), underlay.created_at
+    )
 
 
 @functools.lru_cache(maxsize=IMAGE_CACHE_SIZE)
-def _fetch_rgba(plate_api, uri: str, max_px: int) -> np.ndarray:
+def _fetch_rgba(plate_api, uri: str, max_px: int, created_at: str) -> np.ndarray:
     loader = getattr(plate_api, "loader", None)
     if loader is None:
         raise RuntimeError("the plate API has no credentials loaded")

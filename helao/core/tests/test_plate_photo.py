@@ -182,6 +182,19 @@ def test_load_image_caches_so_a_redraw_never_refetches():
     assert len(api.loader.calls) == 2  # max_px is part of the key
 
 
+def test_a_reposted_photo_at_the_same_uri_is_refetched():
+    """S3 keys are deterministic and overwritten on re-post, so created_at keys it."""
+    api = serving(np.zeros((4, 4, 4), dtype=np.uint8))
+    same = plate_photo.parse_note(note(created_at="2026-09-30T12:00:00Z"))
+    again = plate_photo.parse_note(note(created_at="2026-09-30T12:00:00Z"))
+    newer = plate_photo.parse_note(note(created_at="2026-10-01T09:00:00Z"))
+    plate_photo.load_image(api, same)
+    plate_photo.load_image(api, again)
+    assert len(api.loader.calls) == 1
+    plate_photo.load_image(api, newer)
+    assert len(api.loader.calls) == 2
+
+
 @pytest.mark.parametrize(
     "loader, error",
     [

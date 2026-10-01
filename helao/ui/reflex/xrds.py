@@ -171,6 +171,7 @@ def build_page():
             *spectra_page.plot_controls(S),
             spacing="3",
             align="center",
+            flex_wrap="wrap",
         ),
         *spectra_page.window_rows(S, "deg"),
         *spectra_page.charts(S),

@@ -133,6 +133,21 @@ def test_a_failed_image_fetch_draws_without_a_photo_and_names_it(monkeypatch):
     assert label in state.photo_note and "access denied" in state.photo_note
 
 
+def test_a_successful_read_clears_a_previous_read_error(monkeypatch):
+    api = serving(top_row_red())
+    good = api.loader
+    api.loader = FakeLoader(error=OSError("access denied"))
+    _with_api(monkeypatch, api)
+    state = FakePhotoState()
+    state._load_photos(10197)
+    state.set_photo_choice(state.photo_options[1])
+    assert state._underlay_arg() is None
+    assert "access denied" in state.photo_note
+    api.loader = good
+    assert state._underlay_arg() is not None
+    assert state.photo_note == ""
+
+
 def test_choosing_a_photo_or_off_redraws_and_an_unknown_choice_is_off(monkeypatch):
     _with_api(monkeypatch, serving(top_row_red()))
     state = FakePhotoState()
