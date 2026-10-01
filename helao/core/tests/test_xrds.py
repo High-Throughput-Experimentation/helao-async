@@ -14,6 +14,21 @@ ORIGINAL, LEGACY_ORIGINAL = xrds.FILE_TYPES["original"]
 BKGSUB, LEGACY_BKGSUB = xrds.FILE_TYPES["background subtracted"]
 
 
+def test_pattern_types_name_both_converters_literally() -> None:
+    # The fixtures below borrow FILE_TYPES, so only this pins the strings the
+    # API actually carries (verified live on plate 10148, 2026-10-01).
+    assert xrds.FILE_TYPES == {
+        "original": (
+            "bruker_gadds_xy_original__helao_file",
+            "bruker_xy_original__helao_file",
+        ),
+        "background subtracted": (
+            "bruker_gadds_xy_bkgsub__helao_file",
+            "bruker_xy_bkgsub__helao_file",
+        ),
+    }
+
+
 def _item(n, seq="s1", run_use="data", original=ORIGINAL, bkgsub=BKGSUB):
     return {
         "process_name": "xrds_frame",

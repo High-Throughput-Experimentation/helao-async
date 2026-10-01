@@ -122,7 +122,10 @@ async def records_for_plate(client, plate_id: int) -> list:
 
 
 async def load_spectra(client, records, file_type: str, progress=None) -> int:
-    """Fetch every uncached pattern of *records*, all of *file_type*."""
+    """Fetch every uncached pattern of *records*, each by its own file type.
+
+    *file_type* is only the fallback for a record that carries none.
+    """
     return await spectra.load_spectra(
         client,
         records,
