@@ -212,8 +212,11 @@ async def yml_finisher(yml_path: str, sync_config: dict = {}, retry: int = 3) ->
         LOGGER.info(f"{yml_path} was not found, was it already moved?")
         return False
 
-    ymld = yml_load(yp)
-    yml_type = ymld["file_type"]
+    # Type from the suffix, as /finish_yml ranks it. A full load only to name
+    # the type took ~25 s on a 9.7 MB -seq.yml and blocked the caller's loop.
+    yml_type = {"seq": "sequence", "exp": "experiment", "act": "action"}.get(
+        yp.stem.rsplit("-", 1)[-1], "yml"
+    )
 
     req_params = {"yml_path": yml_path}
     req_url = f"http://{dbp_host}:{dbp_port}/finish_yml"
