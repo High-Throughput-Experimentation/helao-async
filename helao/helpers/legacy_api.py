@@ -105,6 +105,7 @@ class HTELegacyAPI:
                 return False
             else:
                 return True
+        return False
 
     def check_annealrecord_plateid(self, plateid: int):
         """Return ``True`` if an anneal record is present in the plate info."""
@@ -114,6 +115,7 @@ class HTELegacyAPI:
                 return False
             else:
                 return True
+        return False
 
     def get_platemap_plateid(self, plateid: int) -> list:
         """Return the parsed platemap for a plate id (cached).
