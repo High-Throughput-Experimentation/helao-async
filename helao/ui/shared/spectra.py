@@ -129,7 +129,9 @@ async def load_spectra(
     re-reads its own action's name before giving up.
 
     Args:
-        file_type: The spectrum file's ``file_type``.
+        file_type: The spectrum file's ``file_type``, for records that do not
+            carry their own. A record with a ``file_type`` (XRD, whose two
+            converters wrote different types) is fetched by that.
         x_key: The plottable series holding x.
         y_key: The plottable series holding y.
         progress: Optional ``async (done, total)`` callback, called per batch.
@@ -151,7 +153,7 @@ async def load_spectra(
     async def _fetch(record, action_name):
         body = {
             "file_name": record.file_name,
-            "file_type": file_type,
+            "file_type": getattr(record, "file_type", "") or file_type,
             "action_name": action_name,
             "action_uuid": record.action_uuid,
         }
