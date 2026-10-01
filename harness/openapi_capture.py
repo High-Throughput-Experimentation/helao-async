@@ -88,6 +88,11 @@ def _describe(schema: dict[str, Any], schemas: dict[str, Any]) -> dict[str, Any]
     return out
 
 
+def _name_of(pair: list[Any]) -> str:
+    """Sort key for a ``[name, description]`` pair: the name."""
+    return pair[0]
+
+
 def _body(op: dict[str, Any], schemas: dict[str, Any]) -> Any:
     """A route's request body, resolved one level into its component.
 
@@ -111,7 +116,7 @@ def _body(op: dict[str, Any], schemas: dict[str, Any]) -> Any:
                 [name, _describe(prop, schemas)]
                 for name, prop in (target.get("properties") or {}).items()
             ),
-            key=lambda pair: pair[0],
+            key=_name_of,
         ),
         "required_props": sorted(target.get("required") or []),
     }
