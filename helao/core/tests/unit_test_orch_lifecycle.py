@@ -1,5 +1,5 @@
-"""Unit tests for the ``RunLifecycle`` collaborator extracted from ``Orch``
-(CARDS P5, Stage S6): active-sequence/experiment close-out cluster.
+"""Unit tests for the ``RunLifecycle`` collaborator (CARDS P5, Stage S6):
+active-sequence/experiment close-out cluster, driven through ``OrchHost``.
 
 ``finish_active_sequence``/``finish_active_experiment`` are already exercised
 (byte-for-byte) by ``test_orch_dispatch_golden_master.py --check`` via the
@@ -10,12 +10,13 @@ on the resulting ``active_*``/``last_*``/history state directly. This module
 is the S6-specific behavior-preservation gate for that close-out state and
 for the two small ``write_active_*`` helpers.
 
-Mirrors the ``Orch.__new__`` bypass fixture used by
-``test_orch_dispatch_golden_master.py``'s ``_make_orch`` (and the S3/S4/S5
-sibling unit tests): a bare ``Orch`` built without ``Base.__init__`` (no
-FastAPI app, no disk I/O, no NTP), populated only with the attributes
-``RunLifecycle`` methods touch, then ``_init_collaborators()`` is called so
-``orch.run_lifecycle`` exists exactly as it would after the real ``__init__``.
+Mirrors the ``OrchHost.__new__`` bypass fixture used by
+``test_orch_dispatch_golden_master.py``'s ``_make_orch``: a bare ``OrchHost``
+built without ``__init__`` (no FastAPI app, no disk I/O, no NTP), populated
+only with the attributes ``RunLifecycle`` methods touch, then
+``_init_orch_collaborators()`` is called so ``orch.run_lifecycle`` exists
+exactly as it would after the real ``__init__``. (Ported from the legacy
+``Orch`` fixture by B7b.)
 
 Hermetic: no network, no disk I/O -- ``write_seq``/``write_exp``/``put_lbuf``
 are recording no-ops bound directly on the fixture (mirrors the golden
@@ -37,18 +38,18 @@ from helao.core.hooks import FinishHook, HookSet
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.machine import MachineModel
 from helao.core.models.server import GlobalStatusModel
-from helao.core.servers.orch import Orch
 from helao.core.tests._test_utils import TestReporter
 from helao.helpers.dequedict import DequeDict
 from helao.helpers.premodels import Experiment, Sequence
+from helao.hexagon.app.orch_host import OrchHost
 
 ORCH_SERVER_NAME = "ORCH"
 ORCH_MACHINE = "test-machine"
 
 
-def _make_orch() -> Orch:
-    """Build a bare ``Orch`` with every attribute ``RunLifecycle`` methods touch."""
-    orch = Orch.__new__(Orch)
+def _make_orch() -> tuple[OrchHost, dict]:
+    """Build a bare ``OrchHost`` with every attribute ``RunLifecycle`` methods touch."""
+    orch = OrchHost.__new__(OrchHost)
 
     orch.server = MachineModel(
         server_name=ORCH_SERVER_NAME,
@@ -92,7 +93,7 @@ def _make_orch() -> Orch:
     orch.write_exp = _write_exp
     orch.put_lbuf = _put_lbuf
 
-    orch._init_collaborators()
+    orch._init_orch_collaborators()
     return orch, recorded
 
 
@@ -185,7 +186,7 @@ async def _check_finish_active_experiment() -> bool:
         and len(orch.active_sequence.dispatched_experiments) == 1
         and orch.active_sequence.dispatched_experiments[0].experiment_name == "exp1"
         # finish_active_experiment calls write_active_sequence_seq() (the
-        # Orch delegator -> RunLifecycle.write_active_sequence_seq(), which
+        # OrchHost delegator -> RunLifecycle.write_active_sequence_seq(), which
         # in turn calls orch.write_seq) and its own write_exp on the way out.
         and recorded["write_seq"] == ["seq1"]
         and recorded["write_exp"] == ["exp1"]

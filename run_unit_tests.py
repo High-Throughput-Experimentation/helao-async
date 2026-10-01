@@ -18,17 +18,10 @@ import sys
 from helao.core.tests.unit_test_action_experiment_sequence import (
     action_experiment_sequence_unit_test,
 )
-from helao.core.tests.unit_test_active_data_file import active_data_file_unit_test
-from helao.core.tests.unit_test_active_data_stream import active_data_stream_unit_test
-from helao.core.tests.unit_test_active_executor import active_executor_unit_test
-from helao.core.tests.unit_test_active_finalizer import active_finalizer_unit_test
 from helao.core.tests.unit_test_artifact_generation import (
     artifact_generation_unit_test,
 )
-from helao.core.tests.unit_test_base_api import base_api_unit_test
-from helao.core.tests.unit_test_base_endpoints import base_endpoints_unit_test
 from helao.core.tests.unit_test_base_live_buffer import base_live_buffer_unit_test
-from helao.core.tests.unit_test_base_meta_writer import base_meta_writer_unit_test
 from helao.core.tests.unit_test_base_status import base_status_unit_test
 from helao.core.tests.unit_test_config_loader import config_loader_unit_test
 from helao.core.tests.unit_test_config_seam import config_seam_unit_test
@@ -70,7 +63,6 @@ TESTS = [
     ("logging", logging_unit_test),
     ("artifact_generation", artifact_generation_unit_test),
     ("dispatcher", dispatcher_unit_test),
-    ("base_api", base_api_unit_test),
     ("orch_status", orch_status_unit_test),
     ("helaodict", helaodict_unit_test),
     ("version", version_unit_test),
@@ -91,12 +83,6 @@ TESTS = [
     ("orch_dispatch_policy", orch_dispatch_policy_unit_test),
     ("base_live_buffer", base_live_buffer_unit_test),
     ("base_status", base_status_unit_test),
-    ("base_meta_writer", base_meta_writer_unit_test),
-    ("active_data_file", active_data_file_unit_test),
-    ("active_data_stream", active_data_stream_unit_test),
-    ("active_executor", active_executor_unit_test),
-    ("active_finalizer", active_finalizer_unit_test),
-    ("base_endpoints", base_endpoints_unit_test),
     ("echem_params", echem_params_unit_test),
     ("oersim_params", oersim_params_unit_test),
 ]

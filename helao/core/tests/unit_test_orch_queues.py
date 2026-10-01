@@ -1,5 +1,5 @@
-"""Unit tests for the ``RunQueues`` collaborator extracted from ``Orch``
-(CARDS P5, Stage S5): queue CRUD + uuid tracking cluster ("cluster A").
+"""Unit tests for the ``RunQueues`` collaborator (CARDS P5, Stage S5): queue
+CRUD + uuid tracking cluster ("cluster A"), driven through ``OrchHost``.
 
 Queue CRUD is partly exercised (byte-for-byte) by
 ``test_orch_dispatch_golden_master.py --check`` via the dispatch loop's own
@@ -9,12 +9,13 @@ harness never drives the operator-facing surface directly: ``move_*``/
 ``supplement_error_action``/``replace_action``, or the uuid-history helpers.
 This module is the S5-specific behavior-preservation gate for that surface.
 
-Mirrors the ``Orch.__new__`` bypass fixture used by
-``test_orch_dispatch_golden_master.py``'s ``_make_orch`` (and the S3/S4
-sibling unit tests): a bare ``Orch`` built without ``Base.__init__`` (no
-FastAPI app, no disk I/O, no NTP), populated only with the attributes
-``RunQueues`` methods touch, then ``_init_collaborators()`` is called so
-``orch.run_queues`` exists exactly as it would after the real ``__init__``.
+Mirrors the ``OrchHost.__new__`` bypass fixture used by
+``test_orch_dispatch_golden_master.py``'s ``_make_orch``: a bare ``OrchHost``
+built without ``__init__`` (no FastAPI app, no disk I/O, no NTP), populated
+only with the attributes ``RunQueues`` methods touch, then
+``_init_orch_collaborators()`` is called so ``orch.run_queues`` exists exactly
+as it would after the real ``__init__``. (Ported from the legacy ``Orch``
+fixture by B7b.)
 
 Hermetic: no network, no disk I/O, real ``zdeque``/``DequeDict``/
 ``GlobalStatusModel``/``Sequence``/``Experiment``/``Action`` model instances
@@ -31,19 +32,19 @@ from uuid import uuid4
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.machine import MachineModel
 from helao.core.models.server import GlobalStatusModel
-from helao.core.servers.orch import Orch
 from helao.core.tests._test_utils import TestReporter
 from helao.helpers.dequedict import DequeDict
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.zdeque import zdeque
+from helao.hexagon.app.orch_host import OrchHost
 
 ORCH_SERVER_NAME = "ORCH"
 ORCH_MACHINE = "test-machine"
 
 
-def _make_orch() -> Orch:
-    """Build a bare ``Orch`` with every attribute ``RunQueues`` methods touch."""
-    orch = Orch.__new__(Orch)
+def _make_orch() -> OrchHost:
+    """Build a bare ``OrchHost`` with every attribute ``RunQueues`` methods touch."""
+    orch = OrchHost.__new__(OrchHost)
 
     orch.server = MachineModel(
         server_name=ORCH_SERVER_NAME,
@@ -74,7 +75,7 @@ def _make_orch() -> Orch:
 
     orch.globalstatusmodel = GlobalStatusModel(orchestrator=orch.server)
 
-    orch._init_collaborators()
+    orch._init_orch_collaborators()
     return orch
 
 
@@ -86,7 +87,7 @@ def _mk_experiment(name: str) -> Experiment:
     return Experiment(experiment_name=name, experiment_params={})
 
 
-def _mk_action(orch: Orch, name: str, order: int = 0) -> Action:
+def _mk_action(orch: OrchHost, name: str, order: int = 0) -> Action:
     return Action(
         action_name=name,
         action_params={},
@@ -218,9 +219,9 @@ async def _check_action_crud() -> bool:
         orch.active_experiment.experiment_uuid
     ] = 0
 
-    orch.append_action(_mk_action(orch, "act1"))
-    orch.append_action(_mk_action(orch, "act2"))
-    orch.append_action(_mk_action(orch, "act3"))
+    orch.run_queues.append_action(_mk_action(orch, "act1"))
+    orch.run_queues.append_action(_mk_action(orch, "act2"))
+    orch.run_queues.append_action(_mk_action(orch, "act3"))
     names = [a.action_name for a in orch.list_actions()]
     add_order_ok = names == ["act1", "act2", "act3"]
     orders_ok = [a.action_order for a in orch.action_dq] == [1, 2, 3]
@@ -237,10 +238,10 @@ async def _check_action_crud() -> bool:
     # replace_action by index -- note the preserved `if by_index:` truthiness
     # quirk means index 0 is indistinguishable from "no index given", so this
     # exercises index 1 (the only way `by_index` is exercised as truthy).
-    orch.append_action(_mk_action(orch, "orig1"))
-    orch.append_action(_mk_action(orch, "orig2"))
+    orch.run_queues.append_action(_mk_action(orch, "orig1"))
+    orch.run_queues.append_action(_mk_action(orch, "orig2"))
     replacement = _mk_action(orch, "replaced")
-    orch.replace_action(replacement, by_index=1)
+    orch.run_queues.replace_action(replacement, by_index=1)
     replace_ok = [a.action_name for a in orch.action_dq] == ["orig1", "replaced"] and (
         orch.action_dq[1].action_order == 2
     )
@@ -268,7 +269,7 @@ async def _check_supplement_error_action() -> bool:
     orch.globalstatusmodel.nonactive_dict[HloStatus.errored] = {check_uuid: errored}
 
     replacement = _mk_action(orch, "retry_act")
-    orch.supplement_error_action(check_uuid, replacement)
+    orch.run_queues.supplement_error_action(check_uuid, replacement)
 
     # zdeque stores by value, so assert on the queued action's fields (not identity)
     if len(orch.action_dq) != 1:
@@ -313,20 +314,22 @@ def _check_get_active_and_last() -> bool:
 
 
 def _check_base_collaborator_seam() -> bool:
-    """Regression: Orch._init_collaborators must call super() so the Base
-    collaborators (live_buffer_mgr, status_broadcaster; CARDS P6) exist on
-    Orch instances -- otherwise every inherited status/live delegator raises
-    AttributeError at Orch.myinit (found in P6-S2 review)."""
+    """Regression: ``OrchHost._init_orch_collaborators`` must build every
+    collaborator the host delegates to (and the finalize lock RunLifecycle and
+    EstopController share) -- a missing one is an AttributeError on the first
+    delegated call, not at construction."""
     orch = _make_orch()
     return all(
         hasattr(orch, a)
         for a in (
-            "live_buffer_mgr",
-            "status_broadcaster",
+            "finalize_lock",
             "queue_persister",
+            "server_monitor",
             "status_ingester",
             "run_queues",
+            "run_lifecycle",
             "dispatch_runner",
+            "estop_controller",
         )
     )
 
@@ -389,9 +392,9 @@ def orch_queues_unit_test() -> bool:
         lambda: res["get_active_and_last"],
     )
 
-    reporter.section("Base collaborator seam")
+    reporter.section("OrchHost collaborator seam")
     reporter.check(
-        "Orch._init_collaborators calls super() -> Base live_buffer_mgr/status_broadcaster built on Orch",
+        "OrchHost._init_orch_collaborators builds all seven collaborators and the finalize lock",
         lambda: res["base_collaborator_seam"],
     )
 

@@ -1,0 +1,51 @@
+[
+  {
+    "action_status": [
+      "active"
+    ],
+    "event": "post_myinit",
+    "nonblocking": true
+  },
+  {
+    "action_name": "nonblock",
+    "action_uuid": "<UUID:0>",
+    "data_keys": [
+      "t",
+      "v"
+    ],
+    "event": "data_packet",
+    "file_conn_keys": [
+      "<UUID:1>"
+    ],
+    "status": "active"
+  },
+  {
+    "action_name": "nonblock",
+    "action_status": [
+      "active"
+    ],
+    "action_uuid": "<UUID:0>",
+    "client_host": "127.0.0.1",
+    "client_port": 9000,
+    "client_servkey": "NBCLIENT",
+    "event": "nbstatus_packet",
+    "nonblocking": true
+  },
+  {
+    "action_status": [
+      "active"
+    ],
+    "event": "post_send_nonblocking",
+    "num_status_clients": 1
+  },
+  {
+    "action_uuid": "<UUID:0>",
+    "event": "move_dir"
+  },
+  {
+    "action_status": [
+      "finished"
+    ],
+    "event": "post_finish"
+  }
+]

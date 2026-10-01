@@ -1,0 +1,49 @@
+[
+  {
+    "action_name": "subst",
+    "action_status": [
+      "active"
+    ],
+    "action_uuid": "<UUID:0>",
+    "event": "status_packet"
+  },
+  {
+    "action_name": "subst",
+    "action_uuid": "<UUID:0>",
+    "data_keys": [
+      "t",
+      "v"
+    ],
+    "event": "data_packet",
+    "file_conn_keys": [
+      "<UUID:1>"
+    ],
+    "status": "active"
+  },
+  {
+    "event": "pre_substitute",
+    "open_files": 1
+  },
+  {
+    "event": "post_substitute",
+    "open_files": 1
+  },
+  {
+    "action_name": "subst",
+    "action_status": [
+      "finished"
+    ],
+    "action_uuid": "<UUID:0>",
+    "event": "status_packet"
+  },
+  {
+    "action_uuid": "<UUID:0>",
+    "event": "move_dir"
+  },
+  {
+    "action_status": [
+      "finished"
+    ],
+    "event": "post_finish"
+  }
+]

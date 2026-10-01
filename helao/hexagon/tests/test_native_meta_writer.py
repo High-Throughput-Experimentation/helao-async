@@ -34,7 +34,7 @@ def test_source_parity_with_legacy():
 
 
 def _swap(base, tmp_path):
-    base.meta_writer = NativeMetaFileWriter(base)  # type: ignore[reportAttributeAccessIssue]
+    assert isinstance(base.meta_writer, NativeMetaFileWriter)  # native by construction
     return base
 
 
@@ -51,6 +51,16 @@ async def test_write_act_layout(tmp_path):
     assert text.startswith("file_type: action\n")  # file_type first key
     assert text.endswith("\n")  # trailing newline
     assert not [f for f in os.listdir(out_dir) if f.endswith(".tmp")]
+
+
+@pytest.mark.asyncio
+async def test_write_act_save_act_false_writes_nothing(tmp_path):
+    """Moved from unit_test_base_meta_writer (write_act_save_act_false)."""
+    save_root = str(tmp_path / "RUNS_ACTIVE")
+    base = _swap(make_base(save_root), tmp_path)
+    action = mk_action(save_act=False)
+    await base.write_act(action)
+    assert not os.path.exists(os.path.join(save_root, str(action.action_output_dir)))
 
 
 @pytest.mark.asyncio

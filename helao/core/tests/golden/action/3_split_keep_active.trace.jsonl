@@ -1,0 +1,118 @@
+[
+  {
+    "action_name": "split",
+    "action_status": [
+      "active"
+    ],
+    "action_uuid": "<UUID:0>",
+    "event": "status_packet"
+  },
+  {
+    "action_name": "split",
+    "action_uuid": "<UUID:0>",
+    "data_keys": [
+      "t",
+      "v"
+    ],
+    "event": "data_packet",
+    "file_conn_keys": [
+      "<UUID:1>"
+    ],
+    "status": "active"
+  },
+  {
+    "action_name": "split",
+    "action_uuid": "<UUID:0>",
+    "data_keys": [
+      "t",
+      "v"
+    ],
+    "event": "data_packet",
+    "file_conn_keys": [
+      "<UUID:1>"
+    ],
+    "status": "active"
+  },
+  {
+    "action_name": "split",
+    "action_status": [
+      "active"
+    ],
+    "action_uuid": "<UUID:2>",
+    "event": "status_packet"
+  },
+  {
+    "action_list_len": 2,
+    "cur_action_status": [
+      "active"
+    ],
+    "cur_file_conn_keys": 1,
+    "event": "post_split",
+    "num_new_file_conn_keys": 1,
+    "prev_action_status": [
+      "active",
+      "split"
+    ]
+  },
+  {
+    "action_name": "split",
+    "action_uuid": "<UUID:2>",
+    "data_keys": [
+      "t",
+      "v"
+    ],
+    "event": "data_packet",
+    "file_conn_keys": [
+      "<UUID:3>"
+    ],
+    "status": "active"
+  },
+  {
+    "action_name": "split",
+    "action_uuid": "<UUID:2>",
+    "data_keys": [
+      "t",
+      "v"
+    ],
+    "event": "data_packet",
+    "file_conn_keys": [
+      "<UUID:3>"
+    ],
+    "status": "active"
+  },
+  {
+    "action_name": "split",
+    "action_status": [
+      "finished"
+    ],
+    "action_uuid": "<UUID:2>",
+    "event": "status_packet"
+  },
+  {
+    "action_uuid": "<UUID:2>",
+    "event": "move_dir"
+  },
+  {
+    "action_name": "split",
+    "action_status": [
+      "finished",
+      "split"
+    ],
+    "action_uuid": "<UUID:0>",
+    "event": "status_packet"
+  },
+  {
+    "action_uuid": "<UUID:0>",
+    "event": "move_dir"
+  },
+  {
+    "cur_action_status": [
+      "finished"
+    ],
+    "event": "post_finish_all",
+    "prev_action_status": [
+      "finished",
+      "split"
+    ]
+  }
+]

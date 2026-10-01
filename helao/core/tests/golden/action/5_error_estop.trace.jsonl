@@ -1,0 +1,50 @@
+[
+  {
+    "action_name": "errst",
+    "action_status": [
+      "active"
+    ],
+    "action_uuid": "<UUID:0>",
+    "event": "status_packet"
+  },
+  {
+    "action_name": "errst",
+    "action_uuid": "<UUID:0>",
+    "data_keys": [
+      "t",
+      "v"
+    ],
+    "event": "data_packet",
+    "file_conn_keys": [
+      "<UUID:1>"
+    ],
+    "status": "active"
+  },
+  {
+    "action_status": [
+      "active",
+      "estopped"
+    ],
+    "event": "post_set_estop"
+  },
+  {
+    "action_name": "errst",
+    "action_status": [
+      "finished",
+      "estopped"
+    ],
+    "action_uuid": "<UUID:0>",
+    "event": "status_packet"
+  },
+  {
+    "action_uuid": "<UUID:0>",
+    "event": "move_dir"
+  },
+  {
+    "action_status": [
+      "finished",
+      "estopped"
+    ],
+    "event": "post_finish"
+  }
+]

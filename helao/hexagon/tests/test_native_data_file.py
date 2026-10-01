@@ -9,6 +9,7 @@ import os
 import pytest
 
 from helao.core.models.file import HloFileGroup
+from helao.helpers.premodels import Action
 from helao.core.servers.active_data_file import DataFileWriter
 from helao.hexagon.adapters.native.data_file import NativeDataFileWriter
 from helao.hexagon.tests.native_fixtures import (
@@ -40,7 +41,7 @@ def _native_active(tmp_path, **action_over):
     active, dflt = mk_active(
         base, action=mk_action(**action_over) if action_over else None
     )
-    active.data_file_writer = NativeDataFileWriter(active)  # type: ignore[reportAttributeAccessIssue]  # the swap under test
+    assert isinstance(active.data_file_writer, NativeDataFileWriter)
     return base, active, dflt
 
 
@@ -61,7 +62,10 @@ def test_init_datafile_autogen_filename(tmp_path):
         == f"{a.action_abbr}-{a.orch_submit_order}.{a.action_order}.{a.action_retry}.{a.action_split}__0.hlo"
     )
     assert header.endswith("\n")
+    assert "a: 1" in header
     assert file_info.data_keys == ["t_s"]
+    assert file_info.file_type == "nu__test_file"
+    assert file_info.action_uuid == a.action_uuid
 
 
 def test_init_datafile_empty_header_variants(tmp_path):
@@ -177,3 +181,47 @@ async def test_write_file_creates_a_subdirectory_named_by_the_filename(tmp_path)
     )
     assert path is not None and os.path.isfile(path)
     assert os.path.basename(os.path.dirname(path)) == "subdir"
+
+
+def test_init_datafile_explicit_filename_aux(tmp_path):
+    """Moved from unit_test_active_data_file: an explicit filename is used as
+    given, an empty header stays empty, and the sample label is recorded."""
+    _, active, _ = _native_active(tmp_path)
+    header, file_info = active.init_datafile(
+        header=None,
+        file_type="df__aux",
+        json_data_keys=None,
+        file_sample_label="label-1",
+        filename="explicit.csv",
+        file_group=HloFileGroup.aux_files,
+    )
+    assert file_info.file_name == "explicit.csv"
+    assert header == ""
+    assert list(file_info.sample) == ["label-1"]
+
+
+def test_resolve_output_path_save_data_false(tmp_path):
+    """Moved from unit_test_active_data_file: save_data=False resolves to None."""
+    _, active, _ = _native_active(tmp_path)
+    result = active._resolve_output_path(
+        file_type="df__blob",
+        filename="whatever.txt",
+        file_group=HloFileGroup.aux_files,
+        header=None,
+        file_sample_label=None,
+        json_data_keys=None,
+        action=Action(action_name="x", save_data=False),
+    )
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_track_file_outside_the_output_dir_records_its_basename(tmp_path):
+    """Moved from unit_test_active_data_file: a file outside the action's
+    output dir is recorded under its basename."""
+    _, active, _ = _native_active(tmp_path)
+    outside = tmp_path / "elsewhere" / "aux_data.dat"
+    outside.parent.mkdir()
+    outside.write_text("payload")
+    await active.track_file("df__aux", str(outside), [])
+    assert any(fi.file_name == "aux_data.dat" for fi in active.action.files)

@@ -316,26 +316,23 @@ async def test_a_manual_action_is_evicted_from_the_journal_when_it_finishes(
     """
     import asyncio
 
-    import helao.core.servers.active_finalizer as finalizer_module
-    import helao.core.servers.base as base_module
+    import helao.hexagon.adapters.native.finalizer as finalizer_module
     from helao.core.error import ErrorCodes
-    from helao.core.tests.unit_test_active_finalizer import _make_active_for_journal
+    from helao.hexagon.tests.native_fixtures import _make_active_for_journal
 
     base, active = _make_active_for_journal(tmp_path, manual_action=True)
+    journal = base.run_journal
+    assert journal is not None
 
     async def _noop_dispatch(*args, **kwargs):
         return {}, ErrorCodes.none
 
-    orig = (
-        base_module.async_private_dispatcher,
-        finalizer_module.async_private_dispatcher,
-    )
-    base_module.async_private_dispatcher = _noop_dispatch
+    orig = finalizer_module.async_private_dispatcher
     finalizer_module.async_private_dispatcher = _noop_dispatch
     try:
         await active.myinit()
         await asyncio.sleep(0.02)
-        assert set(base.run_journal.working_set()) == {
+        assert set(journal.working_set()) == {
             str(active.action.action_uuid)
         }, "the action was never journalled active; the test proves nothing"
 
@@ -343,16 +340,13 @@ async def test_a_manual_action_is_evicted_from_the_journal_when_it_finishes(
         # move_dir is scheduled fire-and-forget by _finish
         for _ in range(100):
             await asyncio.sleep(0.01)
-            if base.run_journal.working_set() == {}:
+            if journal.working_set() == {}:
                 break
     finally:
-        (
-            base_module.async_private_dispatcher,
-            finalizer_module.async_private_dispatcher,
-        ) = orig
+        finalizer_module.async_private_dispatcher = orig
 
     assert (
-        base.run_journal.working_set() == {}
+        journal.working_set() == {}
     ), "a manual action stayed active in the journal after it finished"
 
 
