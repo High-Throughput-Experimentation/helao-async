@@ -364,3 +364,26 @@ def test_heartbeat_failed_without_dead_uuids_is_unchanged_t12():
     new, cmds = fsm.step(state, fsm.HeartbeatFailed(message="m"))
     assert new.loop_intent == LoopIntent.stop
     assert cmds == (fsm.SetStopMessage(message="m"), fsm.AlertOperator(message="m"))
+
+
+# --- T13 vs the E-STOP generation (eche10 2026-09-30) ---
+
+
+def test_t13_stale_generation_is_dropped_after_estop_and_clear():
+    """An iterate that began before an E-STOP/clear cycle must not re-latch."""
+    s0 = st(loop_state=LoopStatus.stopped, estop_gen=2)
+    s, cmds = fsm.step(s0, fsm.UncaughtLoopException(reason="boom", estop_gen=0))
+    assert s == s0 and cmds == ()
+
+
+def test_t13_current_generation_still_escalates():
+    s0 = st(loop_state=LoopStatus.stopped, estop_gen=2)
+    s, cmds = fsm.step(s0, fsm.UncaughtLoopException(reason="boom", estop_gen=2))
+    assert s.loop_state == LoopStatus.estopped
+    assert fsm.FinishActiveEstopped in kinds(cmds)
+
+
+def test_t13_without_a_generation_always_escalates():
+    s0 = st(loop_state=LoopStatus.started, estop_gen=2)
+    s, cmds = fsm.step(s0, fsm.UncaughtLoopException(reason="boom"))
+    assert s.loop_state == LoopStatus.estopped

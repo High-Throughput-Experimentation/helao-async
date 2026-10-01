@@ -239,8 +239,13 @@ class RunLifecycle:
         orch.active_experiment.initial_global_params = {
             k: v for k, v in orch.global_params.items() if k != "_fast_samples_in"
         }
-        await orch.write_exp(orch.active_experiment)
-        self._record_active(orch.active_experiment, "experiment")
+        exp = orch.active_experiment
+        await orch.write_exp(exp)
+        # an E-STOP finalizing during the write cleared the record and owns its
+        # journal entry; an ``active`` line now would follow its ``estopped`` one
+        if orch.active_experiment is not exp:
+            return
+        self._record_active(exp, "experiment")
 
     async def write_active_sequence_seq(self):
         """Persist the active sequence to disk after snapshotting initial global params."""
@@ -248,8 +253,11 @@ class RunLifecycle:
         orch.active_sequence.initial_global_params = {
             k: v for k, v in orch.global_params.items() if k != "_fast_samples_in"
         }
-        await orch.write_seq(orch.active_sequence)
-        self._record_active(orch.active_sequence, "sequence")
+        seq = orch.active_sequence
+        await orch.write_seq(seq)
+        if orch.active_sequence is not seq:  # see write_active_experiment_exp
+            return
+        self._record_active(seq, "sequence")
 
     def _record_active(self, hobj, kind: str) -> None:
         """Journal ``hobj`` as ``active`` (spec §4.3).
