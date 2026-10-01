@@ -756,10 +756,11 @@ class ActionHost(HelaoFastAPI):
                             f"Failed to push status message to {client_servkey} "
                             f"after {retry_limit} attempts."
                         )
-                    # Blocking, and deliberately so until parity is signed
-                    # off: legacy paces subscribers with time.sleep here, and
-                    # swapping in asyncio.sleep reorders this loop against
-                    # every other coroutine on the server.
+                    # Blocking, deliberately, and deferred past B7: this is
+                    # the pacing legacy used, and asyncio.sleep would reorder
+                    # this loop against every other coroutine on the server.
+                    # That is a behaviour change with its own station check,
+                    # not part of deleting the engine.
                     time.sleep(0.3)
 
                 # delete errored and finished statuses only after every

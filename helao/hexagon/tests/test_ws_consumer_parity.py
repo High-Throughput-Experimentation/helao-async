@@ -177,26 +177,38 @@ async def test_reflex_normalize_per_channel():
     assert cross_cols2 == {} and cross_rows2 == []
 
 
-def test_ws_globstat_is_dead():
-    """No route registration for /ws_globstat exists on either native host --
-    Corrections §C1b. Uses the repo's own static AST route extractor
-    (harness.endpoints), not a hand-rolled grep, so a future dynamic-route
-    addition is exactly as visible here as to the endpoint-parity checklist
-    that tool already gates."""
+def test_ws_globstat_channel_is_gone():
+    """No /ws_globstat route exists on either host, and the sender that fed it
+    is deleted (B7b, spec §6.1). The route half uses the repo's own static AST
+    route extractor (harness.endpoints), not a hand-rolled grep, so a future
+    route addition is exactly as visible here as to the endpoint-parity
+    checklist that tool already gates."""
+    from helao.hexagon.app.orch_host import OrchHost
+    from helao.hexagon.app.orch_status_sync import StatusIngester
+    from helao.hexagon.tests.test_orch_host_surface import _host
+
     base_routes = extract_routes(ACTION_HOST_PATH)
     orch_routes = extract_routes(ORCH_HOST_PATH)
-    assert base_routes, "extractor found nothing in action_host.py -- inert glob?"
-    assert orch_routes, "extractor found nothing in orch_host.py -- inert glob?"
+    assert base_routes, f"extractor found nothing in {ACTION_HOST_PATH} -- inert glob?"
+    assert orch_routes, f"extractor found nothing in {ORCH_HOST_PATH} -- inert glob?"
 
     base_paths = {r["path"] for r in base_routes}
     orch_paths = {r["path"] for r in orch_routes}
     # The three routes that DO carry a live producer, as a sanity check that
-    # the extractor is actually seeing this file's websocket decorators.
+    # the extractor is actually seeing each file's websocket decorators.
     for expected in ("/ws_status", "/ws_data", "/ws_live"):
+        assert expected in base_paths, (expected, base_paths)
         assert expected in orch_paths, (expected, orch_paths)
 
     assert "/ws_globstat" not in base_paths
     assert "/ws_globstat" not in orch_paths
+
+    # The sender is gone, not merely unrouted.
+    assert not hasattr(OrchHost, "ws_globstat")
+    assert not hasattr(OrchHost, "globstat_broadcast_task")
+    assert not hasattr(StatusIngester, "ws_globstat")
+    assert not hasattr(StatusIngester, "globstat_broadcast_task")
+    assert not hasattr(_host(), "globstat_q")
 
 
 def test_operator_ws_face_is_shape_blind():

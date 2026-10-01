@@ -35,7 +35,6 @@ class _Probe(OrchHost):
         self.action_dq = []
         self._hex_health = self
         self.status_subscriber = None
-        self.globstat_broadcaster = None
         self.driver_monitor = None
         self.heartbeat_monitor = None
 
