@@ -8,7 +8,9 @@ needs a platemap.
 import asyncio
 from typing import Any
 
+from helao.core.tests._plate_photo_fakes import FakePlateAPI, serving, top_row_red
 from helao.ui.reflex import composition
+from helao.ui.reflex import plate_photo as rpp
 from helao.ui.shared.composition import grouping
 from helao.ui.shared.composition.model import CompositionRecord
 
@@ -301,6 +303,12 @@ class _FakeCompositionState:
         self.sequence_options: list = []
         self.transition_options: list = []
         self.unit_options: list = []
+        # PlatePhotoState's vars, as the real page state carries them.
+        self.photo_options = ["off"]
+        self.photo_choice = "off"
+        self.photo_opacity = 0.6
+        self.photo_note = ""
+        self._photos: list = []
 
     def panel_key(self) -> str:
         return "test-panel"
@@ -330,6 +338,11 @@ class _FakeCompositionState:
     _draw_spectra = composition.CompositionState._draw_spectra
     set_overlay_spectra = composition.CompositionState.set_overlay_spectra.fn  # type: ignore[attr-defined]
     on_tern_select = composition.CompositionState.on_tern_select.fn  # type: ignore[attr-defined]
+    retrieve = composition.CompositionState.retrieve.fn  # type: ignore[attr-defined]
+    _load_photos = composition.CompositionState._load_photos
+    _underlay_arg = composition.CompositionState._underlay_arg
+    _redraw_photo = composition.CompositionState._redraw_photo
+    set_photo_choice = composition.CompositionState.set_photo_choice.fn  # type: ignore[attr-defined]
 
 
 def test_plot_clears_the_previous_charts_on_a_platemap_less_reload() -> None:
@@ -870,3 +883,58 @@ def test_clicked_samples_get_rings_in_their_spectrum_colours(monkeypatch) -> Non
 
     state.plot()  # a new plot clears the selection and its rings
     assert rings(state.map_spec) == []
+
+
+def _kinds(spec) -> list:
+    return [t["kind"] for t in spec.get("traces") or []]
+
+
+def test_choosing_a_photo_redraws_the_map_over_it_and_off_removes_it(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(rpp, "_plate_api", lambda: serving(top_row_red()))
+    state = _FakeCompositionState()
+    state._records = RECORDS
+    state._pm_rows = PM_ROWS
+    state.transition_choice, state.unit_choice = "Co.K", "net_counts"
+    state.vertex_a, state.vertex_b, state.vertex_c = "Co.K", "Y.K", "Pt.L"
+    state.plot()
+    assert "heatmap" not in _kinds(state.map_spec)
+    state.selected_label = "sample 1"
+
+    state._load_photos(10244)
+    state.set_photo_choice(state.photo_options[1])
+    assert _kinds(state.map_spec)[:2] == ["heatmap", "scatter"]
+    # The ternary is not a plate map and never carries the photo.
+    assert "heatmap" not in _kinds(state.tern_spec)
+    assert state.selected_label == "sample 1"  # a redraw, not a re-plot
+
+    state.set_photo_choice("off")
+    assert "heatmap" not in _kinds(state.map_spec)
+
+
+def test_retrieve_lists_the_photos_and_survives_a_failing_photo_lookup(
+    monkeypatch,
+) -> None:
+    async def fake_load(plate_id):
+        return composition.Loaded(records=RECORDS, failures=0)
+
+    monkeypatch.setattr(composition, "load_records", fake_load)
+    monkeypatch.setattr(composition, "platemap_for", lambda pid: (PM_ROWS, ""))
+
+    monkeypatch.setattr(rpp, "_plate_api", lambda: serving(top_row_red()))
+    state = _FakeCompositionState()
+    state.plate_id = "10244"
+    asyncio.run(state.retrieve(""))
+    assert len(state.photo_options) == 2
+    assert state.status.startswith("plate 10244: 2 XRF processes")
+
+    failing = FakePlateAPI(error=RuntimeError("HTTP 503"))
+    monkeypatch.setattr(rpp, "_plate_api", lambda: failing)
+    state = _FakeCompositionState()
+    state.plate_id = "10244"
+    asyncio.run(state.retrieve(""))
+    assert state.photo_options == ["off"]
+    assert "HTTP 503" in state.photo_note
+    assert state.status.startswith("plate 10244: 2 XRF processes")
+    assert state._pm_rows == PM_ROWS

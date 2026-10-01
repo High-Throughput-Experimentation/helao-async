@@ -31,6 +31,7 @@ import reflex as rx
 
 from helao.helpers import helao_logging as logging
 from helao.ui.reflex import plots
+from helao.ui.reflex.plate_photo import PlatePhotoState, photo_controls
 from helao.ui.shared import platemap
 from helao.ui.shared.composition import api, grouping, interp, model
 from helao.ui.shared.composition import ternary as _ternary
@@ -354,7 +355,7 @@ def nearest_record(records, xs, ys, x: float, y: float, scale=(1.0, 1.0)):
     return records[index] if index < len(records) else None
 
 
-class CompositionState(rx.State):
+class CompositionState(PlatePhotoState, rx.State):
     """Everything the composition page holds."""
 
     plate_id: str = ""
@@ -521,6 +522,11 @@ class CompositionState(rx.State):
         self._draw_map(records)
         self._draw_composition(records)
 
+    def _redraw_photo(self) -> None:
+        """PlatePhotoState's hook: a photo or opacity change keeps the selection."""
+        self.version += 1
+        self._redraw_charts()
+
     def _rings(self, plotted, xs, ys) -> list:
         """``(x, y, series_index)`` for each held spectrum's sample on a chart.
 
@@ -621,6 +627,7 @@ class CompositionState(rx.State):
             self._records = loaded.records
             self._pm_rows = rows
             self.platemap_note = note
+            self._load_photos(plate_id)
             self.run_use_options = grouping.run_use_options(loaded.records)
             self.run_use_choice = grouping.ALL
             self.sequence_choice = grouping.ALL
@@ -707,6 +714,8 @@ class CompositionState(rx.State):
             version=self.version,
             size=self._point_size(),
             rings=rings,
+            underlay=self._underlay_arg(),
+            underlay_opacity=self.photo_opacity,
         )
         self.map_spec = payload.spec
         self.map_url = payload.buffer_url
@@ -1025,8 +1034,10 @@ def _map_panel():
                 checked=CompositionState.interpolate,
                 on_change=CompositionState.set_interpolate,
             ),
+            photo_controls(CompositionState),
             spacing="3",
             align="center",
+            flex_wrap="wrap",
         ),
         rx.cond(
             CompositionState.platemap_note != "",

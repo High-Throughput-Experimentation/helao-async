@@ -73,6 +73,12 @@ class _FakeXrdsState:
             setattr(self, f"{name}_spec", {})
             setattr(self, f"{name}_url", "")
             setattr(self, f"{name}_layout", "")
+        # PlatePhotoState's vars, as the real page state carries them.
+        self.photo_options = ["off"]
+        self.photo_choice = "off"
+        self.photo_opacity = 0.6
+        self.photo_note = ""
+        self._photos: list = []
 
     def panel_key(self):
         return "test-xrds"
@@ -90,6 +96,7 @@ class _FakeXrdsState:
     _x_unit = page.XrdsState._x_unit
     _redraw = page.XrdsState._redraw
     on_map_select = page.XrdsState.on_map_select.fn  # type: ignore[attr-defined]
+    _underlay_arg = page.XrdsState._underlay_arg
 
 
 def test_patterns_of_both_types_cache_apart_and_plot_by_two_theta() -> None:
