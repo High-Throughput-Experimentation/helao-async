@@ -533,4 +533,3 @@ dependencies:
       - wsproto==1.3.2
       - xy==0.0.5
       - https://github.com/meerstetter/pyMeCom/archive/master.zip
-      - https://github.com/onepunchdan/easy-biologic/archive/main.zip

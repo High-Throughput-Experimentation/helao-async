@@ -8,8 +8,8 @@ checklist and fails here.
 
 Measured at ``5c05c8d2``, 16 of the 17 station-live modules built on Linux, the
 exception being ``biologic_server``. All 17 build as of the BioLogic backend
-split, which made ``biologic/enum.py`` hermetic and left the eclib driver's
-``easy_biologic`` import lazy, so ``WINDOWS_ONLY`` is now empty.
+split, which made ``biologic/enum.py`` hermetic, and the EClib1-direct driver
+then dropped easy-biologic altogether, so ``WINDOWS_ONLY`` is now empty.
 
 It is kept rather than removed: a module that cannot build here must be
 recorded by name and by the exception it raises, not skipped, so "it did not
@@ -51,8 +51,8 @@ BUILDS: list[tuple[str, str, str]] = [
     ("sync_server", "adss3", "SYNC"),
     ("syringe_server", "adss3", "WORKSYRINGE"),
     # Moved out of WINDOWS_ONLY when the BioLogic backend split made
-    # biologic/enum.py hermetic: the eclib driver's easy_biologic import is
-    # lazy now, so the module builds on Linux like the rest. `PSTAT`, not
+    # biologic/enum.py hermetic; the EClib1-direct driver loads its DLL only
+    # in connect(), so the module builds on Linux like the rest. `PSTAT`, not
     # `BIOLOGIC` -- hispec keys its potentiostat PSTAT whichever backend it is.
     ("biologic_server", "hispec", "PSTAT"),
 ]
@@ -105,9 +105,9 @@ def test_windows_only_module_fails_the_way_we_recorded(
 ) -> None:
     """Not a skip: the failure MODE is the assertion.
 
-    If ``easy_biologic`` ever becomes importable on Linux this fails, and that
-    is correct -- it would mean the module gained a Linux build gate it does
-    not have today, and BUILDS should grow to claim it.
+    If a listed module ever builds on Linux this fails, and that is correct --
+    it would mean the module gained a Linux build it does not have today, and
+    BUILDS should grow to claim it.
     """
     with pytest.raises(BaseException) as exc:
         importlib.import_module(f"helao.deploy.hte.servers.action.{module}")
