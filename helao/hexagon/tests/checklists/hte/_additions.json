@@ -68,5 +68,19 @@
     "method": "post",
     "date": "2026-09-28",
     "why": "stop running toggle_ttl holds (one dev_ttl line, or all); each drives its line low in the executor's cleanup"
+  },
+  {
+    "module": "andor_server.py",
+    "path": "/ANDOR/reset_camera_state_for_triggered_aq",
+    "method": "post",
+    "date": "2026-09-21",
+    "why": "rewrite the Andor features for a following External Start acquire, so reference_scale can leave the camera ready for SpEC without a disconnect (fa83602a)"
+  },
+  {
+    "module": "andor_server.py",
+    "path": "/get_wl",
+    "method": "post",
+    "date": "2026-09-22",
+    "why": "private live wavelength axis for action visualizers, same contract as the Ocean /get_wl; the axis is in the action yml header, not on ws_data (50085eb6)"
   }
 ]
