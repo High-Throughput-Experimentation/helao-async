@@ -36,11 +36,8 @@ def test_slice1_driver_imports_on_linux(mod):
 
 @pytest.mark.parametrize("mod", SLICE2_MODULES)
 def test_slice2_driver_imports_on_linux(mod):
-    # P3a-2 DONE (2026-07-22): biologic/technique.py no longer references
-    # blp.OCV/... at module scope. The registry stores technique-name strings
-    # (`easy_class_name`) and resolves the vendor class lazily via
-    # `resolve_easy_class` at setup() time, so the driver now imports on Linux
-    # without the Windows-only easy_biologic runtime.
+    # The EClib1-direct driver builds its techniques natively and loads the
+    # vendor DLL only in connect(), so it imports on Linux with no SDK.
     importlib.import_module(BASE + mod)
 
 
