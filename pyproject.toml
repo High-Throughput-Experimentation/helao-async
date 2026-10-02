@@ -14,9 +14,9 @@ requires-python = ">=3.14"
 #
 # The authoritative dependency lists are helao_dev_linux-64.yml and
 # helao_dev_win-64.yml, which build the `helao` conda env. Duplicating them
-# here would create a second source of truth that silently drifts -- and two
-# entries could not be reproduced from PyPI anyway: pyMeCom and easy-biologic
-# are installed from GitHub archive URLs rather than PyPI releases.
+# here would create a second source of truth that silently drifts -- and one
+# entry could not be reproduced from PyPI anyway: pyMeCom is installed from a
+# GitHub archive URL rather than a PyPI release.
 
 [tool.black]
 # Pinned so black does NOT infer its target from [project].requires-python
