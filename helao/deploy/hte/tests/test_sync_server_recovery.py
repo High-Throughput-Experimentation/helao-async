@@ -36,7 +36,11 @@ from typing import Any
 
 import pytest
 
-from helao.deploy.hte.servers.action.sync_server import SWEEP_PARAM, sweep_pending
+from helao.deploy.hte.servers.action.sync_server import (
+    SWEEP_PARAM,
+    sweep_pending,
+    wait_until_listening,
+)
 
 
 class _StubLogger:
@@ -242,6 +246,17 @@ def _world(tmp_path, params=None):
             },
         },
     }
+
+
+@pytest.fixture(autouse=True)
+def _port_already_bound(monkeypatch):
+    """No test here binds a port; the startup sweep would wait out its timeout."""
+    from helao.deploy.hte.servers.action import sync_server
+
+    async def bound(*a, **k):
+        return True
+
+    monkeypatch.setattr(sync_server, "wait_until_listening", bound)
 
 
 @pytest.fixture()
@@ -468,3 +483,56 @@ async def test_tasks_reports_the_sweep_beside_the_queue_it_already_reported(
     body = await endpoint()
     assert body["last_startup_sweep"] == {"ran": True, "enqueued": 0}
     assert json.loads(json.dumps(body)) == body
+
+
+# --------------------------------------------------------------------------- #
+# the sweep waits for the port (note1, 2026-10-01: a backlog swept before the
+# bind held SYNC's port unbound for ~4.5 minutes)
+# --------------------------------------------------------------------------- #
+def test_wait_until_listening_sees_a_bound_port():
+    async def run():
+        server = await asyncio.start_server(lambda r, w: w.close(), "127.0.0.1", 0)
+        port = server.sockets[0].getsockname()[1]
+        async with server:
+            return await wait_until_listening("127.0.0.1", port, timeout=2.0)
+
+    assert asyncio.run(run()) is True
+
+
+def test_wait_until_listening_waits_for_a_late_bind_then_times_out():
+    import socket
+
+    with socket.socket() as s:  # a port nothing listens on
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+
+    async def late_bind():
+        await asyncio.sleep(0.3)
+        return await asyncio.start_server(lambda r, w: w.close(), "127.0.0.1", port)
+
+    async def run():
+        binder = asyncio.create_task(late_bind())
+        t0 = asyncio.get_running_loop().time()
+        ok = await wait_until_listening("127.0.0.1", port, timeout=3.0, interval=0.05)
+        waited = asyncio.get_running_loop().time() - t0
+        server = await binder
+        server.close()
+        await server.wait_closed()
+        refused = await wait_until_listening(
+            "127.0.0.1", port, timeout=0.2, interval=0.05
+        )
+        return ok, waited, refused
+
+    ok, waited, refused = asyncio.run(run())
+    assert ok is True and waited >= 0.25
+    assert refused is False
+
+
+def test_the_startup_sweep_waits_for_the_port_before_sweeping():
+    import inspect
+
+    from helao.deploy.hte.servers.action import sync_server
+
+    src = inspect.getsource(sync_server.makeApp)
+    body = src[src.index("async def _startup_sweep") :]
+    assert body.index("wait_until_listening") < body.index("sweep_pending(")

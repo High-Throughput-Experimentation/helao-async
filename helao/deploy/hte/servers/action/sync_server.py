@@ -10,7 +10,7 @@ A pending sweep also runs once at startup, because the syncer's work queue does
 not survive the process that holds it. See :func:`sweep_pending`.
 """
 
-__all__ = ["makeApp", "sweep_pending", "SWEEP_PARAM"]
+__all__ = ["makeApp", "sweep_pending", "wait_until_listening", "SWEEP_PARAM"]
 
 import asyncio
 import contextlib
@@ -155,6 +155,33 @@ async def sweep_pending(driver: Any, enabled: bool = True, logger: Any = None) -
     return summary
 
 
+async def wait_until_listening(
+    host: str, port: int, timeout: float = 60.0, interval: float = 0.2
+) -> bool:
+    """Return ``True`` once ``host:port`` accepts a connection, ``False`` on timeout.
+
+    uvicorn binds the port only after every startup handler has run, on the same
+    event loop the syncer workers use. Work queued from a startup handler (the
+    pending sweep) therefore starts before the port exists, and a heavy backlog
+    held it unbound for ~4.5 minutes on note1 (2026-10-01): every other server
+    saw ``Connection refused``.
+    """
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while True:
+        try:
+            _, writer = await asyncio.open_connection(host, port)
+        except OSError:
+            if loop.time() >= deadline:
+                return False
+            await asyncio.sleep(interval)
+            continue
+        writer.close()
+        with contextlib.suppress(OSError):
+            await writer.wait_closed()
+        return True
+
+
 def makeApp(server_key) -> ActionHost:
     """Build the data-packaging FastAPI app.
 
@@ -266,7 +293,13 @@ def makeApp(server_key) -> ActionHost:
         )
 
     async def _startup_sweep(enabled: bool) -> None:
-        """Run one sweep and record its summary for ``/tasks``."""
+        """Run one sweep, once the port is bound, and record its summary."""
+        host, port = app.server_cfg["host"], app.server_cfg["port"]
+        if not await wait_until_listening(host, port):
+            LOGGER.warning(
+                f"SYNC port {host}:{port} not accepting connections after 60 s; "
+                "running the startup sweep anyway"
+            )
         app.last_startup_sweep = await sweep_pending(  # type: ignore[attr-defined]
             app.driver, enabled=enabled
         )
