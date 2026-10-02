@@ -424,6 +424,15 @@ def freeze_deployment(
     lines: list[str] = []
     blockers: list[str] = []
     wanted = only[:-3] if only and only.endswith(".py") else only
+    # Routes named in _additions.json are deliberate post-freeze surface. The
+    # gate allows them by name on top of the verbatim baseline, so appending
+    # them here would fold them into the frozen record the gate counts.
+    additions = checklist_dir / "_additions.json"
+    listed = (
+        {(a["module"], *_route_key(a)) for a in json.loads(additions.read_text())}
+        if additions.is_file()
+        else set()
+    )
 
     for entry in load_manifest(checklist_dir):
         module = entry["module"]
@@ -448,7 +457,11 @@ def freeze_deployment(
                     + (f" ({note})" if note else "")
                 )
                 continue
-        current = extract_routes(src, server_key=key)
+        current = [
+            r
+            for r in extract_routes(src, server_key=key)
+            if (module, *_route_key(r)) not in listed
+        ]
         merged, drift = merge_routes(
             frozen,
             current,
