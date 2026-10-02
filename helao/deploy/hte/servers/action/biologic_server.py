@@ -960,11 +960,11 @@ async def biologic_dyn_endpoints(app: ActionHost):
 
 
 #: `pstat_backend` value -> driver class. An absent key yields the
-#: easy-biologic driver, so every existing station config keeps working
+#: EClib1 driver, so every existing station config keeps working
 #: unedited; a station opts into EC-Lab (`olecom`) or the EC-Lib 2.0 SDK
 #: (`eclib2`) by adding the key. `eclib` and `eclib2` are not versions of one
-#: backend: EC-Lib 2.0 is not backwards compatible with the EClib1 DLLs
-#: easy-biologic bundles, so they are separate drivers over separate SDKs.
+#: backend: EC-Lib 2.0 is not backwards compatible with the EClib1 DLLs,
+#: so they are separate drivers over separate SDKs.
 #:
 #: Annotated `type[BiologicBackend]` rather than bare `type`, which is what
 #: makes the protocol's conformance claim true: the drivers are structural
@@ -982,8 +982,8 @@ BACKENDS: dict[str, type[BiologicBackend]] = {
 DEFAULT_BACKEND = "eclib"
 
 #: Technique-object resolver per backend. The two backends take different
-#: technique objects -- a BiologicTechnique names an easy-biologic program
-#: class, an OleTechnique names an .mps template -- so the endpoints pass a
+#: technique objects -- a BiologicTechnique names an EClib1 .ecc technique,
+#: an OleTechnique names an .mps template -- so the endpoints pass a
 #: technique *name* and the executor resolves it against the selected
 #: backend's registry. A shared object would have to know both.
 TECHNIQUE_REGISTRIES = {
@@ -1012,8 +1012,8 @@ def _backend_name(server_key: str) -> str:
     Raises:
         ValueError: On an unrecognized value. A typo must not fall through to
             the default -- a station meaning to drive EC-Lab would silently
-            get the easy-biologic driver and fail at connect() with a vendor
-            import error that names the wrong problem.
+            get the EClib1 driver and fail at connect() with a DLL error that
+            names the wrong problem.
     """
     config = getattr(config_loader, "CONFIG", None) or {}
     params = (config.get("servers") or {}).get(server_key, {}).get("params", {}) or {}

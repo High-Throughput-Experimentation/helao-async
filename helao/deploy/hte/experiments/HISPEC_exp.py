@@ -504,7 +504,7 @@ def HISPEC_calculate_lower_vertex_potential(
 
 
 # implement Biologic trigger actions
-#  use easy_biologic's BiologicDevice.load_techniques() method
+#  chain techniques on one channel with the BIOLOGIC run_plan endpoint
 
 # HISPEC_sub_OCVtoCAtoCV -- use OCV potential for conditioning CA and starting CV; CV needs to locally queue after CA
 # HISPEC_sub_EIS
