@@ -1628,7 +1628,39 @@ class SyncDriver:
         # if yml_path.name in self.task_set:
         #     async with self.aiolock:
         #         self.task_set.remove(yml_path.name)
-        prog = self.get_progress(yml_path)
+
+        # A parent with a child still queued or running cannot sync this pass.
+        # Re-queue it one rank lower, as the full child check below would, but
+        # without parsing it: a 296-experiment -seq.yml (9.7 MB, ~4 s a parse)
+        # re-entered every ~15 s and starved the event loop for minutes.
+        if not yml_path.name.endswith("-act.yml"):
+            # A shipped child re-posted to the queue is not one to wait for:
+            # it returns at once without re-queuing this parent, which would
+            # then be dropped below rank_limit and lost until a restart.
+            children = await asyncio.to_thread(
+                lambda: list(yml_path.parent.glob("*/*.yml"))
+            )
+            busy = [
+                c.name
+                for c in children
+                if c.stem.endswith(("-exp", "-act"))
+                and (c.name in self.task_set or c.name in self.running_tasks)
+                and not _prg_is_complete(c.with_suffix(".prg"))
+            ]
+            if busy:
+                LOGGER.debug(
+                    f"Cannot sync {str(yml_path)}, {len(busy)} child(ren) still "
+                    "queued or running; re-queuing without parsing."
+                )
+                if yml_path.name in self.running_tasks:
+                    async with self.aiolock:
+                        self.running_tasks.pop(yml_path.name)
+                self.task_set.discard(yml_path.name)
+                await self.enqueue_yml(yml_path, rank - 1)
+                return False
+
+        # Parsing a large record holds a thread, not the event loop.
+        prog = await asyncio.to_thread(self.get_progress, yml_path)
         if not prog:
             LOGGER.debug(
                 f"{str(yml_path)} does not exist, assume yml has moved to synced."
@@ -1672,7 +1704,10 @@ class SyncDriver:
         # locks acquired in the syncer worker, so this method only needs to
         # gate on child *sync status*, not on whether children are running.
         if prog.yml.type != "action":
-            active_children = prog.yml.active_children
+            # Each property loads every child yml; enumerate once, off the loop.
+            active_children, finished_children = await asyncio.to_thread(
+                lambda: (prog.yml.active_children, prog.yml.finished_children)
+            )
             # An estopped child left stranded in RUNS_ACTIVE is terminal: it will
             # never finish or move on its own, so it must not block the parent
             # forever. Only genuinely-still-running (non-estopped) active children
@@ -1690,7 +1725,7 @@ class SyncDriver:
                     f"child(ren) stranded in RUNS_ACTIVE; treating as terminal and "
                     f"proceeding with sync."
                 )
-            if prog.yml.finished_children:
+            if finished_children:
                 LOGGER.debug(
                     f"Cannot sync {str(prog.yml.target)}, children are not 'synced'."
                 )
@@ -1710,7 +1745,7 @@ class SyncDriver:
                 # dedup point: a child still queued/running is skipped, while a
                 # child whose sync failed (and so left task_set/running_tasks)
                 # is re-queued at strictly higher priority than this parent.
-                for child in prog.yml.finished_children:
+                for child in finished_children:
                     await self.enqueue_yml(child.target, child_rank)
                     LOGGER.info(str(child.target))
                 LOGGER.debug(
