@@ -382,7 +382,6 @@ dependencies:
   - python_abi=3.14=8_cp314
   - pytokens=0.4.1=py314h0f05182_2
   - pytorch=2.13.0=cpu_mkl_py314_h2ec8912_101
-  - pytorch-cpu=2.13.0=cpu_mkl_hd61e0f4_101
   - pytz=2026.4
   - pyusb=1.3.1=pyhd8ed1ab_0
   - pyvisa=1.16.2=pyhd8ed1ab_0
@@ -448,7 +447,6 @@ dependencies:
   - typing_utils=0.1.0=pyhd8ed1ab_1
   - tzdata=2026c=h151e31d_0
   - uc-micro-py=2.0.0=pyhcf101f3_0
-  - unicodedata2=17.0.1=py314h5bd0f2a_0
   - uri-template=1.3.0=pyhd8ed1ab_1
   - urllib3=2.8.0
   - uvicorn=0.54.0
