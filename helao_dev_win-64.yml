@@ -85,7 +85,7 @@ dependencies:
   - setuptools<82
   - shortuuid
   - sqlalchemy
-  - sqlmodel
+  - sqlmodel>=0.0.42
   - sshtunnel
   - starlette
   - statsmodels
