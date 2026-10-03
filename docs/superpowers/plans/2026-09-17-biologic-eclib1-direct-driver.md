@@ -30,7 +30,8 @@ Every task's requirements implicitly include this section.
 
 These cannot be done by an implementing agent and **must** be complete before Task 16 lands.
 
-- [ ] **P1: Capture the runtime golden with the CURRENT driver, at the station.** Run `helao/hexagon/tests/smoke/biologic_diff.bat` against a dummy cell or calibration resistor on a BioLogic station, with that station's real `address`/`num_channels`. Archive the capture. Once easy-biologic is deleted this reference is unobtainable, and the rewrite would then have only its own assertions to agree with.
+- [x] **P1: CLOSED, not done (2026-10-02).** The user closed this without a capture: the project will not return to the easy-biologic dependency, so there is no old driver to compare against. Task 16 landed without it (merge afac5e5d), and the at-station gates in Task 18 are the only reference.
+  Original text: **Capture the runtime golden with the CURRENT driver, at the station.** Run `helao/hexagon/tests/smoke/biologic_diff.bat` against a dummy cell or calibration resistor on a BioLogic station, with that station's real `address`/`num_channels`. Archive the capture. Once easy-biologic is deleted this reference is unobtainable, and the rewrite would then have only its own assertions to agree with.
 - [ ] **P2: Record which board family the gate station reports.** `BL_GetChannelBoardType` → `ESSENTIAL` (VMP3-series layouts) or `PREMIUM`/`DIGICORE` (VMP-300-series layouts). The other family's tables will be asserted against the PDF and `BL_GetParamInfos` but not against a record; note which one that is.
 - [ ] **P3: Cut a freeze branch from `unstable`** before the merge. Rollback is a revert of the merge commit; there is no config key to flip back.
 
@@ -4808,7 +4809,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 **Interfaces:** none new. This task removes.
 
-**Prerequisite P1 must be complete before this lands.** After it, the runtime golden cannot be captured with the old driver.
+**Prerequisite P1 must be complete before this lands.** After it, the runtime golden cannot be captured with the old driver. *(P1 was closed without a capture on 2026-10-02; see Prerequisites.)*
 
 - [ ] **Step 1: Rewrite the hermeticity test to assert the new invariant**
 
