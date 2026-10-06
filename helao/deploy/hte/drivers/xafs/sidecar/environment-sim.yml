@@ -1,0 +1,27 @@
+name: easyxafs-sim
+channels:
+  - conda-forge
+dependencies:
+  - python=3.9
+  - numpy=1.26
+  - scipy=1.13
+  - pandas=2.2
+  - matplotlib=3.9
+  - plotly=5.11
+  - ipython
+  - tqdm
+  - xraydb=4.5
+  - fastapi
+  - uvicorn
+  - pydantic=1.10
+  - httpx
+  - pytest
+  - psutil
+  - pip
+  - pip:
+      # fetch from note1: /mnt/k/experiments/xafs/python_wheels/ (see Task 2 notes)
+      - ./easyxafs_xray_utils-1.1.0-py3-none-any.whl
+# hklhop: copy easyxafs_env/Lib/site-packages/hklhop/ from
+# /mnt/k/experiments/xafs/easyxafs_env.zip into the env's site-packages (not on PyPI).
+# easyxafs import path: ~/.local/share/easyxafs-sim-path/easyxafs -> easyxafs checkout,
+# plus a .pth file in the env's site-packages pointing at that dir.
