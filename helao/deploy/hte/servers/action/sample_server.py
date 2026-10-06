@@ -640,6 +640,7 @@ def makeApp(server_key) -> ActionHost:
         volume_ml: float = 0.0,
         combine_liquids: bool = False,
         dilute_liquids: bool = True,
+        allow_empty: bool = False,
     ):
         """Add ``volume_ml`` of ``source_liquid_in`` to a custom position.
 
@@ -653,6 +654,8 @@ def makeApp(server_key) -> ActionHost:
                 ``source_liquid_in`` into a new combined liquid.
             dilute_liquids: When true, compute a dilution factor; use
                 together with ``combine_liquids``.
+            allow_empty: When true, an empty custom position receives a
+                liquid-only sample instead of failing with ``no_sample``.
 
         Returns:
             The finished action dictionary.
@@ -671,6 +674,7 @@ def makeApp(server_key) -> ActionHost:
             volume_ml=active.action.action_params["volume_ml"],
             combine_liquids=active.action.action_params["combine_liquids"],
             dilute_liquids=active.action.action_params["dilute_liquids"],
+            allow_empty=active.action.action_params["allow_empty"],
             action=active.action,
         )
         active.action.error_code = error_code

@@ -321,7 +321,7 @@ def ANEC_sub_normal_state() -> list:
     return apm.planned_actions
 
 
-@experiment(version=1)
+@experiment(version=2)
 def ANEC_sub_flush_fill_cell(
     liquid_flush_time: float = 70,
     co2_purge_time: float = 15,
@@ -333,7 +333,8 @@ def ANEC_sub_flush_fill_cell(
 
     Opens the fill path, reverses pump direction, flushes for
     ``liquid_flush_time`` seconds, switches to a CO2 purge, equilibrates,
-    then archives a combined+diluted liquid into ``cell1_we``.
+    then archives a combined+diluted liquid into ``cell1_we``. An empty
+    ``cell1_we`` (no solid loaded) receives a liquid-only sample.
 
     Args:
         liquid_flush_time: Liquid flush duration (s).
@@ -378,9 +379,10 @@ def ANEC_sub_flush_fill_cell(
         {
             "custom": "cell1_we",
             "source_liquid_in": liquid_sample_in,
-            "volume_ml": volume_ul_cell_liquid,
+            "volume_ml": volume_ul_cell_liquid / 1000,
             "combine_liquids": True,
             "dilute_liquids": True,
+            "allow_empty": True,
         },
     )
     return apm.planned_actions
@@ -444,7 +446,7 @@ def ANEC_sub_drain_cell(
     return apm.planned_actions
 
 
-@experiment(version=1)
+@experiment(version=2)
 def ANEC_sub_cleanup(
     reservoir_liquid_sample_no: int = 1511,
 ) -> list:

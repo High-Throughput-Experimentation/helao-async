@@ -1514,6 +1514,7 @@ class Archive:
         volume_ml: float = 0.0,
         combine_liquids: bool = False,
         dilute_liquids: bool = True,
+        allow_empty: bool = False,
         action: Optional[Action] = None,
     ) -> tuple[
         ErrorCodes,
@@ -1528,6 +1529,9 @@ class Archive:
         merges with an existing assembly's liquid part, or creates a
         new assembly. Updates source-reservoir volume and writes
         everything back through :attr:`unified_db`.
+
+        An empty position is rejected unless ``allow_empty`` is set, so
+        a liquid is not recorded without the solid it was meant to wet.
 
         Returns:
             ``(error_code, samples_in_initial, samples_out)``.
@@ -1574,11 +1578,19 @@ class Archive:
         if custom in self.positions.customs_dict:
             custom_sample = deepcopy(self.positions.customs_dict[custom].sample)
             if isinstance(custom_sample, NoneSample):
-                LOGGER.error(
-                    f"A blank sample is loaded in custom position '{custom}', unload it first."
+                # pristine = untouched empty position; hlo_version is ignored
+                # because a NoneSample persisted by an older commit differs
+                # from NoneSample() only in that stamp
+                pristine = (
+                    not custom_sample.status and custom_sample.inheritance is None
                 )
-                error = ErrorCodes.no_sample
-                return error, [], []
+                if not (allow_empty and pristine):
+                    LOGGER.error(
+                        f"No sample is loaded in custom position '{custom}', load one first."
+                    )
+                    error = ErrorCodes.no_sample
+                    return error, [], []
+                custom_sample = NoneSample()
             else:
                 LOGGER.info(f"custom sample in valid position: {custom_sample}")
         else:
@@ -1968,7 +1980,7 @@ class Archive:
             custom_sample = deepcopy(self.positions.customs_dict[custom].sample)
             if isinstance(custom_sample, NoneSample):
                 LOGGER.error(
-                    f"A blank sample is loaded in custom position '{custom}', unload it first."
+                    f"No sample is loaded in custom position '{custom}', load one first."
                 )
                 error = ErrorCodes.no_sample
                 return error, [], []

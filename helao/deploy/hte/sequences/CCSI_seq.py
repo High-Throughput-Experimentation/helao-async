@@ -1763,7 +1763,7 @@ def CCSI_Solution_testing_fixed_cleans(  # assumes initialization performed prev
     return epm.planned_experiments
 
 
-@sequence(version=1)
+@sequence(version=2)
 def CCSI_priming(  # assumes initialization performed previously
     Solution_volume_ul: list[float] = [2000],
     Solution_reservoir_sample_no: int = 2,
@@ -1789,6 +1789,7 @@ def CCSI_priming(  # assumes initialization performed previously
     drainrecirc: bool = True,
     recirculation_rate_uL_min: int = 10000,
     need_fill: bool = False,
+    gas_sample_no: int = 2,
 ) -> list:
     """Prime the CCSI fluidic system with the working solution.
 
@@ -1817,6 +1818,7 @@ def CCSI_priming(  # assumes initialization performed previously
         drainrecirc: Whether to recirculate while draining.
         recirculation_rate_uL_min: Recirculation rate (µL/min).
         need_fill: Whether the cell needs to be filled first.
+        gas_sample_no: Gas-sample number of the headspace gas loaded before the liquid.
 
     Returns:
         List of planned experiments to dispatch.
@@ -1827,6 +1829,13 @@ def CCSI_priming(  # assumes initialization performed previously
 
         epm.add("CCSI_sub_unload_cell", {})
 
+        epm.add(
+            "CCSI_sub_load_gas",
+            {
+                "reservoir_gas_sample_no": gas_sample_no,
+                "volume_ul_cell_gas": 5000,
+            },
+        )
         if solnvolume != 0:
             epm.add(
                 "CCSI_sub_load_liquid",
