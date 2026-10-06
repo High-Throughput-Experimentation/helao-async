@@ -74,6 +74,7 @@ def test_rows_since(env):
     assert out["columns"][0] == "Time" and "MCA" not in out["columns"]
     assert out["columns"][-4:] == ["Beta_encoder", "Detector_encoder", "Rho_encoder", "Theta_encoder"]
     assert len(out["rows"][0]) == len(out["columns"])
+    assert all(type(v) in (int, float, str) for row in out["rows"] for v in row)
 
 
 def test_interlock_shutter_closed(env):
@@ -149,7 +150,6 @@ def test_stop_during_move(env):
 
 def test_watchdog(env):
     h, _ = env
-    h.mono.move_delay = 0.05
     h.mono.move_delay = 0.3  # keep the scan alive past the first row
     r = ScanRunner(watchdog_margin_s=0.5)
     sid = go(r, env, n_points=3)
@@ -166,6 +166,7 @@ def test_watchdog(env):
         h.ketek.hang = False
 
 
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
 def test_scan_exception(env):
     h, _ = env
     h.mono.fail_on_call = 1
@@ -173,7 +174,7 @@ def test_scan_exception(env):
     sid = go(r, env)
     s = wait(r, sid)
     assert s["state"] == "error", s
-    assert "RuntimeError" in s["error"]
+    assert "RuntimeError" in s["error"] and "fake mono failure" in s["error"]
 
 
 def test_xchanger_station_moves_only_if_different(env):
@@ -200,3 +201,44 @@ def test_mcas_and_artifacts(env):
     assert "metadata" in r.artifacts(sid)
     with pytest.raises(KeyError):
         r.state("nope")
+
+
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
+def test_watchdog_covers_start_hang_and_busy_until_released(env):
+    h, _ = env
+    h.ketek.hang = True  # hangs the header ping inside scan.start()
+    r = ScanRunner(watchdog_margin_s=0.3)
+    sid = go(r, env)
+    try:
+        s = wait(r, sid, timeout=10)
+        assert s["state"] == "error" and s["error"].startswith("watchdog timeout"), s
+        assert h.mono.stop_called
+        with pytest.raises(BusyError):  # hung worker still alive
+            go(r, env)
+    finally:
+        h.ketek.hang = False
+    t0 = time.time()
+    while True:
+        try:
+            sid2 = go(r, env)
+            break
+        except BusyError:
+            assert time.time() - t0 < 15
+            time.sleep(0.05)
+    assert wait(r, sid2)["state"] == "done"
+
+
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
+def test_stop_before_first_point_is_stopped(env):
+    h, _ = env
+    h.ketek.hang = True  # hold the scan before any row
+    r = ScanRunner(watchdog_margin_s=30)
+    sid = go(r, env)
+    t0 = time.time()
+    # wait until scan.start() has begun (stop event exists) so stop() reaches the vendor scan
+    while getattr(r._scans[sid].scan, "_stop_event", None) is None and time.time() - t0 < 10:
+        time.sleep(0.01)
+    r.stop(sid)
+    h.ketek.hang = False
+    s = wait(r, sid)
+    assert s["state"] == "stopped" and s["exd_path"] is None and s["error"] is None, s

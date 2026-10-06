@@ -57,6 +57,9 @@ class _Scan:
         self.exd_path: Optional[str] = None
         self.error: Optional[str] = None
         self.stop_requested = False
+        self.timed_out = False
+        self.worker: Optional[threading.Thread] = None
+        self.thread: Optional[threading.Thread] = None  # vendor scan thread
         self.t0 = time.monotonic()
         self.t_end: Optional[float] = None
 
@@ -75,7 +78,7 @@ class ScanRunner:
         if not easyxafs.scan.mono._calibrated:
             raise InterlockError("monochromator not calibrated")
         proto = pyprotohv.proto_controller
-        if proto.get_shutter_status() != "Open":
+        if proto.get_shutter_status() == "Closed":
             raise InterlockError("shutter closed")
         kv = proto.readback_kv_ma()[0]
         if kv < MIN_KV:
@@ -88,17 +91,22 @@ class ScanRunner:
               xchanger_station: Optional[int], savename: str, save_dir: str,
               duration_scale: float = 1.0) -> str:
         with self._lock:
-            if any(s.state in ACTIVE for s in self._scans.values()):
+            # a watchdog-errored record may still have live threads: still busy
+            if any(s.state in ACTIVE
+                   or (s.worker is not None and s.worker.is_alive())
+                   or (s.thread is not None and s.thread.is_alive())
+                   for s in self._scans.values()):
                 raise BusyError("a scan is already active")
             self.check_interlocks(x_mm, y_mm)
             scan_id = uuid.uuid4().hex
             rec = _Scan()
             self._scans[scan_id] = rec
-        threading.Thread(
-            target=self._run, name="ScanRunner",
-            args=(rec, scan_def, x_mm, y_mm, xchanger_station, savename, save_dir, duration_scale),
-            daemon=True,
-        ).start()
+            rec.worker = threading.Thread(
+                target=self._run, name="ScanRunner",
+                args=(rec, scan_def, x_mm, y_mm, xchanger_station, savename, save_dir, duration_scale),
+                daemon=True,
+            )
+            rec.worker.start()
         return scan_id
 
     def stop(self, scan_id: str) -> None:
@@ -119,6 +127,7 @@ class ScanRunner:
         except Exception:
             rec.error = traceback.format_exc()
             rec.state = "error"
+        rec.scan = None  # drop MCA data; mcas_bytes/artifacts read exd_path
         rec.t_end = time.monotonic()
 
     def _run_inner(self, rec: _Scan, scan_def: dict, x_mm: float, y_mm: float,
@@ -158,28 +167,52 @@ class ScanRunner:
         rec.state = "running"
 
         def cb(s: Any) -> None:
+            row = [v.item() if hasattr(v, "item") else v
+                   for v in list(s.data[-1][:-1]) + list(s.encoder_readings[-1])]
             with self._lock:
-                rec.rows.append(list(s.data[-1][:-1]) + list(s.encoder_readings[-1]))
-
-        scan.start(callback=cb)
-        rec.columns = list(scan.data_headers[:-1]) + list(scan.encoder_header)
-        rec.n_expected = int(scan.num_steps_total)
-        if rec.stop_requested:
-            scan.stop()
+                if not rec.columns:
+                    rec.columns = list(s.data_headers[:-1]) + list(s.encoder_header)
+                    rec.n_expected = int(s.num_steps_total)
+                rec.rows.append(row)
 
         timeout = rec.est_total * 2 + self.watchdog_margin_s
-        thread = scan._thread
-        thread.join(timeout)
-        if thread.is_alive():
+        deadline = time.monotonic() + timeout
+        fire_lock = threading.Lock()
+
+        def on_timeout() -> None:
+            with fire_lock:
+                if rec.timed_out:
+                    return
+                rec.timed_out = True
+                rec.error = "watchdog timeout after %.0f s" % timeout
+                rec.state = "error"
             easyxafs.scan.mono.stop()
-            scan.stop()
-            rec.error = "watchdog timeout after %.0f s" % timeout
-            rec.state = "error"
+            if getattr(scan, "_stop_event", None) is not None:
+                scan.stop()
+
+        timer = threading.Timer(timeout, on_timeout)  # also covers a hang inside scan.start()
+        timer.daemon = True
+        timer.start()
+        try:
+            scan.start(callback=cb)
+            rec.thread = thread = scan._thread
+            rec.columns = list(scan.data_headers[:-1]) + list(scan.encoder_header)
+            rec.n_expected = int(scan.num_steps_total)
+            if rec.stop_requested:
+                scan.stop()
+            thread.join(max(0.0, deadline - time.monotonic()))
+            if thread.is_alive():
+                on_timeout()
+        finally:
+            timer.cancel()
+        if rec.timed_out:
             return
 
         exc = _thread_errors.pop(thread, None)
         n = len(rec.rows)
-        if exc:
+        if rec.stop_requested and n == 0:
+            rec.state = "stopped"  # nothing to save; vendor empty-data save error is expected
+        elif exc:
             rec.error, rec.state = exc, "error"
         elif rec.stop_requested:
             rec.exd_path = scan.saved_path
