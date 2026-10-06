@@ -7,6 +7,7 @@ and is tested offline in ``test_retire.py``; this file tests the wiring.
 """
 
 import asyncio
+import glob
 import json
 import os
 from typing import Awaitable, Callable
@@ -34,6 +35,8 @@ class _FakeRetireState:
         self.campaign = ""
         self.confirm_text = ""
         self.armed = False
+        self.synced = False
+        self.override_text = ""
         self.busy = False
         self.progress = 0
         self.ledger = ""
@@ -60,6 +63,7 @@ class _FakeRetireState:
     do_retire = rr.RetireState.do_retire.fn  # type: ignore[attr-defined]
     set_uuid = rr.RetireState.set_uuid.fn  # type: ignore[attr-defined]
     set_confirm = rr.RetireState.set_confirm.fn  # type: ignore[attr-defined]
+    set_override = rr.RetireState.set_override.fn  # type: ignore[attr-defined]
 
 
 def _boom(*a, **k):
@@ -364,7 +368,7 @@ def test_do_retire_resets_progress_on_entering_retiring(enabled, monkeypatch):
     state.progress = 57
     seen = {}
 
-    async def fake_retire(client, root, inv, cb, ledger):
+    async def fake_retire(client, root, inv, cb, ledger, **kw):
         seen["progress"], seen["phase"] = state.progress, state.phase
         return rr.retire_logic.RetireResult(True, ledger, {}, {}, {}, [])
 
@@ -393,7 +397,7 @@ def test_do_retire_failed_result_reports_error(enabled, monkeypatch):
     """Mutation: map result.ok=False to phase "done", or leave busy/_inv set."""
     state, _ = _armed(enabled, monkeypatch)
 
-    async def fake_retire(client, root, inv, cb, ledger):
+    async def fake_retire(client, root, inv, cb, ledger, **kw):
         return rr.retire_logic.RetireResult(False, ledger, {}, {}, {}, [], "boom")
 
     monkeypatch.setattr(rr.retire_logic, "retire", fake_retire)
@@ -450,7 +454,8 @@ def test_gather_api_only_warns(enabled, monkeypatch):
     assert state.phase == "gathered"
     assert state.warnings == [
         "experiments/actions unknowable from API alone; "
-        "processes may already be gone"
+        "processes may already be gone",
+        _WARN,  # no local record: it may be running on another station
     ]
 
 
@@ -465,7 +470,7 @@ def test_do_retire_failed_result_keeps_persisting_warnings(enabled, monkeypatch)
     """Mutation: the failed branch no longer copies result.persisting."""
     state, _ = _armed(enabled, monkeypatch)
 
-    async def fake_retire(client, root, inv, cb, ledger):
+    async def fake_retire(client, root, inv, cb, ledger, **kw):
         return rr.retire_logic.RetireResult(
             False, ledger, {}, {}, {"EXPERIMENT": ["e1", "e2"]}, [], "boom"
         )
@@ -487,7 +492,7 @@ def test_do_retire_interleaved_set_uuid_and_second_retire_are_inert(
     state, _ = _armed(enabled, monkeypatch)
     calls = []
 
-    async def counting_retire(client, root, inv, cb, ledger):
+    async def counting_retire(client, root, inv, cb, ledger, **kw):
         calls.append(inv.sequence_uuid)
         return rr.retire_logic.RetireResult(True, ledger, {}, {}, {}, [])
 
@@ -523,3 +528,146 @@ def test_gather_interleaved_set_uuid_is_inert(enabled, monkeypatch):
     asyncio.run(_FakeRetireState.gather(state))
     assert state._inv is None or state._inv.sequence_uuid == state.uuid_text
     assert state.uuid_text == U and state.phase == "gathered"
+
+
+# ---- synced-or-override guard -------------------------------------------------
+
+_WARN = "not synced — may still be running or uploading; retiring it can race the orchestrator/syncer"
+
+
+def _set_prg(root, body):
+    """Rewrite the .prg of every run-tree location under root."""
+    for p in glob.glob(os.path.join(str(root), "RUNS*", "*", "*", "*", "*-seq.prg")):
+        with open(p, "w") as f:
+            f.write(body)
+
+
+def _unsynced(enabled, monkeypatch):
+    root, _ = enabled
+    make_run_tree(
+        str(root),
+        "RUNS",
+        "26.40/1001/seqA",
+        sequence_uuid=U,
+        label="LBL",
+        experiments={E1: [(A1, P1)]},
+        prg="synced: false",
+    )
+    client = _client()
+    monkeypatch.setattr(rr.api, "get_client", lambda: client)
+    state = _FakeRetireState()
+    state.uuid_text = U
+    asyncio.run(_FakeRetireState.gather(state))
+    return state, client
+
+
+def test_unsynced_gather_warns_and_requires_override(enabled, monkeypatch):
+    """Mutation: arm on the label alone, or accept any override text."""
+    state, _ = _unsynced(enabled, monkeypatch)
+    assert state.synced is False and _WARN in state.warnings
+    state.set_confirm("LBL")
+    assert state.armed is False and state.phase == "gathered"
+    state.set_override("unsynced")
+    assert state.armed is False and state.phase == "gathered"
+    state.set_override("UNSYNCED")
+    assert state.armed is True and state.phase == "armed"
+    state.set_confirm("x")  # confirm text changing disarms again
+    assert state.armed is False and state.phase == "gathered"
+    state.set_confirm("LBL")
+    state.set_override("")
+    assert state.armed is False
+
+
+def test_synced_gather_needs_no_override(enabled, monkeypatch):
+    """Mutation: require the override even when synced, or warn when synced."""
+    state, _ = _gathered(enabled, monkeypatch)
+    assert state.synced is True and _WARN not in state.warnings
+    state.set_confirm("LBL")
+    assert state.armed is True and state.phase == "armed"
+
+
+def test_do_retire_passes_allow_unsynced_only_with_override(enabled, monkeypatch):
+    """Mutation: hardcode allow_unsynced, or ignore override_text."""
+    seen = []
+
+    async def fake_retire(client, root, inv, cb, ledger, **kw):
+        seen.append(kw)
+        return rr.retire_logic.RetireResult(True, ledger, {}, {}, {}, [])
+
+    monkeypatch.setattr(rr.retire_logic, "retire", fake_retire)
+    state, _ = _unsynced(enabled, monkeypatch)
+    state.set_confirm("LBL")
+    state.set_override("UNSYNCED")
+    asyncio.run(_FakeRetireState.do_retire(state))
+    _set_prg(enabled[0], "synced: true")
+    asyncio.run(_FakeRetireState.gather(state))
+    state.set_confirm("LBL")
+    state.set_override("UNSYNCED")  # stray override on a synced sequence
+    asyncio.run(_FakeRetireState.do_retire(state))
+    _set_prg(enabled[0], "synced: false")
+    asyncio.run(_FakeRetireState.gather(state))
+    state.phase = "armed"  # forced past the arming rule: no override typed
+    asyncio.run(_FakeRetireState.do_retire(state))
+    assert seen == [
+        {"allow_unsynced": True},
+        {"allow_unsynced": False},
+        {"allow_unsynced": False},
+    ]
+
+
+def test_set_override_is_noop_while_busy(enabled, monkeypatch):
+    """Mutation: drop the busy guard in set_override."""
+    state, _ = _unsynced(enabled, monkeypatch)
+    state.set_confirm("LBL")
+    state.busy = True
+    state.set_override("UNSYNCED")
+    assert state.override_text == "" and state.armed is False
+
+
+def test_set_uuid_clears_override_and_synced(enabled, monkeypatch):
+    """Mutation: set_uuid leaves override_text or synced behind."""
+    state, _ = _unsynced(enabled, monkeypatch)
+    state.set_override("UNSYNCED")
+    state.set_uuid("x")
+    assert state.override_text == "" and state.synced is False
+    _set_prg(enabled[0], "synced: true")
+    state.uuid_text = U
+    asyncio.run(_FakeRetireState.gather(state))
+    assert state.synced is True
+    state.set_uuid("x")
+    assert state.synced is False
+
+
+def test_do_retire_refuses_while_busy_and_leaves_error(enabled, monkeypatch):
+    """Mutation: drop `or self.busy` from do_retire's first gate (the second click
+    would then overwrite error with "gather and confirm first")."""
+    state, _ = _armed(enabled, monkeypatch)
+    state.error = "x"
+    state.busy = True
+    monkeypatch.setattr(rr.retire_logic, "retire", _boom)
+    asyncio.run(_FakeRetireState.do_retire(state))
+    assert state.error == "x" and state.phase == "armed"
+
+
+def test_do_retire_success_clears_stale_error(enabled, monkeypatch):
+    """Mutation: drop `self.error = ""` from the success branch."""
+    state, _ = _armed(enabled, monkeypatch)
+    state.error = "x"
+    asyncio.run(_FakeRetireState.do_retire(state))
+    assert state.phase == "done" and state.error == ""
+
+
+def test_do_retire_cancel_resets_state(enabled, monkeypatch):
+    """Mutation: drop `self._inv, self.armed = None, False` from the cancel branch,
+    or leave busy set."""
+    state, _ = _armed(enabled, monkeypatch)
+
+    async def cancelled(client, root, inv, cb, ledger, **kw):
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(rr.retire_logic, "retire", cancelled)
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(_FakeRetireState.do_retire(state))
+    assert state.busy is False and state.phase == "failed"
+    assert state._inv is None and state.armed is False
+    assert state.error == "retire cancelled; API rows may be deleted"

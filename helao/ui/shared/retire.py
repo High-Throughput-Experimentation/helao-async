@@ -17,12 +17,14 @@ import json
 import os
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable
 
 import httpx
 
 from helao.helpers import helao_logging as logging
+from helao.helpers.run_state import _prg_is_complete
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -57,6 +59,7 @@ class Inventory:
     campaign_name: str
     api_only: bool  # not found locally, present in API
     analysis_dirs: list[str]  # local ANALYSES/ dirs referencing these processes
+    synced: bool  # every location's .prg is complete; False when api_only
 
     @property
     def nothing_to_retire(self) -> bool:
@@ -137,6 +140,14 @@ def locate(root: str, sequence_uuid: str) -> list[SeqLocation]:
             )
         )
     return sorted(out, key=lambda loc: (loc.run_tree, loc.rel_dir))
+
+
+def is_synced(loc: SeqLocation) -> bool:
+    """Whether the location's ``.prg`` sidecar reports the record fully shipped.
+
+    A missing sidecar is unsynced.
+    """
+    return _prg_is_complete(Path(loc.seq_yml).with_suffix(".prg"))
 
 
 def in_flight(sources_root: str, sequence_uuid: str, rel_dirs: list[str]) -> str | None:
@@ -281,6 +292,9 @@ async def inventory(
 ) -> Inventory:
     locations = await asyncio.to_thread(locate, root, sequence_uuid)
     local, n = await asyncio.to_thread(_scan_local, locations)
+    synced = bool(locations) and await asyncio.to_thread(
+        lambda: all(is_synced(loc) for loc in locations)
+    )
     await progress("scan", n, n)
 
     seq_body = await _read(client, "SEQUENCE", sequence_uuid)
@@ -359,6 +373,7 @@ async def inventory(
         sequence_in_api=seq_body is not None,
         sequence_label=label,
         campaign_name=campaign,
+        synced=synced,
         api_only=nothing_local and (seq_body is not None or any(in_api.values())),
         analysis_dirs=await asyncio.to_thread(
             _analysis_dirs, root, all_procs | in_api["ANALYSIS"]
@@ -453,7 +468,13 @@ async def _fail(res: RetireResult, msg: str, st: dict) -> RetireResult:
 
 
 async def retire(
-    client: Any, root: str, inv: Inventory, progress: Progress, ledger_path: str
+    client: Any,
+    root: str,
+    inv: Inventory,
+    progress: Progress,
+    ledger_path: str,
+    *,
+    allow_unsynced: bool = False,
 ) -> RetireResult:
     """Guarded, children-first delete of one sequence, then move its run dirs.
 
@@ -464,7 +485,9 @@ async def retire(
     res = RetireResult(False, ledger_path, {}, {}, {}, [])
     st: dict = {"phase": "pre", "plan": [], "move_failed": set()}
     try:
-        return await _retire(client, root, inv, progress, ledger_path, res, st)
+        return await _retire(
+            client, root, inv, progress, ledger_path, res, st, allow_unsynced
+        )
     except Exception as exc:  # the contract is "never raises"
         LOGGER.exception("retire: unexpected failure")
         return await _fail(res, f"unexpected error: {exc!r}", st)
@@ -478,6 +501,7 @@ async def _retire(
     ledger_path: str,
     res: RetireResult,
     st: dict,
+    allow_unsynced: bool,
 ) -> RetireResult:
     stop = False
     errors: list[str] = []
@@ -514,6 +538,13 @@ async def _retire(
     # 1. ledger first
     n_rows = sum(len(inv.in_api[t]) for t in DELETE_ORDER if t != "SEQUENCE")
     total = n_rows + int(inv.sequence_in_api) + len(inv.locations)
+
+    def sync_flags() -> dict[str, bool]:
+        return {
+            f"{loc.run_tree}/{loc.rel_dir}": is_synced(loc) for loc in inv.locations
+        }
+
+    flags = await asyncio.to_thread(sync_flags)
     try:
         os.makedirs(os.path.dirname(ledger_path), exist_ok=True)
         _append(
@@ -527,6 +558,8 @@ async def _retire(
                     "api_rows": {t: len(inv.in_api[t]) for t in inv.in_api},
                     "sequence_in_api": inv.sequence_in_api,
                     "locations": len(inv.locations),
+                    "allow_unsynced": allow_unsynced,
+                    "synced": flags,
                 },
             },
         )
@@ -542,6 +575,11 @@ async def _retire(
 
     if bad := await asyncio.to_thread(reverify):
         return await _fail(res, f"{bad} no longer names this sequence; re-gather", st)
+    if not allow_unsynced:
+        now = await asyncio.to_thread(sync_flags)
+        if not now or not all(now.values()):
+            which = [k for k, v in now.items() if not v] or ["no local location"]
+            return await _fail(res, f"not synced: {', '.join(which)}", st)
 
     # 3. pre-check every move
     date = datetime.now(timezone.utc).strftime("%Y%m%d")
@@ -598,7 +636,7 @@ async def _retire(
                 probe_rows.append((t, uuid))
             elif outcome == "absent":
                 res.already_absent[t] = res.already_absent.get(t, 0) + 1
-                if t in MUST_404:  # a non-404 error can carry 404-looking text
+                if t in MUST_404:  # an error without a status can look like a 404
                     probe_rows.append((t, uuid))
             else:
                 stop = True

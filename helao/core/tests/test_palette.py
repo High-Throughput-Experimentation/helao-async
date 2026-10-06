@@ -884,9 +884,8 @@ def test_page_tint_rows_cover_every_route_twice() -> None:
 def test_slate_500_is_measured_on_every_tint(pair: tuple[str, str]) -> None:
     """The shade the Reflex stack moved *away* from, pinned as a measurement.
 
-    Three of the six tints put ``slate-500`` under the 4.5 body floor and a
-    fourth clears it by 0.02, which is why ``REFLEX_MUTED_TEXT`` is
-    ``slate-600``.
+    Four of the eleven tints put ``slate-500`` under the 4.5 body floor, which
+    is why ``REFLEX_MUTED_TEXT`` is ``slate-600``.
     Asserting the numbers here means a future edit that reintroduces
     ``slate-500`` cannot claim it was fine, and a Tailwind revision that changed
     the shade enough to matter would surface as a published-value mismatch
@@ -899,7 +898,7 @@ def test_slate_500_is_measured_on_every_tint(pair: tuple[str, str]) -> None:
 def test_slate_500_fails_the_body_floor_on_four_of_the_eleven_tints() -> None:
     """Exactly four, and named -- not "at least one".
 
-    A count would pass if the failing set moved to three different tints, and
+    A count would pass if the failing set moved to four different tints, and
     the point of the row block above is that *which* surfaces fail is not
     guessable from the shade names. ``rose-50`` joined them when ``/control``
     was added, at 4.33: a sixth route was not going to make the case for

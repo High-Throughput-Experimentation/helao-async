@@ -21,12 +21,15 @@ def make_run_tree(
     name: str = "SEQ",
     campaign: str = "",
     experiments: dict[str, list[tuple[str, str | None]]] = {},
+    prg: str | None = "synced: true",
 ) -> str:
     """Write <root>/<run_tree>/<rel_dir>/<ts>-seq.yml plus exp and act children.
 
     experiments maps experiment_uuid -> [(action_uuid, process_uuid or None)].
     The seq yml carries an indented embedded ``sequence_uuid`` block ahead of the
     top-level line, so only an anchored scan finds the right one.
+    prg is the body of the ``<ts>-seq.prg`` sidecar (default: a finished sync);
+    None writes no sidecar.
     Returns the seq-dir path.
     """
     seq_dir = os.path.join(root, run_tree, *rel_dir.split("/"))
@@ -42,6 +45,8 @@ def make_run_tree(
     if campaign:
         lines.append(f"campaign_name: {campaign}")
     _write(os.path.join(seq_dir, "20261001.000000-seq.yml"), lines)
+    if prg is not None:
+        _write(os.path.join(seq_dir, "20261001.000000-seq.prg"), prg.splitlines())
     for i, (exp_uuid, acts) in enumerate(experiments.items()):
         exp_dir = os.path.join(seq_dir, f"{i}__exp")
         _write(
@@ -86,7 +91,23 @@ class FakeMetadataClient:
         self.cascade: dict[tuple[str, str], bool] = {}
         self.sequence_body: dict = {}
 
+    OPS = frozenset(
+        {
+            "read_sequence",
+            "read_experiment",
+            "read_action",
+            "read_process",
+            "read_analysis",
+            "read_processes_by_sequence",
+            "read_analysis_by_process",
+            "delete_command",
+        }
+    )
+
     def _maybe_fail(self, op: str, uuid: str) -> None:
+        for name, _ in self.fail:  # a typo must not silently disable a failure
+            if name not in self.OPS:
+                raise KeyError(f"fail names an operation the fake lacks: {name!r}")
         mode = self.fail.get((op, uuid))
         if mode == "timeout":
             try:

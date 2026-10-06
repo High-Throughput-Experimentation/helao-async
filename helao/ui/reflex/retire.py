@@ -71,6 +71,37 @@ def _progress(state):
     return _cb
 
 
+_UNSYNCED_WARNING = (
+    "not synced — may still be running or uploading; "
+    "retiring it can race the orchestrator/syncer"
+)
+_OVERRIDE = "UNSYNCED"
+
+
+def _is_armed(
+    inv: Inventory | None, confirm: str, label: str, synced: bool, override: str
+) -> bool:
+    """Label (or uuid) typed, and either synced or the override typed."""
+    return (
+        inv is not None
+        and confirm == (label or inv.sequence_uuid)
+        and (synced or override == _OVERRIDE)
+    )
+
+
+def _rearm(state) -> None:
+    """Recompute ``armed`` and move ``phase`` between gathered and armed."""
+    state.armed = _is_armed(
+        state._inv,
+        state.confirm_text,
+        state.label,
+        state.synced,
+        state.override_text,
+    )
+    if state.phase in ("gathered", "armed"):
+        state.phase = "armed" if state.armed else "gathered"
+
+
 class RetireState(rx.State):
     """Gather, confirm and retire one sequence. Handlers re-check the gate."""
 
@@ -82,6 +113,8 @@ class RetireState(rx.State):
     campaign: str = ""
     confirm_text: str = ""
     armed: bool = False
+    synced: bool = False
+    override_text: str = ""
     busy: bool = False
     progress: int = 0
     ledger: str = ""
@@ -100,6 +133,7 @@ class RetireState(rx.State):
         self.status, self.error = "", ""
         self.counts, self.label, self.campaign = [], "", ""
         self.confirm_text, self.armed, self.progress = "", False, 0
+        self.override_text, self.synced = "", False
         self.ledger, self.warnings, self.moved = "", [], []
         self.run_dirs, self.analysis_dirs = [], []
         self._inv = None
@@ -111,10 +145,14 @@ class RetireState(rx.State):
         if self.busy:
             return
         self.confirm_text = v
-        inv = self._inv
-        self.armed = inv is not None and v == (self.label or inv.sequence_uuid)
-        if self.phase in ("gathered", "armed"):
-            self.phase = "armed" if self.armed else "gathered"
+        _rearm(self)
+
+    @rx.event
+    def set_override(self, v: str):
+        if self.busy:
+            return
+        self.override_text = v
+        _rearm(self)
 
     @rx.event(background=True)
     async def gather(self):
@@ -124,6 +162,7 @@ class RetireState(rx.State):
             self.status, self.error = "", ""
             self.counts, self.label, self.campaign = [], "", ""
             self.confirm_text, self.armed, self.progress = "", False, 0
+            self.override_text, self.synced = "", False
             self.ledger, self.warnings, self.moved = "", [], []
             self.run_dirs, self.analysis_dirs = [], []
             self._inv = None
@@ -184,11 +223,18 @@ class RetireState(rx.State):
             self.campaign = inv.campaign_name
             self.run_dirs = [f"{loc.run_tree}/{loc.rel_dir}" for loc in inv.locations]
             self.analysis_dirs = list(inv.analysis_dirs)
-            if inv.api_only:
-                self.warnings = [
-                    "experiments/actions unknowable from API alone; "
-                    "processes may already be gone"
-                ]
+            self.synced = inv.synced
+            self.warnings = [
+                *(
+                    [
+                        "experiments/actions unknowable from API alone; "
+                        "processes may already be gone"
+                    ]
+                    if inv.api_only
+                    else []
+                ),
+                *([] if inv.synced else [_UNSYNCED_WARNING]),
+            ]
             self._inv = inv
             self.status, self.phase = "", "gathered"
 
@@ -213,6 +259,7 @@ class RetireState(rx.State):
                 # busy is set in this block, so nothing can interleave after it.
                 self.busy, self.phase, self.progress = True, "retiring", 0
                 root = _CONFIG["root"]
+                allow = not inv.synced and self.override_text == _OVERRIDE
             result = None
             error = ""
             try:
@@ -228,11 +275,17 @@ class RetireState(rx.State):
                     self.ledger = ledger
                 try:
                     result = await retire_logic.retire(
-                        client, root, inv, _progress(self), ledger
+                        client,
+                        root,
+                        inv,
+                        _progress(self),
+                        ledger,
+                        allow_unsynced=allow,
                     )
                 except asyncio.CancelledError:
                     async with self:
                         self.busy, self.phase = False, "failed"
+                        self._inv, self.armed = None, False
                         self.error = "retire cancelled; API rows may be deleted"
                     raise
             async with self:
@@ -310,6 +363,15 @@ def retire_page() -> rx.Component:
                         value=RetireState.confirm_text,
                         on_change=RetireState.set_confirm,
                         width="28em",
+                    ),
+                    rx.cond(
+                        ~RetireState.synced,  # type: ignore[operator]
+                        rx.input(
+                            placeholder=f"type {_OVERRIDE} to override",
+                            value=RetireState.override_text,
+                            on_change=RetireState.set_override,
+                            width="20em",
+                        ),
                     ),
                     rx.button(
                         "Retire",

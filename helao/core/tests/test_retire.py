@@ -121,6 +121,7 @@ def test_nothing_to_retire_property():
             campaign_name="",
             api_only=False,
             analysis_dirs=[],
+            synced=False,
         )
 
     assert inv().nothing_to_retire
@@ -917,3 +918,101 @@ def test_move_time_reguard_refuses(tmp_path):
     assert "API rows are already deleted" in res.error
     assert "already exists" in res.error and os.path.isdir(_src(root))
     assert any(x["outcome"] == "move_failed" for x in _lines(ledger))
+
+
+# ---- synced-or-override guard -------------------------------------------------
+
+
+def _inv(root, client=None):
+    client = client or _full_client()
+    return asyncio.run(retire.inventory(client, root, U, _noprogress))
+
+
+def _prg(root, rt, body):
+    p = os.path.join(root, rt, *REL.split("/"), "20261001.000000-seq.prg")
+    if body is None:
+        os.remove(p)
+    else:
+        with open(p, "w") as f:
+            f.write(body)
+
+
+def test_inventory_synced_requires_complete_prg_everywhere(tmp_path):
+    """Mutation: any() instead of all() over the locations, or an is_synced that
+    ignores a missing sidecar."""
+    root = str(tmp_path)
+    make_run_tree(root, "RUNS", REL, sequence_uuid=U, prg="synced: true\n")
+    make_run_tree(root, "RUNS_FINISHED", REL, sequence_uuid=U, prg="synced: false\n")
+    assert _inv(root).synced is False
+    _prg(root, "RUNS_FINISHED", "synced: true\n")
+    assert _inv(root).synced is True
+    _prg(root, "RUNS_FINISHED", None)
+    assert _inv(root).synced is False
+    _prg(root, "RUNS_FINISHED", "s3: true\napi: true\n")  # legacy: no synced key
+    assert _inv(root).synced is True
+
+
+def test_api_only_inventory_is_unsynced(tmp_path):
+    """Mutation: all([]) leaking through, so no locations reads as synced."""
+    client = FakeMetadataClient({"SEQUENCE": {U}})
+    inv = asyncio.run(retire.inventory(client, str(tmp_path), U, _noprogress))
+    assert inv.api_only and inv.synced is False
+
+
+def test_retire_refuses_unsynced_without_flag(tmp_path):
+    """Mutation: drop the unsynced check from the re-verify step."""
+    root, client, inv, ledger = _setup(tmp_path)
+    _prg(root, "RUNS_FINISHED", "synced: false\n")
+    inv = _inv(root, client)
+    assert inv.synced is False
+    res = _run(client, root, inv, ledger)
+    assert not res.ok and "not synced" in res.error
+    assert res.error.endswith("; no files were moved")
+    assert client.calls == [] and os.path.isdir(_src(root))
+
+
+def test_retire_allows_unsynced_with_flag(tmp_path):
+    """Mutation: ignore allow_unsynced (always refuse), or omit it from the
+    start ledger line."""
+    root, client, inv, ledger = _setup(tmp_path)
+    _prg(root, "RUNS_FINISHED", "synced: false\n")
+    inv = _inv(root, client)
+    res = asyncio.run(
+        retire.retire(client, root, inv, _noprogress, ledger, allow_unsynced=True)
+    )
+    assert res.ok, res.error
+    assert os.path.isdir(_dst(root)) and not os.path.exists(_src(root))
+    start = _lines(ledger)[0]
+    assert start["outcome"] == "start"
+    assert start["detail"]["allow_unsynced"] is True
+    assert list(start["detail"]["synced"].values()) == [False]
+
+
+def test_retire_rechecks_sync_at_retire_time(tmp_path):
+    """Mutation: use inv.synced (gather-time) instead of recomputing per location."""
+    root, client, inv, ledger = _setup(tmp_path)
+    assert inv.synced is True
+    _prg(root, "RUNS_FINISHED", "synced: false\n")
+    res = _run(client, root, inv, ledger)
+    assert not res.ok and "not synced" in res.error
+    assert client.calls == [] and os.path.isdir(_src(root))
+
+
+def test_retire_refuses_api_only_without_flag(tmp_path):
+    """Mutation: treat an empty locations list as vacuously synced in retire."""
+    client = _full_client()
+    root = str(tmp_path)
+    inv = _inv(root, client)
+    assert inv.api_only
+    ledger = os.path.join(root, "STATES", "r.jsonl")
+    res = _run(client, root, inv, ledger)
+    assert not res.ok and "not synced" in res.error
+    assert client.calls == []
+
+
+def test_fake_rejects_a_fail_key_naming_a_missing_operation():
+    """Mutation: drop the OPS check from FakeMetadataClient._maybe_fail."""
+    client = FakeMetadataClient({"SEQUENCE": {U}})
+    client.fail[("read_sequnce", U)] = "500"  # typo
+    with pytest.raises(KeyError, match="read_sequnce"):
+        asyncio.run(client.read_sequence(sequence_uuid=U))
