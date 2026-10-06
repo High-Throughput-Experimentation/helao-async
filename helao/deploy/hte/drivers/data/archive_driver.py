@@ -504,21 +504,7 @@ class Archive:
                         samples = self.positions.trays_dict[tray][slot].unload()
         self.write_config()  # save current state of table
 
-        # update samples with most recent info from db
-        for sample in samples:
-            sample = await self.update_samples_from_db_helper(sample=sample)
-        # unpack samples, this also sets the status
-        samples_in, samples_out = await self._unload_unpack_samples_helper(samples)
-        samples_in = self.append_sample_status(
-            samples=samples_in, newstatus=SampleStatus.unloaded
-        )
-        samples_out = self.append_sample_status(
-            samples=samples_out, newstatus=SampleStatus.unloaded
-        )
-        # now write all samples back to the db
-        # update all sample in the db
-        await self.unified_db.update_samples(samples=samples_in)
-        await self.unified_db.update_samples(samples=samples_out)
+        samples_in, samples_out = await self._finish_unload(samples)
         return unloaded, samples_in, samples_out, tray_dict
 
     async def tray_unloadall(self, *args, **kwargs) -> tuple[
@@ -557,21 +543,7 @@ class Archive:
 
         self.write_config()  # save current state of table
 
-        # update samples with most recent info from db
-        for sample in samples:
-            sample = await self.update_samples_from_db_helper(sample=sample)
-        # unpack samples, this also sets the status
-        samples_in, samples_out = await self._unload_unpack_samples_helper(samples)
-        samples_in = self.append_sample_status(
-            samples=samples_in, newstatus=SampleStatus.unloaded
-        )
-        samples_out = self.append_sample_status(
-            samples=samples_out, newstatus=SampleStatus.unloaded
-        )
-        # now write all samples back to the db
-        # update all sample in the db
-        await self.unified_db.update_samples(samples=samples_in)
-        await self.unified_db.update_samples(samples=samples_out)
+        samples_in, samples_out = await self._finish_unload(samples)
         return True, samples_in, samples_out, tray_dict
 
     async def tray_export_json(
@@ -1196,27 +1168,8 @@ class Archive:
         ``unloaded`` status appended and any selected destructions
         applied via :meth:`selective_destroy_samples`.
         """
-        # update samlpes with most recent info from db
-        for sample in samples:
-            sample = await self.update_samples_from_db_helper(sample=sample)
-
-        # unpack all assemblies
-        # this also sets new status
-        samples_in, samples_out = await self._unload_unpack_samples_helper(samples)
-
-        # add unloaded status
-        samples_in = self.append_sample_status(
-            samples=samples_in, newstatus=SampleStatus.unloaded
-        )
-        samples_out = self.append_sample_status(
-            samples=samples_out, newstatus=SampleStatus.unloaded
-        )
-
-        # now write all samples back to the db
-        # update all sample in the db
-        # (need to write it back as selective_destroy needs it)
-        await self.unified_db.update_samples(samples=samples_in)
-        await self.unified_db.update_samples(samples=samples_out)
+        # (written back to the db as selective_destroy re-reads it)
+        samples_in, samples_out = await self._finish_unload(samples)
 
         # now destroy samples if selected
         samples_in = await self.selective_destroy_samples(
@@ -1274,6 +1227,30 @@ class Archive:
         self.write_config()  # save current state of table
         sample.reset_sample_status(SampleStatus.loaded)
         return loaded, sample, customs_dict
+
+    async def _finish_unload(
+        self, samples: list[AnySample]
+    ) -> tuple[list[AnySample], list[AnySample]]:
+        """Refresh, unpack and mark unloaded samples, then write them to the db.
+
+        Returns ``(samples_in, samples_out)`` from
+        :meth:`_unload_unpack_samples_helper`, each with ``unloaded``
+        status appended.
+        """
+        # update samples with most recent info from db
+        for sample in samples:
+            sample = await self.update_samples_from_db_helper(sample=sample)
+        # unpack all assemblies, this also sets the status
+        samples_in, samples_out = await self._unload_unpack_samples_helper(samples)
+        samples_in = self.append_sample_status(
+            samples=samples_in, newstatus=SampleStatus.unloaded
+        )
+        samples_out = self.append_sample_status(
+            samples=samples_out, newstatus=SampleStatus.unloaded
+        )
+        await self.unified_db.update_samples(samples=samples_in)
+        await self.unified_db.update_samples(samples=samples_out)
+        return samples_in, samples_out
 
     async def _unload_unpack_samples_helper(
         self,
