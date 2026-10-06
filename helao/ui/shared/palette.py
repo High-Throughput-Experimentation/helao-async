@@ -98,6 +98,11 @@ TW: Final[Mapping[str, str]] = {
     # carries danger here, and rose-50 at 16.25 against slate-900 is a page
     # background, not a warning.
     "rose-50": "#fff1f2",
+    # The /retire canvas: warm and cautionary, for the page that deletes
+    # metadata rows. Deliberately not in the red/ESTOP family, for the same
+    # reason as rose-50 above: red-700 upward carries danger, this is a
+    # page background.
+    "orange-50": "#fff7ed",
 }
 
 WHITE: Final[str] = "#ffffff"
@@ -193,6 +198,7 @@ REFLEX_PAGE_TINTS: Final[Mapping[str, str]] = {
     "/uvvis": "cyan-50",
     "/xafs": "teal-50",
     "/xrds": "yellow-50",
+    "/retire": "orange-50",
 }
 """One page canvas per Reflex route — the functional-section signal.
 

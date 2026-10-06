@@ -400,3 +400,28 @@ Settled during spec review on 2026-10-06, by evidence on the batch host:
    state names the un-moved directory and writes a `move_failed` ledger line,
    and the directory is cleaned up by hand. The pre-move guards make this
    reachable only through a race or an OS error.
+
+## Addendum 2026-10-06: synced-or-override guard
+
+On an instrument station a record is written once under `RUNS` and stays there
+for life, while its run state lives in per-server journals. `locate` therefore
+finds sequences that are still running or still uploading, and retiring one
+races the orchestrator or the syncer. The batch host is unaffected: its
+sequences are finished when written.
+
+- **Synced predicate.** `is_synced(loc)` is
+  `run_state._prg_is_complete(<seq yml>.prg)`, reused rather than
+  re-implemented. A missing `.prg` is unsynced.
+- **`Inventory.synced`** is true only when there is at least one location and
+  every location is synced. An API-only inventory is `synced=False`, because
+  the sequence may be running on another station.
+- **`retire(..., allow_unsynced=False)`** recomputes `is_synced` per location in
+  the re-verify step, after the ledger `start` line and before any delete. An
+  unsynced location, or no location at all, is refused with zero deletes: the
+  error contains `not synced` and ends with `; no files were moved`. The
+  `start` line's detail records `allow_unsynced` and the per-location flags.
+- **Page.** When the gathered sequence is not synced, the page adds a warning
+  and a second input; Retire arms only when the label (or uuid) matches *and*
+  the second input reads `UNSYNCED`. Synced sequences see neither. `do_retire`
+  passes `allow_unsynced` only when the sequence is unsynced and the override
+  is typed.
