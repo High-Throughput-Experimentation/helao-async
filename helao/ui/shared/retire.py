@@ -384,6 +384,11 @@ def _move_guard(root: str, loc: SeqLocation, src: str, dst: str) -> str:
     """Why this move must be refused, or "" when every guard holds."""
     if not fnmatch.fnmatch(loc.run_tree, "RUNS*") or loc.run_tree == SUPERSEDED:
         return f"run tree {loc.run_tree!r} is not movable"
+    cur = os.path.join(root, loc.run_tree)
+    for part in loc.rel_dir.split("/"):
+        cur = os.path.join(cur, part)
+        if os.path.islink(cur):  # rename would move the link, not the data
+            return f"{cur} is a symlink"
     tree = os.path.realpath(os.path.join(root, loc.run_tree))
     if not os.path.realpath(src).startswith(tree + os.sep):
         return f"{src} is not strictly inside {tree}"
@@ -400,9 +405,40 @@ def _append(path: str, rec: dict) -> None:
         f.flush()
 
 
-def _fail(res: RetireResult, msg: str, *, moved: bool = False) -> RetireResult:
+def _stamp() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+async def _fail(res: RetireResult, msg: str, st: dict) -> RetireResult:
+    """Finish with ok=False; the message says how far the retire got."""
     res.ok = False
-    res.error = msg if moved else msg + _ANCHOR
+    if st["phase"] == "move":
+        done = {src for src, _ in res.moved}
+        unmoved = [(src, dst) for _, src, dst in st["plan"] if src not in done]
+        for src, dst in unmoved:
+            if src not in st["move_failed"]:
+                try:
+                    await asyncio.to_thread(
+                        _append,
+                        res.ledger_path,
+                        {
+                            "ts": _stamp(),
+                            "entity_type": "DIR",
+                            "uuid": src,
+                            "outcome": "move_failed",
+                            "detail": dst,
+                        },
+                    )
+                except OSError:
+                    break
+        res.error = (
+            f"{msg}; moved: {[s for s, _ in res.moved]}; "
+            f"un-moved: {[s for s, _ in unmoved]}; API rows are already deleted"
+        )
+    elif st["phase"] == "delete":
+        res.error = msg + "; API rows may already be deleted" + _ANCHOR
+    else:
+        res.error = msg + _ANCHOR
     return res
 
 
@@ -411,14 +447,17 @@ async def retire(
 ) -> RetireResult:
     """Guarded, children-first delete of one sequence, then move its run dirs.
 
-    Never raises: every failure is ``ok=False`` with ``error`` set.
+    Never raises on failure: every failure is ``ok=False`` with ``error`` set.
+    ``asyncio.CancelledError`` is not a failure and propagates unchanged.
+    A raising ``progress`` callback is logged and ignored in every phase.
     """
     res = RetireResult(False, ledger_path, {}, {}, {}, [])
+    st: dict = {"phase": "pre", "plan": [], "move_failed": set()}
     try:
-        return await _retire(client, root, inv, progress, ledger_path, res)
+        return await _retire(client, root, inv, progress, ledger_path, res, st)
     except Exception as exc:  # the contract is "never raises"
         LOGGER.exception("retire: unexpected failure")
-        return _fail(res, f"unexpected error: {exc!r}")
+        return await _fail(res, f"unexpected error: {exc!r}", st)
 
 
 async def _retire(
@@ -428,29 +467,39 @@ async def _retire(
     progress: Progress,
     ledger_path: str,
     res: RetireResult,
+    st: dict,
 ) -> RetireResult:
     stop = False
     errors: list[str] = []
+    lock = asyncio.Lock()  # keeps concurrent ledger lines whole and in order
 
-    def log(entity_type: str, uuid: str, outcome: str, detail: str = "") -> bool:
+    async def prog(phase: str, done: int, total: int) -> None:
+        try:
+            await progress(phase, done, total)
+        except Exception as exc:
+            LOGGER.warning(f"retire: progress callback failed: {exc!r}")
+
+    async def log(entity_type: str, uuid: str, outcome: str, detail: str = "") -> None:
         """Append one ledger line; an OSError sets the stop flag."""
         nonlocal stop
-        try:
-            _append(
-                ledger_path,
-                {
-                    "ts": datetime.now(timezone.utc).isoformat(),
-                    "entity_type": entity_type,
-                    "uuid": uuid,
-                    "outcome": outcome,
-                    "detail": detail,
-                },
-            )
-            return True
-        except OSError as exc:
-            stop = True
-            errors.append(f"ledger write failed: {exc}")
-            return False
+        async with lock:
+            try:
+                await asyncio.to_thread(
+                    _append,
+                    ledger_path,
+                    {
+                        "ts": _stamp(),
+                        "entity_type": entity_type,
+                        "uuid": uuid,
+                        "outcome": outcome,
+                        "detail": detail,
+                    },
+                )
+            except OSError as exc:
+                stop = True
+                errors.append(f"ledger write failed: {exc}")
+        if outcome == "move_failed":
+            st["move_failed"].add(uuid)
 
     # 1. ledger first
     n_rows = sum(len(inv.in_api[t]) for t in DELETE_ORDER if t != "SEQUENCE")
@@ -460,21 +509,19 @@ async def _retire(
         _append(
             ledger_path,
             {
-                "ts": datetime.now(timezone.utc).isoformat(),
+                "ts": _stamp(),
                 "entity_type": "SEQUENCE",
                 "uuid": inv.sequence_uuid,
                 "outcome": "start",
                 "detail": {
-                    "api_rows": {
-                        t: len(inv.in_api[t]) for t in DELETE_ORDER if t in inv.in_api
-                    },
+                    "api_rows": {t: len(inv.in_api[t]) for t in inv.in_api},
                     "sequence_in_api": inv.sequence_in_api,
                     "locations": len(inv.locations),
                 },
             },
         )
     except OSError as exc:
-        return _fail(res, f"cannot write ledger {ledger_path}: {exc}")
+        return await _fail(res, f"cannot write ledger {ledger_path}: {exc}", st)
 
     # 2. re-verify
     def reverify() -> str:
@@ -484,11 +531,12 @@ async def _retire(
         return ""
 
     if bad := await asyncio.to_thread(reverify):
-        return _fail(res, f"{bad} no longer names this sequence; re-gather")
+        return await _fail(res, f"{bad} no longer names this sequence; re-gather", st)
 
     # 3. pre-check every move
     date = datetime.now(timezone.utc).strftime("%Y%m%d")
     plan = [(loc, *_paths(root, loc, date)) for loc in inv.locations]
+    st["plan"] = [(loc, src, dst) for loc, src, dst in plan]
 
     def precheck() -> str:
         for loc, src, dst in plan:
@@ -497,18 +545,22 @@ async def _retire(
         return ""
 
     if why := await asyncio.to_thread(precheck):
-        return _fail(res, f"move refused: {why}")
+        return await _fail(res, f"move refused: {why}", st)
 
     # 4. delete, children first
     sem = asyncio.Semaphore(DELETE_CONCURRENCY)
     done = 0
-    deleted_rows: list[tuple[str, str]] = []
+    deleted_rows: list[tuple[str, str]] = (
+        []
+    )  # EXPERIMENT/ACTION persisting is a warning
+    probe_rows: list[tuple[str, str]] = []  # every row the read-back must probe
 
     async def delete_one(t: str, uuid: str) -> None:
         nonlocal done, stop
         async with sem:
             if stop:
                 return
+            st["phase"] = "delete"
             detail = ""
             try:
                 await _op(client, "delete_command")(
@@ -537,22 +589,30 @@ async def _retire(
             if outcome == "deleted":
                 res.deleted[t] = res.deleted.get(t, 0) + 1
                 deleted_rows.append((t, uuid))
+                probe_rows.append((t, uuid))
             elif outcome == "absent":
                 res.already_absent[t] = res.already_absent.get(t, 0) + 1
+                if t in MUST_404:  # a non-404 error can carry 404-looking text
+                    probe_rows.append((t, uuid))
             else:
                 stop = True
                 errors.append(f"delete {t} {uuid} failed: {detail}")
-            log(t, uuid, outcome, detail)
+            await log(t, uuid, outcome, detail)
             done += 1
-            await progress(f"delete:{t}", done, total)
+            await prog(f"delete:{t}", done, total)
 
     for t in DELETE_ORDER:
         rows = sorted(inv.in_api[t]) if t != "SEQUENCE" else []
         if t == "SEQUENCE" and inv.sequence_in_api:
             rows = [inv.sequence_uuid]
-        await asyncio.gather(*(delete_one(t, u) for u in rows), return_exceptions=True)
+        results = await asyncio.gather(
+            *(delete_one(t, u) for u in rows), return_exceptions=True
+        )
+        for r in results:
+            if isinstance(r, BaseException):
+                LOGGER.warning(f"retire: delete task for {t} raised: {r!r}")
         if stop:
-            return _fail(res, "; ".join(errors))
+            return await _fail(res, "; ".join(errors), st)
 
     # 5. read-back
     persisting: dict[str, list[str]] = {}
@@ -567,17 +627,17 @@ async def _retire(
                 return
         if not present:
             return
-        log(t, uuid, "persists", "row still readable after acknowledged delete")
+        await log(t, uuid, "persists", "row still readable after delete")
         if t in MUST_404:
             failed.append(f"{t} {uuid} still exists after delete")
         else:
             persisting.setdefault(t, []).append(uuid)
 
-    await asyncio.gather(*(read_back(t, u) for t, u in deleted_rows))
-    await progress("readback", len(deleted_rows), len(deleted_rows))
+    await asyncio.gather(*(read_back(t, u) for t, u in probe_rows))
+    await prog("readback", done, total)
     res.persisting = {t: sorted(v) for t, v in persisting.items()}
     if failed or stop:
-        return _fail(res, "; ".join(failed + errors))
+        return await _fail(res, "; ".join(failed + errors), st)
 
     # 6. move
     def move(loc: SeqLocation, src: str, dst: str) -> None:
@@ -586,20 +646,17 @@ async def _retire(
             raise OSError(why)
         os.rename(src, dst)
 
+    st["phase"] = "move"
     for i, (loc, src, dst) in enumerate(plan, 1):
         try:
             await asyncio.to_thread(move, loc, src, dst)
         except OSError as exc:
-            log("DIR", src, "move_failed", dst)
-            return _fail(
-                res,
-                f"move of {src} failed: {exc}; API rows are already deleted",
-                moved=True,
-            )
+            await log("DIR", src, "move_failed", dst)
+            return await _fail(res, f"move of {src} failed: {exc}", st)
         res.moved.append((src, dst))
-        log("DIR", src, "moved", dst)
-        await progress("move", i, total)
+        await log("DIR", src, "moved", dst)
+        await prog("move", done + i, total)
         if stop:
-            return _fail(res, "; ".join(errors), moved=True)
+            return await _fail(res, "; ".join(errors), st)
     res.ok = True
     return res

@@ -327,9 +327,10 @@ def test_failed_probe_cancels_pending_probes(tmp_path):
             await asyncio.wait_for(
                 retire.inventory(client, root, U, _noprogress), timeout=5
             )
+        # before loop teardown, whose shutdown would cancel the orphans anyway
+        assert sorted(cancelled) == ["E1", "E2"]
 
     asyncio.run(run())
-    assert sorted(cancelled) == ["E1", "E2"]
 
 
 def test_processes_by_sequence_non_list_raises(tmp_path):
@@ -412,22 +413,53 @@ def _dst(root, rt="RUNS_FINISHED"):
     )
 
 
+def _yielding(client):
+    """Record ("start"|"end", type) around each delete, yielding in between so a
+    delete that is not gated on the previous type can overlap it."""
+    events: list[tuple[str, str]] = []
+    real = client.delete_command
+
+    async def delete(*, entity_type, primary_id, delete_connected_processes):
+        events.append(("start", entity_type))
+        await asyncio.sleep(0)
+        try:
+            return await real(
+                entity_type=entity_type,
+                primary_id=primary_id,
+                delete_connected_processes=delete_connected_processes,
+            )
+        finally:
+            events.append(("end", entity_type))
+
+    setattr(client, "delete_command", delete)
+    return events
+
+
 def test_delete_order_is_children_first(tmp_path):
-    """Mutation: swapping two entries of DELETE_ORDER, or starting all the types
-    at once."""
+    """Mutation: swapping two entries of DELETE_ORDER, or one gather over all the
+    rows (every type starts at once)."""
     root, client, inv, ledger = _setup(tmp_path)
+    events = _yielding(client)
     res = _run(client, root, inv, ledger)
     assert res.ok, res.error
     order = ["ANALYSIS", "ACTION", "PROCESS", "EXPERIMENT", "SEQUENCE"]
-    types = [c[1] for c in client.calls]
-    assert types == sorted(types, key=order.index)  # no interleaving
-    assert set(types) == set(order)
+    assert {t for _, t in events} == set(order)
+    for k, t in enumerate(order[:-1]):
+        last_end = max(i for i, e in enumerate(events) if e == ("end", t))
+        later = [
+            i
+            for i, (kind, u) in enumerate(events)
+            if kind == "start" and order.index(u) > k
+        ]
+        assert min(later) > last_end, (t, events)
 
 
 def test_action_500_stops_before_sequence_and_move(tmp_path):
-    """Mutation: `continue` instead of stop, or moving before checking."""
+    """Mutation: `continue` instead of stop, moving before checking, or one gather
+    over all the rows."""
     root, client, inv, ledger = _setup(tmp_path)
     client.fail[("delete", "A1")] = "500"
+    _yielding(client)  # lets every other delete start before A1 fails
     res = _run(client, root, inv, ledger)
     assert not res.ok and "no files were moved" in res.error
     assert not {"PROCESS", "EXPERIMENT", "SEQUENCE"} & {c[1] for c in client.calls}
@@ -653,3 +685,130 @@ def test_ledger_dir_is_created(tmp_path):
     assert not os.path.exists(os.path.join(root, "STATES"))
     assert _run(client, root, inv, ledger).ok
     assert os.path.isfile(ledger)
+
+
+def test_progress_raising_during_move_does_not_abort_moves(tmp_path):
+    """Mutation: calling progress directly (unguarded) in the move phase."""
+    root, client, inv, ledger = _setup(tmp_path, ("RUNS_SYNCED", "RUNS_FINISHED"))
+
+    async def boom(phase, *_):
+        if phase == "move":
+            raise RuntimeError("ui state gone")
+
+    res = _run(client, root, inv, ledger, boom)
+    assert res.ok, res.error
+    assert len(res.moved) == 2 and not os.path.exists(_src(root))
+
+
+def test_failure_after_a_move_never_claims_nothing_moved(tmp_path, monkeypatch):
+    """Mutation: appending "no files were moved" regardless of phase, or not
+    listing the un-moved dirs."""
+    root, client, inv, ledger = _setup(tmp_path, ("RUNS_SYNCED", "RUNS_FINISHED"))
+    real = retire._append
+
+    def flaky(path, rec):
+        if rec["outcome"] == "moved":
+            raise OSError("disk full")
+        real(path, rec)
+
+    monkeypatch.setattr(retire, "_append", flaky)
+    res = _run(client, root, inv, ledger)
+    assert not res.ok and len(res.moved) == 1
+    assert "no files were moved" not in res.error
+    unmoved = _src(root, "RUNS_SYNCED")  # sorted: FINISHED moved first
+    assert os.path.isdir(unmoved) and unmoved in res.error
+    assert "API rows are already deleted" in res.error
+    assert any(
+        x["outcome"] == "move_failed" and x["uuid"] == unmoved for x in _lines(ledger)
+    )
+
+
+def test_delete_failure_says_rows_may_be_deleted(tmp_path):
+    """Mutation: dropping the delete-phase wording."""
+    root, client, inv, ledger = _setup(tmp_path)
+    client.fail[("delete", "A1")] = "500"
+    res = _run(client, root, inv, ledger)
+    assert "API rows may already be deleted" in res.error
+    assert res.error.endswith("; no files were moved")
+
+
+def test_progress_done_never_decreases(tmp_path):
+    """Mutation: progress("move", i, total) with the bare location index, or
+    readback reporting its own probe count."""
+    root, client, inv, ledger = _setup(tmp_path, ("RUNS_SYNCED", "RUNS_FINISHED"))
+    client.rows["ACTION"].discard("A2")  # absent: fewer read-back probes
+    ticks = []
+
+    async def progress(*a):
+        ticks.append(a)
+
+    res = _run(client, root, inv, ledger, progress)
+    assert res.ok, res.error
+    dones = [d for _, d, _ in ticks]
+    assert dones == sorted(dones) and dones[-1] == ticks[-1][2]
+    assert {p for p, _, _ in ticks} >= {"delete:ACTION", "readback", "move"}
+
+
+def test_symlinked_source_is_refused_before_deletes(tmp_path):
+    """Mutation: removing the islink check in _move_guard."""
+    root, client, inv, ledger = _setup(tmp_path)
+    link = os.path.join(root, "RUNS_FINISHED", "26.40", "1005", "linked")
+    os.symlink(_src(root), link)
+    inv.locations.append(
+        retire.SeqLocation(
+            "RUNS_FINISHED",
+            "26.40/1005/linked",
+            inv.locations[0].seq_yml,
+            "",
+            "",
+            "",
+        )
+    )
+    res = _run(client, root, inv, ledger)
+    assert not res.ok and "symlink" in res.error and client.calls == []
+    assert os.path.isdir(_src(root))
+
+
+def test_absent_must404_row_is_probed_in_readback(tmp_path):
+    """Mutation: skipping the read-back of rows whose delete read as absent."""
+    root, client, inv, ledger = _setup(tmp_path)
+    real = client.delete_command
+
+    async def odd(*, entity_type, primary_id, delete_connected_processes):
+        if primary_id == "P1":  # not a 404, but its text says so
+            raise RuntimeError("API call failed: 500 - Could not find upstream")
+        return await real(
+            entity_type=entity_type,
+            primary_id=primary_id,
+            delete_connected_processes=delete_connected_processes,
+        )
+
+    setattr(client, "delete_command", odd)
+    res = _run(client, root, inv, ledger)
+    assert not res.ok and "P1" in res.error and "no files were moved" in res.error
+    assert os.path.isdir(_src(root))
+
+
+def test_raising_delete_task_is_logged(tmp_path, monkeypatch):
+    """Mutation: dropping the logging of gather exception results."""
+    root, client, inv, ledger = _setup(tmp_path)
+    real = retire._append
+
+    def bad(path, rec):
+        if rec["uuid"] == "A1":
+            raise ValueError("unserialisable")
+        real(path, rec)
+
+    warned = []
+
+    class Spy:
+        def warning(self, msg):
+            warned.append(msg)
+
+        def exception(self, msg):
+            warned.append(msg)
+
+    monkeypatch.setattr(retire, "_append", bad)
+    monkeypatch.setattr(retire, "LOGGER", Spy())
+    _run(client, root, inv, ledger)
+    assert any("delete task for ACTION raised" in m for m in warned)
