@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import time
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -217,8 +218,7 @@ def test_api_only_inventory(tmp_path):
     assert inv.api_only and not inv.locations
     assert all(not v for v in inv.local.values())
     assert (inv.sequence_label, inv.campaign_name) == ("APIL", "APIC")
-    # in_api alone (no sequence row, but a process row) must still be api_only,
-    # while a local tree makes it not api_only
+    # a local tree makes it not api_only
     root = str(tmp_path / "t")
     make_run_tree(root, "RUNS", REL, sequence_uuid=U)
     assert not asyncio.run(retire.inventory(client, root, U, _noprogress)).api_only
@@ -264,9 +264,126 @@ def test_analysis_dirs_are_reported_not_required(tmp_path):
     assert inv.analysis_dirs == []
     d = tmp_path / "ANALYSES" / "2026" / "1005" / "120000__x"
     d.mkdir(parents=True)
-    (d / "out.json").write_text('{"process_uuid": "P2"}')
+    (d / "out.yml").write_text("process_uuid: P2\n")
     other = tmp_path / "ANALYSES" / "2026" / "1005" / "130000__y"
     other.mkdir()
     (other / "out.json").write_text('{"process_uuid": "unrelated"}')
     inv = asyncio.run(retire.inventory(client, root, U, _noprogress))
     assert inv.analysis_dirs == [str(d)]
+
+
+def test_analysis_dirs_read_only_yml_and_skip_unreadable(tmp_path):
+    """Mutation: reading every file (drop the .yml filter), or letting OSError
+    from an unreadable yml propagate."""
+    root = str(tmp_path)
+    make_run_tree(root, "RUNS", REL, sequence_uuid=U, experiments=EXPS)
+    base = tmp_path / "ANALYSES" / "2026" / "1005"
+    only_json = base / "120000__j"
+    only_json.mkdir(parents=True)
+    (only_json / "out.json").write_text('{"process_uuid": "P2"}')
+    bad = base / "130000__bad"
+    bad.mkdir()
+    (bad / "x.yml").mkdir()  # a directory named x.yml: not a file, skipped
+    unreadable = base / "140000__perm"
+    unreadable.mkdir()
+    f = unreadable / "y.yml"
+    f.write_text("process_uuid: P2\n")
+    f.chmod(0)
+    try:
+        inv = asyncio.run(retire.inventory(_full_client(), root, U, _noprogress))
+    finally:
+        f.chmod(0o644)
+    assert inv.analysis_dirs == []
+
+
+def test_unreadable_yml_oserror_is_skipped(tmp_path, monkeypatch):
+    """Mutation: removing the except OSError in _analysis_dirs."""
+    d = tmp_path / "ANALYSES" / "2026" / "1005" / "120000__x"
+    d.mkdir(parents=True)
+    (d / "a.yml").write_text("P2")
+    real_open = open
+
+    def boom(path, *a, **k):
+        if str(path).endswith("a.yml"):
+            raise PermissionError("denied")
+        return real_open(path, *a, **k)
+
+    monkeypatch.setattr("builtins.open", boom)
+    assert retire._analysis_dirs(str(tmp_path), {"P2"}) == []
+
+
+def test_failed_probe_cancels_pending_probes(tmp_path):
+    """Mutation: dropping the cancel of pending tasks on failure (the raise then
+    waits out the slow reads and their progress ticks)."""
+    root = str(tmp_path)
+    make_run_tree(root, "RUNS", REL, sequence_uuid=U, experiments=EXPS)
+    client = _full_client()
+    client.fail[("read", "A1")] = "500"
+    orig = client.read_experiment
+
+    async def slow(*, experiment_uuid):
+        await asyncio.sleep(0.3)
+        return await orig(experiment_uuid=experiment_uuid)
+
+    client.read_experiment = slow
+    ticks = []
+
+    async def progress(*a):
+        ticks.append(a)
+
+    async def run():
+        t0 = time.monotonic()
+        with pytest.raises(RuntimeError):
+            await retire.inventory(client, root, U, progress)
+        assert time.monotonic() - t0 < 0.2  # did not wait out the slow reads
+        n = len(ticks)
+        await asyncio.sleep(0.6)
+        return n
+
+    assert asyncio.run(run()) == len(ticks)
+
+
+def test_processes_by_sequence_non_list_raises(tmp_path):
+    """Mutation: dropping the isinstance(list) check."""
+    client = _full_client()
+
+    async def bad(*, sequence_uuid):
+        return {"detail": "x"}
+
+    client.read_processes_by_sequence = bad  # type: ignore
+    with pytest.raises(
+        RuntimeError,
+        match=r"read_processes_by_sequence returned dict; expected a list",
+    ):
+        asyncio.run(retire.inventory(client, str(tmp_path), U, _noprogress))
+
+
+def test_processes_by_sequence_404_is_empty(tmp_path):
+    """Mutation: letting the 404 from read_processes_by_sequence propagate."""
+    client = _full_client()
+    client.fail[("read", U)] = "404"  # read_sequence 404 too
+    inv = asyncio.run(retire.inventory(client, str(tmp_path), U, _noprogress))
+    assert inv.in_api["PROCESS"] == set() and not inv.sequence_in_api
+
+
+def test_api_only_without_sequence_row_via_process(tmp_path):
+    """Mutation: api_only ignoring in_api rows when the sequence row is absent."""
+    client = FakeMetadataClient({"PROCESS": {"P_api"}}, seq_processes={U: ["P_api"]})
+    inv = asyncio.run(retire.inventory(client, str(tmp_path), U, _noprogress))
+    assert not inv.sequence_in_api and inv.api_only and not inv.nothing_to_retire
+
+
+def test_null_uuid_in_api_list_rows_is_skipped(tmp_path):
+    """Mutation: indexing ["process_uuid"]/["analysis_uuid"] without .get/skip."""
+    client = FakeMetadataClient({"SEQUENCE": {U}})
+
+    async def procs(*, sequence_uuid):
+        return [{"process_uuid": None}, {"process_uuid": "P9"}]
+
+    async def ans(*, process_uuid):
+        return [{"analysis_uuid": None}, {}]
+
+    client.read_processes_by_sequence = procs
+    client.read_analysis_by_process = ans
+    inv = asyncio.run(retire.inventory(client, str(tmp_path), U, _noprogress))
+    assert inv.in_api["PROCESS"] == {"P9"} and inv.in_api["ANALYSIS"] == set()

@@ -248,10 +248,16 @@ def _analysis_dirs(root: str, uuids: set[str]) -> list[str]:
             continue
         for name in os.listdir(d):
             path = os.path.join(d, name)
-            if not os.path.isfile(path):
+            if not name.endswith(".yml") or not os.path.isfile(path):
                 continue
-            with open(path, errors="replace") as f:
-                text = f.read()
+            try:
+                with open(path, errors="replace") as f:
+                    text = f.read()
+            except OSError as exc:
+                LOGGER.warning(
+                    f"retire: skipping unreadable analysis file {path}: {exc}"
+                )
+                continue
             if any(u in text for u in uuids):
                 hits.append(d)
                 break
@@ -261,8 +267,8 @@ def _analysis_dirs(root: str, uuids: set[str]) -> list[str]:
 async def inventory(
     client: Any, root: str, sequence_uuid: str, progress: Progress
 ) -> Inventory:
-    locations = locate(root, sequence_uuid)
-    local, n = _scan_local(locations)
+    locations = await asyncio.to_thread(locate, root, sequence_uuid)
+    local, n = await asyncio.to_thread(_scan_local, locations)
     await progress("scan", n, n)
 
     seq_body = await _read(client, "SEQUENCE", sequence_uuid)
@@ -274,7 +280,7 @@ async def inventory(
             f"read_processes_by_sequence returned {type(listed).__name__}; "
             "expected a list"
         )
-    api_procs = {p["process_uuid"] for p in listed}
+    api_procs = {u for p in listed if (u := p.get("process_uuid"))}
     all_procs = local["PROCESS"] | api_procs
 
     in_api: dict[str, set[str]] = {t: set() for t in ENTITY_TYPES}
@@ -304,13 +310,27 @@ async def inventory(
             rows = await _list_or_empty(
                 client, "read_analysis_by_process", process_uuid=proc
             )
-        in_api["ANALYSIS"].update(a["analysis_uuid"] for a in rows)
+        in_api["ANALYSIS"].update(u for a in rows if (u := a.get("analysis_uuid")))
         await tick()
 
-    await asyncio.gather(
-        *(probe(t, u) for t in ("EXPERIMENT", "ACTION", "PROCESS") for u in local[t]),
-        *(analyses(p) for p in all_procs),
-    )
+    tasks = [
+        asyncio.ensure_future(c)
+        for c in (
+            *(
+                probe(t, u)
+                for t in ("EXPERIMENT", "ACTION", "PROCESS")
+                for u in local[t]
+            ),
+            *(analyses(p) for p in all_procs),
+        )
+    ]
+    try:
+        await asyncio.gather(*tasks)
+    except BaseException:
+        for t in tasks:
+            t.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
 
     if locations:
         label, campaign = locations[0].label, locations[0].campaign
@@ -328,5 +348,7 @@ async def inventory(
         sequence_label=label,
         campaign_name=campaign,
         api_only=nothing_local and (seq_body is not None or any(in_api.values())),
-        analysis_dirs=_analysis_dirs(root, all_procs | in_api["ANALYSIS"]),
+        analysis_dirs=await asyncio.to_thread(
+            _analysis_dirs, root, all_procs | in_api["ANALYSIS"]
+        ),
     )
