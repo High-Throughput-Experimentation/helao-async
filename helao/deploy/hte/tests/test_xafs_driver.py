@@ -4,6 +4,7 @@ import http.server
 import json
 import pathlib
 import socket
+import subprocess
 import sys
 import threading
 
@@ -12,6 +13,7 @@ import pytest
 from helao.core.drivers.helao_driver import DriverResponseType, DriverStatus
 from helao.deploy.hte.drivers.xafs.driver import XafsSidecarDriver
 
+HEALTH = {"pid": 1, "hw_initialized": False, "simulate": False}
 FIXTURES = pathlib.Path(__file__).parent / "fixtures"
 
 
@@ -56,7 +58,7 @@ def make_stub():
     stubs = []
 
     def _make(routes=None):
-        stubs.append(Stub({"GET /health": (200, {"pid": 1}), **(routes or {})}))
+        stubs.append(Stub({"GET /health": (200, HEALTH), **(routes or {})}))
         return stubs[-1]
 
     yield _make
@@ -164,3 +166,79 @@ def test_rows_and_artifacts_and_reset(make_stub):
     assert d.initialize({"mono": True}).data == {"mono": "ok"}
     assert d.reset().response == DriverResponseType.success
     assert stub.requests[-1][2] == {"mono": True}
+
+
+def _spawn_driver(**extra):
+    return XafsSidecarDriver(
+        config={
+            "sidecar_port": free_port(),
+            "spawn_sidecar": True,
+            "sidecar_python": sys.executable,
+            "sidecar_script": str(FIXTURES / "slow_health_server.py"),
+            "spawn_wait_s": 15.0,
+            **extra,
+        }
+    )
+
+
+def test_spawn_simulate_passes_flag_and_matches():
+    d = _spawn_driver(simulate=True)
+    try:
+        assert d.connect().response == DriverResponseType.success
+        assert "--simulate" in d._proc.args
+    finally:
+        d.disconnect()
+
+
+def test_simulate_mismatch_existing_fails(make_stub):
+    r = make_stub().driver(simulate=True).connect()  # stub reports simulate False
+    assert r.response == DriverResponseType.failed
+
+
+def test_simulate_mismatch_spawned_fails_and_kills():
+    d = _spawn_driver(sidecar_args=[], simulate=False)
+    d.config["sidecar_args"] = ["--simulate"]  # sidecar sims, config says real
+    r = d.connect()
+    assert r.response == DriverResponseType.failed and d._proc is None
+
+
+def test_reconnect_after_disconnect(make_stub):
+    d = make_stub().driver()
+    assert d.connect().response == DriverResponseType.success
+    d.disconnect()
+    assert d.connect().response == DriverResponseType.success
+
+
+def test_non_sidecar_health_rejected(make_stub):
+    stub = make_stub({"GET /health": (200, {"ok": True})})
+    assert stub.driver().connect().response == DriverResponseType.failed
+
+
+def test_non_sidecar_health_spawns_instead(make_stub):
+    stub = make_stub({"GET /health": (200, {"ok": True})})
+    d = stub.driver(
+        spawn_sidecar=True,
+        sidecar_python=sys.executable,
+        sidecar_script=str(FIXTURES / "slow_health_server.py"),
+        spawn_wait_s=3.0,
+    )
+    try:
+        d.connect()
+        assert d._proc is not None  # a spawn was attempted
+    finally:
+        d.disconnect()
+
+
+def test_second_connect_terminates_unhealthy_old_process():
+    d = _spawn_driver(spawn_wait_s=0.3)  # fixture sleeps 1 s: times out
+    assert d.connect().response == DriverResponseType.failed
+    assert d._proc is None  # timeout path terminated it
+    d.config["spawn_wait_s"], d.spawn_wait_s = 15.0, 15.0
+    first = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    d._proc = first
+    try:
+        assert d.connect().response == DriverResponseType.success
+        assert first.poll() is not None
+    finally:
+        d.disconnect()
+        first.kill()

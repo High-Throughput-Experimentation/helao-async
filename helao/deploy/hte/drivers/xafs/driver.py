@@ -84,25 +84,46 @@ class XafsSidecarDriver(HelaoDriver):
             return _fail(f"{desc}: bad response body: {exc}")
         return _ok(desc, data)
 
+    @staticmethod
+    def _is_sidecar(data) -> bool:
+        return isinstance(data, dict) and all(
+            k in data for k in ("pid", "hw_initialized", "simulate")
+        )
+
+    def _probe(self) -> DriverResponse:
+        """GET /health; success only if the body identifies as the sidecar."""
+        r = self._call("GET", "/health", "sidecar health")
+        if r.response == DriverResponseType.success and not self._is_sidecar(r.data):
+            return _fail("port answered /health but is not the xafs sidecar", r.data)
+        return r
+
+    def _check_simulate(self, r: DriverResponse, what: str) -> DriverResponse:
+        want = bool(self.config.get("simulate", False))
+        if bool(r.data["simulate"]) != want:
+            return _fail(
+                f"{what} sidecar simulate={r.data['simulate']} but config simulate={want}"
+            )
+        return _ok(what, r.data)
+
     def connect(self) -> DriverResponse:
         """Probe `/health`; if down and `spawn_sidecar`, spawn and poll it."""
         if self.port is None:
             return _fail("missing sidecar_port in config")
-        r = self._call("GET", "/health", "sidecar health")
+        if self.client.is_closed:  # reconnect after disconnect()
+            self.client = httpx.Client(base_url=self.base_url, timeout=self.timeout)
+        r = self._probe()
         if r.response == DriverResponseType.success:
-            return _ok("connected to existing sidecar", r.data)
+            return self._check_simulate(r, "connected to existing sidecar")
         if not self.spawn:
             return _fail(f"sidecar unreachable and spawn_sidecar is off: {r.message}")
+        self._terminate(graceful=False)  # unhealthy leftover from a prior connect
         c = self.config
+        args = list(c.get("sidecar_args", []))
+        if c.get("simulate", False) and "--simulate" not in args:
+            args.append("--simulate")
         try:
             self._proc = subprocess.Popen(
-                [
-                    c["sidecar_python"],
-                    c["sidecar_script"],
-                    "--port",
-                    str(self.port),
-                    *c.get("sidecar_args", []),
-                ]
+                [c["sidecar_python"], c["sidecar_script"], "--port", str(self.port), *args]
             )
         except Exception as exc:
             return _fail(f"could not spawn sidecar: {type(exc).__name__}: {exc}")
@@ -110,17 +131,20 @@ class XafsSidecarDriver(HelaoDriver):
         while time.monotonic() < deadline:
             if self._proc.poll() is not None:
                 return _fail(f"sidecar exited with code {self._proc.returncode}")
-            r = self._call("GET", "/health", "sidecar health")
+            r = self._probe()
             if r.response == DriverResponseType.success:
-                return _ok("spawned sidecar", r.data)
+                r = self._check_simulate(r, "spawned sidecar")
+                if r.response != DriverResponseType.success:
+                    self._terminate(graceful=False)
+                return r
             time.sleep(0.25)
-        self._terminate()
+        self._terminate(graceful=False)
         return _fail(f"sidecar did not answer /health within {self.spawn_wait_s} s")
 
     def get_status(self) -> DriverResponse:
         """No current scan: ok if sidecar reachable. Else map the scan state."""
         if self.current_scan_id is None:
-            r = self._call("GET", "/health", "sidecar health")
+            r = self._probe()
             if r.response == DriverResponseType.success:
                 return _ok("sidecar reachable", {"state": None})
             return r
@@ -150,24 +174,30 @@ class XafsSidecarDriver(HelaoDriver):
     def disconnect(self) -> DriverResponse:
         """Close the client; if this driver spawned the sidecar, shut it down."""
         if self._proc is not None:
-            self._call("POST", "/shutdown", "shutdown sidecar")
-            self._terminate()
+            # sidecar waits up to 30 s for an active scan to finish saving
+            self._call("POST", "/shutdown", "shutdown sidecar", timeout=35.0)
+            self._terminate(graceful=True)
         self.client.close()
         return _ok("disconnected")
 
-    def _terminate(self, wait: float = 5.0):
+    def _terminate(self, graceful: bool = False, wait: float = 10.0):
+        """Stop the spawned process. `graceful` waits `wait` s for exit first
+        (after /shutdown); otherwise terminate immediately, then kill."""
         p, self._proc = self._proc, None
-        if p is None:
+        if p is None or p.poll() is not None:
             return
-        try:
-            p.wait(timeout=wait)  # graceful, after /shutdown
-        except subprocess.TimeoutExpired:
-            p.terminate()
+        if graceful:
             try:
                 p.wait(timeout=wait)
+                return
             except subprocess.TimeoutExpired:
-                p.kill()
-                p.wait()
+                pass
+        p.terminate()
+        try:
+            p.wait(timeout=5.0)
+        except subprocess.TimeoutExpired:
+            p.kill()
+            p.wait()
 
     def initialize(self, flags: dict) -> DriverResponse:
         """POST /initialize; data is the per-device ok/error map."""
