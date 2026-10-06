@@ -1422,7 +1422,7 @@ class Archive:
                 LOGGER.info(f"combining liquids '{source}' into new liquid reference")
                 sample_dict.update({"parts": samples_in})
                 samples.append(LiquidSample.model_validate(sample_dict))
-            if (
+            elif (
                 all(sample.sample_type == SampleType.gas for sample in samples_in)
                 and combine_gases
             ):
@@ -1675,9 +1675,11 @@ class Archive:
         # (5-2)
         # we only can combine samples if dilution for the position is allowed
         # too, e.g. not allowed if custom is a reservoir type position
+        # (without combine the same-kind sample falls through to 5-3 and
+        # both go into an assembly, as 5-2b does for an assembly's part)
         elif (
             (custom_sample.sample_type == kind)
-            # and combine
+            and combine
             and self.custom_dilution_allowed(custom=custom)
         ):
             # convert the ref samples that gets added to a real sample
