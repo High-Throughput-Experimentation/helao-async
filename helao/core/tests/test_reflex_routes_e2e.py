@@ -414,3 +414,15 @@ def test_xrds_route_is_the_real_page_and_its_handlers_register(reflex_cfg):
         "set_photo_opacity",
     ):
         assert name in handlers, f"{name} not registered; have {sorted(handlers)}"
+
+
+def test_retire_route_is_the_real_page_and_its_handlers_register(reflex_cfg):
+    from helao.ui.reflex import retire as page
+
+    from helao.ui.reflex.app import SHELL_ROUTES, build_app
+
+    build_app(reflex_cfg, "UI")
+    assert "/retire" in SHELL_ROUTES
+    handlers = page.RetireState.event_handlers
+    for name in ("set_uuid", "set_confirm", "gather", "do_retire"):
+        assert name in handlers, f"{name} not registered; have {sorted(handlers)}"

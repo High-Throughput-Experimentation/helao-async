@@ -71,6 +71,7 @@ from helao.ui.reflex.control import (
     configure_control,
     control_page,
 )
+from helao.ui.reflex.retire import RetireState, configure_retire, retire_page
 from helao.ui.reflex.state import make_panel_state
 from helao.ui.reflex.xy_component import make_buffer_router
 from helao.helpers import config_loader
@@ -91,6 +92,7 @@ SHELL_ROUTES = (
     "/uvvis",
     "/xafs",
     "/xrds",
+    "/retire",
 )
 
 #: Page name -> the config key whose panels belong on it.
@@ -312,6 +314,7 @@ def _nav():
         rx.link("UV-Vis", href="/uvvis"),
         rx.link("XAFS", href="/xafs"),
         rx.link("XRD", href="/xrds"),
+        rx.link("Retire", href="/retire"),
         width="100%",
         padding="0.75em 1em",
         align="center",
@@ -472,6 +475,7 @@ def build_app(world_cfg: dict, server_key: str):
     assert UvvisState is not None
     assert XafsState is not None
     assert XrdsState is not None
+    assert RetireState is not None
     # The operator's backend is built per session from this config; without
     # this the page renders but can never reach an orchestrator.
     configure_operator(world_cfg, server_key)
@@ -480,6 +484,8 @@ def build_app(world_cfg: dict, server_key: str):
     configure_control(world_cfg, server_key)
     # And the composition page's plate-metadata API target, same reasoning.
     configure_composition(world_cfg, server_key)
+    # And the retire page, which is off unless this server opts in.
+    configure_retire(world_cfg, server_key)
 
     # The buffer route carries bulk column data out-of-band, so megabyte float
     # arrays never traverse Reflex's JSON state channel. `api_transformer` is
@@ -576,6 +582,11 @@ def build_app(world_cfg: dict, server_key: str):
         lambda: _page("XRD", xrds_page(), "/xrds"),
         route="/xrds",
         title="HELAO XRD",
+    )
+    application.add_page(
+        lambda: _page("Retire sequence", retire_page(), "/retire"),
+        route="/retire",
+        title="HELAO retire",
     )
 
     @contextlib.asynccontextmanager

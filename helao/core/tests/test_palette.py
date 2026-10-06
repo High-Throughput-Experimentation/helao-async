@@ -126,6 +126,7 @@ CANONICAL_TAILWIND: Final[dict[str, str]] = {
     "pink-400": "#f472b6",
     "pink-500": "#ec4899",
     "rose-50": "#fff1f2",
+    "orange-50": "#fff7ed",
 }
 
 TW_KEY_RE: Final[re.Pattern[str]] = re.compile(r"^[a-z]+-(50|[1-9]00|950)$")
@@ -586,6 +587,8 @@ PAGE_TINT_TEXT_ROWS: Final[dict[tuple[str, str], float]] = {
     ("slate-600", "teal-50"): 7.27,
     ("slate-900", "yellow-50"): 17.26,  # /xrds
     ("slate-600", "yellow-50"): 7.33,
+    ("slate-900", "orange-50"): 16.81,  # /retire
+    ("slate-600", "orange-50"): 7.14,
 }
 
 # The shade slate-600 replaced, kept as a measurement rather than a comment.
@@ -594,6 +597,7 @@ PAGE_TINT_TEXT_ROWS: Final[dict[tuple[str, str], float]] = {
 # a later Tailwind revision moved slate-500 enough to change that, this says so.
 SLATE_500_ON_TINT_ROWS: Final[dict[tuple[str, str], float]] = {
     ("slate-500", "rose-50"): 4.33,  # /control -- a third failing surface
+    ("slate-500", "orange-50"): 4.48,  # /retire
     ("slate-500", "slate-50"): 4.55,
     ("slate-500", "sky-50"): 4.46,
     ("slate-500", "violet-50"): 4.34,
@@ -892,7 +896,7 @@ def test_slate_500_is_measured_on_every_tint(pair: tuple[str, str]) -> None:
     assert measured == pytest.approx(SLATE_500_ON_TINT_ROWS[pair], abs=0.01)
 
 
-def test_slate_500_fails_the_body_floor_on_three_of_the_seven_tints() -> None:
+def test_slate_500_fails_the_body_floor_on_four_of_the_eleven_tints() -> None:
     """Exactly three, and named -- not "at least one".
 
     A count would pass if the failing set moved to three different tints, and
@@ -901,14 +905,15 @@ def test_slate_500_fails_the_body_floor_on_three_of_the_seven_tints() -> None:
     was added, at 4.33: a sixth route was not going to make the case for
     ``slate-500`` any better, and it did not. ``lime-50`` arrived with
     ``/composition`` at 4.60 and did not join them, which is the other half of
-    the same point -- the set is measured, not predicted.
+    the same point -- the set is measured, not predicted. ``orange-50`` joined
+    them with ``/retire``, at 4.48.
     """
     failing = {
         bg
         for (fg, bg) in SLATE_500_ON_TINT_ROWS
         if contrast_ratio(_shade(fg), _shade(bg)) < FLOOR_BODY_TEXT
     }
-    assert failing == {"sky-50", "violet-50", "rose-50"}
+    assert failing == {"sky-50", "violet-50", "rose-50", "orange-50"}
 
 
 def test_slate_600_clears_every_tint_by_a_real_margin() -> None:
