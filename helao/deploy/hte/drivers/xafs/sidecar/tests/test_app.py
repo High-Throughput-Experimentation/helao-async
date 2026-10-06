@@ -33,6 +33,12 @@ def ctx(tmp_path, monkeypatch):
     return TestClient(app), app.state.sim, lock, str(tmp_path / "save"), exits
 
 
+@pytest.fixture
+def hw(ctx):
+    assert ctx[0].post("/initialize", json={}).status_code == 200
+    return ctx
+
+
 def body(save_dir, **kw):
     d = {"scan_def": scan_def(), "x_mm": 1.0, "y_mm": 2.0, "xchanger_station": 1,
          "savename": "Zn_Scan0000_Sample1_X1.000_Y2.000", "save_dir": save_dir,
@@ -98,8 +104,8 @@ def test_stale_lock_replaced(ctx):
     assert open(lock).read().strip() == str(os.getpid())
 
 
-def test_scan_roundtrip(ctx):
-    c, save_dir = ctx[0], ctx[3]
+def test_scan_roundtrip(hw):
+    c, save_dir = hw[0], hw[3]
     r = c.post("/scans", json=body(save_dir))
     assert r.status_code == 200, r.text
     sid = r.json()["scan_id"]
@@ -112,8 +118,8 @@ def test_scan_roundtrip(ctx):
     assert "scan_def" in c.get("/scans/%s/artifacts" % sid).json()
 
 
-def test_mcas_before_done_409(ctx):
-    c, h, save_dir = ctx[0], ctx[1], ctx[3]
+def test_mcas_before_done_409(hw):
+    c, h, save_dir = hw[0], hw[1], hw[3]
     h.wafer_stage.move_delay = 0.5
     sid = c.post("/scans", json=body(save_dir)).json()["scan_id"]
     assert c.get("/scans/%s/mcas" % sid).status_code == 409
@@ -121,16 +127,16 @@ def test_mcas_before_done_409(ctx):
     wait_done(c, sid)
 
 
-def test_scan_409_interlock(ctx):
-    c, h, save_dir = ctx[0], ctx[1], ctx[3]
+def test_scan_409_interlock(hw):
+    c, h, save_dir = hw[0], hw[1], hw[3]
     h.proto.shutter = "Closed"
     r = c.post("/scans", json=body(save_dir))
     assert r.status_code == 409
     assert "shutter" in r.json()["detail"]
 
 
-def test_scan_409_busy(ctx):
-    c, h, save_dir = ctx[0], ctx[1], ctx[3]
+def test_scan_409_busy(hw):
+    c, h, save_dir = hw[0], hw[1], hw[3]
     h.wafer_stage.move_delay = 0.5
     sid = c.post("/scans", json=body(save_dir)).json()["scan_id"]
     assert c.post("/scans", json=body(save_dir)).status_code == 409
@@ -146,16 +152,20 @@ def test_unknown_scan_404(ctx):
     assert c.post("/scans/nope/stop").status_code == 404
 
 
-def test_stop_endpoint(ctx):
-    c, h, save_dir = ctx[0], ctx[1], ctx[3]
-    h.wafer_stage.move_delay = 0.3
+def test_stop_endpoint(hw):
+    c, h, save_dir = hw[0], hw[1], hw[3]
+    h.mono.move_delay = 0.3
     sid = c.post("/scans", json=body(save_dir)).json()["scan_id"]
+    for _ in range(200):
+        if c.get("/scans/" + sid).json()["state"] == "running":
+            break
+        time.sleep(0.01)
     assert c.post("/scans/%s/stop" % sid).status_code == 200
-    assert wait_done(c, sid)["state"] in ("stopped", "done")
+    assert wait_done(c, sid)["state"] == "stopped"
 
 
-def test_xray_shutter_close(ctx):
-    c = ctx[0]
+def test_xray_shutter_close(hw):
+    c = hw[0]
     r = c.post("/xray", json={"shutter": "close"})
     assert r.status_code == 200, r.text
     assert c.get("/status").json()["proto"]["shutter"] == "Closed"
@@ -163,8 +173,8 @@ def test_xray_shutter_close(ctx):
     assert c.post("/xray", json={"off": True}).json()["kv"] == 0
 
 
-def test_calibrate_job(ctx):
-    c = ctx[0]
+def test_calibrate_job(hw):
+    c = hw[0]
     jid = c.post("/calibrate", json={"devices": ["mono"]}).json()["job_id"]
     for _ in range(200):
         j = c.get("/jobs/" + jid).json()
@@ -175,12 +185,79 @@ def test_calibrate_job(ctx):
     assert c.get("/jobs/nope").status_code == 404
 
 
-def test_shutdown_releases_lock(ctx):
-    c, h, lock, exits = ctx[0], ctx[1], ctx[2], ctx[4]
-    c.post("/initialize", json={})
+def test_shutdown_releases_lock(hw):
+    c, h, lock, exits = hw[0], hw[1], hw[2], hw[4]
     assert os.path.exists(lock)
     assert c.post("/shutdown").status_code == 200
     assert not os.path.exists(lock)
     assert h.proto.shutter == "Closed"
     time.sleep(0.5)
     assert exits
+
+
+def test_shutdown_keeps_foreign_lock(ctx):
+    c, lock = ctx[0], ctx[2]
+    p = subprocess.Popen(["sleep", "30"])
+    try:
+        with open(lock, "w") as f:
+            f.write(str(p.pid))
+        assert c.post("/shutdown").status_code == 200
+        assert open(lock).read() == str(p.pid)
+        assert ctx[1].proto.shutter == "Open"
+    finally:
+        p.kill()
+        p.wait()
+
+
+def test_shutdown_waits_for_scan(hw):
+    c, h, save_dir = hw[0], hw[1], hw[3]
+    h.mono.move_delay = 0.2
+    sid = c.post("/scans", json=body(save_dir)).json()["scan_id"]
+    assert c.post("/shutdown").status_code == 200
+    assert c.get("/scans/" + sid).json()["state"] not in ("queued", "moving", "running", "saving")
+
+
+def test_logging_survives_easyxafs_import(ctx):
+    import logging
+    import importlib
+    import easyxafs.logging_setup as ls
+    importlib.reload(ls)  # what a late first import would do: clears root handlers
+    xafs_sidecar.create_app(True, ctx[2], str(ctx[3]) + "_x", exit_fn=None)
+    assert any(getattr(x, "_xafs_sidecar", False) for x in logging.getLogger().handlers)
+
+
+def test_status_has_bragg(hw):
+    assert set(hw[0].get("/status").json()["mono_bragg"]) == {"Beta", "Detector", "Rho", "Theta"}
+
+
+def test_hw_routes_423_without_lock(ctx):
+    c, save_dir = ctx[0], ctx[3]
+    assert c.post("/xray", json={"shutter": "close"}).status_code == 423
+    assert c.post("/scans", json=body(save_dir)).status_code == 423
+    assert c.post("/calibrate", json={"devices": ["mono"]}).status_code == 423
+
+
+def test_bad_request_422(hw):
+    c = hw[0]
+    assert c.post("/xray", json={"shutter": "ajar"}).status_code == 422
+    assert c.post("/calibrate", json={"devices": ["toaster"]}).status_code == 422
+
+
+def test_calibrate_vs_scan_guards(hw):
+    c, h, save_dir = hw[0], hw[1], hw[3]
+    import threading
+    gate = threading.Event()
+    h.mono.calibrate_all = lambda: gate.wait(10)
+    jid = c.post("/calibrate", json={"devices": ["mono"]}).json()["job_id"]
+    assert c.post("/scans", json=body(save_dir)).status_code == 409
+    assert c.post("/calibrate", json={"devices": ["mono"]}).status_code == 409
+    gate.set()
+    for _ in range(200):
+        if c.get("/jobs/" + jid).json()["state"] != "running":
+            break
+        time.sleep(0.02)
+    h.wafer_stage.move_delay = 0.5
+    sid = c.post("/scans", json=body(save_dir)).json()["scan_id"]
+    assert c.post("/calibrate", json={"devices": ["mono"]}).status_code == 409
+    c.post("/scans/%s/stop" % sid)
+    wait_done(c, sid)

@@ -5,11 +5,12 @@ import os
 import sys
 import tempfile
 import threading
+import time
 import traceback
 import uuid
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Literal, Optional
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
@@ -32,7 +33,7 @@ class InitFlags(BaseModel):
 
 
 class CalibrateReq(BaseModel):
-    devices: List[str]
+    devices: List[Literal["mono", "wafer_linear", "wafer_rotary", "xchanger"]]
 
 
 class ScanReq(BaseModel):
@@ -48,14 +49,13 @@ class ScanReq(BaseModel):
 class XrayReq(BaseModel):
     kv: Optional[float] = None
     ma: Optional[float] = None
-    shutter: Optional[str] = None
+    shutter: Optional[Literal["open", "close"]] = None
     off: bool = False
 
 
 def create_app(simulate: bool, lock_path: str, state_dir: str,
                exit_fn: Optional[Callable[[], None]] = None) -> FastAPI:
     """exit_fn runs shortly after /shutdown replies; None means do not exit (tests)."""
-    hardware._sim = simulate
     hardware._inited.clear()
     app = FastAPI()
     app.state.sim = None
@@ -65,10 +65,28 @@ def create_app(simulate: bool, lock_path: str, state_dir: str,
         except ImportError:
             import sim_hw  # type: ignore
         app.state.sim = sim_hw.install_sim(state_dir)
-    logging.basicConfig(level=logging.INFO)
+    import easyxafs  # noqa: F401  its logging_setup clears root handlers: import before ours
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    if not any(getattr(h, "_xafs_sidecar", False) for h in root.handlers):
+        h = logging.StreamHandler()
+        h._xafs_sidecar = True  # type: ignore[attr-defined]
+        h.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
+        root.addHandler(h)
     runner = ScanRunner()
     jobs = {}  # type: Dict[str, dict]
     st = {"hw_initialized": False, "scan_id": None}
+
+    def scan_active() -> bool:
+        sid = st["scan_id"]
+        return bool(sid) and runner.state(sid)["state"] in ACTIVE
+
+    def calibrating() -> bool:
+        return any(j["state"] == "running" for j in jobs.values())
+
+    def need_lock() -> None:
+        if not hardware.owns_lock(lock_path):
+            raise HTTPException(423, "hardware lock not held by this process; POST /initialize first")
 
     @app.exception_handler(InterlockError)
     async def _interlock(request: Request, exc: InterlockError) -> JSONResponse:
@@ -108,11 +126,14 @@ def create_app(simulate: bool, lock_path: str, state_dir: str,
     def status() -> dict:
         out = hardware.status()
         sid = st["scan_id"]
-        out["scan_id"] = sid if sid and runner.state(sid)["state"] in ACTIVE else None
+        out["scan_id"] = sid if scan_active() else None
         return out
 
     @app.post("/calibrate")
     def calibrate(req: CalibrateReq) -> dict:
+        need_lock()
+        if scan_active() or calibrating():
+            raise HTTPException(409, "scan or calibration in progress")
         jid = uuid.uuid4().hex
         job = {"state": "running", "error": None}
         jobs[jid] = job
@@ -134,6 +155,9 @@ def create_app(simulate: bool, lock_path: str, state_dir: str,
 
     @app.post("/scans")
     def start_scan(req: ScanReq) -> dict:
+        need_lock()
+        if calibrating():
+            raise HTTPException(409, "calibration in progress")
         sid = runner.start(req.scan_def, req.x_mm, req.y_mm, req.xchanger_station,
                            req.savename, req.save_dir, req.duration_scale)
         st["scan_id"] = sid
@@ -169,17 +193,23 @@ def create_app(simulate: bool, lock_path: str, state_dir: str,
 
     @app.post("/xray")
     def xray(req: XrayReq) -> dict:
+        need_lock()
         return hardware.xray(req.kv, req.ma, req.shutter, req.off)
 
     @app.post("/shutdown")
     def shutdown() -> dict:
+        held = hardware.owns_lock(lock_path)
         sid = st["scan_id"]
-        if sid and runner.state(sid)["state"] in ACTIVE:
+        if sid and scan_active():
             runner.stop(sid)
-        try:
-            hardware.xray(shutter="close")
-        except Exception:
-            logging.exception("shutter close failed during shutdown")
+            deadline = time.monotonic() + 30  # let the scan finish saving before we exit
+            while scan_active() and time.monotonic() < deadline:
+                time.sleep(0.05)
+        if held:
+            try:
+                hardware.xray(shutter="close")
+            except Exception:
+                logging.exception("shutter close failed during shutdown")
         hardware.release_lock(lock_path)
         if exit_fn is not None:
             threading.Timer(0.2, exit_fn).start()

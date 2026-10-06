@@ -55,6 +55,10 @@ class FakeMono:
     def stop(self) -> None:
         self.stop_called = True
 
+    def get_current_positions_bragg(self) -> Dict[str, float]:  # extra: sidecar /status
+        a = self.calls[-1] if self.calls else 0.0
+        return {k: a for k in ("Beta", "Detector", "Rho", "Theta")}
+
     def check_calibration(self) -> bool:
         return self._calibrated
 
@@ -258,6 +262,7 @@ def install_sim(state_dir: str) -> SimHandles:
 
     _install_fake_modules()
 
+    import easyxafs.ketek
     import easyxafs.monochromator
     import easyxafs.scan
     import easyxafs.wafer_stage_motor_control
@@ -272,6 +277,7 @@ def install_sim(state_dir: str) -> SimHandles:
     easyxafs.monochromator.mono = mono
     easyxafs.scan.mono = mono
     easyxafs.scan.sdd_detector = ketek
+    easyxafs.ketek.initialize = ketek.initialize  # extra: sidecar initialize hits the fake
     easyxafs.wafer_stage_motor_control.wafer_stage = wafer
     easyxafs.xchanger_control.xchanger = xch
     sys.modules["pyprotohv"].proto_controller = proto

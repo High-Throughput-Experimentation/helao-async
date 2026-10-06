@@ -10,7 +10,6 @@ import psutil
 
 DEVICES = ("mono", "ketek", "wafer_stage", "xchanger", "proto")
 
-_sim = False
 _inited = set()  # real mode: devices we already initialized
 
 
@@ -32,11 +31,21 @@ def acquire_lock(lock_path: str) -> None:
         f.write(str(os.getpid()))
 
 
-def release_lock(lock_path: str) -> None:
+def owns_lock(lock_path: str) -> bool:
     try:
-        os.remove(lock_path)
-    except FileNotFoundError:
-        pass
+        with open(lock_path) as f:
+            return int(f.read().strip()) == os.getpid()
+    except (OSError, ValueError):
+        return False
+
+
+def release_lock(lock_path: str) -> None:
+    """Delete the lock only if it holds our PID."""
+    if owns_lock(lock_path):
+        try:
+            os.remove(lock_path)
+        except FileNotFoundError:
+            pass
 
 
 def _init_device(name: str) -> None:
@@ -68,8 +77,8 @@ def initialize(flags: dict) -> dict:
     for name in DEVICES:
         if not flags.get(name, True):
             continue
-        if _sim or name in _inited:
-            out[name] = "ok"  # sim: install_sim already populated the singletons
+        if name in _inited:
+            out[name] = "ok"
             continue
         try:
             _init_device(name)
@@ -98,6 +107,7 @@ def status() -> dict:
     return {
         "mono_calibrated": bool(mono._calibrated),
         "mono_positions": {k: int(v) for k, v in mono.get_positions().items()},
+        "mono_bragg": {k: float(v) for k, v in mono.get_current_positions_bragg().items()},
         "wafer_xy": list(stage.get_current_position_wafer_xy()) if stage is not None else None,
         "xchanger_station": xch.get_current_station() if xch is not None else None,
         "proto": None if proto is None else {
