@@ -61,6 +61,9 @@ class FakeMono:
     def initialize(self) -> None:
         pass
 
+    def calibrate_all(self) -> None:  # extra: sidecar /calibrate
+        pass
+
 
 class FakeKetek:
     def __init__(self, mono: FakeMono) -> None:
@@ -132,6 +135,12 @@ class FakeWaferStage:
     def stop_motors(self) -> None:
         pass
 
+    def calibrate_linear_motor(self) -> None:  # extra: sidecar /calibrate
+        pass
+
+    def calibrate_rotary_motor(self) -> None:  # extra: sidecar /calibrate
+        pass
+
 
 class FakeXchanger:
     def __init__(self) -> None:
@@ -147,6 +156,9 @@ class FakeXchanger:
         return float(self.station)
 
     def wait_until_idle(self) -> None:
+        pass
+
+    def calibrate(self) -> None:  # extra: sidecar /calibrate
         pass
 
 

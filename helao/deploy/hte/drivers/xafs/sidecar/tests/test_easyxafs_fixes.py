@@ -1,6 +1,7 @@
 """Python 3.9 sim env: vendor easyxafs fixes the sidecar depends on."""
 import os
 from pathlib import Path
+import pytest
 
 from helao.deploy.hte.drivers.xafs.sidecar import sim_hw
 
@@ -26,6 +27,7 @@ def test_saved_path_set(tmp_path, monkeypatch):
     assert os.path.isfile(s.saved_path)
 
 
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
 def test_thetascan_exception_sets_finished(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     h = sim_hw.install_sim(str(tmp_path))
