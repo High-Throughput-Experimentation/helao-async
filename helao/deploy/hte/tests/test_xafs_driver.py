@@ -242,3 +242,16 @@ def test_second_connect_terminates_unhealthy_old_process():
     finally:
         d.disconnect()
         first.kill()
+
+
+def test_calibrate_and_job_state(make_stub):
+    stub = make_stub(
+        {
+            "POST /calibrate": (200, {"job_id": "j1"}),
+            "GET /jobs/j1": (200, {"state": "done", "error": None}),
+        }
+    )
+    d = stub.driver()
+    assert d.calibrate(["mono"]).data == {"job_id": "j1"}
+    assert ("POST", "/calibrate", {"devices": ["mono"]}) in stub.requests
+    assert d.job_state("j1").data == {"state": "done", "error": None}

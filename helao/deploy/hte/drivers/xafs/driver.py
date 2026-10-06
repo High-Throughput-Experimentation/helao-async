@@ -230,3 +230,11 @@ class XafsSidecarDriver(HelaoDriver):
 
     def xray(self, **body) -> DriverResponse:
         return self._call("POST", "/xray", "xray", json=body)
+
+    def calibrate(self, devices: list) -> DriverResponse:
+        """POST /calibrate; data={"job_id": ...}."""
+        return self._call("POST", "/calibrate", "calibrate", json={"devices": devices})
+
+    def job_state(self, job_id: str) -> DriverResponse:
+        """GET /jobs/{id}; data={"state": running|done|error, "error": ...}."""
+        return self._call("GET", f"/jobs/{job_id}", "job state")
