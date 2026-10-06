@@ -94,6 +94,8 @@ class RetireState(rx.State):
 
     @rx.event
     def set_uuid(self, v: str):
+        if self.busy:
+            return
         self.uuid_text = v
         self.status, self.error = "", ""
         self.counts, self.label, self.campaign = [], "", ""
@@ -106,6 +108,8 @@ class RetireState(rx.State):
 
     @rx.event
     def set_confirm(self, v: str):
+        if self.busy:
+            return
         self.confirm_text = v
         inv = self._inv
         self.armed = inv is not None and v == (self.label or inv.sequence_uuid)
@@ -126,34 +130,38 @@ class RetireState(rx.State):
             try:
                 u = str(uuid.UUID(self.uuid_text.strip()))
             except ValueError:
-                self.error = "not a uuid"
+                self.error, self.phase = "not a uuid", "idle"
                 return
             self.busy, self.phase, self.uuid_text = True, "gathering", u
             root, sources_root = _CONFIG["root"], _CONFIG["sources_root"]
         _cb = _progress(self)
+        err, inv = "", None
         try:
             locs = await asyncio.to_thread(retire_logic.locate, root, u)
+            hit = None
             if sources_root:
                 hit = await asyncio.to_thread(
                     retire_logic.in_flight, sources_root, u, [l.rel_dir for l in locs]
                 )
-                if hit:
-                    async with self:
-                        self.error = f"batch conversion in flight: {hit}"
-                        self.phase = "idle"
-                    return
-            client = api.get_client()
-            inv = await retire_logic.inventory(client, root, u, _cb)
+            if hit:
+                err = f"batch conversion in flight: {hit}"
+            else:
+                client = api.get_client()
+                inv = await retire_logic.inventory(client, root, u, _cb)
+        except asyncio.CancelledError:
+            async with self:
+                self.busy, self.phase = False, "idle"
+            raise
         except Exception as exc:
             LOGGER.warning(f"retire gather failed: {exc!r}")
-            async with self:
-                self.error = str(exc)
-                self.phase = "idle"
-            return
-        finally:
-            async with self:
-                self.busy = False
+            err = str(exc)
+        # busy drops in the same block as the terminal write, so set_uuid cannot
+        # run in the gap between them and be overwritten by the results.
         async with self:
+            self.busy = False
+            if inv is None:
+                self.error, self.phase = err, "idle"
+                return
             if inv.nothing_to_retire:
                 self.status, self.phase = "nothing to retire", "idle"
                 return
@@ -201,20 +209,23 @@ class RetireState(rx.State):
         try:
             result = None
             error = ""
+            async with self:
+                self.busy, self.phase, self.error = True, "retiring", ""
+                self.progress = 0
             try:
+                client = api.get_client()
+            except Exception as exc:
+                LOGGER.warning(f"retire could not get a client: {exc!r}")
+                error = f"{exc}; no files were moved"
+            else:
                 ledger = retire_logic.ledger_path_for(
                     root, inv.sequence_uuid, datetime.now(timezone.utc)
                 )
                 async with self:
-                    self.busy, self.phase, self.error = True, "retiring", ""
                     self.ledger = ledger
-                client = api.get_client()
                 result = await retire_logic.retire(
                     client, root, inv, _progress(self), ledger
                 )
-            except Exception as exc:
-                LOGGER.warning(f"retire failed before running: {exc!r}")
-                error = str(exc)
             async with self:
                 if result is not None and result.ok:
                     self.phase = "done"

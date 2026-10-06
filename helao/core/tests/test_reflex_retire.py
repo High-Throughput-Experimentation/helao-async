@@ -174,10 +174,44 @@ def test_gather_rejects_non_uuid(enabled, monkeypatch):
 
 
 def test_gather_fills_counts(enabled, monkeypatch):
-    state, _ = _gathered(enabled, monkeypatch)
+    """Asymmetric on purpose: PROCESS is 3 local but 2 in the API.
+
+    The first version of this test used one process each way (1/1), which is
+    symmetric and could not see the two columns swapped; the brief's 3/3 was not
+    asserted either.
+
+    Mutation: swap the columns to [t, len(in_api[t]), len(local[t])].
+    """
+    root, _ = enabled
+    make_run_tree(
+        str(root),
+        "RUNS_SYNCED",
+        "26.40/1001/seqA",
+        sequence_uuid=U,
+        label="LBL",
+        experiments={E1: [(A1, P1), ("a2", "p2")], "e2": [("a3", "p3")]},
+    )
+    client = FakeMetadataClient(
+        {
+            "SEQUENCE": {U},
+            "EXPERIMENT": {E1, "e2"},
+            "ACTION": {A1, "a2", "a3"},
+            "PROCESS": {P1, "p2"},
+        },
+        seq_processes={U: [P1, "p2"]},
+    )
+    monkeypatch.setattr(rr.api, "get_client", lambda: client)
+    state = _FakeRetireState()
+    state.uuid_text = U
+    asyncio.run(_FakeRetireState.gather(state))
     assert state.error == ""
-    assert state.counts[2] == ["PROCESS", "1", "1"]
-    assert state.counts[-1] == ["SEQUENCE", "1", "present"]
+    assert state.counts == [
+        ["EXPERIMENT", "2", "2"],
+        ["ACTION", "3", "3"],
+        ["PROCESS", "3", "2"],
+        ["ANALYSIS", "0", "0"],
+        ["SEQUENCE", "1", "present"],
+    ]
     assert state.phase == "gathered"
     assert state.label == "LBL"
     assert state.busy is False
@@ -295,3 +329,119 @@ def test_every_foreach_var_carries_an_element_annotation():
     assert fields["counts"].annotated_type == list[list[str]]
     for name in ("warnings", "moved", "run_dirs", "analysis_dirs"):
         assert fields[name].annotated_type == list[str], name
+
+
+def test_set_uuid_and_confirm_are_no_ops_while_busy(enabled, monkeypatch):
+    """Mutation: drop the `if self.busy: return` guard in set_uuid/set_confirm."""
+    state, _ = _gathered(enabled, monkeypatch)
+    state.set_confirm("LBL")
+    state.ledger = "L"
+    state.busy = True
+    state.set_uuid("other")
+    state.set_confirm("zzz")
+    assert state.uuid_text == U
+    assert state._inv is not None
+    assert state.ledger == "L"
+    assert state.confirm_text == "LBL" and state.armed is True
+
+
+def _armed(enabled, monkeypatch):
+    state, client = _gathered(enabled, monkeypatch)
+    state.set_confirm("LBL")
+    return state, client
+
+
+def test_do_retire_resets_progress_on_entering_retiring(enabled, monkeypatch):
+    """Mutation: drop `self.progress = 0` from the retiring block."""
+    state, _ = _armed(enabled, monkeypatch)
+    state.progress = 57
+    seen = {}
+
+    async def fake_retire(client, root, inv, cb, ledger):
+        seen["progress"], seen["phase"] = state.progress, state.phase
+        return rr.retire_logic.RetireResult(True, ledger, {}, {}, {}, [])
+
+    monkeypatch.setattr(rr.retire_logic, "retire", fake_retire)
+    asyncio.run(_FakeRetireState.do_retire(state))
+    assert seen == {"progress": 0, "phase": "retiring"}
+
+
+def test_do_retire_get_client_failure_leaves_no_ledger(enabled, monkeypatch):
+    """Mutation: set self.ledger before get_client, or drop the suffix."""
+    state, _ = _armed(enabled, monkeypatch)
+
+    def no_client():
+        raise RuntimeError("spec fetch failed")
+
+    monkeypatch.setattr(rr.api, "get_client", no_client)
+    monkeypatch.setattr(rr.retire_logic, "retire", _boom)
+    asyncio.run(_FakeRetireState.do_retire(state))
+    assert state.phase == "failed"
+    assert state.ledger == ""
+    assert state.error == "spec fetch failed; no files were moved"
+    assert state.busy is False and state._inv is None and state.armed is False
+
+
+def test_do_retire_failed_result_reports_error(enabled, monkeypatch):
+    """Mutation: map result.ok=False to phase "done", or leave busy/_inv set."""
+    state, _ = _armed(enabled, monkeypatch)
+
+    async def fake_retire(client, root, inv, cb, ledger):
+        return rr.retire_logic.RetireResult(False, ledger, {}, {}, {}, [], "boom")
+
+    monkeypatch.setattr(rr.retire_logic, "retire", fake_retire)
+    asyncio.run(_FakeRetireState.do_retire(state))
+    assert state.phase == "failed"
+    assert state.error == "boom"
+    assert state.busy is False and state._inv is None and state.armed is False
+
+
+def test_non_uuid_gather_after_done_returns_to_idle(enabled, monkeypatch):
+    """Mutation: drop `self.phase = "idle"` from the non-uuid branch."""
+    state, _ = _armed(enabled, monkeypatch)
+    asyncio.run(_FakeRetireState.do_retire(state))
+    assert state.phase == "done"
+    state.uuid_text = "nope"
+    asyncio.run(_FakeRetireState.gather(state))
+    assert state.error == "not a uuid"
+    assert state.phase == "idle"
+
+
+def test_gather_exception_leaves_idle_unarmed(enabled, monkeypatch):
+    """Mutation: leave phase "gathering"/busy set when inventory raises."""
+    root, _ = enabled
+    _tree(root)
+    client = _client()
+    client.fail[("read", U)] = "500"
+    monkeypatch.setattr(rr.api, "get_client", lambda: client)
+    state = _FakeRetireState()
+    state.uuid_text = U
+    asyncio.run(_FakeRetireState.gather(state))
+    assert "500" in state.error
+    assert state.phase == "idle" and state.busy is False
+    assert state.armed is False and state._inv is None
+
+
+def test_gather_nothing_to_retire(enabled, monkeypatch):
+    """Mutation: fill the vars (phase "gathered") even when nothing is found."""
+    client = FakeMetadataClient({})
+    monkeypatch.setattr(rr.api, "get_client", lambda: client)
+    state = _FakeRetireState()
+    state.uuid_text = U
+    asyncio.run(_FakeRetireState.gather(state))
+    assert state.status == "nothing to retire"
+    assert state.phase == "idle" and state._inv is None and state.busy is False
+
+
+def test_gather_api_only_warns(enabled, monkeypatch):
+    """Mutation: drop the api_only warning."""
+    client = FakeMetadataClient({"SEQUENCE": {U}})
+    monkeypatch.setattr(rr.api, "get_client", lambda: client)
+    state = _FakeRetireState()
+    state.uuid_text = U
+    asyncio.run(_FakeRetireState.gather(state))
+    assert state.phase == "gathered"
+    assert state.warnings == [
+        "experiments/actions unknowable from API alone; "
+        "processes may already be gone"
+    ]
