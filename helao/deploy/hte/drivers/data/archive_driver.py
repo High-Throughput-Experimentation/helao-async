@@ -1523,44 +1523,116 @@ class Archive:
     ]:
         """Transfer ``volume_ml`` of ``source_liquid_in`` into ``custom``.
 
-        Creates a new liquid reference for the transferred portion, then
-        either places it directly (empty position), merges it with an
-        existing liquid (when allowed and ``combine_liquids`` is set),
-        merges with an existing assembly's liquid part, or creates a
-        new assembly. Updates source-reservoir volume and writes
-        everything back through :attr:`unified_db`.
-
-        An empty position is rejected unless ``allow_empty`` is set, so
-        a liquid is not recorded without the solid it was meant to wet.
+        See :meth:`_custom_add`. An empty position is rejected unless
+        ``allow_empty`` is set, so a liquid is not recorded without the
+        solid it was meant to wet.
 
         Returns:
             ``(error_code, samples_in_initial, samples_out)``.
         """
+        return await self._custom_add(
+            kind=SampleType.liquid,
+            custom=custom,
+            source_in=source_liquid_in,
+            volume_ml=volume_ml,
+            combine=combine_liquids,
+            dilute=dilute_liquids,
+            allow_empty=allow_empty,
+            action=action,
+        )
+
+    async def custom_add_gas(
+        self,
+        custom: Optional[str] = None,
+        source_gas_in: Optional[GasSample] = None,
+        volume_ml: float = 0.0,
+        combine_gases: bool = False,
+        dilute_gases: bool = True,
+        action: Optional[Action] = None,
+    ) -> tuple[
+        ErrorCodes,
+        list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+        list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+    ]:
+        """Transfer ``volume_ml`` of ``source_gas_in`` into ``custom``.
+
+        See :meth:`_custom_add`. An empty position is always rejected.
+
+        Returns:
+            ``(error_code, samples_in_initial, samples_out)``.
+        """
+        return await self._custom_add(
+            kind=SampleType.gas,
+            custom=custom,
+            source_in=source_gas_in,
+            volume_ml=volume_ml,
+            combine=combine_gases,
+            dilute=dilute_gases,
+            allow_empty=False,
+            action=action,
+        )
+
+    async def _custom_add(
+        self,
+        kind: SampleType,
+        custom: Optional[str],
+        source_in: Optional[Union[LiquidSample, GasSample]],
+        volume_ml: float,
+        combine: bool,
+        dilute: bool,
+        allow_empty: bool,
+        action: Optional[Action],
+    ) -> tuple[
+        ErrorCodes,
+        list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+        list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+    ]:
+        """Transfer ``volume_ml`` of a liquid or gas ``source_in`` into ``custom``.
+
+        ``kind`` is :attr:`SampleType.liquid` or :attr:`SampleType.gas`.
+        Creates a new reference of that kind for the transferred portion,
+        then either places it directly (empty position, only with
+        ``allow_empty``), merges it with an existing sample of the same
+        kind (when the position allows dilution), merges it into an
+        existing assembly's part of the same kind, or creates a new
+        assembly. Updates source-reservoir volume and writes everything
+        back through :attr:`unified_db`.
+
+        Returns:
+            ``(error_code, samples_in_initial, samples_out)``.
+        """
+        name = kind.value
+        other = SampleType.gas if kind == SampleType.liquid else SampleType.liquid
+        # new_ref_samples takes a per-kind combine flag
+        combine_kw = {
+            SampleType.liquid: "combine_liquids",
+            SampleType.gas: "combine_gases",
+        }[kind]
 
         error = ErrorCodes.none
         samples_in = []
         samples_in_initial = []
         samples_out = []
 
-        # (1) check if source_liquid_in is not None
+        # (1) check if source_in is not None
         # and its a valid sample (add it to samples_in list)
-        if source_liquid_in is None:
+        if source_in is None:
             error = ErrorCodes.no_sample
             return error, [], []
         else:
-            # check if source_liquid_in is valid
-            # converts source_liquid_in to a list
-            source_liquid_in = object_to_sample(source_liquid_in)
-            LOGGER.info(f"source_liquid_in: {source_liquid_in.model_dump()}")
-            samples_in = await self.unified_db.get_samples(samples=[source_liquid_in])
+            # check if source_in is valid
+            # converts source_in to a list
+            source_in = object_to_sample(source_in)
+            LOGGER.info(f"source_{name}_in: {source_in.model_dump()}")
+            samples_in = await self.unified_db.get_samples(samples=[source_in])
 
             if not samples_in:
-                LOGGER.error(f"source_liquid_in '{source_liquid_in}' is not in db")
+                LOGGER.error(f"source_{name}_in '{source_in}' is not in db")
                 error = ErrorCodes.no_sample
                 return error, [], []
 
-        if samples_in[0].sample_type != SampleType.liquid:
-            LOGGER.error("Not a liquid Sample")
+        if samples_in[0].sample_type != kind:
+            LOGGER.error(f"Not a {name} Sample")
             return ErrorCodes.not_allowed, [], []
 
         if samples_in[0].volume_ml < volume_ml:
@@ -1619,10 +1691,10 @@ class Archive:
         # status=[SampleStatus.created]
         # inheritance=SampleInheritance.receive_only
         error, ref_samples_out = await self.new_ref_samples(
-            # sample check converted source_liquid_in
+            # sample check converted source_in
             # to a list already
             samples_in=samples_in,
-            sample_out_type=SampleType.liquid,
+            sample_out_type=kind,
             sample_position=custom,
             action=action,
         )
@@ -1641,8 +1713,9 @@ class Archive:
 
         # (5) now decide what the new sample should be
         # (5-1) custom is empty --> new sample is ref_samples_out[0]
-        # (5-2) we combine liquid from custom with ref_samples_out[0]
-        #       and create a new liquid (combine_liquids is True)
+        # (5-2) we combine the same kind from custom with ref_samples_out[0]
+        #       and create a new sample of that kind (combine is True)
+        # (5-2b) we merge ref_samples_out[0] into an existing assembly
         # (5-3) we create an assembly with custom_sample and ref_samples_out[0]
 
         # (5-1)
@@ -1661,7 +1734,7 @@ class Archive:
 
             if not replaced:
                 LOGGER.error(
-                    "could not replace sample with assembly when adding liquid"
+                    f"could not replace sample with assembly when adding {name}"
                 )
                 error = ErrorCodes.critical_error
 
@@ -1669,8 +1742,8 @@ class Archive:
         # we only can combine samples if dilution for the position is allowed
         # too, e.g. not allowed if custom is a reservoir type position
         elif (
-            (custom_sample.sample_type == SampleType.liquid)
-            # and combine_liquids
+            (custom_sample.sample_type == kind)
+            # and combine
             and self.custom_dilution_allowed(custom=custom)
         ):
             # convert the ref samples that gets added to a real sample
@@ -1689,15 +1762,15 @@ class Archive:
             samples_in.append(custom_sample)
             samples_in_initial.append(deepcopy(custom_sample))
 
-            # create a new ref sample which combines both liquid samples
+            # create a new ref sample which combines both samples
             error, ref_samples_out2 = await self.new_ref_samples(
                 # input for assembly is the custom sample
-                # and the new sample from source_liquid_in
+                # and the new sample from source_in
                 samples_in=[custom_sample, samples_out[0]],
                 sample_out_type=SampleType.assembly,
                 sample_position=custom,
                 action=action,
-                combine_liquids=combine_liquids,
+                **{combine_kw: combine},
             )
 
             ref_samples_out2[0].sample_position = custom
@@ -1706,7 +1779,7 @@ class Archive:
             update_vol(
                 ref_samples_out2[0],
                 delta_vol_ml=samples_out[0].volume_ml,
-                dilute=dilute_liquids,
+                dilute=dilute,
             )
 
             # a reference assembly was successfully created
@@ -1727,91 +1800,80 @@ class Archive:
             )
             if not replaced:
                 LOGGER.error(
-                    "could not replace sample with assembly when adding liquid"
+                    f"could not replace sample with assembly when adding {name}"
                 )
                 return ErrorCodes.critical_error, [], []
 
-        # (5-2b) liquid + assembly case
+        # (5-2b) liquid/gas + assembly case
         elif (
             (custom_sample.sample_type == SampleType.assembly)
-            # and combine_liquids
+            # and combine
             and self.custom_assembly_allowed(custom=custom)
         ):
             # convert the ref samples that gets added to a real sample
-            # this next line populates local sqlite dbs with new liquid sample, should
-            # be the liquid created from new liquid_in + existing assembly liquid
+            # this next line populates local sqlite dbs with the new sample, should
+            # be the sample created from source_in + existing assembly part
             samples_out = await self.unified_db.new_samples(samples=ref_samples_out)
             if not samples_out:
                 error = ErrorCodes.no_sample
                 return error, [], []
 
-            # seprate assembly into solid and liquid parts
-            loaded_liquid = [
-                p for p in custom_sample.parts if p.sample_type == SampleType.liquid
-            ]
+            # separate assembly into same-kind, solid and other-kind parts
+            loaded_same = [p for p in custom_sample.parts if p.sample_type == kind]
             loaded_solid = [
                 p for p in custom_sample.parts if p.sample_type == SampleType.solid
             ]
-            loaded_gas = [
-                p for p in custom_sample.parts if p.sample_type == SampleType.gas
-            ]
+            loaded_other = [p for p in custom_sample.parts if p.sample_type == other]
 
             new_assembly_parts = []
 
             LOGGER.info("recovering parts from assembly")
-            if loaded_liquid:
-                # create a new liquid mixture
-                error, new_liquid_mixture = await self.new_ref_samples(
-                    samples_in=[loaded_liquid[0], samples_out[0]],
+            if loaded_same:
+                # create a new mixture
+                error, new_mixture = await self.new_ref_samples(
+                    samples_in=[loaded_same[0], samples_out[0]],
                     sample_out_type=SampleType.assembly,
                     sample_position=custom,
                     action=action,
-                    combine_liquids=combine_liquids,
+                    **{combine_kw: combine},
                 )
-                if combine_liquids:  # there's only 1 liquid in new ref
-                    new_liquid_mixture[0].append_sample_status(SampleStatus.merged)
+                if combine:  # there's only 1 sample of this kind in new ref
+                    new_mixture[0].append_sample_status(SampleStatus.merged)
                     # calculate volumes, dilutions
-                    new_liquid_mixture[0].sample_position = custom
-                    new_liquid_mixture[0].volume_ml = loaded_liquid[0].volume_ml
-                    new_liquid_mixture[0].dilution_factor = loaded_liquid[
-                        0
-                    ].dilution_factor
+                    new_mixture[0].sample_position = custom
+                    new_mixture[0].volume_ml = loaded_same[0].volume_ml
+                    new_mixture[0].dilution_factor = loaded_same[0].dilution_factor
                     update_vol(
-                        new_liquid_mixture[0],
+                        new_mixture[0],
                         delta_vol_ml=samples_out[0].volume_ml,
-                        dilute=dilute_liquids,
+                        dilute=dilute,
                     )
-                    liquid_samples_out = await self.unified_db.new_samples(
-                        samples=new_liquid_mixture
-                    )
-                    new_assembly_parts.append(liquid_samples_out[0])
-                    # set inheritance and status for sample transfered out of source_liquid_in
+                    mixture_out = await self.unified_db.new_samples(samples=new_mixture)
+                    new_assembly_parts.append(mixture_out[0])
+                    # set inheritance and status for sample transfered out of source_in
                     samples_out[0].inheritance = SampleInheritance.allow_both
                     samples_out[0].append_sample_status(SampleStatus.merged)
-                    LOGGER.info("liquid recovered")
+                    LOGGER.info(f"{name} recovered")
                 else:
                     # add them separately
-                    new_assembly_parts.append(loaded_liquid[0])
+                    new_assembly_parts.append(loaded_same[0])
                     new_assembly_parts.append(samples_out[0])
-                    pass
             else:
-                liquid_samples_out = await self.unified_db.new_samples(
-                    samples=ref_samples_out
-                )
-                new_assembly_parts.append(liquid_samples_out[0])
-                LOGGER.info("liquid added")
+                added_out = await self.unified_db.new_samples(samples=ref_samples_out)
+                new_assembly_parts.append(added_out[0])
+                LOGGER.info(f"{name} added")
             if loaded_solid:
                 new_assembly_parts.append(loaded_solid[0])
                 LOGGER.info("solid recovered")
-            if loaded_gas:
-                new_assembly_parts.append(loaded_gas[0])
-                LOGGER.info("gas recovered")
+            if loaded_other:
+                new_assembly_parts.append(loaded_other[0])
+                LOGGER.info(f"{other.value} recovered")
 
             # old assembly, mark as incorporated
             custom_sample.reset_sample_status(SampleStatus.recovered)
             LOGGER.info("old assembly status set to recovered")
 
-            # add the old assembly to the samples_in which already contains source_liquid_in
+            # add the old assembly to the samples_in which already contains source_in
             samples_in.append(custom_sample)
             samples_in_initial.append(deepcopy(custom_sample))
 
@@ -1819,7 +1881,7 @@ class Archive:
             # create a new ref sample for new assembly
             error, ref_samples_out2 = await self.new_ref_samples(
                 # input for assembly is the custom sample
-                # and the new sample from source_liquid_in
+                # and the new sample from source_in
                 samples_in=new_assembly_parts,
                 sample_out_type=SampleType.assembly,
                 sample_position=custom,
@@ -1838,7 +1900,7 @@ class Archive:
                 LOGGER.error("could not convert reference assembly to real assembly")
                 return ErrorCodes.critical_error, [], []
 
-            # add new reference to samples out list which already contains new liquid mixture
+            # add new reference to samples out list which already contains new mixture
             samples_out.append(samples_out2[0])
             # and update the custom position with the new sample
 
@@ -1847,7 +1909,7 @@ class Archive:
             )
             if not replaced:
                 LOGGER.error(
-                    "could not replace sample with assembly when adding liquid"
+                    f"could not replace sample with assembly when adding {name}"
                 )
                 return ErrorCodes.critical_error, [], []
 
@@ -1872,7 +1934,7 @@ class Archive:
             # create a new ref sample first
             error, ref_samples_out2 = await self.new_ref_samples(
                 # input for assembly is the custom sample
-                # and the new sample from source_liquid_in
+                # and the new sample from source_in
                 samples_in=[custom_sample, samples_out[0]],
                 sample_out_type=SampleType.assembly,
                 sample_position=custom,
@@ -1900,391 +1962,8 @@ class Archive:
             )
             if not replaced:
                 LOGGER.error(
-                    "could not replace sample with assembly when adding liquid"
+                    f"could not replace sample with assembly when adding {name}"
                 )
-                return ErrorCodes.critical_error, [], []
-
-        else:
-            # nothing else possible
-            LOGGER.error(f"Cannot add sample to position {custom}")
-            return ErrorCodes.not_allowed, [], []
-
-        # update all samples_out in the db
-        await self.unified_db.update_samples(samples=samples_out)
-
-        # update all samples_in in the db
-        await self.unified_db.update_samples(samples=samples_in)
-
-        return error, samples_in_initial, samples_out
-
-    async def custom_add_gas(
-        self,
-        custom: Optional[str] = None,
-        source_gas_in: Optional[GasSample] = None,
-        volume_ml: float = 0.0,
-        combine_gases: bool = False,
-        dilute_gases: bool = True,
-        action: Optional[Action] = None,
-    ) -> tuple[
-        ErrorCodes,
-        list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
-        list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
-    ]:
-        """Transfer ``volume_ml`` of ``source_gas_in`` into ``custom``.
-
-        Mirrors :meth:`custom_add_liquid` but for :class:`GasSample`
-        reservoirs.
-
-        Returns:
-            ``(error_code, samples_in_initial, samples_out)``.
-        """
-
-        error = ErrorCodes.none
-        samples_in = []
-        samples_in_initial = []
-        samples_out = []
-
-        # (1) check if source_gas_in is not None
-        # and its a valid sample (add it to samples_in list)
-        if source_gas_in is None:
-            error = ErrorCodes.no_sample
-            return error, [], []
-        else:
-            # check if source_gas_in is valid
-            # converts source_gas_in to a list
-            source_gas_in = object_to_sample(source_gas_in)
-            samples_in = await self.unified_db.get_samples(samples=[source_gas_in])
-
-            if not samples_in:
-                LOGGER.error(f"source_gas_in '{source_gas_in}' is not in db")
-                error = ErrorCodes.no_sample
-                return error, [], []
-
-        if samples_in[0].sample_type != SampleType.gas:
-            LOGGER.error("Not a gas Sample")
-            return ErrorCodes.not_allowed, [], []
-
-        if samples_in[0].volume_ml < volume_ml:
-            LOGGER.error("Not enough volume available")
-            return ErrorCodes.not_available, [], []
-
-        samples_in[0].inheritance = SampleInheritance.give_only
-        samples_in[0].reset_sample_status(SampleStatus.preserved)
-        # save a deepcopy of initial state as we will return only initial
-        # samples_in and final samples_out
-        samples_in_initial.append(deepcopy(samples_in[0]))
-
-        # (2) verify if custom is a valid position
-        # and get sample from custom position
-        if custom in self.positions.customs_dict:
-            custom_sample = deepcopy(self.positions.customs_dict[custom].sample)
-            if isinstance(custom_sample, NoneSample):
-                LOGGER.error(
-                    f"No sample is loaded in custom position '{custom}', load one first."
-                )
-                error = ErrorCodes.no_sample
-                return error, [], []
-            else:
-                LOGGER.info(f"custom sample in valid position: {custom_sample}")
-        else:
-            error = ErrorCodes.not_available
-            return error, [], []
-
-        # (3) check if sample in custom position is valid
-        if custom_sample != NoneSample():
-            custom_samples_in = await self.unified_db.get_samples(
-                samples=[custom_sample]
-            )
-            if not custom_samples_in:
-                LOGGER.error("invalid sample in custom position")
-                error = ErrorCodes.critical_error
-                return error, [], []
-            else:
-                custom_sample = custom_samples_in[0]
-
-        LOGGER.info(
-            f"sample in custom position '{custom}' is {custom_sample.exp_dict()}"
-        )
-
-        # (4) create a new ref sample first for the amount we
-        # take from samples_in
-        # always sets reference status and inheritance to:
-        # status=[SampleStatus.created]
-        # inheritance=SampleInheritance.receive_only
-        error, ref_samples_out = await self.new_ref_samples(
-            # sample check converted source_gas_in
-            # to a list already
-            samples_in=samples_in,
-            sample_out_type=SampleType.gas,
-            sample_position=custom,
-            action=action,
-        )
-
-        if error != ErrorCodes.none:
-            return error, [], []
-
-        # set the volume to the requested value
-        ref_samples_out[0].sample_position = custom
-        ref_samples_out[0].volume_ml = volume_ml
-
-        # update volume of samples_in
-        # also sets status to destroyed if vol <= 0
-        # never dilute reservoir
-        update_vol(samples_in[0], delta_vol_ml=-volume_ml, dilute=False)
-
-        # (5) now decide what the new sample should be
-        # (5-1) custom is empty --> new sample is ref_samples_out[0]
-        # (5-2) we combine liquid from custom with ref_samples_out[0]
-        #       and create a new liquid (combine_liquids is True)
-        # (5-3) we create an assembly with custom_sample and ref_samples_out[0]
-
-        # (5-1)
-        if custom_sample == NoneSample():
-            # cannot always convert reference sample to real sample
-            # as at last 5-3 not always can do that
-            samples_out = await self.unified_db.new_samples(samples=ref_samples_out)
-            if not samples_out:
-                error = ErrorCodes.no_sample
-                return error, [], []
-
-            # replace sample in custom position
-            replaced, sample = await self.custom_replace_sample(
-                custom=custom, sample=samples_out[0]
-            )
-
-            if not replaced:
-                LOGGER.error("could not replace sample with assembly when adding gas")
-                error = ErrorCodes.critical_error
-
-        # (5-2)
-        # we only can combine samples if dilution for the position is allowed
-        # too, e.g. not allowed if custom is a reservoir type position
-        elif (
-            (custom_sample.sample_type == SampleType.gas)
-            # and combine_gases
-            and self.custom_dilution_allowed(custom=custom)
-        ):
-            # convert the ref samples that gets added to a real sample
-            samples_out = await self.unified_db.new_samples(samples=ref_samples_out)
-            if not samples_out:
-                error = ErrorCodes.no_sample
-                return error, [], []
-
-            # set sample status
-            custom_sample.inheritance = SampleInheritance.allow_both
-            custom_sample.reset_sample_status(SampleStatus.merged)
-            samples_out[0].inheritance = SampleInheritance.allow_both
-            samples_out[0].append_sample_status(SampleStatus.merged)
-
-            # add the custom sample to the samples_in
-            samples_in.append(custom_sample)
-            samples_in_initial.append(deepcopy(custom_sample))
-
-            # create a new ref sample which combines both gas samples
-            error, ref_samples_out2 = await self.new_ref_samples(
-                # input for assembly is the custom sample
-                # and the new sample from source_gas_in
-                samples_in=[custom_sample, samples_out[0]],
-                sample_out_type=SampleType.assembly,
-                sample_position=custom,
-                action=action,
-                combine_gases=combine_gases,
-            )
-
-            ref_samples_out2[0].sample_position = custom
-            ref_samples_out2[0].volume_ml = custom_sample.volume_ml
-            ref_samples_out2[0].dilution_factor = custom_sample.dilution_factor
-            update_vol(
-                ref_samples_out2[0],
-                delta_vol_ml=samples_out[0].volume_ml,
-                dilute=dilute_gases,
-            )
-
-            # a reference assembly was successfully created
-            # convert it now to a real sample
-            samples_out2 = await self.unified_db.new_samples(samples=ref_samples_out2)
-
-            if not samples_out2:
-                # reference could not be converted to a real sample
-                LOGGER.error("could not convert reference assembly to real assembly")
-                return ErrorCodes.critical_error, [], []
-
-            # add new reference to samples out list
-            samples_out.append(samples_out2[0])
-            # and update the custom position with the new sample
-
-            replaced, sample = await self.custom_replace_sample(
-                custom=custom, sample=samples_out2[0]
-            )
-            if not replaced:
-                LOGGER.error("could not replace sample with assembly when adding gas")
-                return ErrorCodes.critical_error, [], []
-
-        # (5-2b) gas + assembly case
-        elif (
-            (custom_sample.sample_type == SampleType.assembly)
-            # and combine_gases
-            and self.custom_assembly_allowed(custom=custom)
-        ):
-            # convert the ref samples that gets added to a real sample
-            # this next line populates local sqlite dbs with new gas sample, should
-            # be the gas created from new gas_in + existing assembly gas
-            samples_out = await self.unified_db.new_samples(samples=ref_samples_out)
-            if not samples_out:
-                error = ErrorCodes.no_sample
-                return error, [], []
-
-            # seprate assembly into solid and liquid and gas parts
-            loaded_liquid = [
-                p for p in custom_sample.parts if p.sample_type == SampleType.liquid
-            ]
-            loaded_solid = [
-                p for p in custom_sample.parts if p.sample_type == SampleType.solid
-            ]
-            loaded_gas = [
-                p for p in custom_sample.parts if p.sample_type == SampleType.gas
-            ]
-
-            new_assembly_parts = []
-
-            LOGGER.info("recovering parts from assembly")
-            if loaded_gas:
-                # create a new gas mixture
-                error, new_gas_mixture = await self.new_ref_samples(
-                    samples_in=[loaded_gas[0], samples_out[0]],
-                    sample_out_type=SampleType.assembly,
-                    sample_position=custom,
-                    action=action,
-                    combine_gases=combine_gases,
-                )
-                if combine_gases:  # there's only 1 gas in new ref
-                    new_gas_mixture[0].append_sample_status(SampleStatus.merged)
-                    # calculate volumes, dilutions
-                    new_gas_mixture[0].sample_position = custom
-                    new_gas_mixture[0].volume_ml = loaded_gas[0].volume_ml
-                    new_gas_mixture[0].dilution_factor = loaded_gas[0].dilution_factor
-                    update_vol(
-                        new_gas_mixture[0],
-                        delta_vol_ml=samples_out[0].volume_ml,
-                        dilute=dilute_gases,
-                    )
-                    gas_samples_out = await self.unified_db.new_samples(
-                        samples=new_gas_mixture
-                    )
-                    new_assembly_parts.append(gas_samples_out[0])
-                    # set inheritance and status for sample transfered out of source_gas_in
-                    samples_out[0].inheritance = SampleInheritance.allow_both
-                    samples_out[0].append_sample_status(SampleStatus.merged)
-                    LOGGER.info("gas recovered")
-                else:
-                    # add them separately
-                    new_assembly_parts.append(loaded_gas[0])
-                    new_assembly_parts.append(samples_out[0])
-                    pass
-            else:
-                gas_samples_out = await self.unified_db.new_samples(
-                    samples=ref_samples_out
-                )
-                new_assembly_parts.append(gas_samples_out[0])
-                LOGGER.info("gas added")
-            if loaded_solid:
-                new_assembly_parts.append(loaded_solid[0])
-                LOGGER.info("solid recovered")
-            if loaded_liquid:
-                new_assembly_parts.append(loaded_liquid[0])
-                LOGGER.info("liquid recovered")
-
-            # old assembly, mark as incorporated
-            custom_sample.reset_sample_status(SampleStatus.recovered)
-            LOGGER.info("old assembly status set to recovered")
-
-            # add the old assembly to the samples_in which already contains source_gas_in
-            samples_in.append(custom_sample)
-            samples_in_initial.append(deepcopy(custom_sample))
-
-            LOGGER.info("creating new assembly reference")
-            # create a new ref sample for new assembly
-            error, ref_samples_out2 = await self.new_ref_samples(
-                # input for assembly is the custom sample
-                # and the new sample from source_gas_in
-                samples_in=new_assembly_parts,
-                sample_out_type=SampleType.assembly,
-                sample_position=custom,
-                action=action,
-            )
-            LOGGER.info("new assembly was successfully created")
-            ref_samples_out2[0].sample_position = custom
-
-            # a reference assembly was successfully created
-            # convert it now to a real sample
-            LOGGER.info("adding new assembly to sqlite db")
-            samples_out2 = await self.unified_db.new_samples(samples=ref_samples_out2)
-
-            if not samples_out2:
-                # reference could not be converted to a real sample
-                LOGGER.error("could not convert reference assembly to real assembly")
-                return ErrorCodes.critical_error, [], []
-
-            # add new reference to samples out list which already contains new gas mixture
-            samples_out.append(samples_out2[0])
-            # and update the custom position with the new sample
-
-            replaced, sample = await self.custom_replace_sample(
-                custom=custom, sample=samples_out2[0]
-            )
-            if not replaced:
-                LOGGER.error("could not replace sample with assembly when adding gas")
-                return ErrorCodes.critical_error, [], []
-
-        # (5-3)
-        # custom holds a sample and we need to create an assembly
-        elif self.custom_assembly_allowed(custom=custom):
-            # convert the ref samples that gets added to a real sample
-            samples_out = await self.unified_db.new_samples(samples=ref_samples_out)
-            if not samples_out:
-                error = ErrorCodes.no_sample
-                return error, [], []
-
-            # set sample status
-            custom_sample.inheritance = SampleInheritance.allow_both
-            custom_sample.reset_sample_status(SampleStatus.incorporated)
-            samples_out[0].append_sample_status(SampleStatus.incorporated)
-
-            # add the custom sample to the samples_in
-            samples_in.append(custom_sample)
-            samples_in_initial.append(deepcopy(custom_sample))
-
-            # create a new ref sample first
-            error, ref_samples_out2 = await self.new_ref_samples(
-                # input for assembly is the custom sample
-                # and the new sample from source_gas_in
-                samples_in=[custom_sample, samples_out[0]],
-                sample_out_type=SampleType.assembly,
-                sample_position=custom,
-                action=action,
-            )
-
-            if error != ErrorCodes.none:
-                # something went wrong when creating the reference assembly
-                return error, [], []
-
-            # a reference assembly was successfully created
-            # convert it now to a real sample
-            samples_out2 = await self.unified_db.new_samples(samples=ref_samples_out2)
-            if not samples_out2:
-                # reference could not be converted to a real sample
-                LOGGER.error("could not convert reference assembly to real assembly")
-                return ErrorCodes.critical_error, [], []
-
-            # add new reference to samples out list
-            samples_out.append(samples_out2[0])
-
-            # and update the custom position with the new sample
-            replaced, sample = await self.custom_replace_sample(
-                custom=custom, sample=samples_out2[0]
-            )
-            if not replaced:
-                LOGGER.error("could not replace sample with assembly when adding gas")
                 return ErrorCodes.critical_error, [], []
 
         else:
