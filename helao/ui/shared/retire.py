@@ -3,14 +3,15 @@
 Reflex-free logic module. Design and contracts:
 docs/superpowers/specs/2026-10-06-sequence-retire-page-design.md
 
-This part holds the dataclasses, the anchored line scans, ``locate``,
-``in_flight`` and ``ledger_path_for``. Seq ymls can be ~10 MB, so nothing
-here parses YAML.
+Holds the dataclasses, the anchored line scans, ``locate``, ``in_flight``,
+``ledger_path_for``, ``inventory`` and the guarded ``retire``. Seq ymls can be
+~10 MB, so nothing here parses YAML.
 """
 
 from __future__ import annotations
 
 import asyncio
+import fnmatch
 import glob
 import json
 import os
@@ -30,6 +31,7 @@ ENTITY_TYPES = ("EXPERIMENT", "ACTION", "PROCESS", "ANALYSIS")
 DELETE_ORDER = ("ANALYSIS", "ACTION", "PROCESS", "EXPERIMENT", "SEQUENCE")
 MUST_404 = frozenset({"PROCESS", "ANALYSIS", "SEQUENCE"})
 SUPERSEDED = "RUNS_SUPERSEDED"
+DELETE_CONCURRENCY = 8
 _NULLS = {"", "null", "None", "~"}
 
 
@@ -352,3 +354,252 @@ async def inventory(
             _analysis_dirs, root, all_procs | in_api["ANALYSIS"]
         ),
     )
+
+
+_ANCHOR = "; no files were moved"
+
+
+def _st_dev(path: str) -> int:
+    return os.stat(path).st_dev
+
+
+def _nearest_existing(path: str) -> str:
+    while not os.path.exists(path):
+        parent = os.path.dirname(path)
+        if parent == path:
+            break
+        path = parent
+    return path
+
+
+def _paths(root: str, loc: SeqLocation, date: str) -> tuple[str, str]:
+    src = os.path.join(root, loc.run_tree, *loc.rel_dir.split("/"))
+    dst = os.path.join(
+        root, SUPERSEDED, f"{date}_retired", loc.run_tree, *loc.rel_dir.split("/")
+    )
+    return src, dst
+
+
+def _move_guard(root: str, loc: SeqLocation, src: str, dst: str) -> str:
+    """Why this move must be refused, or "" when every guard holds."""
+    if not fnmatch.fnmatch(loc.run_tree, "RUNS*") or loc.run_tree == SUPERSEDED:
+        return f"run tree {loc.run_tree!r} is not movable"
+    tree = os.path.realpath(os.path.join(root, loc.run_tree))
+    if not os.path.realpath(src).startswith(tree + os.sep):
+        return f"{src} is not strictly inside {tree}"
+    if os.path.lexists(dst):
+        return f"destination {dst} already exists"
+    if _st_dev(src) != _st_dev(_nearest_existing(os.path.dirname(dst))):
+        return f"{src} and {dst} are on different devices"
+    return ""
+
+
+def _append(path: str, rec: dict) -> None:
+    with open(path, "a") as f:
+        f.write(json.dumps(rec) + "\n")
+        f.flush()
+
+
+def _fail(res: RetireResult, msg: str, *, moved: bool = False) -> RetireResult:
+    res.ok = False
+    res.error = msg if moved else msg + _ANCHOR
+    return res
+
+
+async def retire(
+    client: Any, root: str, inv: Inventory, progress: Progress, ledger_path: str
+) -> RetireResult:
+    """Guarded, children-first delete of one sequence, then move its run dirs.
+
+    Never raises: every failure is ``ok=False`` with ``error`` set.
+    """
+    res = RetireResult(False, ledger_path, {}, {}, {}, [])
+    try:
+        return await _retire(client, root, inv, progress, ledger_path, res)
+    except Exception as exc:  # the contract is "never raises"
+        LOGGER.exception("retire: unexpected failure")
+        return _fail(res, f"unexpected error: {exc!r}")
+
+
+async def _retire(
+    client: Any,
+    root: str,
+    inv: Inventory,
+    progress: Progress,
+    ledger_path: str,
+    res: RetireResult,
+) -> RetireResult:
+    stop = False
+    errors: list[str] = []
+
+    def log(entity_type: str, uuid: str, outcome: str, detail: str = "") -> bool:
+        """Append one ledger line; an OSError sets the stop flag."""
+        nonlocal stop
+        try:
+            _append(
+                ledger_path,
+                {
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                    "entity_type": entity_type,
+                    "uuid": uuid,
+                    "outcome": outcome,
+                    "detail": detail,
+                },
+            )
+            return True
+        except OSError as exc:
+            stop = True
+            errors.append(f"ledger write failed: {exc}")
+            return False
+
+    # 1. ledger first
+    n_rows = sum(len(inv.in_api[t]) for t in DELETE_ORDER if t != "SEQUENCE")
+    total = n_rows + int(inv.sequence_in_api) + len(inv.locations)
+    try:
+        os.makedirs(os.path.dirname(ledger_path), exist_ok=True)
+        _append(
+            ledger_path,
+            {
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "entity_type": "SEQUENCE",
+                "uuid": inv.sequence_uuid,
+                "outcome": "start",
+                "detail": {
+                    "api_rows": {
+                        t: len(inv.in_api[t]) for t in DELETE_ORDER if t in inv.in_api
+                    },
+                    "sequence_in_api": inv.sequence_in_api,
+                    "locations": len(inv.locations),
+                },
+            },
+        )
+    except OSError as exc:
+        return _fail(res, f"cannot write ledger {ledger_path}: {exc}")
+
+    # 2. re-verify
+    def reverify() -> str:
+        for loc in inv.locations:
+            if not names_uuid(loc.seq_yml, inv.sequence_uuid):
+                return loc.seq_yml
+        return ""
+
+    if bad := await asyncio.to_thread(reverify):
+        return _fail(res, f"{bad} no longer names this sequence; re-gather")
+
+    # 3. pre-check every move
+    date = datetime.now(timezone.utc).strftime("%Y%m%d")
+    plan = [(loc, *_paths(root, loc, date)) for loc in inv.locations]
+
+    def precheck() -> str:
+        for loc, src, dst in plan:
+            if why := _move_guard(root, loc, src, dst):
+                return why
+        return ""
+
+    if why := await asyncio.to_thread(precheck):
+        return _fail(res, f"move refused: {why}")
+
+    # 4. delete, children first
+    sem = asyncio.Semaphore(DELETE_CONCURRENCY)
+    done = 0
+    deleted_rows: list[tuple[str, str]] = []
+
+    async def delete_one(t: str, uuid: str) -> None:
+        nonlocal done, stop
+        async with sem:
+            if stop:
+                return
+            detail = ""
+            try:
+                await _op(client, "delete_command")(
+                    entity_type=t,
+                    primary_id=uuid,
+                    delete_connected_processes=(t == "SEQUENCE"),
+                )
+                outcome = "deleted"
+            except Exception as exc:
+                if is_not_found(exc):
+                    outcome = "absent"
+                elif t == "SEQUENCE" and is_timeout_or_504(exc):
+                    try:
+                        gone = not await exists(client, "SEQUENCE", uuid)
+                    except Exception as probe_exc:
+                        gone, exc = False, probe_exc
+                    if gone:
+                        outcome, detail = (
+                            "deleted",
+                            "confirmed absent after timeout/504",
+                        )
+                    else:
+                        outcome, detail = "error", repr(exc)
+                else:
+                    outcome, detail = "error", repr(exc)
+            if outcome == "deleted":
+                res.deleted[t] = res.deleted.get(t, 0) + 1
+                deleted_rows.append((t, uuid))
+            elif outcome == "absent":
+                res.already_absent[t] = res.already_absent.get(t, 0) + 1
+            else:
+                stop = True
+                errors.append(f"delete {t} {uuid} failed: {detail}")
+            log(t, uuid, outcome, detail)
+            done += 1
+            await progress(f"delete:{t}", done, total)
+
+    for t in DELETE_ORDER:
+        rows = sorted(inv.in_api[t]) if t != "SEQUENCE" else []
+        if t == "SEQUENCE" and inv.sequence_in_api:
+            rows = [inv.sequence_uuid]
+        await asyncio.gather(*(delete_one(t, u) for u in rows), return_exceptions=True)
+        if stop:
+            return _fail(res, "; ".join(errors))
+
+    # 5. read-back
+    persisting: dict[str, list[str]] = {}
+    failed: list[str] = []
+
+    async def read_back(t: str, uuid: str) -> None:
+        async with sem:
+            try:
+                present = await exists(client, t, uuid)
+            except Exception as exc:
+                failed.append(f"read-back of {t} {uuid} failed: {exc!r}")
+                return
+        if not present:
+            return
+        log(t, uuid, "persists", "row still readable after acknowledged delete")
+        if t in MUST_404:
+            failed.append(f"{t} {uuid} still exists after delete")
+        else:
+            persisting.setdefault(t, []).append(uuid)
+
+    await asyncio.gather(*(read_back(t, u) for t, u in deleted_rows))
+    await progress("readback", len(deleted_rows), len(deleted_rows))
+    res.persisting = {t: sorted(v) for t, v in persisting.items()}
+    if failed or stop:
+        return _fail(res, "; ".join(failed + errors))
+
+    # 6. move
+    def move(loc: SeqLocation, src: str, dst: str) -> None:
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        if why := _move_guard(root, loc, src, dst):
+            raise OSError(why)
+        os.rename(src, dst)
+
+    for i, (loc, src, dst) in enumerate(plan, 1):
+        try:
+            await asyncio.to_thread(move, loc, src, dst)
+        except OSError as exc:
+            log("DIR", src, "move_failed", dst)
+            return _fail(
+                res,
+                f"move of {src} failed: {exc}; API rows are already deleted",
+                moved=True,
+            )
+        res.moved.append((src, dst))
+        log("DIR", src, "moved", dst)
+        await progress("move", i, total)
+        if stop:
+            return _fail(res, "; ".join(errors), moved=True)
+    res.ok = True
+    return res

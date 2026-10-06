@@ -3,7 +3,6 @@
 import asyncio
 import json
 import os
-import time
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -272,9 +271,9 @@ def test_analysis_dirs_are_reported_not_required(tmp_path):
     assert inv.analysis_dirs == [str(d)]
 
 
-def test_analysis_dirs_read_only_yml_and_skip_unreadable(tmp_path):
-    """Mutation: reading every file (drop the .yml filter), or letting OSError
-    from an unreadable yml propagate."""
+def test_analysis_dirs_read_only_yml_and_skip_non_files(tmp_path):
+    """Mutation: reading every file (drop the .yml filter), or treating a
+    directory named *.yml as a file."""
     root = str(tmp_path)
     make_run_tree(root, "RUNS", REL, sequence_uuid=U, experiments=EXPS)
     base = tmp_path / "ANALYSES" / "2026" / "1005"
@@ -284,15 +283,7 @@ def test_analysis_dirs_read_only_yml_and_skip_unreadable(tmp_path):
     bad = base / "130000__bad"
     bad.mkdir()
     (bad / "x.yml").mkdir()  # a directory named x.yml: not a file, skipped
-    unreadable = base / "140000__perm"
-    unreadable.mkdir()
-    f = unreadable / "y.yml"
-    f.write_text("process_uuid: P2\n")
-    f.chmod(0)
-    try:
-        inv = asyncio.run(retire.inventory(_full_client(), root, U, _noprogress))
-    finally:
-        f.chmod(0o644)
+    inv = asyncio.run(retire.inventory(_full_client(), root, U, _noprogress))
     assert inv.analysis_dirs == []
 
 
@@ -314,33 +305,31 @@ def test_unreadable_yml_oserror_is_skipped(tmp_path, monkeypatch):
 
 def test_failed_probe_cancels_pending_probes(tmp_path):
     """Mutation: dropping the cancel of pending tasks on failure (the raise then
-    waits out the slow reads and their progress ticks)."""
+    leaves the slow reads pending, so none records a cancellation)."""
     root = str(tmp_path)
     make_run_tree(root, "RUNS", REL, sequence_uuid=U, experiments=EXPS)
     client = _full_client()
     client.fail[("read", "A1")] = "500"
-    orig = client.read_experiment
+    never = asyncio.Event()
+    cancelled: list[str] = []
 
     async def slow(*, experiment_uuid):
-        await asyncio.sleep(0.3)
-        return await orig(experiment_uuid=experiment_uuid)
+        try:
+            await never.wait()
+        except asyncio.CancelledError:
+            cancelled.append(experiment_uuid)
+            raise
 
-    client.read_experiment = slow
-    ticks = []
-
-    async def progress(*a):
-        ticks.append(a)
+    setattr(client, "read_experiment", slow)
 
     async def run():
-        t0 = time.monotonic()
         with pytest.raises(RuntimeError):
-            await retire.inventory(client, root, U, progress)
-        assert time.monotonic() - t0 < 0.2  # did not wait out the slow reads
-        n = len(ticks)
-        await asyncio.sleep(0.6)
-        return n
+            await asyncio.wait_for(
+                retire.inventory(client, root, U, _noprogress), timeout=5
+            )
 
-    assert asyncio.run(run()) == len(ticks)
+    asyncio.run(run())
+    assert sorted(cancelled) == ["E1", "E2"]
 
 
 def test_processes_by_sequence_non_list_raises(tmp_path):
@@ -350,7 +339,7 @@ def test_processes_by_sequence_non_list_raises(tmp_path):
     async def bad(*, sequence_uuid):
         return {"detail": "x"}
 
-    client.read_processes_by_sequence = bad  # type: ignore
+    setattr(client, "read_processes_by_sequence", bad)
     with pytest.raises(
         RuntimeError,
         match=r"read_processes_by_sequence returned dict; expected a list",
@@ -387,3 +376,280 @@ def test_null_uuid_in_api_list_rows_is_skipped(tmp_path):
     client.read_analysis_by_process = ans
     inv = asyncio.run(retire.inventory(client, str(tmp_path), U, _noprogress))
     assert inv.in_api["PROCESS"] == {"P9"} and inv.in_api["ANALYSIS"] == set()
+
+
+# ---- retire() ---------------------------------------------------------------
+
+TODAY = lambda: datetime.now(timezone.utc).strftime("%Y%m%d")  # noqa: E731
+
+
+def _setup(tmp_path, run_trees=("RUNS_FINISHED",), client=None, experiments=EXPS):
+    root = str(tmp_path)
+    for rt in run_trees:
+        make_run_tree(root, rt, REL, sequence_uuid=U, experiments=experiments)
+    client = client or _full_client()
+    inv = asyncio.run(retire.inventory(client, root, U, _noprogress))
+    ledger = os.path.join(root, "STATES", "retire_test.jsonl")
+    return root, client, inv, ledger
+
+
+def _run(client, root, inv, ledger, progress=_noprogress):
+    return asyncio.run(retire.retire(client, root, inv, progress, ledger))
+
+
+def _lines(ledger):
+    with open(ledger) as f:
+        return [json.loads(x) for x in f]
+
+
+def _src(root, rt="RUNS_FINISHED"):
+    return os.path.join(root, rt, *REL.split("/"))
+
+
+def _dst(root, rt="RUNS_FINISHED"):
+    return os.path.join(
+        root, "RUNS_SUPERSEDED", f"{TODAY()}_retired", rt, *REL.split("/")
+    )
+
+
+def test_delete_order_is_children_first(tmp_path):
+    """Mutation: swapping two entries of DELETE_ORDER, or starting all the types
+    at once."""
+    root, client, inv, ledger = _setup(tmp_path)
+    res = _run(client, root, inv, ledger)
+    assert res.ok, res.error
+    order = ["ANALYSIS", "ACTION", "PROCESS", "EXPERIMENT", "SEQUENCE"]
+    types = [c[1] for c in client.calls]
+    assert types == sorted(types, key=order.index)  # no interleaving
+    assert set(types) == set(order)
+
+
+def test_action_500_stops_before_sequence_and_move(tmp_path):
+    """Mutation: `continue` instead of stop, or moving before checking."""
+    root, client, inv, ledger = _setup(tmp_path)
+    client.fail[("delete", "A1")] = "500"
+    res = _run(client, root, inv, ledger)
+    assert not res.ok and "no files were moved" in res.error
+    assert not {"PROCESS", "EXPERIMENT", "SEQUENCE"} & {c[1] for c in client.calls}
+    assert os.path.isdir(_src(root)) and not os.path.exists(_dst(root))
+    assert res.moved == []
+
+
+def test_sequence_504_then_probe_404_succeeds(tmp_path):
+    """Mutation: trusting the 504 as an error without probing."""
+    root, client, inv, ledger = _setup(tmp_path)
+    client.fail[("delete", U)] = "504"
+    real = client.delete_command
+
+    async def delete_then_504(*, entity_type, primary_id, delete_connected_processes):
+        if entity_type == "SEQUENCE":
+            client.rows["SEQUENCE"].discard(primary_id)
+        return await real(
+            entity_type=entity_type,
+            primary_id=primary_id,
+            delete_connected_processes=delete_connected_processes,
+        )
+
+    setattr(client, "delete_command", delete_then_504)
+    res = _run(client, root, inv, ledger)
+    assert res.ok, res.error
+    seq = [x for x in _lines(ledger) if x["entity_type"] == "SEQUENCE"]
+    assert seq[-1]["outcome"] == "deleted"
+    assert seq[-1]["detail"] == "confirmed absent after timeout/504"
+    assert os.path.isdir(_dst(root))
+
+
+def test_sequence_timeout_then_probe_200_fails(tmp_path):
+    """Mutation: treating any timeout as success."""
+    root, client, inv, ledger = _setup(tmp_path)
+    client.fail[("delete", U)] = "timeout"
+    res = _run(client, root, inv, ledger)
+    assert not res.ok and "no files were moved" in res.error
+    assert os.path.isdir(_src(root)) and not os.path.exists(_dst(root))
+    seq = [l for l in _lines(ledger) if l["entity_type"] == "SEQUENCE"]
+    assert [l["outcome"] for l in seq] == ["start", "error"]
+
+
+def test_persisting_experiment_action_warn_but_succeed(tmp_path):
+    """Mutation: putting EXPERIMENT in MUST_404."""
+    root, client, inv, ledger = _setup(tmp_path)
+    client.persist = {"E1", "A1"}
+    res = _run(client, root, inv, ledger)
+    assert res.ok, res.error
+    assert res.persisting == {"EXPERIMENT": ["E1"], "ACTION": ["A1"]}
+    assert os.path.isdir(_dst(root)) and not os.path.exists(_src(root))
+    assert {x["uuid"] for x in _lines(ledger) if x["outcome"] == "persists"} == {
+        "E1",
+        "A1",
+    }
+
+
+def test_persisting_process_fails_before_move(tmp_path):
+    """Mutation: removing PROCESS from MUST_404."""
+    root, client, inv, ledger = _setup(tmp_path)
+    client.persist = {"P1"}
+    res = _run(client, root, inv, ledger)
+    assert not res.ok and "P1" in res.error and "no files were moved" in res.error
+    assert os.path.isdir(_src(root))
+
+
+def test_ledger_has_one_line_per_row_and_survives_failure(tmp_path, monkeypatch):
+    """Mutation: buffering lines and writing them at the end."""
+    monkeypatch.setattr(retire, "DELETE_CONCURRENCY", 1)
+    exps = {"E1": [("A1", None), ("A2", None), ("A3", None)]}
+    client = FakeMetadataClient(
+        {
+            "SEQUENCE": {U},
+            "EXPERIMENT": {"E1"},
+            "ACTION": {"A1", "A2", "A3"},
+            "PROCESS": {"P_api"},
+            "ANALYSIS": {"AN1"},
+        },
+        seq_processes={U: ["P_api"]},
+        analyses={"P_api": ["AN1"]},
+    )
+    root, client, inv, ledger = _setup(tmp_path, client=client, experiments=exps)
+    acts = sorted(inv.in_api["ACTION"])
+    client.fail[("delete", acts[1])] = "500"
+    seen = []
+    real = client.delete_command
+
+    async def checked(*, entity_type, primary_id, delete_connected_processes):
+        if primary_id == acts[1]:
+            seen.extend(_lines(ledger))  # earlier lines must already be on disk
+        return await real(
+            entity_type=entity_type,
+            primary_id=primary_id,
+            delete_connected_processes=delete_connected_processes,
+        )
+
+    setattr(client, "delete_command", checked)
+    res = _run(client, root, inv, ledger)
+    assert not res.ok
+    assert [(x["entity_type"], x["outcome"]) for x in seen] == [
+        ("SEQUENCE", "start"),
+        ("ANALYSIS", "deleted"),
+        ("ACTION", "deleted"),
+    ]
+    final = _lines(ledger)
+    assert [(x["entity_type"], x["outcome"]) for x in final] == [
+        ("SEQUENCE", "start"),
+        ("ANALYSIS", "deleted"),
+        ("ACTION", "deleted"),
+        ("ACTION", "error"),
+    ]
+    assert {"ts", "entity_type", "uuid", "outcome", "detail"} <= set(final[-1])
+
+
+def test_run_dir_lands_in_superseded_layout(tmp_path):
+    """Mutation: dropping <run_tree> from the dst."""
+    root, client, inv, ledger = _setup(tmp_path)
+    res = _run(client, root, inv, ledger)
+    assert res.ok, res.error
+    assert res.moved == [(_src(root), _dst(root))]
+    assert os.path.isdir(_dst(root)) and not os.path.exists(_src(root))
+    moved = [x for x in _lines(ledger) if x["outcome"] == "moved"]
+    assert moved[0]["entity_type"] == "DIR"
+    assert (moved[0]["uuid"], moved[0]["detail"]) == (_src(root), _dst(root))
+
+
+def test_changed_seq_yml_refuses_with_zero_deletes(tmp_path):
+    """Mutation: removing the re-verify."""
+    root, client, inv, ledger = _setup(tmp_path)
+    yml = inv.locations[0].seq_yml
+    with open(yml) as f:
+        text = f.read()
+    with open(yml, "w") as f:
+        f.write(text.replace(f"\nsequence_uuid: {U}\n", "\nsequence_uuid: other\n"))
+    res = _run(client, root, inv, ledger)
+    assert not res.ok and "re-gather" in res.error
+    assert client.calls == [] and os.path.isdir(_src(root))
+
+
+def test_source_equal_to_run_tree_root_is_refused(tmp_path):
+    """Mutation: `>=` containment instead of strict."""
+    root, client, inv, ledger = _setup(tmp_path)
+    inv.locations[0] = retire.SeqLocation(
+        "RUNS_FINISHED", ".", inv.locations[0].seq_yml, "", "", ""
+    )
+    res = _run(client, root, inv, ledger)
+    assert not res.ok and client.calls == [] and "no files were moved" in res.error
+    assert os.path.isdir(os.path.join(root, "RUNS_FINISHED"))
+
+
+def test_existing_destination_is_refused_before_deletes(tmp_path):
+    """Mutation: deferring the dst check to move time."""
+    root, client, inv, ledger = _setup(tmp_path)
+    os.makedirs(_dst(root))
+    res = _run(client, root, inv, ledger)
+    assert not res.ok and client.calls == [] and "no files were moved" in res.error
+    assert os.path.isdir(_src(root))
+
+
+def test_cross_device_is_refused_before_deletes(tmp_path, monkeypatch):
+    """Mutation: removing the device comparison."""
+    root, client, inv, ledger = _setup(tmp_path)
+    real = retire._st_dev
+    monkeypatch.setattr(
+        retire,
+        "_st_dev",
+        lambda p: real(p)
+        + (1 if "RUNS_FINISHED" in p and "SUPERSEDED" not in p else 0),
+    )
+    res = _run(client, root, inv, ledger)
+    assert not res.ok and client.calls == [] and "no files were moved" in res.error
+    assert os.path.isdir(_src(root))
+
+
+def test_two_locations_are_both_moved(tmp_path):
+    """Mutation: moving locations[0] only."""
+    root, client, inv, ledger = _setup(tmp_path, ("RUNS_SYNCED", "RUNS_FINISHED"))
+    assert len(inv.locations) == 2
+    res = _run(client, root, inv, ledger)
+    assert res.ok, res.error
+    for rt in ("RUNS_SYNCED", "RUNS_FINISHED"):
+        assert os.path.isdir(_dst(root, rt)) and not os.path.exists(_src(root, rt))
+    assert len(res.moved) == 2
+
+
+def test_second_location_dest_clash_refuses_before_deletes(tmp_path):
+    """Mutation: pre-checking only the first location."""
+    root, client, inv, ledger = _setup(tmp_path, ("RUNS_FINISHED", "RUNS_SYNCED"))
+    os.makedirs(_dst(root, inv.locations[1].run_tree))
+    res = _run(client, root, inv, ledger)
+    assert not res.ok and client.calls == [] and "no files were moved" in res.error
+
+
+def test_retry_after_failure_moves_with_no_deletes(tmp_path):
+    """Mutation: making retire refuse an inventory with no API rows."""
+    root, client, inv, ledger = _setup(tmp_path)
+    client.persist = {"P1"}
+    assert not _run(client, root, inv, ledger).ok
+    client.persist = set()
+    client.rows = {t: set() for t in client.rows}
+    client.seq_processes = {}
+    client.analyses = {}
+    inv2 = asyncio.run(retire.inventory(client, root, U, _noprogress))
+    assert not any(inv2.in_api.values()) and not inv2.sequence_in_api
+    client.calls.clear()
+    res = _run(client, root, inv2, os.path.join(root, "STATES", "retry.jsonl"))
+    assert res.ok, res.error
+    assert client.calls == [] and os.path.isdir(_dst(root))
+
+
+def test_unwritable_ledger_fails_before_any_delete(tmp_path):
+    """Mutation: opening the ledger lazily on the first outcome."""
+    root, client, inv, _ = _setup(tmp_path)
+    blocker = tmp_path / "notadir"
+    blocker.write_text("x")
+    res = _run(client, root, inv, str(blocker / "sub" / "l.jsonl"))
+    assert not res.ok and client.calls == []
+    assert os.path.isdir(_src(root))
+
+
+def test_ledger_dir_is_created(tmp_path):
+    """Mutation: removing the makedirs."""
+    root, client, inv, ledger = _setup(tmp_path)
+    assert not os.path.exists(os.path.join(root, "STATES"))
+    assert _run(client, root, inv, ledger).ok
+    assert os.path.isfile(ledger)
