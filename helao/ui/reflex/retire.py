@@ -141,7 +141,10 @@ class RetireState(rx.State):
             hit = None
             if sources_root:
                 hit = await asyncio.to_thread(
-                    retire_logic.in_flight, sources_root, u, [l.rel_dir for l in locs]
+                    retire_logic.in_flight,
+                    sources_root,
+                    u,
+                    [loc.rel_dir for loc in locs],
                 )
             if hit:
                 err = f"batch conversion in flight: {hit}"
@@ -191,27 +194,27 @@ class RetireState(rx.State):
 
     @rx.event(background=True)
     async def do_retire(self):
-        async with self:
-            if not retire_enabled():
-                return
-            inv = self._inv
-            if self.phase != "armed" or inv is None:
-                self.error = "gather and confirm first"
-                return
-            root = _CONFIG["root"]
-        # No await between locked() and acquire(): another handler cannot slip
-        # in, so a second click reports busy instead of queueing a second retire.
-        if _RETIRE_LOCK.locked():
-            async with self:
-                self.error = "a retire is already running"
-            return
-        await _RETIRE_LOCK.acquire()
+        held = False
         try:
+            async with self:
+                if not retire_enabled() or self.busy:
+                    return  # a running gather/retire owns the state: write nothing
+                inv = self._inv
+                if self.phase != "armed" or inv is None:
+                    self.error = "gather and confirm first"
+                    return
+                # No await between locked() and acquire(): another handler cannot
+                # slip in, so a second click reports busy, not a second retire.
+                if _RETIRE_LOCK.locked():
+                    self.error = "a retire is already running"
+                    return
+                await _RETIRE_LOCK.acquire()
+                held = True
+                # busy is set in this block, so nothing can interleave after it.
+                self.busy, self.phase, self.progress = True, "retiring", 0
+                root = _CONFIG["root"]
             result = None
             error = ""
-            async with self:
-                self.busy, self.phase, self.error = True, "retiring", ""
-                self.progress = 0
             try:
                 client = api.get_client()
             except Exception as exc:
@@ -223,12 +226,17 @@ class RetireState(rx.State):
                 )
                 async with self:
                     self.ledger = ledger
-                result = await retire_logic.retire(
-                    client, root, inv, _progress(self), ledger
-                )
+                try:
+                    result = await retire_logic.retire(
+                        client, root, inv, _progress(self), ledger
+                    )
+                except asyncio.CancelledError:
+                    async with self:
+                        self.busy, self.phase = False, "failed"
+                        self.error = "retire cancelled; API rows may be deleted"
+                    raise
             async with self:
-                if result is not None and result.ok:
-                    self.phase = "done"
+                if result is not None:
                     self.warnings = [
                         *self.warnings,
                         *(
@@ -237,13 +245,16 @@ class RetireState(rx.State):
                             for t, u in result.persisting.items()
                         ),
                     ]
+                if result is not None and result.ok:
+                    self.phase, self.status, self.error = "done", "retired", ""
                     self.moved = [f"{s} -> {d}" for s, d in result.moved]
                 else:
                     self.phase = "failed"
                     self.error = result.error if result is not None else error
                 self._inv, self.armed, self.busy = None, False, False
         finally:
-            _RETIRE_LOCK.release()
+            if held:
+                _RETIRE_LOCK.release()
 
 
 def _count_row(row: list[str]) -> rx.Component:

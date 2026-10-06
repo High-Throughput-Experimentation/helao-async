@@ -24,7 +24,7 @@ def test_prefix_uuid_does_not_match(tmp_path):
         root, "RUNS_FINISHED", "26.40/1005/20261005.110000__SEQ", sequence_uuid=U + "0"
     )
     locs = retire.locate(root, U)
-    assert [l.rel_dir for l in locs] == [REL]
+    assert [loc.rel_dir for loc in locs] == [REL]
 
 
 def test_indented_sequence_uuid_creates_no_location(tmp_path):
@@ -148,7 +148,7 @@ def test_classifiers_read_the_real_client_error_format():
     assert not retire.is_not_found(e500) and not retire.is_timeout_or_504(e500)
     assert not retire.is_not_found(e504) and retire.is_timeout_or_504(e504)
     fake = FakeMetadataClient({})
-    fake.fail[("read", "t")] = "timeout"
+    fake.fail[("read_action", "t")] = "timeout"
     with pytest.raises(RuntimeError) as ei:
         asyncio.run(fake.read_action(action_uuid="t"))
     assert retire.is_timeout_or_504(ei.value) and not retire.is_not_found(ei.value)
@@ -202,7 +202,7 @@ def test_probe_500_raises_and_is_not_counted_absent(tmp_path):
     root = str(tmp_path)
     make_run_tree(root, "RUNS", REL, sequence_uuid=U, experiments=EXPS)
     client = _full_client()
-    client.fail[("read", "A1")] = "500"
+    client.fail[("read_action", "A1")] = "500"
     with pytest.raises(RuntimeError, match="probe of ACTION A1 failed"):
         asyncio.run(retire.inventory(client, root, U, _noprogress))
 
@@ -309,7 +309,7 @@ def test_failed_probe_cancels_pending_probes(tmp_path):
     root = str(tmp_path)
     make_run_tree(root, "RUNS", REL, sequence_uuid=U, experiments=EXPS)
     client = _full_client()
-    client.fail[("read", "A1")] = "500"
+    client.fail[("read_action", "A1")] = "500"
     never = asyncio.Event()
     cancelled: list[str] = []
 
@@ -351,7 +351,8 @@ def test_processes_by_sequence_non_list_raises(tmp_path):
 def test_processes_by_sequence_404_is_empty(tmp_path):
     """Mutation: letting the 404 from read_processes_by_sequence propagate."""
     client = _full_client()
-    client.fail[("read", U)] = "404"  # read_sequence 404 too
+    client.fail[("read_sequence", U)] = "404"
+    client.fail[("read_processes_by_sequence", U)] = "404"
     inv = asyncio.run(retire.inventory(client, str(tmp_path), U, _noprogress))
     assert inv.in_api["PROCESS"] == set() and not inv.sequence_in_api
 
@@ -458,7 +459,7 @@ def test_action_500_stops_before_sequence_and_move(tmp_path):
     """Mutation: `continue` instead of stop, moving before checking, or one gather
     over all the rows."""
     root, client, inv, ledger = _setup(tmp_path)
-    client.fail[("delete", "A1")] = "500"
+    client.fail[("delete_command", "A1")] = "500"
     _yielding(client)  # lets every other delete start before A1 fails
     res = _run(client, root, inv, ledger)
     assert not res.ok and "no files were moved" in res.error
@@ -470,7 +471,7 @@ def test_action_500_stops_before_sequence_and_move(tmp_path):
 def test_sequence_504_then_probe_404_succeeds(tmp_path):
     """Mutation: trusting the 504 as an error without probing."""
     root, client, inv, ledger = _setup(tmp_path)
-    client.fail[("delete", U)] = "504"
+    client.fail[("delete_command", U)] = "504"
     real = client.delete_command
 
     async def delete_then_504(*, entity_type, primary_id, delete_connected_processes):
@@ -494,12 +495,12 @@ def test_sequence_504_then_probe_404_succeeds(tmp_path):
 def test_sequence_timeout_then_probe_200_fails(tmp_path):
     """Mutation: treating any timeout as success."""
     root, client, inv, ledger = _setup(tmp_path)
-    client.fail[("delete", U)] = "timeout"
+    client.fail[("delete_command", U)] = "timeout"
     res = _run(client, root, inv, ledger)
     assert not res.ok and "no files were moved" in res.error
     assert os.path.isdir(_src(root)) and not os.path.exists(_dst(root))
-    seq = [l for l in _lines(ledger) if l["entity_type"] == "SEQUENCE"]
-    assert [l["outcome"] for l in seq] == ["start", "error"]
+    seq = [x for x in _lines(ledger) if x["entity_type"] == "SEQUENCE"]
+    assert [x["outcome"] for x in seq] == ["start", "error"]
 
 
 def test_persisting_experiment_action_warn_but_succeed(tmp_path):
@@ -542,7 +543,7 @@ def test_ledger_has_one_line_per_row_and_survives_failure(tmp_path, monkeypatch)
     )
     root, client, inv, ledger = _setup(tmp_path, client=client, experiments=exps)
     acts = sorted(inv.in_api["ACTION"])
-    client.fail[("delete", acts[1])] = "500"
+    client.fail[("delete_command", acts[1])] = "500"
     seen = []
     real = client.delete_command
 
@@ -726,7 +727,7 @@ def test_failure_after_a_move_never_claims_nothing_moved(tmp_path, monkeypatch):
 def test_delete_failure_says_rows_may_be_deleted(tmp_path):
     """Mutation: dropping the delete-phase wording."""
     root, client, inv, ledger = _setup(tmp_path)
-    client.fail[("delete", "A1")] = "500"
+    client.fail[("delete_command", "A1")] = "500"
     res = _run(client, root, inv, ledger)
     assert "API rows may already be deleted" in res.error
     assert res.error.endswith("; no files were moved")
@@ -775,8 +776,8 @@ def test_absent_must404_row_is_probed_in_readback(tmp_path):
     real = client.delete_command
 
     async def odd(*, entity_type, primary_id, delete_connected_processes):
-        if primary_id == "P1":  # not a 404, but its text says so
-            raise RuntimeError("API call failed: 500 - Could not find upstream")
+        if primary_id == "P1":  # no status, so the text decides: absent
+            raise RuntimeError("API call failed - Could not find upstream")
         return await real(
             entity_type=entity_type,
             primary_id=primary_id,
@@ -812,3 +813,107 @@ def test_raising_delete_task_is_logged(tmp_path, monkeypatch):
     monkeypatch.setattr(retire, "LOGGER", Spy())
     _run(client, root, inv, ledger)
     assert any("delete task for ACTION raised" in m for m in warned)
+
+
+# ---- final-review safety branches --------------------------------------------
+
+
+def test_not_found_decided_by_status_when_present():
+    """Mutation: the old `"failed: 404" in msg or "Could not find" in msg`."""
+    e500 = RuntimeError(
+        "API call to 'x' (GET https://h/y) failed: 500 - Details: "
+        "{'detail': 'Could not find upstream'}"
+    )
+    e404 = RuntimeError("API call to 'x' (GET https://h/y) failed: 404 - Details: {}")
+    nostatus = RuntimeError("gateway: Could not find thing")
+    assert not retire.is_not_found(e500)
+    assert retire.is_not_found(e404) and retire.is_not_found(nostatus)
+
+
+@pytest.mark.parametrize(
+    "op, key", [("read_processes_by_sequence", U), ("read_analysis_by_process", "P1")]
+)
+def test_inventory_500_on_a_list_read_raises(tmp_path, op, key):
+    """Mutation: `_list_or_empty` swallows a non-404 error as [] (replace its
+    `raise` with `return []`)."""
+    root = str(tmp_path)
+    make_run_tree(root, "RUNS", REL, sequence_uuid=U, experiments=EXPS)
+    client = _full_client()
+    client.fail[(op, key)] = "500"
+    with pytest.raises(RuntimeError, match="500"):
+        asyncio.run(retire.inventory(client, root, U, _noprogress))
+
+
+def test_readback_500_on_a_process_fails_without_moving(tmp_path):
+    """Mutation: in read_back, `except Exception: present = False` (a read-back
+    error treated as absent)."""
+    root, client, inv, ledger = _setup(tmp_path)
+    client.fail[("read_process", "P1")] = "500"
+    res = _run(client, root, inv, ledger)
+    assert not res.ok and "read-back of PROCESS P1 failed" in res.error
+    assert res.moved == []
+    assert os.path.isdir(_src(root)) and not os.path.exists(_dst(root))
+
+
+def test_sequence_504_then_probe_500_is_an_error_not_deleted(tmp_path):
+    """Mutation: in the timeout probe, `gone, exc = True, probe_exc` (a probe
+    that raises treated as gone)."""
+    root, client, inv, ledger = _setup(tmp_path)
+    client.fail[("delete_command", U)] = "504"
+    client.fail[("read_sequence", U)] = "500"
+    res = _run(client, root, inv, ledger)
+    assert not res.ok and os.path.isdir(_src(root))
+    seq = [x for x in _lines(ledger) if x["entity_type"] == "SEQUENCE"]
+    assert [x["outcome"] for x in seq] == ["start", "error"]
+
+
+def test_action_delete_timeout_is_never_deleted(tmp_path):
+    """Mutation: dropping the `t == "SEQUENCE"` condition on the timeout probe
+    (the row is gone by then, so the probe would call it deleted)."""
+    root, client, inv, ledger = _setup(tmp_path)
+    client.fail[("delete_command", "A1")] = "timeout"
+    real = client.delete_command
+
+    async def gone_then_timeout(*, entity_type, primary_id, delete_connected_processes):
+        if primary_id == "A1":
+            client.rows["ACTION"].discard("A1")
+        return await real(
+            entity_type=entity_type,
+            primary_id=primary_id,
+            delete_connected_processes=delete_connected_processes,
+        )
+
+    setattr(client, "delete_command", gone_then_timeout)
+    res = _run(client, root, inv, ledger)
+    assert not res.ok and os.path.isdir(_src(root))
+    acts = [x for x in _lines(ledger) if x["uuid"] == "A1"]
+    assert [x["outcome"] for x in acts] == ["error"]
+    assert "SEQUENCE" not in {c[1] for c in client.calls}
+
+
+def test_only_the_sequence_delete_cascades(tmp_path):
+    """Mutation: passing delete_connected_processes=False on the SEQUENCE delete
+    (or True on any other)."""
+    root, client, inv, ledger = _setup(tmp_path)
+    assert _run(client, root, inv, ledger).ok
+    assert client.cascade[("SEQUENCE", U)] is True
+    others = {k: v for k, v in client.cascade.items() if k[0] != "SEQUENCE"}
+    assert others and not any(others.values())
+
+
+def test_move_time_reguard_refuses(tmp_path):
+    """The destination appears after the pre-check, during the read-back.
+
+    Mutation: dropping the `_move_guard` call in `move` (rename then succeeds
+    onto the empty directory)."""
+    root, client, inv, ledger = _setup(tmp_path)
+
+    async def create_dst(phase, *_):
+        if phase == "readback":
+            os.makedirs(_dst(root), exist_ok=True)
+
+    res = _run(client, root, inv, ledger, create_dst)
+    assert not res.ok and res.moved == []
+    assert "API rows are already deleted" in res.error
+    assert "already exists" in res.error and os.path.isdir(_src(root))
+    assert any(x["outcome"] == "move_failed" for x in _lines(ledger))

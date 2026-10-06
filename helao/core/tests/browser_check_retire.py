@@ -71,7 +71,7 @@ def prepare(workdir: str) -> int:
         yaml.safe_dump(cfg, f, sort_keys=False)
     print(f"uuid:  {seq_uuid}")
     print(f"label: {label}")
-    print(f"launch: ./helao.sh {cfg_path}")
+    print(f"launch: bash ./helao.sh {cfg_path}")
     print(
         f"check:  python helao/core/tests/browser_check_retire.py check "
         f"http://127.0.0.1:5010 {seq_uuid} {label}"
@@ -85,7 +85,8 @@ def retire_guard(
     """Why Retire must not be clicked, or "" when the inventory is the fresh one.
 
     Enforces the fresh-uuid assumption: label is CHECK-<first 8 of uuid>, the
-    sequence has 2 local locations, and no entity is in the API.
+    sequence has 2 local locations, the table has exactly 5 in-API cells (one per
+    entity row, so a changed layout fails closed), and none is in the API.
     """
     want = f"CHECK-{seq_uuid[:8]}"
     why = []
@@ -93,6 +94,8 @@ def retire_guard(
         why.append(f"label {shown_label!r}/{label_arg!r}, expected {want!r}")
     if local != "2":
         why.append(f"SEQUENCE local count {local!r}, expected '2'")
+    if len(in_api) != 5:
+        why.append(f"{len(in_api)} in-API cells, expected exactly 5")
     if any(c not in ("0", "absent") for c in in_api):
         why.append("some entity is present in the API")
     return "; ".join(why)
@@ -106,6 +109,9 @@ def _selftest() -> None:
     assert retire_guard(u, "CHECK-843efefc", "CHECK-843efefc", "3", ok)
     assert retire_guard(u, "CHECK-843efefc", "CHECK-843efefc", "2", ["0", "1"])
     assert retire_guard(u, "CHECK-843efefc", "CHECK-843efefc", "2", ["present"])
+    assert retire_guard(u, "CHECK-843efefc", "CHECK-843efefc", "2", [])
+    assert retire_guard(u, "CHECK-843efefc", "CHECK-843efefc", "2", ok[:4])
+    assert retire_guard(u, "CHECK-843efefc", "CHECK-843efefc", "2", ok + ["0"])
 
 
 def _run(base: str, seq_uuid: str, label: str, page, errors: list[str]) -> int:

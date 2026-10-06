@@ -9,6 +9,7 @@ and is tested offline in ``test_retire.py``; this file tests the wiring.
 import asyncio
 import json
 import os
+from typing import Awaitable, Callable
 
 import pytest
 
@@ -42,11 +43,17 @@ class _FakeRetireState:
         self.run_dirs: list = []
         self.analysis_dirs: list = []
         self._inv = None
+        self.on_exit: Callable[[], Awaitable[None]] | None = (
+            None  # one-shot hook run at the next block exit
+        )
 
     async def __aenter__(self):
         return self
 
     async def __aexit__(self, *exc):
+        if self.on_exit:
+            hook, self.on_exit = self.on_exit, None
+            await hook()
         return False
 
     gather = rr.RetireState.gather.fn  # type: ignore[attr-defined]
@@ -412,7 +419,7 @@ def test_gather_exception_leaves_idle_unarmed(enabled, monkeypatch):
     root, _ = enabled
     _tree(root)
     client = _client()
-    client.fail[("read", U)] = "500"
+    client.fail[("read_sequence", U)] = "500"
     monkeypatch.setattr(rr.api, "get_client", lambda: client)
     state = _FakeRetireState()
     state.uuid_text = U
@@ -445,3 +452,74 @@ def test_gather_api_only_warns(enabled, monkeypatch):
         "experiments/actions unknowable from API alone; "
         "processes may already be gone"
     ]
+
+
+def test_do_retire_done_sets_status_retired(enabled, monkeypatch):
+    """Mutation: drop `self.status = "retired"` on done."""
+    state, _ = _armed(enabled, monkeypatch)
+    asyncio.run(_FakeRetireState.do_retire(state))
+    assert state.phase == "done" and state.status == "retired"
+
+
+def test_do_retire_failed_result_keeps_persisting_warnings(enabled, monkeypatch):
+    """Mutation: the failed branch no longer copies result.persisting."""
+    state, _ = _armed(enabled, monkeypatch)
+
+    async def fake_retire(client, root, inv, cb, ledger):
+        return rr.retire_logic.RetireResult(
+            False, ledger, {}, {}, {"EXPERIMENT": ["e1", "e2"]}, [], "boom"
+        )
+
+    monkeypatch.setattr(rr.retire_logic, "retire", fake_retire)
+    asyncio.run(_FakeRetireState.do_retire(state))
+    assert state.phase == "failed"
+    assert state.warnings == ["EXPERIMENT: 2 acknowledged-but-persists, e.g. e1, e2"]
+
+
+def test_do_retire_interleaved_set_uuid_and_second_retire_are_inert(
+    enabled, monkeypatch
+):
+    """At the first block's exit another tab edits the uuid and clicks Retire.
+
+    Mutation: set busy/phase in a later block than the lock acquire (then the
+    injected set_uuid rewrites uuid_text and the second click reports "already
+    running")."""
+    state, _ = _armed(enabled, monkeypatch)
+    calls = []
+
+    async def counting_retire(client, root, inv, cb, ledger):
+        calls.append(inv.sequence_uuid)
+        return rr.retire_logic.RetireResult(True, ledger, {}, {}, {}, [])
+
+    monkeypatch.setattr(rr.retire_logic, "retire", counting_retire)
+
+    async def inject():
+        state.set_uuid("other")
+        await _FakeRetireState.do_retire(state)
+
+    state.on_exit = inject
+    asyncio.run(_FakeRetireState.do_retire(state))
+    assert calls == [U]
+    assert state.error == "" and state.phase == "done"
+    assert state.uuid_text == U and state.busy is False
+
+
+def test_gather_interleaved_set_uuid_is_inert(enabled, monkeypatch):
+    """Another tab's set_uuid lands at the first block's exit.
+
+    Mutation: drop `self.busy = True` from gather's first block (set_uuid then
+    rewrites uuid_text, which no longer matches the inventory gathered)."""
+    root, _ = enabled
+    _tree(root)
+    client = _client()
+    monkeypatch.setattr(rr.api, "get_client", lambda: client)
+    state = _FakeRetireState()
+    state.uuid_text = U
+
+    async def inject():
+        state.set_uuid("other")
+
+    state.on_exit = inject
+    asyncio.run(_FakeRetireState.gather(state))
+    assert state._inv is None or state._inv.sequence_uuid == state.uuid_text
+    assert state.uuid_text == U and state.phase == "gathered"

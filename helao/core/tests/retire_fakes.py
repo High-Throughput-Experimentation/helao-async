@@ -62,9 +62,11 @@ def make_run_tree(
 class FakeMetadataClient:
     """In-memory stand-in for the metadata client, with the real error formats.
 
-    rows: entity_type -> uuids present. fail: (op_kind, uuid) -> "404" | "500" |
-    "504" | "timeout", op_kind "read" or "delete". persist: uuids whose delete is
-    acknowledged but whose row stays. calls: ("delete", entity_type, uuid) in order.
+    rows: entity_type -> uuids present. fail: (op_name, uuid) -> "404" | "500" |
+    "504" | "timeout", op_name e.g. "read_sequence" or "delete_command". persist:
+    uuids whose delete is acknowledged but whose row stays. calls: ("delete",
+    entity_type, uuid) in order. cascade: (entity_type, uuid) ->
+    delete_connected_processes as passed.
     sequence_body: body returned by read_sequence (label/campaign fallback).
     """
 
@@ -81,10 +83,11 @@ class FakeMetadataClient:
         self.fail: dict[tuple[str, str], str] = {}
         self.persist: set[str] = set()
         self.calls: list[tuple[str, str, str]] = []
+        self.cascade: dict[tuple[str, str], bool] = {}
         self.sequence_body: dict = {}
 
-    def _maybe_fail(self, kind: str, op: str, uuid: str) -> None:
-        mode = self.fail.get((kind, uuid))
+    def _maybe_fail(self, op: str, uuid: str) -> None:
+        mode = self.fail.get((op, uuid))
         if mode == "timeout":
             try:
                 raise httpx.ReadTimeout("timed out")
@@ -99,7 +102,7 @@ class FakeMetadataClient:
             )
 
     def _read(self, entity_type: str, op: str, uuid: str) -> dict:
-        self._maybe_fail("read", op, uuid)
+        self._maybe_fail(op, uuid)
         if uuid not in self.rows.get(entity_type, set()):
             self._not_found(op)
         return (
@@ -131,18 +134,19 @@ class FakeMetadataClient:
         return self._read("ANALYSIS", "read_analysis", analysis_uuid)
 
     async def read_processes_by_sequence(self, *, sequence_uuid):
-        self._maybe_fail("read", "read_processes_by_sequence", sequence_uuid)
+        self._maybe_fail("read_processes_by_sequence", sequence_uuid)
         return [{"process_uuid": u} for u in self.seq_processes.get(sequence_uuid, [])]
 
     async def read_analysis_by_process(self, *, process_uuid):
-        self._maybe_fail("read", "read_analysis_by_process", process_uuid)
+        self._maybe_fail("read_analysis_by_process", process_uuid)
         return [{"analysis_uuid": u} for u in self.analyses.get(process_uuid, [])]
 
     async def delete_command(
         self, *, entity_type, primary_id, delete_connected_processes
     ):
         self.calls.append(("delete", entity_type, primary_id))
-        self._maybe_fail("delete", "delete_command", primary_id)
+        self.cascade[(entity_type, primary_id)] = delete_connected_processes
+        self._maybe_fail("delete_command", primary_id)
         if primary_id not in self.rows.get(entity_type, set()):
             self._not_found("delete_command")
         if primary_id not in self.persist:

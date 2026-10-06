@@ -15,6 +15,7 @@ import fnmatch
 import glob
 import json
 import os
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable
@@ -174,9 +175,15 @@ READ_OPS: dict[str, tuple[str, str]] = {
 }
 
 
+_STATUS = re.compile(r"failed: (\d{3})")
+
+
 def is_not_found(exc: BaseException) -> bool:
+    """404 by status when the message carries one; else by "Could not find"."""
     msg = str(exc)
-    return "failed: 404" in msg or "Could not find" in msg
+    if m := _STATUS.search(msg):
+        return m.group(1) == "404"
+    return "Could not find" in msg
 
 
 def is_timeout_or_504(exc: BaseException) -> bool:
@@ -243,6 +250,9 @@ def _scan_local(locations: list[SeqLocation]) -> tuple[dict[str, set[str]], int]
     return local, files
 
 
+_TOKEN = re.compile(r"[0-9A-Za-z][0-9A-Za-z-]*")
+
+
 def _analysis_dirs(root: str, uuids: set[str]) -> list[str]:
     hits = []
     for d in glob.glob(os.path.join(root, "ANALYSES", "*", "*", "*")):
@@ -260,7 +270,7 @@ def _analysis_dirs(root: str, uuids: set[str]) -> list[str]:
                     f"retire: skipping unreadable analysis file {path}: {exc}"
                 )
                 continue
-            if any(u in text for u in uuids):
+            if uuids.intersection(_TOKEN.findall(text)):
                 hits.append(d)
                 break
     return sorted(hits)
@@ -550,9 +560,6 @@ async def _retire(
     # 4. delete, children first
     sem = asyncio.Semaphore(DELETE_CONCURRENCY)
     done = 0
-    deleted_rows: list[tuple[str, str]] = (
-        []
-    )  # EXPERIMENT/ACTION persisting is a warning
     probe_rows: list[tuple[str, str]] = []  # every row the read-back must probe
 
     async def delete_one(t: str, uuid: str) -> None:
@@ -588,7 +595,6 @@ async def _retire(
                     outcome, detail = "error", repr(exc)
             if outcome == "deleted":
                 res.deleted[t] = res.deleted.get(t, 0) + 1
-                deleted_rows.append((t, uuid))
                 probe_rows.append((t, uuid))
             elif outcome == "absent":
                 res.already_absent[t] = res.already_absent.get(t, 0) + 1
