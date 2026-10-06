@@ -1237,9 +1237,12 @@ class Archive:
         :meth:`_unload_unpack_samples_helper`, each with ``unloaded``
         status appended.
         """
-        # update samples with most recent info from db
-        for sample in samples:
-            sample = await self.update_samples_from_db_helper(sample=sample)
+        # update samples with most recent info from db, so the position's
+        # snapshot does not overwrite newer db state
+        samples = [
+            await self.update_samples_from_db_helper(sample=sample)
+            for sample in samples
+        ]
         # unpack all assemblies, this also sets the status
         samples_in, samples_out = await self._unload_unpack_samples_helper(samples)
         samples_in = self.append_sample_status(
