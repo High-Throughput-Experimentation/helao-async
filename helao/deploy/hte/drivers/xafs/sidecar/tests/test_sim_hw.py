@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from helao.deploy.hte.drivers.xafs.sidecar import sim_hw
 
@@ -50,12 +51,10 @@ def test_fake_hooks(tmp_path):
     h = sim_hw.install_sim(str(tmp_path))
     h.mono.fail_on_call = 2
     h.mono.move_to_bragg_angle(80.0)
-    try:
+    with pytest.raises(RuntimeError, match="fake mono failure"):
         h.mono.move_to_bragg_angle(81.0)
-        raise AssertionError("expected failure")
-    except RuntimeError as e:
-        assert str(e) == "fake mono failure"
-    assert h.mono.calls == [80.0]
+    h.mono.move_to_bragg_angle(82.0)  # only call N fails
+    assert h.mono.calls == [80.0, 82.0]
     assert list(h.ketek.get_statistics()) == list(sim_hw.STAT_KEYS)
     assert h.ketek.get_spectrum().shape == (4096,)
     assert h.proto.get_shutter_status() == "Open" and h.proto.readback_kv_ma()[0] == 50

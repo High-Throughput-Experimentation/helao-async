@@ -18,10 +18,9 @@ dependencies:
   - pytest
   - psutil
   - pip
-  - pip:
-      # fetch from note1: /mnt/k/experiments/xafs/python_wheels/ (see Task 2 notes)
-      - ./easyxafs_xray_utils-1.1.0-py3-none-any.whl
-# hklhop: copy easyxafs_env/Lib/site-packages/hklhop/ from
-# /mnt/k/experiments/xafs/easyxafs_env.zip into the env's site-packages (not on PyPI).
+# Manual steps after `conda env create` (proprietary, not committed). Obtain both
+# from the instrument's easyxafs environment:
+#  1. pip install <easyxafs_xray_utils 1.1.0 wheel>
+#  2. copy the hklhop package dir into the env's site-packages (not on PyPI).
 # easyxafs import path: ~/.local/share/easyxafs-sim-path/easyxafs -> easyxafs checkout,
 # plus a .pth file in the env's site-packages pointing at that dir.

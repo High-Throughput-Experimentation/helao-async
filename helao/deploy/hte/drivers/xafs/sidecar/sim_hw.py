@@ -32,11 +32,12 @@ class FakeMono:
         self.move_delay = 0.0
         self.fail_on_call: Optional[int] = None
         self.calls: List[float] = []
+        self._n_calls = 0
         self.stop_called = False
 
     def move_to_bragg_angle(self, bragg: float) -> None:
-        n = len(self.calls) + 1
-        if self.fail_on_call is not None and n == self.fail_on_call:
+        self._n_calls += 1
+        if self.fail_on_call is not None and self._n_calls == self.fail_on_call:
             raise RuntimeError("fake mono failure")
         if self.move_delay:
             time.sleep(self.move_delay)
