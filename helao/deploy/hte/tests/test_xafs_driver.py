@@ -263,3 +263,93 @@ def test_hw_status(make_stub):
     r = make_stub({"GET /status": (500, {"detail": "hw"})}).driver().hw_status()
     assert r.response == DriverResponseType.failed
     assert r.data == {"http_status": 500, "detail": "hw"}
+
+
+MUTATORS = {
+    "initialize": lambda d: d.initialize({"mono": True}),
+    "start_scan": lambda d: d.start_scan(scan_def={}),
+    "xray": lambda d: d.xray(kv=1.0),
+    "calibrate": lambda d: d.calibrate(["mono"]),
+}
+MUT_ROUTES = {
+    "POST /initialize": (200, {}),
+    "POST /scans": (200, {"scan_id": "s"}),
+    "POST /xray": (200, {}),
+    "POST /calibrate": (200, {"job_id": "j"}),
+}
+
+
+@pytest.mark.parametrize("name", sorted(MUTATORS))
+def test_mutators_refuse_after_simulate_mismatch(make_stub, name):
+    stub = make_stub(MUT_ROUTES)
+    d = stub.driver()
+    assert d.connect().response == DriverResponseType.success
+    stub.routes["GET /health"] = (200, {**HEALTH, "simulate": True})
+    r = MUTATORS[name](d)
+    assert r.response == DriverResponseType.failed and "simulate" in r.message
+    assert not any(m == "POST" for m, _, _ in stub.requests)
+
+
+@pytest.mark.parametrize("name", sorted(MUTATORS))
+def test_mutators_refuse_when_sidecar_replaced_then_reconnect(make_stub, name):
+    stub = make_stub(MUT_ROUTES)
+    d = stub.driver()
+    d.connect()
+    stub.routes["GET /health"] = (200, {**HEALTH, "pid": 2})
+    r = MUTATORS[name](d)
+    assert r.response == DriverResponseType.failed and "replaced" in r.message
+    # refusal forgets the verification: the next call re-connects and proceeds
+    assert MUTATORS[name](d).response == DriverResponseType.success
+    assert d._verified["pid"] == 2
+
+
+@pytest.mark.parametrize("name", sorted(MUTATORS))
+def test_mutators_connect_first_when_never_verified(make_stub, name):
+    stub = make_stub(MUT_ROUTES)
+    d = stub.driver()
+    assert MUTATORS[name](d).response == DriverResponseType.success
+    assert d._verified == {"pid": 1, "simulate": False}
+    assert stub.requests[0][:2] == ("GET", "/health")
+
+
+def test_never_verified_with_mismatch_refused(make_stub):
+    stub = make_stub(MUT_ROUTES)
+    d = stub.driver(simulate=True)  # sidecar reports simulate False
+    assert d.initialize({}).response == DriverResponseType.failed
+    assert not any(m == "POST" for m, _, _ in stub.requests)
+
+
+def test_per_call_timeouts(make_stub, monkeypatch):
+    stub = make_stub(MUT_ROUTES)
+    d = stub.driver()
+    seen = {}
+    real = d.client.request
+
+    def spy(method, path, **kw):
+        seen[path] = kw.get("timeout", "default")
+        return real(method, path, **kw)
+
+    monkeypatch.setattr(d.client, "request", spy)
+    d.initialize({})
+    d.xray(kv=1.0)
+    d.calibrate(["mono"])
+    d.start_scan(scan_def={})
+    assert seen["/initialize"] == 120.0
+    assert seen["/xray"] == 120.0
+    assert seen["/calibrate"] == 30.0
+    assert seen["/scans"] == "default"
+
+
+def test_async_shutdown_disconnects_off_loop(make_stub):
+    import asyncio
+    import threading
+
+    d = make_stub().driver()
+    d.connect()
+    where = []
+    real = d.disconnect
+    d.disconnect = lambda: (where.append(threading.get_ident()), real())[1]
+    r = asyncio.run(d.async_shutdown())
+    assert r.response == DriverResponseType.success
+    assert where and where[0] != threading.get_ident()
+    assert d.client.is_closed

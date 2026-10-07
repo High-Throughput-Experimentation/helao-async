@@ -6,6 +6,7 @@ raise, and return a `DriverResponse` (payload in `.data`). The action server
 calls them through `asyncio.to_thread`.
 """
 
+import asyncio
 import subprocess
 import time
 from typing import Optional
@@ -59,6 +60,7 @@ class XafsSidecarDriver(HelaoDriver):
         self.current_scan_id: Optional[str] = None
         self._proc: Optional[subprocess.Popen] = None
         self._init_flags: Optional[dict] = None
+        self._verified: Optional[dict] = None  # {"pid", "simulate"} from last good connect
 
     def _call(self, method: str, path: str, desc: str, **kw) -> DriverResponse:
         """One HTTP request. Success -> data is parsed JSON (or bytes if
@@ -99,11 +101,35 @@ class XafsSidecarDriver(HelaoDriver):
 
     def _check_simulate(self, r: DriverResponse, what: str) -> DriverResponse:
         want = bool(self.config.get("simulate", False))
+        self._verified = None
         if bool(r.data["simulate"]) != want:
             return _fail(
                 f"{what} sidecar simulate={r.data['simulate']} but config simulate={want}"
             )
+        self._verified = {"pid": r.data["pid"], "simulate": want}
         return _ok(what, r.data)
+
+    def _guard(self) -> Optional[DriverResponse]:
+        """None if the sidecar is the one `connect()` verified (same pid and
+        simulate flag); else a failed response. Never verified (first call, or
+        after a refusal / lost sidecar) -> `connect()` first, which also
+        respawns a crashed sidecar."""
+        v = self._verified
+        if v is None:
+            r = self.connect()
+            return None if r.response == DriverResponseType.success else r
+        r = self._probe()
+        if r.response != DriverResponseType.success:
+            self._verified = None  # next call reconnects
+            return r
+        if r.data["pid"] != v["pid"] or bool(r.data["simulate"]) != v["simulate"]:
+            self._verified = None
+            return _fail(
+                "unverified sidecar: simulate mismatch or sidecar replaced "
+                f"(pid {v['pid']} -> {r.data['pid']}, simulate {v['simulate']} -> "
+                f"{r.data['simulate']}); refusing hardware command"
+            )
+        return None
 
     def connect(self) -> DriverResponse:
         """Probe `/health`; if down and `spawn_sidecar`, spawn and poll it."""
@@ -178,6 +204,7 @@ class XafsSidecarDriver(HelaoDriver):
             self._call("POST", "/shutdown", "shutdown sidecar", timeout=35.0)
             self._terminate(graceful=True)
         self.client.close()
+        self._verified = None
         return _ok("disconnected")
 
     def _terminate(self, graceful: bool = False, wait: float = 10.0):
@@ -199,13 +226,23 @@ class XafsSidecarDriver(HelaoDriver):
             p.kill()
             p.wait()
 
+    async def async_shutdown(self):
+        """Hook `ActionHost.shutdown` awaits: disconnect off the event loop
+        (the sidecar shutdown can block up to 35 s)."""
+        return await asyncio.to_thread(self.disconnect)
+
     def initialize(self, flags: dict) -> DriverResponse:
         """POST /initialize; data is the per-device ok/error map."""
         self._init_flags = dict(flags)
-        return self._call("POST", "/initialize", "initialize", json=flags)
+        return self._guard() or self._call(
+            "POST", "/initialize", "initialize", json=flags, timeout=120.0
+        )
 
     def start_scan(self, **body) -> DriverResponse:
         """POST /scans; sets `current_scan_id`; data={"scan_id": ...}."""
+        bad = self._guard()
+        if bad:
+            return bad
         r = self._call("POST", "/scans", "start scan", json=body)
         if r.response == DriverResponseType.success:
             self.current_scan_id = r.data["scan_id"]
@@ -229,11 +266,15 @@ class XafsSidecarDriver(HelaoDriver):
         return self._call("GET", f"/scans/{scan_id}/artifacts", "scan artifacts")
 
     def xray(self, **body) -> DriverResponse:
-        return self._call("POST", "/xray", "xray", json=body)
+        return self._guard() or self._call(
+            "POST", "/xray", "xray", json=body, timeout=120.0
+        )
 
     def calibrate(self, devices: list) -> DriverResponse:
         """POST /calibrate; data={"job_id": ...}."""
-        return self._call("POST", "/calibrate", "calibrate", json={"devices": devices})
+        return self._guard() or self._call(
+            "POST", "/calibrate", "calibrate", json={"devices": devices}, timeout=30.0
+        )
 
     def job_state(self, job_id: str) -> DriverResponse:
         """GET /jobs/{id}; data={"state": running|done|error, "error": ...}."""

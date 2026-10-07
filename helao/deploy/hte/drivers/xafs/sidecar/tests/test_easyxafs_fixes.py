@@ -27,6 +27,27 @@ def test_saved_path_set(tmp_path, monkeypatch):
     assert os.path.isfile(s.saved_path)
 
 
+def test_saved_path_not_set_if_archive_write_fails(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    sim_hw.install_sim(str(tmp_path))
+    import easyxafs.saveable_scan as ss
+    import easyxafs.scan as scan
+
+    s = scan.NormalScan(
+        crystal2d="Si(5,5,3)", beta_offset=0, theta_offset=0, analyzer_radius=500,
+        roi_bragg=80, roi_min=800, roi_max=1000,
+        measurement_mode="XAFS_Fluorescence", saveaftercomplete=False,
+    )
+    s.create_zone_constant_step(9600, 9620, 5, 0.01)
+    s.start()
+    s._thread.join(timeout=30)
+    assert s.saved_path is None
+    monkeypatch.setattr(ss.json, "dumps", lambda *a, **k: (_ for _ in ()).throw(OSError("disk")))
+    with pytest.raises(OSError):
+        s._save_scan_data(str(tmp_path / "Zn_fail"))
+    assert s.saved_path is None
+
+
 @pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
 def test_thetascan_exception_sets_finished(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)

@@ -53,13 +53,15 @@ def fail(http_status=None):
 
 class FakeDriver:
     def __init__(
-        self, states=GOOD_STATES, fail_state_call=None, start=None, est_total=1.0, transient=()
+        self, states=GOOD_STATES, fail_state_call=None, start=None, est_total=1.0, transient=(),
+        no_exd=False
     ):
         self.transient = set(transient)  # 1-based scan_state calls failing without http_status
         self.states = list(states)
         self.fail_state_call = fail_state_call  # 1-based scan_state call that fails 404
         self.start_resp = start or ok({"scan_id": "s1"})
         self.est_total = est_total
+        self.no_exd = no_exd  # stopped before the first point: no archive
         self.calls = []
         self.n_visible = 0
         self.last = self.states[-1][0]
@@ -87,7 +89,7 @@ class FakeDriver:
                 "n_expected": 4,
                 "elapsed": 1.0,
                 "est_total": self.est_total,
-                "exd_path": "/data/run/Zn_x_000_exd.csv.zip" if state == "done" else None,
+                "exd_path": "/data/run/Zn_x_000_exd.csv.zip" if state in ("done", "stopped") and not self.no_exd else None,
                 "error": "Traceback boom" if state == "error" else None,
             }
         )
@@ -393,6 +395,26 @@ async def test_manual_stop_stops_driver_and_finishes_clean(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_stop_before_first_point_no_fetch_not_error(tmp_path):
+    d = FakeDriver(states=[("moving", 0), ("stopped", 0)], no_exd=True)
+    s, ex, _ = make(tmp_path, driver=d)
+    await run(s, ex)
+    assert s.action.error_code == ErrorCodes.none
+    assert "fetch_mcas" not in d.names() and "fetch_artifacts" not in d.names()
+    assert s.action.action_params["scan_state"] == "stopped"
+    assert s.tracked == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stn", [0, 5, -1, "2", None, True])
+async def test_xchanger_station_out_of_range(tmp_path, stn):
+    s, ex, d = make(tmp_path, xchanger_station=stn)
+    await run(s, ex)
+    assert s.action.error_code == ErrorCodes.cmd_error
+    assert d.calls == []
+
+
+@pytest.mark.asyncio
 async def test_timeout_backstop_stops_and_errors(tmp_path, monkeypatch):
     monkeypatch.setattr(xafs_server, "TIMEOUT_MARGIN_S", 0.0)
     d = FakeDriver(states=[("running", 0)], est_total=0.0)
@@ -612,3 +634,50 @@ async def test_calibrate_timeout_errors(tmp_path, monkeypatch):
     await eps["calibrate"](EpCtx(a))
     assert a.action.error_code == ErrorCodes.cmd_error
     assert "timeout" in a.dflt[0]["message"]
+
+
+@pytest.mark.asyncio
+async def test_make_app_registers_routes_and_reaches_driver_shutdown(tmp_path, monkeypatch):
+    """makeApp builds an ActionHost; startup's dyn_endpoints registers the actions
+    (no sidecar: fake driver) and ActionHost.shutdown reaches the driver hook."""
+    from helao.helpers import config_loader
+    from helao.hexagon.app.action_host import ActionHost
+
+    monkeypatch.setattr(
+        config_loader,
+        "CONFIG",
+        {
+            "root": str(tmp_path),
+            "servers": {
+                "XAFS": {
+                    "group": "action",
+                    "host": "127.0.0.1",
+                    "port": 9999,
+                    "params": {"sidecar_port": 1},
+                }
+            },
+        },
+    )
+    app = xafs_server.makeApp("XAFS")
+    assert isinstance(app, ActionHost)
+    assert app._driver_classes == [xafs_server.XafsSidecarDriver]
+
+    class Fake(FakeDriver):
+        shut = 0
+
+        async def async_shutdown(self):
+            Fake.shut += 1
+
+    app.driver = Fake()
+    await app._dyn_endpoints(app)
+    paths = {r.path for r in app.routes}
+    for name in ("normal_scan", "initialize", "calibrate", "status", "set_xray", "shutter"):
+        assert f"/XAFS/{name}" in paths, name
+    assert app.server_params["allow_concurrent_actions"] is False
+
+    # the hook ActionHost awaits exists on the real driver
+    import inspect
+
+    assert inspect.iscoroutinefunction(xafs_server.XafsSidecarDriver.async_shutdown)
+    await app.shutdown()
+    assert Fake.shut == 1

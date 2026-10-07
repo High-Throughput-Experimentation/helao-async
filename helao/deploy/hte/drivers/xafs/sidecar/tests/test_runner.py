@@ -177,7 +177,9 @@ def test_scan_exception(env):
     assert "RuntimeError" in s["error"] and "fake mono failure" in s["error"]
 
 
-def test_xchanger_station_moves_only_if_different(env):
+def test_xchanger_station_always_commanded(env):
+    """Vendor go_to_deg short-circuits within 0.01 deg, so the runner must
+    call go_to_station even when the reported station already matches."""
     h, _ = env
     r = ScanRunner()
     h.xchanger.station = 3
@@ -187,9 +189,9 @@ def test_xchanger_station_moves_only_if_different(env):
     orig = h.xchanger.go_to_station
     h.xchanger.go_to_station = lambda n: (calls.append(n), orig(n))
     wait(r, go(r, env, station=3))
-    assert calls == []
+    assert calls == [3]
     wait(r, go(r, env, station=2))
-    assert calls == [2] and h.xchanger.station == 2
+    assert calls == [3, 2] and h.xchanger.station == 2
 
 
 def test_mcas_and_artifacts(env):

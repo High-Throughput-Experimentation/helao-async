@@ -24,7 +24,12 @@ except ImportError:
 ACTIVE = ("queued", "moving", "running", "saving")
 
 
-class InitFlags(BaseModel):
+class _Req(BaseModel):
+    class Config:
+        extra = "forbid"  # a stale sidecar must reject fields it does not know
+
+
+class InitFlags(_Req):
     mono: bool = True
     ketek: bool = True
     wafer_stage: bool = True
@@ -32,11 +37,11 @@ class InitFlags(BaseModel):
     proto: bool = True
 
 
-class CalibrateReq(BaseModel):
+class CalibrateReq(_Req):
     devices: List[Literal["mono", "wafer_linear", "wafer_rotary", "xchanger"]]
 
 
-class ScanReq(BaseModel):
+class ScanReq(_Req):
     scan_def: Dict[str, Any]
     x_mm: float
     y_mm: float
@@ -47,7 +52,7 @@ class ScanReq(BaseModel):
     roi_element: str = ""
 
 
-class XrayReq(BaseModel):
+class XrayReq(_Req):
     kv: Optional[float] = None
     ma: Optional[float] = None
     shutter: Optional[Literal["open", "close"]] = None
@@ -78,9 +83,10 @@ def create_app(simulate: bool, lock_path: str, state_dir: str,
     jobs = {}  # type: Dict[str, dict]
     st = {"hw_initialized": False, "scan_id": None}
 
+    start_guard = threading.Lock()  # held across check-and-start in /scans and /calibrate
+
     def scan_active() -> bool:
-        sid = st["scan_id"]
-        return bool(sid) and runner.state(sid)["state"] in ACTIVE
+        return runner.busy()  # also true for a watchdog-hung alive vendor thread
 
     def calibrating() -> bool:
         return any(j["state"] == "running" for j in jobs.values())
@@ -133,21 +139,22 @@ def create_app(simulate: bool, lock_path: str, state_dir: str,
     @app.post("/calibrate")
     def calibrate(req: CalibrateReq) -> dict:
         need_lock()
-        if scan_active() or calibrating():
-            raise HTTPException(409, "scan or calibration in progress")
-        jid = uuid.uuid4().hex
-        job = {"state": "running", "error": None}
-        jobs[jid] = job
+        with start_guard:
+            if scan_active() or calibrating():
+                raise HTTPException(409, "scan or calibration in progress")
+            jid = uuid.uuid4().hex
+            job = {"state": "running", "error": None}
+            jobs[jid] = job
 
-        def work() -> None:
-            try:
-                hardware.calibrate(req.devices)
-                job["state"] = "done"
-            except Exception:
-                job["error"] = traceback.format_exc()
-                job["state"] = "error"
+            def work() -> None:
+                try:
+                    hardware.calibrate(req.devices)
+                    job["state"] = "done"
+                except Exception:
+                    job["error"] = traceback.format_exc()
+                    job["state"] = "error"
 
-        threading.Thread(target=work, name="calibrate", daemon=True).start()
+            threading.Thread(target=work, name="calibrate", daemon=True).start()
         return {"job_id": jid}
 
     @app.get("/jobs/{job_id}")
@@ -157,11 +164,12 @@ def create_app(simulate: bool, lock_path: str, state_dir: str,
     @app.post("/scans")
     def start_scan(req: ScanReq) -> dict:
         need_lock()
-        if calibrating():
-            raise HTTPException(409, "calibration in progress")
-        sid = runner.start(req.scan_def, req.x_mm, req.y_mm, req.xchanger_station,
-                           req.savename, req.save_dir, req.duration_scale, req.roi_element)
-        st["scan_id"] = sid
+        with start_guard:
+            if calibrating():
+                raise HTTPException(409, "calibration in progress")
+            sid = runner.start(req.scan_def, req.x_mm, req.y_mm, req.xchanger_station,
+                               req.savename, req.save_dir, req.duration_scale, req.roi_element)
+            st["scan_id"] = sid
         return {"scan_id": sid}
 
     @app.get("/scans/{scan_id}")
@@ -201,11 +209,11 @@ def create_app(simulate: bool, lock_path: str, state_dir: str,
     def shutdown() -> dict:
         held = hardware.owns_lock(lock_path)
         sid = st["scan_id"]
-        if sid and scan_active():
+        if sid and runner.state(sid)["state"] in ACTIVE:
             runner.stop(sid)
-            deadline = time.monotonic() + 30  # let the scan finish saving before we exit
-            while scan_active() and time.monotonic() < deadline:
-                time.sleep(0.05)
+        deadline = time.monotonic() + 30  # let scan/calibration finish before we exit
+        while (scan_active() or calibrating()) and time.monotonic() < deadline:
+            time.sleep(0.05)
         if held:
             try:
                 hardware.xray(shutter="close")

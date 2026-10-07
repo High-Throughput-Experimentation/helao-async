@@ -87,15 +87,18 @@ class ScanRunner:
             raise InterlockError("position outside %.0f mm radius" % MAX_RADIUS_MM)
 
     # -- control ----------------------------------------------------------
+    def busy(self) -> bool:
+        """A scan is active, or a watchdog-errored record still has live threads."""
+        return any(s.state in ACTIVE
+                   or (s.worker is not None and s.worker.is_alive())
+                   or (s.thread is not None and s.thread.is_alive())
+                   for s in self._scans.values())
+
     def start(self, scan_def: dict, x_mm: float, y_mm: float,
               xchanger_station: Optional[int], savename: str, save_dir: str,
               duration_scale: float = 1.0, roi_element: str = "") -> str:
         with self._lock:
-            # a watchdog-errored record may still have live threads: still busy
-            if any(s.state in ACTIVE
-                   or (s.worker is not None and s.worker.is_alive())
-                   or (s.thread is not None and s.thread.is_alive())
-                   for s in self._scans.values()):
+            if self.busy():
                 raise BusyError("a scan is already active")
             self.check_interlocks(x_mm, y_mm)
             roi = None
@@ -150,7 +153,7 @@ class ScanRunner:
 
         rec.state = "moving"
         xch = easyxafs.xchanger_control.xchanger
-        if station is not None and xch.get_current_station() != station:
+        if station is not None:  # unconditional: vendor go_to_deg skips moves within 0.01 deg
             xch.go_to_station(station)
             xch.wait_until_idle()
         stage = easyxafs.wafer_stage_motor_control.wafer_stage

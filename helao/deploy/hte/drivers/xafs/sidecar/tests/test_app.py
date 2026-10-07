@@ -270,3 +270,86 @@ def test_scan_roi_element(hw):
     assert wait_done(c, r.json()["scan_id"])["state"] == "done"
     r = c.post("/scans", json=body(save_dir, roi_element="Xx"))
     assert r.status_code == 409 and "Xx" in r.json()["detail"]
+
+
+def test_unknown_field_422(hw):
+    c, save_dir = hw[0], hw[3]
+    assert c.post("/scans", json=body(save_dir, bogus=1)).status_code == 422
+    assert c.post("/initialize", json={"bogus": True}).status_code == 422
+    assert c.post("/calibrate", json={"devices": ["mono"], "x": 1}).status_code == 422
+    assert c.post("/xray", json={"kv": 1, "x": 1}).status_code == 422
+
+
+def test_calibrate_during_scan_start_interlock_window_409(hw):
+    import threading
+    c, h, save_dir = hw[0], hw[1], hw[3]
+    real = h.proto.readback_kv_ma
+    entered = threading.Event()
+
+    def slow():
+        entered.set()
+        time.sleep(0.6)  # widen the check-and-start window inside runner.start
+        return real()
+
+    h.proto.readback_kv_ma = slow
+    out = {}
+    t = threading.Thread(
+        target=lambda: out.update(r=c.post("/scans", json=body(save_dir))))
+    t.start()
+    assert entered.wait(5)
+    cal = c.post("/calibrate", json={"devices": ["mono"]})
+    t.join()
+    assert out["r"].status_code == 200, out["r"].text
+    assert cal.status_code == 409, cal.text
+    h.proto.readback_kv_ma = real
+    c.post("/scans/%s/stop" % out["r"].json()["scan_id"])
+    wait_done(c, out["r"].json()["scan_id"])
+
+
+def test_scan_while_calibrate_running_409(hw):
+    import threading
+    c, h, save_dir = hw[0], hw[1], hw[3]
+    gate = threading.Event()
+    h.mono.calibrate_all = lambda: gate.wait(10)
+    jid = c.post("/calibrate", json={"devices": ["mono"]}).json()["job_id"]
+    try:
+        assert c.post("/scans", json=body(save_dir)).status_code == 409
+    finally:
+        gate.set()
+    for _ in range(200):
+        if c.get("/jobs/" + jid).json()["state"] != "running":
+            break
+        time.sleep(0.02)
+
+
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
+def test_calibrate_409_while_watchdog_hung_thread_alive(ctx, monkeypatch):
+    from helao.deploy.hte.drivers.xafs.sidecar.runner import ScanRunner
+    monkeypatch.setattr(xafs_sidecar, "ScanRunner", lambda: ScanRunner(watchdog_margin_s=0.3))
+    app = xafs_sidecar.create_app(True, ctx[2], ctx[3] + "_x", exit_fn=None)
+    c, h, save_dir = TestClient(app), app.state.sim, ctx[3]
+    assert c.post("/initialize", json={}).status_code == 200
+    h.ketek.hang = True  # hangs scan.start(): watchdog errors the record, thread stays alive
+    try:
+        sid = c.post("/scans", json=body(save_dir)).json()["scan_id"]
+        assert wait_done(c, sid)["state"] == "error"
+        assert c.post("/calibrate", json={"devices": ["mono"]}).status_code == 409
+    finally:
+        h.ketek.hang = False
+    t0 = time.time()
+    while c.post("/calibrate", json={"devices": ["mono"]}).status_code == 409:
+        assert time.time() - t0 < 15
+        time.sleep(0.05)
+
+
+def test_shutdown_waits_for_calibrate_job(hw):
+    import threading
+    c, h = hw[0], hw[1]
+    gate = threading.Event()
+    h.mono.calibrate_all = lambda: gate.wait(10)
+    jid = c.post("/calibrate", json={"devices": ["mono"]}).json()["job_id"]
+    threading.Timer(0.5, gate.set).start()
+    t0 = time.time()
+    assert c.post("/shutdown").status_code == 200
+    assert time.time() - t0 >= 0.4
+    assert c.get("/jobs/" + jid).json()["state"] != "running"

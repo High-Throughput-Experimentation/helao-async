@@ -134,6 +134,9 @@ class XafsScanExec(Executor):
         idx = p["scan_index"]
         if not isinstance(idx, int) or isinstance(idx, bool) or not 0 <= idx <= 9999:
             raise ScanSetupError(f"scan_index {idx!r} not in 0..9999")
+        stn = p["xchanger_station"]
+        if not isinstance(stn, int) or isinstance(stn, bool) or not 1 <= stn <= 4:
+            raise ScanSetupError(f"xchanger_station {stn!r} not in 1..4")
         ref_name, ref_label = p["reference_name"], p["reference_label"]
         roi = p["roi_element"]
         if run_use == "izero" and not roi:
@@ -350,6 +353,9 @@ class XafsScanExec(Executor):
             action.error_code = ErrorCodes.cmd_error
             return {"error": ErrorCodes.cmd_error, "data": {}}
         action.action_params["exd_path"] = final["exd_path"]
+        if final["exd_path"] is None:
+            # operator stop before the first point: nothing saved, nothing to fetch
+            return {"error": ErrorCodes.none, "data": {}}
 
         mcas = await self._to_thread(self.driver.fetch_mcas, self.scan_id)
         arts = await self._to_thread(self.driver.fetch_artifacts, self.scan_id)
