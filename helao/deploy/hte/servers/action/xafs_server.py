@@ -25,6 +25,7 @@ from helao.core.models.data import DataModel
 from helao.core.models.file import HloHeaderModel
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.run_dir import redirect_manual_dir
+from helao.core.models.run_use import RunUse
 from helao.core.models.sample import (
     AssemblySample,
     GasSample,
@@ -52,6 +53,8 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 #: measured from the first non-queued sidecar state.
 TIMEOUT_FACTOR = 2.0
 TIMEOUT_MARGIN_S = 300.0
+#: Consecutive non-404 poll failures tolerated before the scan is stopped.
+MAX_POLL_FAILURES = 3
 #: Seconds between ``GET /jobs/{id}`` polls while calibrating.
 CALIBRATE_POLL_S = 1.0
 
@@ -90,6 +93,7 @@ class XafsScanExec(Executor):
         self.xy = (0.0, 0.0)
         self._t0 = None
         self._failed = False
+        self._fails = 0
 
     # -- helpers ---------------------------------------------------------
 
@@ -103,6 +107,21 @@ class XafsScanExec(Executor):
         self._failed = True
         return {"error": ErrorCodes.cmd_error, "status": HloStatus.errored, "data": {}}
 
+    def _poll_failure(self, r) -> dict:
+        """404 is terminal (sidecar restarted); other failures are tolerated
+        up to MAX_POLL_FAILURES in a row, then the scan is stopped."""
+        self._fails += 1
+        status = (r.data or {}).get("http_status")
+        if status == 404:
+            return self._record_error(r.message)
+        if self._fails >= MAX_POLL_FAILURES:
+            self.driver.stop()  # sync HTTP, short; keeps this helper sync
+            return self._record_error(
+                f"{self._fails} consecutive poll failures: {r.message}"
+            )
+        LOGGER.warning(f"xafs poll failure {self._fails}: {r.message}")
+        return {"error": ErrorCodes.none, "status": HloStatus.active, "data": {}}
+
     async def _resolve(self) -> None:
         """Set ``self.xy`` and ``self.savename`` from the sample, or raise."""
         p = self.active.action.action_params
@@ -111,6 +130,9 @@ class XafsScanExec(Executor):
             raise ScanSetupError("element is required")
         if not p["save_dir"]:
             raise ScanSetupError("save_dir is required")
+        idx = p["scan_index"]
+        if not isinstance(idx, int) or isinstance(idx, bool) or not 0 <= idx <= 9999:
+            raise ScanSetupError(f"scan_index {idx!r} not in 0..9999")
         samples = self.active.action.samples_in
         if len(samples) != 1:
             raise ScanSetupError(
@@ -155,12 +177,16 @@ class XafsScanExec(Executor):
                 ErrorCodes.no_sample,
             )
 
-    async def _drain(self) -> bool:
-        """Enqueue every new sidecar row as one data row; False on HTTP failure."""
+    async def _drain(self, tolerate: bool = False):
+        """Enqueue every new sidecar row as one data row.
+
+        Returns None on success, else the poll result to return: with
+        ``tolerate`` a transient failure keeps polling (see _poll_failure);
+        otherwise any failure is terminal.
+        """
         r = await self._to_thread(self.driver.rows_since, self.scan_id, self.n_rows)
         if r.response != DriverResponseType.success:
-            self._record_error(r.message)
-            return False
+            return self._poll_failure(r) if tolerate else self._record_error(r.message)
         cols, rows = r.data["columns"], r.data["rows"]
         fck = self.active.action.file_conn_keys[0]
         for row in rows:
@@ -172,7 +198,7 @@ class XafsScanExec(Executor):
                 )
             )
         self.n_rows += len(rows)
-        return True
+        return None
 
     # -- executor phases -------------------------------------------------
 
@@ -189,6 +215,11 @@ class XafsScanExec(Executor):
         except OSError as exc:
             LOGGER.error(f"xafs scan setup: cannot write marker: {exc}")
             self.active.action.action_params["sidecar_error"] = str(exc)
+            return {"error": ErrorCodes.cmd_error}
+        except Exception as exc:
+            # the runner does not wrap _pre_exec: an exception would wedge the server
+            LOGGER.error(f"xafs scan setup failed: {exc!r}", exc_info=True)
+            self.active.action.action_params["sidecar_error"] = repr(exc)
             return {"error": ErrorCodes.cmd_error}
         return {"error": ErrorCodes.none}
 
@@ -219,7 +250,7 @@ class XafsScanExec(Executor):
             }
         r = await self._to_thread(self.driver.scan_state, self.scan_id)
         if r.response != DriverResponseType.success:
-            return self._record_error(r.message)
+            return self._poll_failure(r)
         st = r.data
         state = st["state"]
         now = time.monotonic()
@@ -230,12 +261,10 @@ class XafsScanExec(Executor):
             if now - self._t0 > limit:
                 await self._to_thread(self.driver.stop)
                 return self._record_error(f"scan timed out after {limit:.0f} s")
-        if not await self._drain():
-            return {
-                "error": ErrorCodes.cmd_error,
-                "status": HloStatus.errored,
-                "data": {},
-            }
+        bail = await self._drain(tolerate=True)
+        if bail is not None:
+            return bail
+        self._fails = 0
         if state == "error":
             return self._record_error(st.get("error") or "sidecar scan error")
         if state in _OK_END:
@@ -263,17 +292,32 @@ class XafsScanExec(Executor):
             await asyncio.sleep(self.poll_rate)
 
     async def _post_exec(self) -> dict:
+        # the runner does not wrap _post_exec: an exception would wedge the server
+        try:
+            return await self._post_exec_body()
+        except Exception as exc:
+            LOGGER.error(f"xafs post_exec failed: {exc!r}", exc_info=True)
+            action = self.active.action
+            action.action_params["sidecar_error"] = repr(exc)
+            action.append_action_status(HloStatus.errored)
+            action.error_code = ErrorCodes.cmd_error
+            return {"error": ErrorCodes.cmd_error, "data": {}}
+
+    async def _post_exec_body(self) -> dict:
         action = self.active.action
         if self.scan_id is None or self._failed:
             return {"error": ErrorCodes.none, "data": {}}
         final = await self._wait_terminal()
+        if final is not None:
+            for k in ("scan_state", "n_points", "n_expected"):
+                action.action_params[k] = final["state" if k == "scan_state" else k]
         if final is None or final["state"] not in _OK_END:
             action.error_code = ErrorCodes.cmd_error
             action.action_params["sidecar_error"] = (
                 (final or {}).get("error") or "scan did not end cleanly"
             )
             return {"error": ErrorCodes.cmd_error, "data": {}}
-        if not await self._drain():
+        if await self._drain() is not None:
             action.error_code = ErrorCodes.cmd_error
             return {"error": ErrorCodes.cmd_error, "data": {}}
         action.action_params["exd_path"] = final["exd_path"]
@@ -373,6 +417,10 @@ async def xafs_dyn_endpoints(app: ActionHost):
             realtime=active.get_realtime_nowait(),
             file_conn_keys=active.action.file_conn_keys,
         )
+        try:  # an invalid value is rejected by XafsScanExec._pre_exec
+            active.action.run_use = RunUse(active.action.action_params["run_use"])
+        except ValueError:
+            pass
         executor = XafsScanExec(
             active=active,
             oneoff=False,
@@ -399,20 +447,27 @@ async def xafs_dyn_endpoints(app: ActionHost):
         return await finish_with(active, resp, "initialize")
 
     @app.action()
-    async def calibrate(ctx: ActionContext, devices: list[str] = ["mono"]):
-        """Calibrate the listed devices and wait for the sidecar job to end."""
+    async def calibrate(
+        ctx: ActionContext, devices: list[str] = ["mono"], timeout: float = 900.0
+    ):
+        """Calibrate the listed devices; wait up to ``timeout`` s for the job."""
         active = await ctx.begin()
         resp = await asyncio.to_thread(
             app.driver.calibrate, active.action.action_params["devices"]
         )
         if resp.response == DriverResponseType.success:
             job_id = resp.data["job_id"]
+            deadline = time.monotonic() + active.action.action_params["timeout"]
             while True:
                 resp = await asyncio.to_thread(app.driver.job_state, job_id)
                 if (
                     resp.response != DriverResponseType.success
                     or resp.data["state"] != "running"
                 ):
+                    break
+                if time.monotonic() >= deadline:
+                    resp.response = DriverResponseType.failed
+                    resp.message = f"calibration job {job_id} still running at timeout"
                     break
                 await asyncio.sleep(CALIBRATE_POLL_S)
             if (
@@ -428,6 +483,12 @@ async def xafs_dyn_endpoints(app: ActionHost):
         """Record the driver status (sidecar reachability / current scan)."""
         active = await ctx.begin()
         resp = await asyncio.to_thread(app.driver.get_status)
+        hw = await asyncio.to_thread(app.driver.hw_status)
+        if resp.response == DriverResponseType.success:
+            resp.data = {"health": resp.data, "hw": hw.data}
+            if hw.response != DriverResponseType.success:
+                resp.response = hw.response
+                resp.message = f"{resp.message}; {hw.message}"
         return await finish_with(active, resp, "status")
 
     @app.action()

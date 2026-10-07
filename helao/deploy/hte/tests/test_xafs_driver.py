@@ -255,3 +255,11 @@ def test_calibrate_and_job_state(make_stub):
     assert d.calibrate(["mono"]).data == {"job_id": "j1"}
     assert ("POST", "/calibrate", {"devices": ["mono"]}) in stub.requests
     assert d.job_state("j1").data == {"state": "done", "error": None}
+
+
+def test_hw_status(make_stub):
+    stub = make_stub({"GET /status": (200, {"mono_calibrated": True})})
+    assert stub.driver().hw_status().data == {"mono_calibrated": True}
+    r = make_stub({"GET /status": (500, {"detail": "hw"})}).driver().hw_status()
+    assert r.response == DriverResponseType.failed
+    assert r.data == {"http_status": 500, "detail": "hw"}

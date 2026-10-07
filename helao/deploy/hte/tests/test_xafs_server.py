@@ -22,6 +22,7 @@ from helao.core.drivers.helao_driver import (
     DriverStatus,
 )
 from helao.core.error import ErrorCodes
+from helao.core.models.hlostatus import HloStatus
 from helao.core.models.sample import SolidSample
 from helao.deploy.hte.servers.action import xafs_server
 from helao.deploy.hte.servers.action.xafs_server import XafsScanExec
@@ -51,7 +52,10 @@ def fail(http_status=None):
 
 
 class FakeDriver:
-    def __init__(self, states=GOOD_STATES, fail_state_call=None, start=None, est_total=1.0):
+    def __init__(
+        self, states=GOOD_STATES, fail_state_call=None, start=None, est_total=1.0, transient=()
+    ):
+        self.transient = set(transient)  # 1-based scan_state calls failing without http_status
         self.states = list(states)
         self.fail_state_call = fail_state_call  # 1-based scan_state call that fails 404
         self.start_resp = start or ok({"scan_id": "s1"})
@@ -60,6 +64,9 @@ class FakeDriver:
         self.n_visible = 0
         self.last = self.states[-1][0]
         self.error = None
+
+    def connect(self):
+        return ok()
 
     def start_scan(self, **body):
         self.calls.append(("start_scan", body))
@@ -70,6 +77,8 @@ class FakeDriver:
         self.calls.append(("scan_state", scan_id))
         if self.fail_state_call == n:
             return fail(404)
+        if n in self.transient:
+            return fail()
         state, self.n_visible = self.states[min(n - 1, len(self.states) - 1)]
         return ok(
             {
@@ -142,7 +151,9 @@ class FakeSession:
             file_conn_keys=[FCK],
             samples_in=samples,
             files=[],
+            append_action_status=lambda st: self.statuses.append(st),
         )
+        self.statuses = []
         self.action_task = None
         self.action_loop_running = False
         self.manual_stop = False
@@ -335,3 +346,160 @@ async def test_timeout_backstop_stops_and_errors(tmp_path, monkeypatch):
 
 def test_make_app_exposed():
     assert callable(xafs_server.makeApp)
+
+
+@pytest.mark.asyncio
+async def test_pre_exec_exception_errors_no_start(tmp_path):
+    class Boom(FakeUnifiedDb):
+        async def get_samples_xy(self, samples):
+            raise TypeError("bad platemap")
+
+    s, ex, d = make(tmp_path, db=Boom())
+    await run(s, ex)
+    assert s.action.error_code == ErrorCodes.cmd_error
+    assert d.calls == [] and s.finished
+
+
+@pytest.mark.asyncio
+async def test_post_exec_exception_errors_and_finishes(tmp_path):
+    d = FakeDriver()
+    d.fetch_artifacts = lambda sid: ok({"scan_def": {}})  # no "metadata"
+    s, ex, _ = make(tmp_path, driver=d)
+    await run(s, ex)
+    assert s.action.error_code == ErrorCodes.cmd_error
+    assert HloStatus.errored in s.statuses and s.finished
+
+
+@pytest.mark.asyncio
+async def test_transient_poll_failures_tolerated(tmp_path):
+    d = FakeDriver(transient=(2, 3))
+    s, ex, _ = make(tmp_path, driver=d)
+    await run(s, ex)
+    assert s.action.error_code == ErrorCodes.none
+    assert len(s.rows()) == 4
+    assert "stop" not in d.names()
+
+
+@pytest.mark.asyncio
+async def test_three_consecutive_failures_stop_and_error(tmp_path):
+    d = FakeDriver(transient=(2, 3, 4))
+    s, ex, _ = make(tmp_path, driver=d)
+    await run(s, ex)
+    assert "stop" in d.names()
+    assert s.action.error_code == ErrorCodes.cmd_error
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("idx", [-1, 10000, "3"])
+async def test_scan_index_out_of_range(tmp_path, idx):
+    s, ex, d = make(tmp_path, scan_index=idx)
+    await run(s, ex)
+    assert s.action.error_code == ErrorCodes.cmd_error
+    assert d.calls == []
+
+
+@pytest.mark.asyncio
+async def test_final_state_recorded(tmp_path):
+    s, ex, _ = make(tmp_path)
+    await run(s, ex)
+    ap = s.action.action_params
+    assert (ap["scan_state"], ap["n_points"], ap["n_expected"]) == ("done", 4, 4)
+
+
+class StubApp:
+    def __init__(self, driver, tmp_path):
+        self.server_params = {}
+        self.driver = driver
+        self.base = SimpleNamespace(helaodirs=SimpleNamespace(db_root=str(tmp_path)))
+        self.eps = {}
+
+    def action(self):
+        def deco(f):
+            self.eps[f.__name__] = f
+            return f
+
+        return deco
+
+
+class EpActive:
+    def __init__(self, params, samples=()):
+        self.action = SimpleNamespace(
+            action_params=params,
+            action_name="ep", action_uuid="u",
+            samples_in=list(samples),
+            file_conn_keys=[FCK],
+            run_use=None,
+            error_code=ErrorCodes.none,
+            append_action_status=lambda st: None,
+        )
+        self.driver = None
+        self.dflt = []
+        self.executor = None
+
+    def finish_hlo_header(self, **kw):
+        pass
+
+    def get_realtime_nowait(self):
+        return 0
+
+    def start_executor(self, ex):
+        self.executor = ex
+        return {}
+
+    async def enqueue_data_dflt(self, datadict):
+        self.dflt.append(datadict)
+
+    async def finish(self):
+        return SimpleNamespace(as_dict=lambda: {"error": self.action.error_code})
+
+
+class EpCtx:
+    def __init__(self, active):
+        self.active = active
+        self.action = active.action
+
+    async def begin(self, **kw):
+        return self.active
+
+
+async def make_eps(tmp_path, driver):
+    app = StubApp(driver, tmp_path)
+    await xafs_server.xafs_dyn_endpoints(app)
+    return app.eps
+
+
+@pytest.mark.asyncio
+async def test_normal_scan_sets_action_run_use(tmp_path):
+    from helao.core.models.run_use import RunUse
+
+    eps = await make_eps(tmp_path, FakeDriver())
+    params = {"scan_def": {}, "run_use": "izero"}
+    a = EpActive(params, [ref_sample()])
+    await eps["normal_scan"](EpCtx(a))
+    assert a.action.run_use == RunUse.izero
+    assert a.executor is not None
+
+
+@pytest.mark.asyncio
+async def test_status_returns_health_and_hw(tmp_path):
+    d = FakeDriver()
+    d.get_status = lambda: ok({"state": None})
+    d.hw_status = lambda: ok({"mono_calibrated": True})
+    eps = await make_eps(tmp_path, d)
+    a = EpActive({})
+    await eps["status"](EpCtx(a))
+    assert a.dflt[0]["status"] == {"health": {"state": None}, "hw": {"mono_calibrated": True}}
+    assert a.action.error_code == ErrorCodes.none
+
+
+@pytest.mark.asyncio
+async def test_calibrate_timeout_errors(tmp_path, monkeypatch):
+    monkeypatch.setattr(xafs_server, "CALIBRATE_POLL_S", 0.001)
+    d = FakeDriver()
+    d.calibrate = lambda devices: ok({"job_id": "j"})
+    d.job_state = lambda jid: ok({"state": "running", "error": None})
+    eps = await make_eps(tmp_path, d)
+    a = EpActive({"devices": ["mono"], "timeout": 0.05})
+    await eps["calibrate"](EpCtx(a))
+    assert a.action.error_code == ErrorCodes.cmd_error
+    assert "timeout" in a.dflt[0]["message"]

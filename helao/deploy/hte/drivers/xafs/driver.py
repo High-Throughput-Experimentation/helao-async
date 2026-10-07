@@ -238,3 +238,7 @@ class XafsSidecarDriver(HelaoDriver):
     def job_state(self, job_id: str) -> DriverResponse:
         """GET /jobs/{id}; data={"state": running|done|error, "error": ...}."""
         return self._call("GET", f"/jobs/{job_id}", "job state")
+
+    def hw_status(self) -> DriverResponse:
+        """GET /status; hardware positions, shutter/kV/mA, mono calibration."""
+        return self._call("GET", "/status", "hardware status")
