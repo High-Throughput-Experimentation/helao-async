@@ -107,7 +107,7 @@ class XafsScanExec(Executor):
         self._failed = True
         return {"error": ErrorCodes.cmd_error, "status": HloStatus.errored, "data": {}}
 
-    def _poll_failure(self, r) -> dict:
+    async def _poll_failure(self, r) -> dict:
         """404 is terminal (sidecar restarted); other failures are tolerated
         up to MAX_POLL_FAILURES in a row, then the scan is stopped."""
         self._fails += 1
@@ -115,7 +115,8 @@ class XafsScanExec(Executor):
         if status == 404:
             return self._record_error(r.message)
         if self._fails >= MAX_POLL_FAILURES:
-            self.driver.stop()  # sync HTTP, short; keeps this helper sync
+            # the sidecar is probably hung: keep the blocking HTTP off the loop
+            await self._to_thread(self.driver.stop)
             return self._record_error(
                 f"{self._fails} consecutive poll failures: {r.message}"
             )
@@ -184,9 +185,14 @@ class XafsScanExec(Executor):
         ``tolerate`` a transient failure keeps polling (see _poll_failure);
         otherwise any failure is terminal.
         """
-        r = await self._to_thread(self.driver.rows_since, self.scan_id, self.n_rows)
+        call = self._to_thread if tolerate else self._call_retry
+        r = await call(self.driver.rows_since, self.scan_id, self.n_rows)
         if r.response != DriverResponseType.success:
-            return self._poll_failure(r) if tolerate else self._record_error(r.message)
+            return (
+                await self._poll_failure(r)
+                if tolerate
+                else self._record_error(r.message)
+            )
         cols, rows = r.data["columns"], r.data["rows"]
         fck = self.active.action.file_conn_keys[0]
         for row in rows:
@@ -250,7 +256,7 @@ class XafsScanExec(Executor):
             }
         r = await self._to_thread(self.driver.scan_state, self.scan_id)
         if r.response != DriverResponseType.success:
-            return self._poll_failure(r)
+            return await self._poll_failure(r)
         st = r.data
         state = st["state"]
         now = time.monotonic()
@@ -278,11 +284,26 @@ class XafsScanExec(Executor):
             return {"error": ErrorCodes.cmd_error}
         return {"error": ErrorCodes.none}
 
+    async def _call_retry(self, fn, *args):
+        """Driver call after the scan ended: 404 is final, other failures are
+        retried up to MAX_POLL_FAILURES consecutive times so a blip does not
+        flip a good scan to errored."""
+        for attempt in range(MAX_POLL_FAILURES):
+            r = await self._to_thread(fn, *args)
+            if (
+                r.response == DriverResponseType.success
+                or (r.data or {}).get("http_status") == 404
+            ):
+                return r
+            LOGGER.warning(f"xafs post-scan call failure {attempt + 1}: {r.message}")
+            await asyncio.sleep(self.poll_rate)
+        return r
+
     async def _wait_terminal(self):
         """Final scan-state dict once terminal (bounded), else None."""
         deadline = time.monotonic() + TIMEOUT_MARGIN_S
         while True:
-            r = await self._to_thread(self.driver.scan_state, self.scan_id)
+            r = await self._call_retry(self.driver.scan_state, self.scan_id)
             if r.response != DriverResponseType.success:
                 return None
             if r.data["state"] in _TERMINAL:

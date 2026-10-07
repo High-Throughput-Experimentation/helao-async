@@ -10,6 +10,7 @@ import asyncio
 import io
 import json
 import os
+import threading
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -112,6 +113,7 @@ class FakeDriver:
         )
 
     def stop(self):
+        self.stop_thread = threading.get_ident()
         self.calls.append(("stop",))
         return ok()
 
@@ -386,7 +388,31 @@ async def test_three_consecutive_failures_stop_and_error(tmp_path):
     s, ex, _ = make(tmp_path, driver=d)
     await run(s, ex)
     assert "stop" in d.names()
+    assert d.stop_thread != threading.get_ident()  # off the event loop thread
     assert s.action.error_code == ErrorCodes.cmd_error
+
+
+@pytest.mark.asyncio
+async def test_transient_failure_after_done_tolerated(tmp_path):
+    d = FakeDriver()
+    real = d.rows_since
+    state = {"n": 0}
+
+    def flaky(sid, since):
+        # since == 4: first call is the done-poll's drain, second is _post_exec's
+        if since == 4:
+            state["n"] += 1
+            if state["n"] == 2:
+                return fail()
+        return real(sid, since)
+
+    d.rows_since = flaky
+    s, ex, _ = make(tmp_path, driver=d)
+    await run(s, ex)
+    assert s.action.error_code == ErrorCodes.none
+    assert len(s.rows()) == 4
+    assert [t[0] for t in s.tracked] == ["xafsmca__npz_file"]
+    assert state["n"] >= 3  # the failed final drain was retried
 
 
 @pytest.mark.asyncio
