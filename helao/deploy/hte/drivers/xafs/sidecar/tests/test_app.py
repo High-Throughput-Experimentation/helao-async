@@ -261,3 +261,12 @@ def test_calibrate_vs_scan_guards(hw):
     assert c.post("/calibrate", json={"devices": ["mono"]}).status_code == 409
     c.post("/scans/%s/stop" % sid)
     wait_done(c, sid)
+
+
+def test_scan_roi_element(hw):
+    c, save_dir = hw[0], hw[3]
+    r = c.post("/scans", json=body(save_dir, roi_element="Fe"))
+    assert r.status_code == 200, r.text
+    assert wait_done(c, r.json()["scan_id"])["state"] == "done"
+    r = c.post("/scans", json=body(save_dir, roi_element="Xx"))
+    assert r.status_code == 409 and "Xx" in r.json()["detail"]

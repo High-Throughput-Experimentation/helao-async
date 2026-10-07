@@ -44,6 +44,7 @@ class ScanReq(BaseModel):
     savename: str
     save_dir: str
     duration_scale: float = 1.0
+    roi_element: str = ""
 
 
 class XrayReq(BaseModel):
@@ -159,7 +160,7 @@ def create_app(simulate: bool, lock_path: str, state_dir: str,
         if calibrating():
             raise HTTPException(409, "calibration in progress")
         sid = runner.start(req.scan_def, req.x_mm, req.y_mm, req.xchanger_station,
-                           req.savename, req.save_dir, req.duration_scale)
+                           req.savename, req.save_dir, req.duration_scale, req.roi_element)
         st["scan_id"] = sid
         return {"scan_id": sid}
 

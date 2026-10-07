@@ -89,7 +89,7 @@ class ScanRunner:
     # -- control ----------------------------------------------------------
     def start(self, scan_def: dict, x_mm: float, y_mm: float,
               xchanger_station: Optional[int], savename: str, save_dir: str,
-              duration_scale: float = 1.0) -> str:
+              duration_scale: float = 1.0, roi_element: str = "") -> str:
         with self._lock:
             # a watchdog-errored record may still have live threads: still busy
             if any(s.state in ACTIVE
@@ -98,12 +98,19 @@ class ScanRunner:
                    for s in self._scans.values()):
                 raise BusyError("a scan is already active")
             self.check_interlocks(x_mm, y_mm)
+            roi = None
+            if roi_element:  # resolve before any motion, as WaferGridScans does for Izero
+                import easyxafs.scan
+                try:
+                    roi = easyxafs.scan.get_automatic_fluorescence_ROI(roi_element)
+                except Exception as e:
+                    raise InterlockError("cannot compute ROI for element %r: %s" % (roi_element, e))
             scan_id = uuid.uuid4().hex
             rec = _Scan()
             self._scans[scan_id] = rec
             rec.worker = threading.Thread(
                 target=self._run, name="ScanRunner",
-                args=(rec, scan_def, x_mm, y_mm, xchanger_station, savename, save_dir, duration_scale),
+                args=(rec, scan_def, x_mm, y_mm, xchanger_station, savename, save_dir, duration_scale, roi),
                 daemon=True,
             )
             rec.worker.start()
@@ -121,9 +128,10 @@ class ScanRunner:
 
     # -- worker -----------------------------------------------------------
     def _run(self, rec: _Scan, scan_def: dict, x_mm: float, y_mm: float,
-             station: Optional[int], savename: str, save_dir: str, scale: float) -> None:
+             station: Optional[int], savename: str, save_dir: str, scale: float,
+             roi: Optional[tuple] = None) -> None:
         try:
-            self._run_inner(rec, scan_def, x_mm, y_mm, station, savename, save_dir, scale)
+            self._run_inner(rec, scan_def, x_mm, y_mm, station, savename, save_dir, scale, roi)
         except Exception:
             rec.error = traceback.format_exc()
             rec.state = "error"
@@ -131,7 +139,8 @@ class ScanRunner:
         rec.t_end = time.monotonic()
 
     def _run_inner(self, rec: _Scan, scan_def: dict, x_mm: float, y_mm: float,
-                   station: Optional[int], savename: str, save_dir: str, scale: float) -> None:
+                   station: Optional[int], savename: str, save_dir: str, scale: float,
+                   roi: Optional[tuple] = None) -> None:
         import easyxafs
         import easyxafs.rowland
         import easyxafs.saveable_scan
@@ -156,6 +165,9 @@ class ScanRunner:
         scan = easyxafs.scan.load_scan_def(scan_def)
         if scale != 1:
             scan.scale_scan_times(scale)
+        if roi is not None:  # same as WaferGridScans Izero: vendor only touches scan_def
+            scan.scan_def['ROI']['roi_min'] = roi[0]
+            scan.scan_def['ROI']['roi_max'] = roi[1]
         scan.savename = str(Path(save_dir) / savename)
         scan._saveaftercomplete = True
         try:

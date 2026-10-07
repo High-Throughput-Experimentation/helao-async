@@ -242,3 +242,39 @@ def test_stop_before_first_point_is_stopped(env):
     h.ketek.hang = False
     s = wait(r, sid)
     assert s["state"] == "stopped" and s["exd_path"] is None and s["error"] is None, s
+
+
+def _saved_roi(path):
+    import json
+    import zipfile
+    with zipfile.ZipFile(path) as z:
+        return json.loads(z.read("scan_def.json"))["ROI"]
+
+
+def test_roi_element_rewrites_roi(env):
+    import easyxafs.scan
+    r = ScanRunner()
+    h, save_dir = env
+    sid = r.start(scan_def(), 1.0, 2.0, None, SAVENAME, save_dir, roi_element="Fe")
+    s = wait(r, sid)
+    assert s["state"] == "done", s
+    lo, hi = easyxafs.scan.get_automatic_fluorescence_ROI("Fe")
+    roi = _saved_roi(s["exd_path"])
+    assert (roi["roi_min"], roi["roi_max"]) == (lo, hi)
+    assert (lo, hi) != (800, 1000)
+
+
+def test_roi_unchanged_without_element(env):
+    r = ScanRunner()
+    s = wait(r, go(r, env))
+    roi = _saved_roi(s["exd_path"])
+    assert (roi["roi_min"], roi["roi_max"]) == (800, 1000)
+
+
+def test_roi_unknown_element_interlock_before_motion(env):
+    h, save_dir = env
+    r = ScanRunner()
+    with pytest.raises(InterlockError) as e:
+        r.start(scan_def(), 1.0, 2.0, None, SAVENAME, save_dir, roi_element="Xx")
+    assert "Xx" in e.value.reason
+    assert h.wafer_stage.calls == []
