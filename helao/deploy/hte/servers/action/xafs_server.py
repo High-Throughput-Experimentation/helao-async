@@ -135,6 +135,11 @@ class XafsScanExec(Executor):
         if not isinstance(idx, int) or isinstance(idx, bool) or not 0 <= idx <= 9999:
             raise ScanSetupError(f"scan_index {idx!r} not in 0..9999")
         ref_name, ref_label = p["reference_name"], p["reference_label"]
+        roi = p["roi_element"]
+        if run_use == "izero" and not roi:
+            raise ScanSetupError("run_use izero needs roi_element")
+        if run_use != "izero" and roi:
+            raise ScanSetupError(f"roi_element is only for run_use izero, got {run_use!r}")
         if run_use in ("izero", "energy_calib"):
             if not ref_name or not ref_label:
                 raise ScanSetupError(
@@ -242,6 +247,7 @@ class XafsScanExec(Executor):
             savename=self.savename,
             save_dir=p["save_dir"],
             duration_scale=p["duration_scale"],
+            roi_element=p["roi_element"],
         )
         if r.response != DriverResponseType.success:
             self._record_error(r.message)  # next _poll ends the loop at once
@@ -413,6 +419,7 @@ async def xafs_dyn_endpoints(app: ActionHost):
         save_dir: str = "",
         reference_name: str = "",
         reference_label: str = "",
+        roi_element: str = "",
         fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -431,6 +438,7 @@ async def xafs_dyn_endpoints(app: ActionHost):
                 (izero/energy_calib only).
             reference_label: xafs-std global label recorded as the input
                 sample (izero/energy_calib only).
+            roi_element: Element whose ROI overrides the Izero ROI (izero only).
             fast_samples_in: The plate sample (run_use data); ignored for
                 reference scans.
         """

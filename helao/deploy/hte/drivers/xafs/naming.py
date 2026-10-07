@@ -29,7 +29,3 @@ def apply_affine(m: List[List[float]], px: float, py: float) -> Tuple[float, flo
         m[1][0] * px + m[1][1] * py + m[1][2],
     )
 
-
-def reference_name_from_label(global_label: str, registry_names: dict) -> str:
-    """`<formula>_<form>` for a reference sample; KeyError if not registered."""
-    return registry_names[global_label]["name"]

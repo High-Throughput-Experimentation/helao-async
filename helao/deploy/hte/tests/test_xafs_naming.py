@@ -6,7 +6,6 @@ import pytest
 
 from helao.deploy.hte.drivers.xafs.naming import (
     apply_affine,
-    reference_name_from_label,
     reference_savename,
     sample_savename,
 )
@@ -49,9 +48,3 @@ def test_apply_affine():
     assert apply_affine([[1, 0, 2], [0, 1, -3]], 1, 1) == (3, -2)
     assert apply_affine([[0, 1, 0], [-1, 0, 0]], 2, 5) == (5, -2)
 
-
-def test_reference_name_from_label():
-    refs = {"xafs-std__solid__1_1": {"name": "ZnO_film", "x_mm": 1.0, "y_mm": 2.0}}
-    assert reference_name_from_label("xafs-std__solid__1_1", refs) == "ZnO_film"
-    with pytest.raises(KeyError):
-        reference_name_from_label("nope", refs)

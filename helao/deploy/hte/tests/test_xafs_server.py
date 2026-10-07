@@ -205,6 +205,7 @@ def make(tmp_path, driver=None, samples=None, db=None, **over):
         "scan_index": 7,
         "reference_name": "",
         "reference_label": "",
+        "roi_element": "",
         "save_dir": str(tmp_path / "run"),
     }
     params.update(over)
@@ -304,11 +305,13 @@ async def test_reference_xy_from_params(tmp_path, run_use, savename):
         run_use=run_use,
         reference_name="ZnO_film",
         reference_label=REF_LABEL,
+        roi_element="Zn" if run_use == "izero" else "",
     )
     await run(s, ex)
     body = [c for c in d.calls if c[0] == "start_scan"][0][1]
     assert (body["x_mm"], body["y_mm"]) == (5.5, -6.5)  # no affine, no platemap
     assert body["savename"] == savename
+    assert body["roi_element"] == ("Zn" if run_use == "izero" else "")
     assert db.asked == []
 
 
@@ -323,6 +326,29 @@ async def test_reference_xy_from_params(tmp_path, run_use, savename):
 )
 async def test_reference_scan_missing_fields_errors(tmp_path, over):
     s, ex, d = make(tmp_path, samples=[], run_use="izero", **over)
+    await run(s, ex)
+    assert s.action.error_code != ErrorCodes.none
+    assert d.calls == []
+
+
+@pytest.mark.asyncio
+async def test_izero_without_roi_element_errors(tmp_path):
+    s, ex, d = make(
+        tmp_path, samples=[], run_use="izero",
+        reference_name="ZnO_film", reference_label=REF_LABEL,
+    )
+    await run(s, ex)
+    assert s.action.error_code != ErrorCodes.none
+    assert d.calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("run_use", ["data", "energy_calib"])
+async def test_roi_element_only_for_izero(tmp_path, run_use):
+    kw = {}
+    if run_use == "energy_calib":
+        kw = dict(samples=[], reference_name="ZnO_film", reference_label=REF_LABEL)
+    s, ex, d = make(tmp_path, run_use=run_use, roi_element="Zn", **kw)
     await run(s, ex)
     assert s.action.error_code != ErrorCodes.none
     assert d.calls == []
@@ -538,6 +564,7 @@ async def test_normal_scan_sets_action_run_use(tmp_path):
         "run_use": "izero",
         "reference_name": "ZnO_film",
         "reference_label": REF_LABEL,
+        "roi_element": "Zn",
     }
     a = EpActive(params, [plate_sample()])  # fast_samples_in ignored for references
     await eps["normal_scan"](EpCtx(a))
