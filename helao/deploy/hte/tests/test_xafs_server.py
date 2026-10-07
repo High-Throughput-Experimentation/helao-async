@@ -34,9 +34,8 @@ COLUMNS = ["Time", "Angle(deg)", "Energy(eV)"]
 ALL_ROWS = [[float(i), 10.0 + i, 9000.0 + i] for i in range(4)]
 GOOD_STATES = [("moving", 0), ("running", 2), ("running", 4), ("done", 4)]
 STAGE_M = [[1.0, 0.0, 2.0], [0.0, 1.0, -3.0]]
-REFS = {
-    "xafs-std__solid__ref_1": {"name": "ZnO_film", "x_mm": 5.5, "y_mm": -6.5},
-}
+REFS = {"ZnO_film": {"x_mm": 5.5, "y_mm": -6.5}}
+REF_LABEL = "xafs-std__ZnO_film"
 
 
 def ok(data=None):
@@ -196,10 +195,6 @@ def plate_sample(no=13983):
     return SolidSample(plate_id=1234, sample_no=no)
 
 
-def ref_sample():
-    return SolidSample(plate_id="ref", sample_no=1, machine_name="xafs-std")
-
-
 def make(tmp_path, driver=None, samples=None, db=None, **over):
     params = {
         "scan_def": {"zone_defs": []},
@@ -208,6 +203,8 @@ def make(tmp_path, driver=None, samples=None, db=None, **over):
         "xchanger_station": 2,
         "duration_scale": 1.0,
         "scan_index": 7,
+        "reference_name": "",
+        "reference_label": "",
         "save_dir": str(tmp_path / "run"),
     }
     params.update(over)
@@ -294,16 +291,49 @@ async def test_start_409_errored_no_poll(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_reference_sample_xy_from_params(tmp_path):
+@pytest.mark.parametrize(
+    "run_use,savename",
+    [("izero", "Zn_IzeroRef_ZnO_film"), ("energy_calib", "Zn_EnergyCalib_ZnO_film")],
+)
+async def test_reference_xy_from_params(tmp_path, run_use, savename):
     db = FakeUnifiedDb()
     s, ex, d = make(
-        tmp_path, samples=[ref_sample()], db=db, run_use="izero", element="Zn"
+        tmp_path,
+        samples=[],
+        db=db,
+        run_use=run_use,
+        reference_name="ZnO_film",
+        reference_label=REF_LABEL,
     )
     await run(s, ex)
     body = [c for c in d.calls if c[0] == "start_scan"][0][1]
     assert (body["x_mm"], body["y_mm"]) == (5.5, -6.5)  # no affine, no platemap
-    assert body["savename"] == "Zn_IzeroRef_ZnO_film"
+    assert body["savename"] == savename
     assert db.asked == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "over",
+    [
+        {"reference_name": "", "reference_label": REF_LABEL},
+        {"reference_name": "ZnO_film", "reference_label": ""},
+        {"reference_name": "Nope_film", "reference_label": REF_LABEL},
+    ],
+)
+async def test_reference_scan_missing_fields_errors(tmp_path, over):
+    s, ex, d = make(tmp_path, samples=[], run_use="izero", **over)
+    await run(s, ex)
+    assert s.action.error_code != ErrorCodes.none
+    assert d.calls == []
+
+
+@pytest.mark.asyncio
+async def test_data_scan_with_reference_name_errors(tmp_path):
+    s, ex, d = make(tmp_path, reference_name="ZnO_film")
+    await run(s, ex)
+    assert s.action.error_code != ErrorCodes.none
+    assert d.calls == []
 
 
 @pytest.mark.asyncio
@@ -462,6 +492,10 @@ class EpActive:
         self.dflt = []
         self.executor = None
 
+    async def append_sample(self, samples, IO):
+        assert IO == "in"
+        self.action.samples_in.extend(samples)
+
     def finish_hlo_header(self, **kw):
         pass
 
@@ -499,11 +533,33 @@ async def test_normal_scan_sets_action_run_use(tmp_path):
     from helao.core.models.run_use import RunUse
 
     eps = await make_eps(tmp_path, FakeDriver())
-    params = {"scan_def": {}, "run_use": "izero"}
-    a = EpActive(params, [ref_sample()])
+    params = {
+        "scan_def": {},
+        "run_use": "izero",
+        "reference_name": "ZnO_film",
+        "reference_label": REF_LABEL,
+    }
+    a = EpActive(params, [plate_sample()])  # fast_samples_in ignored for references
     await eps["normal_scan"](EpCtx(a))
     assert a.action.run_use == RunUse.izero
     assert a.executor is not None
+    assert len(a.action.samples_in) == 1
+    smp = a.action.samples_in[0]
+    assert (smp.global_label, smp.sample_type) == (REF_LABEL, "xafs-std-pellet")
+
+
+@pytest.mark.asyncio
+async def test_normal_scan_data_keeps_plate_sample(tmp_path):
+    eps = await make_eps(tmp_path, FakeDriver())
+    params = {
+        "scan_def": {},
+        "run_use": "data",
+        "reference_name": "",
+        "reference_label": "",
+    }
+    a = EpActive(params, [plate_sample()])
+    await eps["normal_scan"](EpCtx(a))
+    assert [x.sample_no for x in a.action.samples_in] == [13983]
 
 
 @pytest.mark.asyncio

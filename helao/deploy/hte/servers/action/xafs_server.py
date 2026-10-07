@@ -31,6 +31,7 @@ from helao.core.models.sample import (
     GasSample,
     LiquidSample,
     NoneSample,
+    SampleModel,
     SolidSample,
 )
 from helao.hexagon.app.action_context import ActionContext
@@ -42,7 +43,6 @@ from helao.helpers.sample_api import UnifiedSampleDataAPI
 from ...drivers.xafs.driver import XafsSidecarDriver
 from ...drivers.xafs.naming import (
     apply_affine,
-    reference_name_from_label,
     reference_savename,
     sample_savename,
 )
@@ -134,31 +134,36 @@ class XafsScanExec(Executor):
         idx = p["scan_index"]
         if not isinstance(idx, int) or isinstance(idx, bool) or not 0 <= idx <= 9999:
             raise ScanSetupError(f"scan_index {idx!r} not in 0..9999")
-        samples = self.active.action.samples_in
-        if len(samples) != 1:
-            raise ScanSetupError(
-                f"expected exactly one sample, got {len(samples)}", ErrorCodes.no_sample
-            )
-        sample = samples[0]
-        label = sample.get_global_label()
-        refs = self.server_params.get("references", {})
-        plate_id = getattr(sample, "plate_id", None)
-        sample_no = getattr(sample, "sample_no", None)
-        if label in refs:
-            if run_use not in ("izero", "energy_calib"):
+        ref_name, ref_label = p["reference_name"], p["reference_label"]
+        if run_use in ("izero", "energy_calib"):
+            if not ref_name or not ref_label:
                 raise ScanSetupError(
-                    f"reference sample {label} needs run_use izero or energy_calib, "
-                    f"got {run_use!r}"
+                    f"run_use {run_use} needs reference_name and reference_label"
                 )
-            ref = refs[label]
+            refs = self.server_params.get("references", {})
+            if ref_name not in refs:
+                raise ScanSetupError(f"reference {ref_name!r} not in params.references")
+            ref = refs[ref_name]
             self.xy = (float(ref["x_mm"]), float(ref["y_mm"]))
-            self.savename = reference_savename(
-                element, run_use, reference_name_from_label(label, refs)
-            )
-        elif plate_id is not None and sample_no is not None:
-            if run_use != "data":
+            self.savename = reference_savename(element, run_use, ref_name)
+        elif run_use == "data":
+            if ref_name or ref_label:
                 raise ScanSetupError(
-                    f"plate sample {label} needs run_use data, got {run_use!r}"
+                    "reference_name/reference_label must be empty for run_use data"
+                )
+            samples = self.active.action.samples_in
+            if len(samples) != 1:
+                raise ScanSetupError(
+                    f"expected exactly one sample, got {len(samples)}",
+                    ErrorCodes.no_sample,
+                )
+            sample = samples[0]
+            label = sample.get_global_label()
+            sample_no = getattr(sample, "sample_no", None)
+            if getattr(sample, "plate_id", None) is None or sample_no is None:
+                raise ScanSetupError(
+                    f"sample {label} is not a plate sample (plate_id and sample_no)",
+                    ErrorCodes.no_sample,
                 )
             xylist = await self.unified_db.get_samples_xy([sample])
             platexy = xylist[0] if xylist else [None, None]
@@ -173,10 +178,7 @@ class XafsScanExec(Executor):
                 element, p["scan_index"], sample_no, self.xy[0], self.xy[1]
             )
         else:
-            raise ScanSetupError(
-                f"sample {label} is neither a plate sample nor a registered reference",
-                ErrorCodes.no_sample,
-            )
+            raise ScanSetupError(f"unknown run_use {run_use!r}")
 
     async def _drain(self, tolerate: bool = False):
         """Enqueue every new sidecar row as one data row.
@@ -409,6 +411,8 @@ async def xafs_dyn_endpoints(app: ActionHost):
         duration_scale: float = 1.0,
         scan_index: int = 0,
         save_dir: str = "",
+        reference_name: str = "",
+        reference_label: str = "",
         fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -423,17 +427,39 @@ async def xafs_dyn_endpoints(app: ActionHost):
             duration_scale: Scale applied to the scan dwell times.
             scan_index: Grid index used in the sample savename.
             save_dir: Run folder the sidecar writes the exd archive into.
-            fast_samples_in: The single sample (plate sample or reference).
+            reference_name: `<formula>_<form>` key into params.references
+                (izero/energy_calib only).
+            reference_label: xafs-std global label recorded as the input
+                sample (izero/energy_calib only).
+            fast_samples_in: The plate sample (run_use data); ignored for
+                reference scans.
         """
         A = ctx.action
+        ap = A.action_params
+        is_ref = ap["run_use"] in ("izero", "energy_calib")
+        ref_ok = is_ref and bool(ap["reference_name"]) and bool(ap["reference_label"])
+        if ref_ok:
+            # references are not plate samples: ignore fast_samples_in
+            A.samples_in = []
+            labels = [ap["reference_label"]]
+        else:
+            labels = [s.get_global_label() for s in A.samples_in]
         active = await ctx.begin(
             action_abbr="xafs_normal",
             file_type="xafsscan__helao_file",
-            hloheader=HloHeaderModel(
-                optional={"scan_def": A.action_params["scan_def"]}
-            ),
-            sample_global_labels=[s.get_global_label() for s in A.samples_in],
+            hloheader=HloHeaderModel(optional={"scan_def": ap["scan_def"]}),
+            sample_global_labels=labels,
         )
+        if ref_ok:
+            await active.append_sample(
+                [
+                    SampleModel(
+                        global_label=ap["reference_label"],
+                        sample_type="xafs-std-pellet",
+                    )
+                ],
+                IO="in",
+            )
         active.finish_hlo_header(
             realtime=active.get_realtime_nowait(),
             file_conn_keys=active.action.file_conn_keys,
