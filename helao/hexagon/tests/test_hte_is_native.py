@@ -66,7 +66,7 @@ def _names(path: Path) -> set[str]:
 def test_the_sweep_sees_every_module() -> None:
     """A wrong ACTION_DIR would make every assertion below pass over nothing."""
     modules = _modules()
-    assert len(modules) == 23, f"found {len(modules)} modules under {ACTION_DIR}"
+    assert len(modules) == 24, f"found {len(modules)} modules under {ACTION_DIR}"
 
 
 def test_ported_modules_reach_the_engine_nowhere() -> None:
