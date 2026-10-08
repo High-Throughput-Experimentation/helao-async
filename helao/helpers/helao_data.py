@@ -18,6 +18,7 @@ from glob import glob
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Optional
 
 import orjson
 import pandas as pd
@@ -282,6 +283,28 @@ class HelaoData:
         runpos = [i for i, v in enumerate(parts) if is_run_root(v)][-1]
         return os.path.join(*parts[runpos + 1 :])
 
+    @staticmethod
+    def _detached_bytes(p: str) -> Optional[bytes]:
+        """Bytes of ``p`` when it lies outside any run tree, else ``None``.
+
+        A record copied out of a station (for example into a shared data
+        repository) has no ``RUNS``/``RUNS_*``/``DIAG``/``PROCESSES`` segment,
+        so neither :class:`FileMapper` nor :meth:`_runs_relpath` can anchor
+        it. Such a file is read where it is. ``.hlo`` data files are recorded
+        as ``.hlo.json`` but stored as ``.hlo``, so both names are tried.
+
+        Raises:
+            FileNotFoundError: ``p`` is detached and neither name exists.
+        """
+        if any(is_run_root(v) for v in Path(p).parts):
+            return None
+        names = [p, p[: -len(".json")]] if p.endswith(".hlo.json") else [p]
+        for name in names:
+            if os.path.isfile(name):
+                with open(name, "rb") as f:
+                    return f.read()
+        raise FileNotFoundError(p)
+
     @property
     def ls(self):
         """Print this node and its children with their indices."""
@@ -316,9 +339,11 @@ class HelaoData:
             return read_hlo_bytes(
                 self.read_file(member), keep_keys=keep_keys, omit_keys=omit_keys
             )
-        else:
-            fm = FileMapper(hlotarget)
-            return fm.read_hlo(self._runs_relpath(hlotarget))
+        raw = self._detached_bytes(hlotarget)
+        if raw is not None:
+            return read_hlo_bytes(raw, keep_keys=keep_keys, omit_keys=omit_keys)
+        fm = FileMapper(hlotarget)
+        return fm.read_hlo(self._runs_relpath(hlotarget))
 
     def read_parquet(
         self, hlotarget: str, keep_keys: list = [], omit_keys: list = []
@@ -341,8 +366,10 @@ class HelaoData:
                     parquet_path = zf.extract(hlotarget, tmpdir)
                     parquet_df = pd.read_parquet(parquet_path)
         else:
-            fm = FileMapper(hlotarget)
-            parbytes = fm.read_bytes(self._runs_relpath(hlotarget))
+            parbytes = self._detached_bytes(hlotarget)
+            if parbytes is None:
+                fm = FileMapper(hlotarget)
+                parbytes = fm.read_bytes(self._runs_relpath(hlotarget))
             parquet_df = pd.read_parquet(BytesIO(parbytes))
 
         return {}, parquet_df.to_dict(orient="list")
@@ -364,8 +391,11 @@ class HelaoData:
         if self.target.endswith(".zip") and RunDir.NOSYNC.value not in hlotarget:
             json_dict = orjson.loads(self.read_file(hlotarget))
         else:
-            fm = FileMapper(hlotarget)
-            json_dict = orjson.loads(fm.read_bytes(self._runs_relpath(hlotarget)))
+            raw = self._detached_bytes(hlotarget)
+            if raw is None:
+                fm = FileMapper(hlotarget)
+                raw = fm.read_bytes(self._runs_relpath(hlotarget))
+            json_dict = orjson.loads(raw)
 
         return {}, json_dict
 
