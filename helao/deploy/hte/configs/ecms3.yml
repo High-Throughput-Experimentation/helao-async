@@ -19,9 +19,7 @@ servers:
     port: 8001
     group: orchestrator
     fast: async_orch2
-    params:
-      seqspec_parser_path: helao\specifications\last3months.py
-      seqspec_folder_path: C:\INST_hlo\DATA\RUNS_SYNCED
+    params: {}
     verbose: false
   OPERATOR:
     group: operator
@@ -32,6 +30,8 @@ servers:
       orch_key: ORCH
       poll_interval: 5
       plate_api: HTEPlateAPI
+      seqspec_parser_path: helao\deploy\hte\specifications\last3months.py
+      seqspec_folder_path: C:\INST_hlo\DATA\RUNS
   # IO:
   #   host: hte-ecms-01.htejcap.caltech.edu
   #   port: 8005
@@ -178,3 +178,5 @@ servers:
     reflex: helao_ui
     params:
       pages: [live, action, operator, browser]
+      seqspec_parser_path: helao\deploy\hte\specifications\last3months.py
+      seqspec_folder_path: C:\INST_hlo\DATA\RUNS

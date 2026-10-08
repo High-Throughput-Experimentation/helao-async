@@ -1,8 +1,9 @@
-"""Shared week-windowed sequence-zip specification parser.
+"""Shared week-windowed sequence specification parser.
 
 Implements a :class:`BaseParser` that the orchestrator uses to surface
-recently-finished sequence runs (under year/week-numbered folders) for
-re-running with overridden parameters.
+recent sequence runs for re-running with overridden parameters. Two layouts
+are listed: the single ``RUNS`` tree (``%Y/%m%d/<seqdir>/``, unzipped) and the
+legacy ``RUNS_SYNCED`` tree (``%y.%U/**/*.zip``).
 """
 
 import glob
@@ -19,7 +20,7 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 class WeekWindowSpecParser(BaseParser):
-    """Lister/parser for sequence zips collected over the last ``WEEKS`` weeks."""
+    """Lister/parser for sequences collected over the last ``WEEKS`` weeks."""
 
     WEEKS: int = 2
 
@@ -32,20 +33,28 @@ class WeekWindowSpecParser(BaseParser):
         }
 
     def lister(self, folderpath: str) -> list:
-        """Return up to 50 recent non-manual sequence zips from ``folderpath``.
+        """Return up to 50 recent non-manual sequences from ``folderpath``.
 
-        Globs ``folderpath/<YY.WW>/**/*.zip`` for each of the last ``WEEKS``
-        weeks and excludes ``__manual_orch_seq__`` paths.
+        Lists sequence directories under ``folderpath/%Y/%m%d/`` for each day
+        of the last ``WEEKS`` weeks (the ``RUNS`` tree), then sequence zips
+        under ``folderpath/%y.%U/**`` (the legacy ``RUNS_SYNCED`` tree), and
+        excludes ``__manual_orch_seq__`` paths.
 
         Args:
-            folderpath: Root directory holding ``YY.WW`` subfolders.
+            folderpath: A ``RUNS`` root or a legacy ``RUNS_SYNCED`` root.
 
         Returns:
-            List of up to 50 zip paths sorted newest-first.
+            List of up to 50 sequence directory or zip paths, newest-first.
         """
+        now = datetime.now()
         specfiles = []
+        for i in range(self.WEEKS * 7):
+            day = (now - timedelta(days=i)).strftime("%Y/%m%d")
+            seqymls = glob.glob(os.path.join(folderpath, day, "*", "*-seq.yml"))
+            specfiles += sorted({os.path.dirname(p) for p in seqymls}, reverse=True)
         for i in range(self.WEEKS):
-            yearweek = (datetime.now() + timedelta(weeks=-i)).strftime("%y.%W")
+            # %U (Sunday-start) is what get_sequence_dir wrote; %W was a week off.
+            yearweek = (now - timedelta(weeks=i)).strftime("%y.%U")
             specfiles += sorted(
                 glob.glob(
                     os.path.join(folderpath, yearweek, "**", "*.zip"),

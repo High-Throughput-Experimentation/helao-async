@@ -98,6 +98,37 @@ SHELL_ROUTES = (
 #: Page name -> the config key whose panels belong on it.
 PAGE_TO_VIS_KEY = {"live": "live_vis", "action": "action_vis"}
 
+#: Routes that read the metadata API or S3 and so need ``HELAO_CREDENTIALS``.
+#: Without it they are hidden from the navigation and render a note instead.
+CREDENTIAL_ROUTES = ("/composition", "/uvvis", "/xafs", "/xrds", "/retire")
+
+CREDENTIALS_NOTE = (
+    "This page needs metadata-API and S3 credentials. Set HELAO_CREDENTIALS "
+    "to a readable credentials file on the machine running this UI, then "
+    "restart it."
+)
+
+
+def credentials_available() -> bool:
+    """Whether ``HELAO_CREDENTIALS`` names an existing file in this process."""
+    path = os.environ.get("HELAO_CREDENTIALS", "")
+    return bool(path) and os.path.isfile(path)
+
+
+class CredentialsState(rx.State):
+    """Carries :func:`credentials_available` to the browser.
+
+    Decided in the backend at runtime, not when the bundle is built: the
+    bundle stamp does not cover environment variables, so a link removed at
+    build time would stay removed after credentials are added. The exported
+    bundle carries the build machine's value only until the page hydrates.
+    """
+
+    @rx.var
+    def has_credentials(self) -> bool:
+        """Whether the credential-gated pages are usable."""
+        return credentials_available()
+
 
 @dataclass(frozen=True)
 class PanelTarget:
@@ -310,11 +341,17 @@ def _nav():
         rx.link("Operator", href="/operator"),
         rx.link("Browser", href="/browser"),
         rx.link("Control", href="/control"),
-        rx.link("Composition", href="/composition"),
-        rx.link("UV-Vis", href="/uvvis"),
-        rx.link("XAFS", href="/xafs"),
-        rx.link("XRD", href="/xrds"),
-        rx.link("Retire", href="/retire"),
+        rx.cond(
+            CredentialsState.has_credentials,
+            rx.hstack(
+                rx.link("Composition", href="/composition"),
+                rx.link("UV-Vis", href="/uvvis"),
+                rx.link("XAFS", href="/xafs"),
+                rx.link("XRD", href="/xrds"),
+                rx.link("Retire", href="/retire"),
+                spacing="4",
+            ),
+        ),
         width="100%",
         padding="0.75em 1em",
         align="center",
@@ -336,6 +373,12 @@ def _page(title: str, body, route: str):
         body: Page content.
         route: The route being rendered, a key of ``REFLEX_PAGE_TINTS``.
     """
+    if route in CREDENTIAL_ROUTES:
+        body = rx.cond(
+            CredentialsState.has_credentials,
+            body,
+            rx.text(CREDENTIALS_NOTE, padding_x="1em"),
+        )
     return rx.vstack(
         _nav(),
         rx.divider(),
@@ -366,18 +409,21 @@ def _panel_page(title: str, targets: list, empty_note: str, route: str):
 
 def _index_page(routes: dict):
     """Render the route index."""
+
+    def _entry(path, targets):
+        row = rx.hstack(
+            rx.link(path, href=path),
+            rx.text(f"{len(targets)} panel(s)", size="1"),
+            spacing="3",
+        )
+        if path in CREDENTIAL_ROUTES:
+            return rx.cond(CredentialsState.has_credentials, row)
+        return row
+
     return _page(
         "Routes",
         rx.vstack(
-            *[
-                rx.hstack(
-                    rx.link(path, href=path),
-                    rx.text(f"{len(targets)} panel(s)", size="1"),
-                    spacing="3",
-                )
-                for path, targets in routes.items()
-                if path != "/"
-            ],
+            *[_entry(path, targets) for path, targets in routes.items() if path != "/"],
             align="start",
             spacing="2",
             padding_x="1em",
