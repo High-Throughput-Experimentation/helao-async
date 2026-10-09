@@ -170,3 +170,46 @@ def test_meta_dict_warns_once_at_the_caller(monkeypatch):
     with pytest.warns(DeprecationWarning) as rec:
         assert act._meta_dict == {}
     assert len(rec) == 1 and rec[0].filename == __file__
+
+
+def test_local_lookup_by_uuid(tmp_path):
+    from uuid import UUID
+
+    loader = LocalLoader(str(_record(tmp_path)))
+    by_index = loader.get_act(0)
+    assert loader.get_act(UUID(ACT_UUID)).yml_path == by_index.yml_path
+    assert loader.get_act(ACT_UUID, hmod=False)["action_uuid"] == ACT_UUID
+    assert loader.get_prc(PRC_UUID).hlo["data"]["v"] == [1.0, 2.0]
+    assert loader.get_json("process", PRC_UUID)["technique_name"] == "tech"
+    with pytest.raises(KeyError, match="no action with uuid"):
+        loader.get_act("00000000-0000-0000-0000-000000000000")
+    with pytest.raises(KeyError):
+        loader.get_json("action", PRC_UUID)
+
+
+def test_uuid_lookup_normalises_and_skips_missing(tmp_path):
+    seq_dir = _record(tmp_path)
+    exp_yml = next(seq_dir.rglob("*-exp.yml"))
+    exp_yml.write_text(f"experiment_name: expA\nexperiment_uuid: {PRC_UUID}\n")
+    loader = LocalLoader(str(seq_dir))
+    assert loader.get_act(ACT_UUID.upper()).action_uuid == ACT_UUID
+    assert loader.get_act(ACT_UUID.replace("-", ""), hmod=False)
+    assert loader.get_exp(PRC_UUID).experiment_name == "expA"
+    with pytest.raises(KeyError):
+        loader.get_seq("None")  # the seq yml has no uuid
+    by_path = loader.get_act(ACT_UUID, path=loader.get_act(0).yml_path)
+    assert by_path.action_uuid == ACT_UUID
+
+
+def test_failed_uuid_map_build_is_retried(tmp_path):
+    seq_dir = _record(tmp_path)
+    act_yml = next(seq_dir.rglob("*-act.yml"))
+    good = act_yml.read_text()
+    act_yml.write_text("action_name: [unclosed\n")
+    loader = LocalLoader(str(seq_dir))
+    for _ in range(2):  # a partial map would turn the 2nd into a KeyError
+        with pytest.raises(Exception) as err:
+            loader.get_act(ACT_UUID)
+        assert not isinstance(err.value, KeyError)
+    act_yml.write_text(good)
+    assert loader.get_act(ACT_UUID).action_uuid == ACT_UUID

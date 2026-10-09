@@ -162,6 +162,14 @@ def parse_prc_path(ymlp) -> tuple:
     return prc_idx, prc_uuid, techname, yml_dir, ymlp, exp_timestamp, exp_name
 
 
+def _uuid_key(value) -> Optional[str]:
+    """Canonical string of a uuid in any accepted spelling, or None if not one."""
+    try:
+        return str(value if isinstance(value, UUID) else UUID(str(value)))
+    except ValueError:
+        return None
+
+
 class ActionProvenanceError(RuntimeError):
     """A dispatched action could not be resolved to the action that ran it.
 
@@ -209,6 +217,7 @@ class LocalLoader:
         self.seq_cache = {}
         self.prc_cache = {}
         self._yml_paths = {}
+        self._uuid_paths = {}  # {helao_type: {uuid str: yml path}}, see _path_of
         self.target = os.path.abspath(os.path.normpath(data_path.strip('"').strip("'")))
         target_state = self.target.split("RUNS_")[-1].split(os.sep)[0]
         states = (
@@ -385,6 +394,54 @@ class LocalLoader:
         self.seq_cache = {}
         self.prc_cache = {}
 
+    def _path_of(self, helao_type: str, uuid) -> str:
+        """The indexed yml path of the ``helao_type`` record with ``uuid``.
+
+        Each type's uuid map is built on its first lookup by reading that
+        type's indexed ymls; the parsed dicts land in its cache, so later
+        ``get_*`` calls reuse them. A map is kept only once complete, so a yml
+        that fails to parse raises on every lookup rather than leaving a
+        partial map behind. On a duplicated uuid the first indexed yml wins;
+        a yml with no parseable uuid is not indexed.
+
+        Raises:
+            KeyError: No indexed record of that type has that uuid.
+        """
+        if helao_type not in self._uuid_paths:
+            sfx = {v: k for k, v in ABBR_MAP.items()}[helao_type]
+            cache = getattr(self, f"{sfx}_cache")
+            paths = {}
+            for ymlp in self._yml_paths[sfx]:
+                if ymlp not in cache:
+                    cache[ymlp] = self.get_yml(ymlp)
+                key = _uuid_key(cache[ymlp].get(f"{helao_type}_uuid"))
+                if key is not None:
+                    paths.setdefault(key, ymlp)
+            self._uuid_paths[helao_type] = paths
+        key = _uuid_key(uuid)
+        if key is None or key not in self._uuid_paths[helao_type]:
+            raise KeyError(f"no {helao_type} with uuid {uuid} under {self.target}")
+        return self._uuid_paths[helao_type][key]
+
+    def get_json(self, helao_type: str, uuid) -> dict:
+        """The ``helao_type`` record with ``uuid`` as a dict, like ``HelaoLoader.get_json``.
+
+        The local record is the parsed yml rather than the S3 JSON.
+
+        Args:
+            helao_type: ``action``, ``experiment``, ``sequence`` or ``process``.
+            uuid: Record uuid (``UUID`` or its string).
+
+        Raises:
+            KeyError: No indexed record of that type has that uuid.
+        """
+        path = self._path_of(helao_type, uuid)
+        sfx = {v: k for k, v in ABBR_MAP.items()}[helao_type]
+        cache = getattr(self, f"{sfx}_cache")
+        if path not in cache:
+            cache[path] = self.get_yml(path)
+        return cache[path]
+
     def get_yml(self, path: str) -> dict:
         """Load a YAML file from the indexed target (zip-aware).
 
@@ -417,7 +474,8 @@ class LocalLoader:
         """Load an action from the indexed target by dataframe ``index`` or yml ``path``.
 
         Args:
-            index: Row index in ``self.actions``.
+            index: Row index in ``self.actions``, or the record's uuid
+                (``UUID`` or string), as ``HelaoLoader.get_act`` takes.
             path: Direct path to the action yml.
             hmod: Return the ``HelaoAction`` wrapper; ``False`` returns the
                 parsed yml dict, as ``HelaoLoader.get_act`` does.
@@ -430,7 +488,9 @@ class LocalLoader:
         """
         if index is None and path is None:
             raise IndexError("neither index, nor path arguments were supplied")
-        if path is None:
+        if path is None and isinstance(index, (UUID, str)):
+            path = self._path_of("action", index)
+        elif path is None:
             path = self.actions.iloc[index].action_localpath
         if path not in self.act_cache:
             self.act_cache[path] = self.get_yml(path)
@@ -507,7 +567,8 @@ class LocalLoader:
         """Load an experiment by dataframe ``index`` or yml ``path``.
 
         Args:
-            index: Row index in ``self.experiments``.
+            index: Row index in ``self.experiments``, or the record's uuid
+                (``UUID`` or string), as ``HelaoLoader.get_exp`` takes.
             path: Direct path to the experiment yml.
             hmod: ``False`` returns the parsed yml dict instead of the wrapper.
 
@@ -519,7 +580,9 @@ class LocalLoader:
         """
         if index is None and path is None:
             raise IndexError("neither index, nor path arguments were supplied")
-        if path is None:
+        if path is None and isinstance(index, (UUID, str)):
+            path = self._path_of("experiment", index)
+        elif path is None:
             path = self.experiments.iloc[index].experiment_localpath
         if path not in self.exp_cache:
             self.exp_cache[path] = self.get_yml(path)
@@ -533,7 +596,8 @@ class LocalLoader:
         """Load a sequence by dataframe ``index`` or yml ``path``.
 
         Args:
-            index: Row index in ``self.sequences``.
+            index: Row index in ``self.sequences``, or the record's uuid
+                (``UUID`` or string), as ``HelaoLoader.get_seq`` takes.
             path: Direct path to the sequence yml.
             hmod: ``False`` returns the parsed yml dict instead of the wrapper.
 
@@ -545,7 +609,9 @@ class LocalLoader:
         """
         if index is None and path is None:
             raise IndexError("neither index, nor path arguments were supplied")
-        if path is None:
+        if path is None and isinstance(index, (UUID, str)):
+            path = self._path_of("sequence", index)
+        elif path is None:
             path = self.sequences.iloc[index].sequence_localpath
         if path not in self.seq_cache:
             self.seq_cache[path] = self.get_yml(path)
@@ -559,7 +625,8 @@ class LocalLoader:
         """Load a process by dataframe ``index`` or yml ``path``.
 
         Args:
-            index: Row index in ``self.processes``.
+            index: Row index in ``self.processes``, or the record's uuid
+                (``UUID`` or string), as ``HelaoLoader.get_prc`` takes.
             path: Direct path to the process yml.
             hmod: ``False`` returns the parsed yml dict instead of the wrapper.
 
@@ -571,7 +638,9 @@ class LocalLoader:
         """
         if index is None and path is None:
             raise IndexError("neither index, nor path arguments were supplied")
-        if path is None:
+        if path is None and isinstance(index, (UUID, str)):
+            path = self._path_of("process", index)
+        elif path is None:
             path = self.processes.iloc[index].process_localpath
         if path not in self.prc_cache:
             self.prc_cache[path] = self.get_yml(path)
