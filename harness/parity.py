@@ -60,8 +60,8 @@ def _diff_aux(norm, gpath, cpath, manifest):
 
 
 def _diff_lines_sorted(gpath, cpath, mg, mc):
-    g = sorted(mg.sub(x) for x in Path(gpath).read_text().splitlines())
-    c = sorted(mc.sub(x) for x in Path(cpath).read_text().splitlines())
+    g = sorted(mg.sub(x) for x in Path(gpath).read_text(encoding="utf-8").splitlines())
+    c = sorted(mc.sub(x) for x in Path(cpath).read_text(encoding="utf-8").splitlines())
     if g != c:
         return [{"key": "manifest_lines", "golden": g, "candidate": c}]
     return []
@@ -226,7 +226,9 @@ def run_parity(
         "accepted_divergences": accepted,
     }
     if report_path is not None:
-        Path(report_path).write_text(json.dumps(report, indent=2, default=str))
+        Path(report_path).write_text(
+            json.dumps(report, indent=2, default=str), encoding="utf-8"
+        )
     return report
 
 

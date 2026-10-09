@@ -27,13 +27,14 @@ def _record(tmp_path: Path) -> Path:
     act_dir = exp_dir / "0__0__SIM__do_thing"
     act_dir.mkdir(parents=True)
     hlo_file = {"file_name": "d.hlo", "file_type": "x_helao__file", "data_keys": ["v"]}
-    (act_dir / "d.hlo").write_text(HLO)
+    (act_dir / "d.hlo").write_text(HLO, encoding="utf-8")
     (act_dir / f"{TS}-act.yml").write_text(
         f"action_name: do_thing\naction_uuid: {ACT_UUID}\n"
-        f"action_timestamp: 2026-09-25 09:41:02\nfiles: {json.dumps([hlo_file])}\n"
+        f"action_timestamp: 2026-09-25 09:41:02\nfiles: {json.dumps([hlo_file])}\n",
+        encoding="utf-8",
     )
-    (exp_dir / f"{TS}-exp.yml").write_text("experiment_name: expA\n")
-    (seq_dir / f"{TS}-seq.yml").write_text("sequence_name: seqA\n")
+    (exp_dir / f"{TS}-exp.yml").write_text("experiment_name: expA\n", encoding="utf-8")
+    (seq_dir / f"{TS}-seq.yml").write_text("sequence_name: seqA\n", encoding="utf-8")
     act_out = act_dir.relative_to(tmp_path / "RUNS").as_posix()
     prc = {
         "technique_name": "tech",
@@ -43,7 +44,9 @@ def _record(tmp_path: Path) -> Path:
         ],
         "files": [dict(hlo_file, action_uuid=ACT_UUID, run_use="data")],
     }
-    (exp_dir / f"0__{PRC_UUID}__tech-prc.yml").write_text(json.dumps(prc))
+    (exp_dir / f"0__{PRC_UUID}__tech-prc.yml").write_text(
+        json.dumps(prc), encoding="utf-8"
+    )
     return seq_dir
 
 
@@ -122,9 +125,9 @@ def test_local_process_hlo_from_synced_zip_with_hlo_json_name(tmp_path):
 
     seq_dir = _record(tmp_path)
     prc_yml = next(seq_dir.rglob("*-prc.yml"))
-    prc = json.loads(prc_yml.read_text())
+    prc = json.loads(prc_yml.read_text(encoding="utf-8"))
     prc["files"][0]["file_name"] = "d.hlo.json"
-    prc_yml.write_text(json.dumps(prc))
+    prc_yml.write_text(json.dumps(prc), encoding="utf-8")
     zip_path = seq_dir.parent / f"{seq_dir.name}.zip"
     with zipfile.ZipFile(zip_path, "w") as zf:
         for f in seq_dir.rglob("*"):
@@ -190,7 +193,9 @@ def test_local_lookup_by_uuid(tmp_path):
 def test_uuid_lookup_normalises_and_skips_missing(tmp_path):
     seq_dir = _record(tmp_path)
     exp_yml = next(seq_dir.rglob("*-exp.yml"))
-    exp_yml.write_text(f"experiment_name: expA\nexperiment_uuid: {PRC_UUID}\n")
+    exp_yml.write_text(
+        f"experiment_name: expA\nexperiment_uuid: {PRC_UUID}\n", encoding="utf-8"
+    )
     loader = LocalLoader(str(seq_dir))
     assert loader.get_act(ACT_UUID.upper()).action_uuid == ACT_UUID
     assert loader.get_act(ACT_UUID.replace("-", ""), hmod=False)
@@ -204,12 +209,12 @@ def test_uuid_lookup_normalises_and_skips_missing(tmp_path):
 def test_failed_uuid_map_build_is_retried(tmp_path):
     seq_dir = _record(tmp_path)
     act_yml = next(seq_dir.rglob("*-act.yml"))
-    good = act_yml.read_text()
-    act_yml.write_text("action_name: [unclosed\n")
+    good = act_yml.read_text(encoding="utf-8")
+    act_yml.write_text("action_name: [unclosed\n", encoding="utf-8")
     loader = LocalLoader(str(seq_dir))
     for _ in range(2):  # a partial map would turn the 2nd into a KeyError
         with pytest.raises(Exception) as err:
             loader.get_act(ACT_UUID)
         assert not isinstance(err.value, KeyError)
-    act_yml.write_text(good)
+    act_yml.write_text(good, encoding="utf-8")
     assert loader.get_act(ACT_UUID).action_uuid == ACT_UUID

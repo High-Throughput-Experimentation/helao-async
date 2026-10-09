@@ -377,7 +377,7 @@ def load_manifest(checklist_dir: Path) -> list[dict]:
     manifest = checklist_dir / MANIFEST
     if not manifest.is_file():
         raise FileNotFoundError(f"no {MANIFEST} in {checklist_dir}")
-    return json.loads(manifest.read_text())["servers"]
+    return json.loads(manifest.read_text(encoding="utf-8"))["servers"]
 
 
 def freeze_deployment(
@@ -429,7 +429,10 @@ def freeze_deployment(
     # them here would fold them into the frozen record the gate counts.
     additions = checklist_dir / "_additions.json"
     listed = (
-        {(a["module"], *_route_key(a)) for a in json.loads(additions.read_text())}
+        {
+            (a["module"], *_route_key(a))
+            for a in json.loads(additions.read_text(encoding="utf-8"))
+        }
         if additions.is_file()
         else set()
     )
@@ -445,7 +448,7 @@ def freeze_deployment(
             blockers.append(f"{stem}: module missing at {src.relative_to(REPO_ROOT)}")
             continue
         dst = checklist_dir / f"{stem}.json"
-        frozen = json.loads(dst.read_text()) if dst.is_file() else []
+        frozen = json.loads(dst.read_text(encoding="utf-8")) if dst.is_file() else []
         key = key_override or entry.get("representative_key")
         if key is None and not include_unwired:
             invented = synthesized_key(frozen)
@@ -521,7 +524,7 @@ def freeze_deployment(
         verb = "would write" if dry_run else "wrote"
         lines.append(f"  {verb}     {stem} ({len(frozen)} -> {len(merged)} routes)")
         if not dry_run:
-            dst.write_text(json.dumps(merged, indent=2) + "\n")
+            dst.write_text(json.dumps(merged, indent=2) + "\n", encoding="utf-8")
         for r in merged:
             if _route_key(r) not in {_route_key(f) for f in frozen}:
                 tags = ",".join(r["tags"]) or "-"

@@ -31,7 +31,7 @@ STANDALONE_SCRIPTS = {"test_funcs.py", "test_read_loop.py"}
 def _imported_modules(path: Path) -> set[str]:
     """Every module name this file imports, however it spells the import."""
     names: set[str] = set()
-    for node in ast.walk(ast.parse(path.read_text())):
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
         if isinstance(node, ast.Import):
             names.update(a.name for a in node.names)
         elif isinstance(node, ast.ImportFrom):

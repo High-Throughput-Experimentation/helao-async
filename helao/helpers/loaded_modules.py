@@ -93,7 +93,7 @@ def write_loaded_modules_snapshot(
     try:
         os.makedirs(states_dir, exist_ok=True)
         snap_path = os.path.join(states_dir, f"loaded_modules_{server_key}.json")
-        with open(snap_path, "w") as f:
+        with open(snap_path, "w", encoding="utf-8") as f:
             json.dump(loaded_repo_modules(repo_root), f)
         return snap_path
     except Exception:

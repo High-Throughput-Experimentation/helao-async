@@ -45,10 +45,12 @@ def _write_action(root: Path, status: str = "finished", with_hlo: bool = False) 
     d = root / "RUNS_DIAG" / "25.28" / "0716" / "0__0__SAMPLE__get_loaded_positions"
     d.mkdir(parents=True)
     (d / "250716.131421-act.yml").write_text(
-        f"file_type: action\naction_status:\n  - {status}\n"
+        f"file_type: action\naction_status:\n  - {status}\n", encoding="utf-8"
     )
     if with_hlo:
-        (d / "get_loaded_positions-0.hlo").write_text("hlo_version: x\n%%\n")
+        (d / "get_loaded_positions-0.hlo").write_text(
+            "hlo_version: x\n%%\n", encoding="utf-8"
+        )
     return d
 
 
@@ -57,7 +59,7 @@ def test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance():
         root = Path(td) / "captroot"
         _write_action(root, status="finished", with_hlo=False)
         (root / "LOGS").mkdir(parents=True)
-        (root / "LOGS" / "SAMPLE.log").write_text("not captured")
+        (root / "LOGS" / "SAMPLE.log").write_text("not captured", encoding="utf-8")
 
         out = Path(td) / "golden" / "run1"
         snapshot(root=root, out_dir=out, config_prefix="samplegold")

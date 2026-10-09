@@ -876,7 +876,9 @@ class OldLiquidSampleAPI:
 
         if not os.path.exists(os.path.join(self._dbfilepath, self._dbfile)):
             # file does not exists, create file
-            f = open(os.path.join(self._dbfilepath, self._dbfile), "w")
+            f = open(
+                os.path.join(self._dbfilepath, self._dbfile), "w", encoding="utf-8"
+            )
             f.close()
 
         LOGGER.info(
@@ -894,7 +896,7 @@ class OldLiquidSampleAPI:
         """
         if os.path.exists(self._dbfilepath):
             self.fdb = await aiofiles.open(
-                os.path.join(self._dbfilepath, self._dbfile), mode
+                os.path.join(self._dbfilepath, self._dbfile), mode, encoding="utf-8"
             )
             return True
         else:
@@ -929,7 +931,7 @@ class OldLiquidSampleAPI:
         async def write_sample_no_jsonfile(filename, datadict):
             """Write a per-sample JSON sidecar next to the CSV index."""
             self.fjson = await aiofiles.open(
-                os.path.join(self._dbfilepath, filename), "a+"
+                os.path.join(self._dbfilepath, filename), "a+", encoding="utf-8"
             )
             await self.fjson.write(json.dumps(datadict))
             await self.fjson.close()
@@ -973,7 +975,7 @@ class OldLiquidSampleAPI:
 
         async def load_json_file(filename, linenr=1):
             async with aiofiles.open(
-                os.path.join(self._dbfilepath, filename), "r+"
+                os.path.join(self._dbfilepath, filename), "r+", encoding="utf-8"
             ) as f:
                 counter = 0
                 retval = ""

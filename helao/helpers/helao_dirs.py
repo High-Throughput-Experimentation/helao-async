@@ -101,7 +101,7 @@ def helao_dirs(world_cfg: dict, server_name: Optional[str] = None) -> HelaoDirs:
                 try:
                     timestamp_found = False
                     timestamp = ""
-                    with open(old_log, "r") as f:
+                    with open(old_log, "r", encoding="utf-8") as f:
                         for line in f:
                             if line.replace("error_[", "[").strip().startswith("["):
                                 timestamp_found = True

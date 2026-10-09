@@ -77,7 +77,7 @@ def has_pytest_tests(path: Path) -> bool:
     looks for.
     """
     try:
-        tree = ast.parse(path.read_text())
+        tree = ast.parse(path.read_text(encoding="utf-8"))
     except (SyntaxError, UnicodeDecodeError, OSError):
         return True  # let pytest report it rather than hiding it here
     for node in tree.body:

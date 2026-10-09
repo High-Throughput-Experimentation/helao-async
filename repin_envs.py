@@ -55,7 +55,7 @@ def norm(name: str) -> str:
 def read_dev(path: Path) -> tuple[list[str], list[str], list[str]]:
     """Return (channels, conda specs, pip specs without URLs) from a dev env file."""
     channels, conda, pip, section = [], [], [], None
-    for line in path.read_text().splitlines():
+    for line in path.read_text(encoding="utf-8").splitlines():
         if line.startswith("channels:"):
             section = "channels"
         elif line.startswith("dependencies:"):
@@ -107,7 +107,7 @@ def pip_resolve(specs: list[str], platform: str, python: str) -> dict[str, str]:
             raise SystemExit(
                 f"pip resolve for {platform} failed:\n{run.stderr[-2000:]}"
             )
-        items = json.loads(report.read_text())["install"]
+        items = json.loads(report.read_text(encoding="utf-8"))["install"]
     return {norm(i["metadata"]["name"]): i["metadata"]["version"] for i in items}
 
 

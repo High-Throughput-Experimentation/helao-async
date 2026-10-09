@@ -208,12 +208,13 @@ def build_record(tmp_path, *, exp_params=None, seq_plate_id=OLD):
     pdir = tmp_path / "PROCESSES" / "25.39" / "1003" / SEQ_NAME / EXP_DIR
     pdir.mkdir(parents=True)
     sample_prc = pdir / f"0__{PRC_SAMPLE}__GRID_scan-prc.yml"
-    sample_prc.write_text(yml_dumps(_prc(PRC_SAMPLE, sample)))
+    sample_prc.write_text(yml_dumps(_prc(PRC_SAMPLE, sample)), encoding="utf-8")
     (pdir / f"1__{PRC_STD}__GRID_scan-prc.yml").write_text(
-        yml_dumps(_prc(PRC_STD, std))
+        yml_dumps(_prc(PRC_STD, std)), encoding="utf-8"
     )
     (pdir / f"0__{OTHER_SEQ_UUID}__GRID_scan-prc.yml").write_text(
-        yml_dumps(_prc(OTHER_SEQ_UUID, sample, sequence_uuid=OTHER_SEQ_UUID))
+        yml_dumps(_prc(OTHER_SEQ_UUID, sample, sequence_uuid=OTHER_SEQ_UUID)),
+        encoding="utf-8",
     )
     return z, pdir.parent, sample_prc
 
@@ -392,7 +393,7 @@ def test_refusals_write_nothing(tmp_path, monkeypatch, capsys, case):
         z.with_suffix(".orig").write_bytes(b"earlier")
     elif case == "twin_not_empty":
         _twin(tmp_path).mkdir(parents=True)
-        (_twin(tmp_path) / "earlier.txt").write_text("x")
+        (_twin(tmp_path) / "earlier.txt").write_text("x", encoding="utf-8")
     zip_before, prc_before = _sha(z), _tree_bytes(pdir)
 
     assert _run(z) == 1
@@ -484,7 +485,11 @@ class FakeLoader:
     @property
     def uploads(self) -> int:
         manifest = self.root / "manifest.jsonl"
-        return len(manifest.read_text().splitlines()) if manifest.exists() else 0
+        return (
+            len(manifest.read_text(encoding="utf-8").splitlines())
+            if manifest.exists()
+            else 0
+        )
 
 
 def build_analysis(
@@ -497,8 +502,10 @@ def build_analysis(
     )
     ana_dir.mkdir(parents=True)
     yml = ana_dir / f"{ANA_UUID}.yml"
-    yml.write_text(yml_dumps(_ana_yml()))
-    (ana_dir / f"{ANA_UUID}_output_array.json").write_text('{"v": [0.1234559999]}')
+    yml.write_text(yml_dumps(_ana_yml()), encoding="utf-8")
+    (ana_dir / f"{ANA_UUID}_output_array.json").write_text(
+        '{"v": [0.1234559999]}', encoding="utf-8"
+    )
     loader = FakeLoader(
         tmp_path / "S3",
         {f"analysis/{ANA_UUID}.json": json.loads(json.dumps(_ana_yml(stored_label)))},
@@ -533,7 +540,9 @@ def _ana(pdir, tmp_path, *extra):
 
 def _s3_body(tmp_path):
     return json.loads(
-        (tmp_path / "S3" / "b" / "analysis" / f"{ANA_UUID}.json").read_text()
+        (tmp_path / "S3" / "b" / "analysis" / f"{ANA_UUID}.json").read_text(
+            encoding="utf-8"
+        )
     )
 
 
@@ -700,7 +709,9 @@ def test_analyses_an_unreadable_s3_body_fails_that_analysis_and_the_run_goes_on(
     pdir, yml, ana_dir, loader = build_analysis(tmp_path, monkeypatch)
     lost_uuid = "00000000-0000-0000-0000-000000000895"  # sorts before ANA_UUID
     lost = ana_dir / f"{lost_uuid}.yml"
-    lost.write_text(yml_dumps({**_ana_yml(), "analysis_uuid": lost_uuid}))
+    lost.write_text(
+        yml_dumps({**_ana_yml(), "analysis_uuid": lost_uuid}), encoding="utf-8"
+    )
     lost_before = lost.read_bytes()
     real_get = loader.get_bytes
 
@@ -730,7 +741,7 @@ def test_analyses_parse_only_ymls_whose_header_names_this_sequence(
         other = dict(
             _ana_yml(), process_uuid=f"00000000-0000-0000-0000-00000000{i:04d}"
         )
-        (foreign / f"other{i}.yml").write_text(yml_dumps(other))
+        (foreign / f"other{i}.yml").write_text(yml_dumps(other), encoding="utf-8")
     parsed = []
     real_load = set_plate_id.yml_load
 
@@ -752,7 +763,7 @@ def test_analyses_still_parse_a_yml_whose_header_lacks_process_uuid(
     uuid = doc.pop("process_uuid")
     padded = {"zz_padding": "x" * (set_plate_id._HEADER_BYTES + 100), **doc}
     padded["process_uuid"] = uuid  # last, beyond the header window
-    yml.write_text(yml_dumps(padded))
+    yml.write_text(yml_dumps(padded), encoding="utf-8")
     assert _ana(pdir, tmp_path, "--dry-run") == 0
     out = capsys.readouterr().out
     assert len([ln for ln in out.splitlines() if ln.startswith("  yml ")]) == 2
@@ -771,7 +782,7 @@ def test_analyses_search_only_the_named_analysis_dirs(tmp_path, monkeypatch, cap
     monkeypatch.setattr(set_plate_id, "yml_load", counting_load)
     decoy = tmp_path / "ANALYSES" / "2025" / "1005" / "101012__GRID_normalize__X"
     decoy.mkdir(parents=True)
-    (decoy / "decoy.yml").write_text(yml_dumps(dict(_ana_yml())))
+    (decoy / "decoy.yml").write_text(yml_dumps(dict(_ana_yml())), encoding="utf-8")
     assert _ana(pdir, tmp_path, "--dry-run", "--analysis-dir", str(rel)) == 0
     assert not any(p.parent == decoy for p in parsed)
     out = capsys.readouterr().out

@@ -355,12 +355,13 @@ def _build_tree(root):
         },
     )
     act0 = make_action(exp_yml, 0)  # process_finish False
-    (act0.parent / HLO).write_text("x")
-    (act0.parent / MISC).write_text("note")
+    (act0.parent / HLO).write_text("x", encoding="utf-8")
+    (act0.parent / MISC).write_text("note", encoding="utf-8")
     act0.write_text(
-        act0.read_text()
+        act0.read_text(encoding="utf-8")
         + f"files:\n- file_name: {HLO}\n  file_type: helao__file\n"
-        + f"- file_name: {MISC}\n  file_type: aux__file\n"
+        + f"- file_name: {MISC}\n  file_type: aux__file\n",
+        encoding="utf-8",
     )
     act1 = make_action(exp_yml, 1, process_finish=True)
     # Controller ruling: rewrite the whole yml from a merged dict instead of

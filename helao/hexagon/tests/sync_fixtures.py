@@ -120,7 +120,7 @@ def assert_verbatim_region(end_line: int | None = None) -> None:
     Both bounds are sentinel-derived; ``end_line`` defaults to the derived end
     of ``SyncDriver``, and is passed explicitly only to pin a narrower prefix.
     """
-    legacy = LEGACY_SYNC_PATH.read_text().splitlines(keepends=True)
+    legacy = LEGACY_SYNC_PATH.read_text(encoding="utf-8").splitlines(keepends=True)
     start_line = verbatim_region_start(legacy)
     if end_line is None:
         end_line = verbatim_region_end(legacy)
@@ -129,7 +129,7 @@ def assert_verbatim_region(end_line: int | None = None) -> None:
         f"the verbatim region reaches into {HELAO_SYNCER_SENTINEL!r}, which the "
         "native module replaces with NativeSyncer and does not copy"
     )
-    native = NATIVE_SYNC_PATH.read_text()
+    native = NATIVE_SYNC_PATH.read_text(encoding="utf-8")
     assert region in native, (
         f"legacy lines {start_line}..{end_line} are not byte-identical "
         f"inside {NATIVE_SYNC_PATH.name}"
@@ -153,7 +153,7 @@ def assert_region_holds_no_imports() -> None:
     instead -- the way black's ``force-exclude`` in pyproject.toml already
     does, since reformatting is not body-preserving the way sorting is.
     """
-    source = LEGACY_SYNC_PATH.read_text()
+    source = LEGACY_SYNC_PATH.read_text(encoding="utf-8")
     lines = source.splitlines(keepends=True)
     start, end = verbatim_region_start(lines), verbatim_region_end(lines)
     offenders = [

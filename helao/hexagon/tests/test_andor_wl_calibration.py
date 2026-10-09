@@ -86,7 +86,8 @@ def test_load_refuses_an_unknown_model(tmp_path):
                 "created": "2026-09-04T00:00:00Z",
                 "source_action_uuid": None,
             }
-        )
+        ),
+        encoding="utf-8",
     )
     with pytest.raises(wlc.UnknownCalibrationModel, match="chebyshev"):
         wlc.load(path)
@@ -106,10 +107,12 @@ def test_save_writes_readable_json(tmp_path):
     )
     path = tmp_path / "calib.json"
     wlc.save(calib, path)
-    loaded = json.loads(path.read_text())
+    loaded = json.loads(path.read_text(encoding="utf-8"))
     assert loaded["lamp"] == "Hg-Ar"
     assert loaded["fit_rms_nm"] == 0.5
-    assert "\n" in path.read_text(), "expected indented JSON, not one line"
+    assert "\n" in path.read_text(
+        encoding="utf-8"
+    ), "expected indented JSON, not one line"
 
 
 def test_calibration_path_follows_the_station_convention():
@@ -119,7 +122,7 @@ def test_calibration_path_follows_the_station_convention():
 
 def test_module_imports_no_vendor_or_server_package():
     """Keeping this module pure is what lets it be iterated on Linux."""
-    src = Path(wlc.__file__).read_text()
+    src = Path(wlc.__file__).read_text(encoding="utf-8")
     for banned in ("pyAndor", "helao.core", "helao.helpers", "fastapi"):
         assert banned not in src, f"{banned} must not appear in wl_calibration.py"
 
@@ -247,7 +250,8 @@ def test_load_defaults_an_absent_wl_source_to_unknown(tmp_path):
                 "created": "2026-09-04T00:00:00Z",
                 "source_action_uuid": None,
             }
-        )
+        ),
+        encoding="utf-8",
     )
     calib = wlc.load(path)
     assert calib.wl_source == "unknown"

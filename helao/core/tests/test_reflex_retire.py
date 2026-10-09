@@ -314,7 +314,7 @@ def test_in_flight_state_file_blocks_gather(enabled, monkeypatch):
     pdir = src / "batch1" / "processing"
     pdir.mkdir(parents=True)
     sf = pdir / "x.state.json"
-    sf.write_text(json.dumps({"sequence_uuid": U}))
+    sf.write_text(json.dumps({"sequence_uuid": U}), encoding="utf-8")
     monkeypatch.setattr(rr.api, "get_client", _boom)
     state = _FakeRetireState()
     state.uuid_text = U
@@ -538,7 +538,7 @@ _WARN = "not synced — may still be running or uploading; retiring it can race 
 def _set_prg(root, body):
     """Rewrite the .prg of every run-tree location under root."""
     for p in glob.glob(os.path.join(str(root), "RUNS*", "*", "*", "*", "*-seq.prg")):
-        with open(p, "w") as f:
+        with open(p, "w", encoding="utf-8") as f:
             f.write(body)
 
 

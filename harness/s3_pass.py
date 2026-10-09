@@ -52,7 +52,7 @@ def diff_s3_manifest(
 ) -> list[dict]:
     def entries(path: Path, mapper: UuidMapper) -> set:
         out = set()
-        for line in Path(path).read_text().splitlines():
+        for line in Path(path).read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue
             e = json.loads(line)

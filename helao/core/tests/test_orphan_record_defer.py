@@ -30,7 +30,8 @@ def _orphan_action(tmp_path: Path) -> Path:
     act.write_text(
         "action_uuid: 06a5a2d6-b26c-7673-8000-9f38fe556fd6\n"
         "action_order: 0\n"
-        "process_contrib:\n- files\n"
+        "process_contrib:\n- files\n",
+        encoding="utf-8",
     )
     return act
 
@@ -66,6 +67,6 @@ def test_an_action_with_its_experiment_present_still_syncs_past_the_gate(tmp_pat
     act = _orphan_action(tmp_path)
     exp_dir = act.parent.parent
     (exp_dir / "260828.120000000000-exp.yml").write_text(
-        "experiment_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n"
+        "experiment_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n", encoding="utf-8"
     )
     assert HelaoYml(act).parent_yml is not None

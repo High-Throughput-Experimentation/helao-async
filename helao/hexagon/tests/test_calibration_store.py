@@ -38,11 +38,11 @@ def test_round_trip_plate_calibration_exact_filename_and_format(tmp_path):
 
     # Byte-format parity with legacy `save_transfermatrix`: a bare
     # `json.dumps(matrix.tolist())` write (no trailing newline / extra keys).
-    raw = expected_path.read_text()
+    raw = expected_path.read_text(encoding="utf-8")
     assert raw == json.dumps(matrix.tolist())
 
     # Parity with legacy `load_transfermatrix`: `json.loads(f.readline())`.
-    with open(expected_path, "r") as f:
+    with open(expected_path, "r", encoding="utf-8") as f:
         loaded = json.loads(f.readline())
     assert loaded == matrix.tolist()
 
@@ -76,7 +76,7 @@ def test_load_plate_calibration_returns_none_on_wrong_shape(tmp_path):
     store = JsonFileCalibrationStore(str(states_root), str(tmp_path), HOSTNAME)
 
     bad_path = states_root / f"{HOSTNAME}_last_plate_calib.json"
-    bad_path.write_text(json.dumps([[1, 0], [0, 1]]))
+    bad_path.write_text(json.dumps([[1, 0], [0, 1]]), encoding="utf-8")
 
     assert store.load_plate_calibration() is None
 
@@ -88,7 +88,7 @@ def test_load_instrument_calibration_exact_path(tmp_path):
 
     matrix = np.matrix([[1, 0, 2], [0, 1, 3], [0, 0, 1]])
     instrument_file = calib_dir / f"{HOSTNAME}_instrument_calib.json"
-    instrument_file.write_text(json.dumps(matrix.tolist()))
+    instrument_file.write_text(json.dumps(matrix.tolist()), encoding="utf-8")
 
     store = JsonFileCalibrationStore(str(tmp_path), str(db_root), HOSTNAME)
     loaded = store.load_instrument_calibration()

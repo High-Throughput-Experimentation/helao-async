@@ -36,7 +36,7 @@ class _Session:
 
 def test_finisher_posts_without_loading_the_yml(tmp_path, monkeypatch):
     yml = tmp_path / "260922.115221000000-seq.yml"
-    yml.write_text("{{{ not yaml")
+    yml.write_text("{{{ not yaml", encoding="utf-8")
 
     def no_load(*args, **kwargs):
         raise AssertionError("yml_finisher must not parse the yml")

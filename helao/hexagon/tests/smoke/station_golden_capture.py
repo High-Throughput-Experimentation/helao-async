@@ -40,7 +40,7 @@ def seq_text(match):
     """Text of the sequence's *-seq.yml, from the directory or from the zip."""
     if match.is_dir():
         ymls = sorted(match.glob("*-seq.yml"))
-        return ymls[0].read_text(errors="replace") if ymls else ""
+        return ymls[0].read_text(errors="replace", encoding="utf-8") if ymls else ""
     with zipfile.ZipFile(match) as z:
         ymls = sorted(
             (n for n in z.namelist() if n.endswith("-seq.yml")),
@@ -105,7 +105,10 @@ def main():
         proc = a.root / "PROCESSES"
         # the process's own top-level line, not a mention in its params
         for p in sorted(proc.rglob("*-prc.yml")) if proc.is_dir() else []:
-            if scalar(p.read_text(errors="replace"), "sequence_uuid") == uuid:
+            if (
+                scalar(p.read_text(errors="replace", encoding="utf-8"), "sequence_uuid")
+                == uuid
+            ):
                 dst = a.out / "root" / "PROCESSES" / p.relative_to(proc)
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(p, dst)
@@ -126,7 +129,7 @@ def main():
     # json.dumps gives a double-quoted scalar, valid YAML: "1e10" stays a string
     lines = [f"{k}: {json.dumps(v)}" for k, v in fields.items()]
     lines.insert(6, "sequence_params: {}")
-    (a.out / "provenance.yml").write_text("\n".join(lines) + "\n")
+    (a.out / "provenance.yml").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     rels = ",".join(m.relative_to(a.root).as_posix() for m in matches)
     layout = "unified" if unified else "legacy"

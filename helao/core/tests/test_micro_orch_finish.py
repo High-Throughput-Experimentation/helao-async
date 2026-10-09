@@ -84,7 +84,7 @@ async def test_finish_experiment_runs_hooks_writes_under_runs_and_hands_off(
     assert yml_path.startswith(str(tmp_path / "RUNS") + os.sep)
     expected_dir = os.path.join(str(tmp_path / "RUNS"), exp.get_experiment_dir())
     assert probe.seen == [("exp1", expected_dir)]
-    meta = yml_load(Path(yml_path).read_text())
+    meta = yml_load(Path(yml_path).read_text(encoding="utf-8"))
     assert meta["experiment_params"] == {"hooked": True}
     assert "finished" in str(meta["experiment_status"])
     assert calls == [(yml_path, SYNC)]
@@ -211,7 +211,7 @@ async def test_track_run_state_is_runs_or_diag(tmp_path):
         / "x-exp.yml"
     )
     yml.parent.mkdir(parents=True)
-    yml.write_text("file_type: experiment\n")
+    yml.write_text("file_type: experiment\n", encoding="utf-8")
     rec = orch._track_run("experiment", "u", "exp1", str(yml))
     assert rec["state"] == "RUNS"
     assert rec["rel_dir"] == os.path.join(

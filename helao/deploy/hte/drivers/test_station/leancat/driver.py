@@ -62,7 +62,7 @@ class LeancatDriver(HelaoDriver):
             raise ValueError(
                 "Please provide a path to the LeanCAT nodes.config.json file."
             )
-        with open(leancat_helao.config.node_config_path, "r") as f:
+        with open(leancat_helao.config.node_config_path, "r", encoding="utf-8") as f:
             self.nodes = {d["alias"]: d["nodeId"] for d in json.load(f)["nodes"]}
 
         leancat_helao.config.arg_logs_folder_path = log_path

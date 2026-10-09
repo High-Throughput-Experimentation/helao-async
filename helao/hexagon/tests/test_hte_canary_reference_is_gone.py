@@ -50,7 +50,7 @@ HEXAGON_SHIMS: Final[Path] = REPO_ROOT / "helao/deploy/hexagon/servers/action"
 
 def _action_server(cfg_path: Path) -> tuple[str, str] | None:
     """``(deployment, fast)`` of the config's action server, if it has one."""
-    cfg = yaml.safe_load(cfg_path.read_text()) or {}
+    cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
     for entry in (cfg.get("servers") or {}).values():
         if isinstance(entry, dict) and entry.get("group") == "action":
             return entry.get("deployment", ""), entry.get("fast", "")

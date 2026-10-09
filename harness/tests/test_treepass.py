@@ -28,7 +28,8 @@ def _write_analyses(root, records):
                     "process_uuid": process_uuid,
                     "analysis_params": {"a": 1},
                 }
-            )
+            ),
+            encoding="utf-8",
         )
     return d
 

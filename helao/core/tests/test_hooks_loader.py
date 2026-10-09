@@ -27,7 +27,7 @@ REPO = Path(__file__).resolve().parents[3]
 
 
 def _write(path: Path, body: str) -> str:
-    path.write_text(textwrap.dedent(body))
+    path.write_text(textwrap.dedent(body), encoding="utf-8")
     return str(path)
 
 

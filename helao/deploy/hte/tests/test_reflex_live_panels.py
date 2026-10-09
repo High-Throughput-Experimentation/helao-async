@@ -270,7 +270,7 @@ def test_the_live_panels_do_not_use_gridjs():
 
     # The call, not the name: the comment above the replacement says what was
     # replaced and why, and must not fail the check it explains.
-    source = pathlib.Path(_live.__file__).read_text()
+    source = pathlib.Path(_live.__file__).read_text(encoding="utf-8")
     assert "rx.data_table(" not in source
     assert "rx.table.root(" in source
 
@@ -308,5 +308,5 @@ def test_no_panel_imports_xy_directly():
 
     panel_dir = pathlib.Path(_live.__file__).parent
     for path in panel_dir.glob("*.py"):
-        source = path.read_text()
+        source = path.read_text(encoding="utf-8")
         assert "import xy" not in source, path.name

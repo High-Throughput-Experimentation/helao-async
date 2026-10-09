@@ -35,7 +35,7 @@ class Hook(FinishHook):
 
 def _hook_file(tmp_path, name, body) -> str:
     p = tmp_path / f"{name}.py"
-    p.write_text(textwrap.dedent(body))
+    p.write_text(textwrap.dedent(body), encoding="utf-8")
     return str(p)
 
 
@@ -181,9 +181,9 @@ async def test_legacy_complete_prg_runs_nothing(tmp_path, mod):
     try:
         act = make_action(make_exp_tree(tmp_path, "RUNS", mk_uuid(1)), 0)
         before = f"yml: {act}\napi: true\ns3: true\nfiles_pending: []\nfiles_s3: {{}}\n"
-        act.with_suffix(".prg").write_text(before)
+        act.with_suffix(".prg").write_text(before, encoding="utf-8")
         assert await asyncio.wait_for(drv.sync_yml(yml_path=act), timeout=15) is True
-        assert act.with_suffix(".prg").read_text() == before
+        assert act.with_suffix(".prg").read_text(encoding="utf-8") == before
         assert mod.HelaoYml(act).status == "synced"
     finally:
         await teardown_driver(drv)
@@ -258,7 +258,9 @@ async def test_dispatch_analysis_without_host_port_resolves_world_config_or_rais
         write_yml(seq_yml, {"sequence_uuid": mk_uuid(999), "sequence_name": "test_seq"})
         # the exp under it is unsynced -> the sequence gate re-queues; write a
         # legacy-complete prg for it so the sequence proceeds to its chain.
-        exp_yml.with_suffix(".prg").write_text(f"yml: {exp_yml}\napi: true\ns3: true\n")
+        exp_yml.with_suffix(".prg").write_text(
+            f"yml: {exp_yml}\napi: true\ns3: true\n", encoding="utf-8"
+        )
         await asyncio.wait_for(drv.sync_yml(yml_path=seq_yml, rank=2), timeout=15)
         d = mod.Progress(seq_yml).dict
         assert d["hooks"]["dispatch_analysis"]["state"] == "failed"

@@ -1493,7 +1493,7 @@ async def run_all_scenarios(base_dir: Path, tmp_root: Path) -> dict:
         data = await coro_fn(tmp_root / name)
         payload = {"scenario": name, **data}
         text = json.dumps(payload, indent=2, sort_keys=True, default=str)
-        (base_dir / f"{name}.jsonl").write_text(text)
+        (base_dir / f"{name}.jsonl").write_text(text, encoding="utf-8")
         results[name] = text
     return results
 

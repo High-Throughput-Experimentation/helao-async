@@ -59,7 +59,7 @@ class RecordingS3Client:
             "gzip": key.endswith(".gz"),
         }
         with self._lock:
-            with open(self.manifest_path, "a") as f:
+            with open(self.manifest_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry) + "\n")
 
     def upload_fileobj(self, fileobj, bucket: str, key: str, **kwargs) -> None:

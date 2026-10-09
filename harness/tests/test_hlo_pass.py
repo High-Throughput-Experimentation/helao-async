@@ -16,7 +16,8 @@ def write_hlo(path: Path, epoch_ns: int, rows: list[str]) -> None:
         "  - epoch_s\n"
         "  - series_0\n"
         f"epoch_ns: {epoch_ns}\n"
-        "%%\n" + "".join(r + "\n" for r in rows)
+        "%%\n" + "".join(r + "\n" for r in rows),
+        encoding="utf-8",
     )
 
 

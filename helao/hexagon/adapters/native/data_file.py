@@ -265,7 +265,7 @@ class NativeDataFileWriter:
         # or re-run would push a spurious separator/header ahead of the real
         # header and corrupt the .hlo layout.
         self.active.file_conn_dict[file_conn_key].file = await aiofiles.open(
-            output_file, mode="w+"
+            output_file, mode="w+", encoding="utf-8"
         )
 
         if header:
@@ -348,7 +348,7 @@ class NativeDataFileWriter:
         header, file_info, output_path, output_file = result
         action.files.append(file_info)
         LOGGER.info(f"writing non stream data to: {output_file}")
-        async with aiofiles.open(output_file, mode="a+") as f:
+        async with aiofiles.open(output_file, mode="a+", encoding="utf-8") as f:
             if header:
                 await f.write(header)
             await f.write("%%\n")
@@ -383,7 +383,7 @@ class NativeDataFileWriter:
             return None
         header, file_info, output_path, output_file = result
         LOGGER.info(f"writing non stream data to: {output_file}")
-        with open(output_file, mode="a+") as f:
+        with open(output_file, mode="a+", encoding="utf-8") as f:
             if header:
                 f.write(header)
             f.write("%%\n")

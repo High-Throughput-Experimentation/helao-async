@@ -14,7 +14,7 @@ from pathlib import Path
 
 
 def _top_level_funcs(module_path: Path) -> list[str]:
-    tree = ast.parse(module_path.read_text())
+    tree = ast.parse(module_path.read_text(encoding="utf-8"))
     return [
         n.name
         for n in tree.body

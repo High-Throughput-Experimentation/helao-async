@@ -55,9 +55,9 @@ def _build_record(root: Path) -> Path:
     )
     actdir.mkdir(parents=True, exist_ok=True)
     yml = actdir / "260707.121718509081-act.yml"
-    yml.write_text(ACT_YML)
-    (actdir / "asdep99.SPC").write_text("spectrum")
-    (actdir / "data-0.hlo").write_text("{}\n")
+    yml.write_text(ACT_YML, encoding="utf-8")
+    (actdir / "asdep99.SPC").write_text("spectrum", encoding="utf-8")
+    (actdir / "data-0.hlo").write_text("{}\n", encoding="utf-8")
     return yml
 
 
@@ -82,7 +82,7 @@ def test_relpath_handles_a_file_in_a_subdirectory(tmp_path):
     yml = _build_record(tmp_path)
     sub = yml.parent / "spectra"
     sub.mkdir()
-    (sub / "scan.SPC").write_text("x")
+    (sub / "scan.SPC").write_text("x", encoding="utf-8")
     prog = Progress(yml)
     assert prog.relpath(sub / "scan.SPC") == "spectra/scan.SPC"
     assert prog.abspath("spectra/scan.SPC") == sub / "scan.SPC"
@@ -119,7 +119,7 @@ def test_a_sidecar_written_under_an_old_root_is_reanchored_on_read(tmp_path):
     }
     prg = _sidecar_for(yml)
     prg.parent.mkdir(parents=True, exist_ok=True)
-    prg.write_text(yml_dumps(stale))
+    prg.write_text(yml_dumps(stale), encoding="utf-8")
 
     prog = Progress(yml)
 
@@ -156,7 +156,8 @@ def test_the_reanchored_entry_no_longer_raises_relative_to(tmp_path):
                 "files_pending": [str(old)],
                 "files_s3": {},
             }
-        )
+        ),
+        encoding="utf-8",
     )
 
     prog = Progress(yml)

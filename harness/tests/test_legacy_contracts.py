@@ -108,7 +108,7 @@ def test_typed_config_is_a_gate_not_a_replacement():
 # --- §9.3 clock / NTP ---------------------------------------------------------
 def test_offset_file_roundtrip(tmp_path):
     p = tmp_path / "ntpLastSync.txt"
-    p.write_text("1752600000.0,2.5")
+    p.write_text("1752600000.0,2.5", encoding="utf-8")
     last_sync, offset = read_saved_offset(str(p))
     assert last_sync == "1752600000.0"
     assert offset == 2.5

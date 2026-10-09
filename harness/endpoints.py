@@ -139,7 +139,7 @@ def _params(fn) -> list[dict]:
 
 
 def extract_routes(module_path: Path, server_key: Optional[str] = None) -> list[dict]:
-    tree = ast.parse(Path(module_path).read_text())
+    tree = ast.parse(Path(module_path).read_text(encoding="utf-8"))
     routes: list[dict] = []
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -265,12 +265,12 @@ def main(argv=None) -> int:
         routes = extract_routes(args.module, server_key=args.server_key)
         text = json.dumps(routes, indent=2)
         if args.out:
-            args.out.write_text(text)
+            args.out.write_text(text, encoding="utf-8")
         else:
             print(text)
         return 0
-    frozen = json.loads(args.frozen.read_text())
-    current = json.loads(args.current.read_text())
+    frozen = json.loads(args.frozen.read_text(encoding="utf-8"))
+    current = json.loads(args.current.read_text(encoding="utf-8"))
     diffs = diff_route_sets(frozen, current)
     for d in diffs:
         print(json.dumps(d))

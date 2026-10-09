@@ -53,7 +53,7 @@ FROZEN_PRIVATE_TOTAL = 79
 
 
 def _load_additions() -> list[dict]:
-    return json.loads(ADDITIONS_PATH.read_text())
+    return json.loads(ADDITIONS_PATH.read_text(encoding="utf-8"))
 
 
 def _additions_for(module: str) -> list[dict]:
@@ -108,7 +108,7 @@ def test_module_matches_its_frozen_checklist(
     module: str, server_key: Optional[str]
 ) -> None:
     checklist = OUT / (Path(module).stem + ".json")
-    frozen = json.loads(checklist.read_text())
+    frozen = json.loads(checklist.read_text(encoding="utf-8"))
     current = extract_routes(HTE_ACTION / module, server_key=server_key)
     diffs, _allowed = filter_allowed_additions(
         diff_route_sets(frozen, current), _additions_for(module)
@@ -149,7 +149,9 @@ def test_the_gate_covers_the_whole_measured_surface() -> None:
     """
     action = private = 0
     for module, _ in SERVERS:
-        for route in json.loads((OUT / (Path(module).stem + ".json")).read_text()):
+        for route in json.loads(
+            (OUT / (Path(module).stem + ".json")).read_text(encoding="utf-8")
+        ):
             if "action" in route["tags"]:
                 action += 1
             elif "private" in route["tags"]:

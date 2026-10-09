@@ -155,7 +155,7 @@ def logging_unit_test() -> bool:
         reporter.section("GZipRotator rename behaviour")
         src = os.path.join(tmpdir, "rotate_src.txt")
         dst = os.path.join(tmpdir, "rotate_dst.txt")
-        with open(src, "w") as fh:
+        with open(src, "w", encoding="utf-8") as fh:
             fh.write("payload")
         try:
             GZipRotator()(src, dst)
@@ -355,7 +355,7 @@ def logging_unit_test() -> bool:
             )
 
         def _read_lines(path):
-            with open(path, "r") as fh:
+            with open(path, "r", encoding="utf-8") as fh:
                 return [ln.rstrip("\n") for ln in fh if ln.strip()]
 
         # Large interval so only a new message (not elapsed time) triggers flush.

@@ -72,11 +72,11 @@ async def test_log_data_set_output_file_truncates_stale_bytes(tmp_path):
     a = active.action
     fname = f"{a.action_abbr}-{a.orch_submit_order}.{a.action_order}.{a.action_retry}.{a.action_split}__0.hlo"
     stale = os.path.join(out_dir, fname)
-    open(stale, "w").write("STALE-CRASH-BYTES\n")
+    open(stale, "w", encoding="utf-8").write("STALE-CRASH-BYTES\n")
     active.file_conn_dict[dflt].params.hloheader.epoch_ns = 1234567890
     await active.log_data_set_output_file(file_conn_key=dflt)
     await active.file_conn_dict[dflt].file.close()
-    text = open(stale).read()
+    text = open(stale, encoding="utf-8").read()
     assert "STALE-CRASH-BYTES" not in text
     assert "epoch_ns: 1234567890" in text
     assert active.action.files and active.action.files[-1].file_name == fname
@@ -92,11 +92,11 @@ async def test_write_file_one_shot_layout_and_gate(tmp_path):
         header="colA,colB",
     )
     assert path is not None and path.endswith("one.csv")
-    assert open(path).read() == "colA,colB\n%%\nr1,r2"
+    assert open(path, encoding="utf-8").read() == "colA,colB\n%%\nr1,r2"
     assert any(fi.file_name == "one.csv" for fi in active.action.files)
     # append mode a+ (not w+): a second write appends
     await active.write_file(output_str="r3", file_type="aux__csv", filename="one.csv")
-    assert open(path).read() == "colA,colB\n%%\nr1,r2%%\nr3"
+    assert open(path, encoding="utf-8").read() == "colA,colB\n%%\nr1,r2%%\nr3"
     # save_data gate
     active.action.save_data = False
     assert (
@@ -112,7 +112,7 @@ def test_write_file_nowait_matches_async_layout(tmp_path):
         output_str="r1", file_type="aux__csv", filename="two.csv", header="h"
     )
     assert path is not None
-    assert open(path).read() == "h\n%%\nr1"
+    assert open(path, encoding="utf-8").read() == "h\n%%\nr1"
 
 
 def test_resolve_output_path_posix_strip_quirk(tmp_path):
@@ -200,6 +200,6 @@ async def test_track_file_outside_the_output_dir_records_its_basename(tmp_path):
     _, active, _ = _native_active(tmp_path)
     outside = tmp_path / "elsewhere" / "aux_data.dat"
     outside.parent.mkdir()
-    outside.write_text("payload")
+    outside.write_text("payload", encoding="utf-8")
     await active.track_file("df__aux", str(outside), [])
     assert any(fi.file_name == "aux_data.dat" for fi in active.action.files)

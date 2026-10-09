@@ -1237,7 +1237,7 @@ class Galil(HelaoDriver):
             if not os.path.exists(filedir):
                 os.makedirs(filedir, exist_ok=True)
 
-            with open(file, "w") as f:
+            with open(file, "w", encoding="utf-8") as f:
                 f.write(json.dumps(self.plate_transfermatrix.tolist()))
 
     def load_transfermatrix(self, file):
@@ -1248,7 +1248,7 @@ class Galil(HelaoDriver):
             if the file is missing, malformed, or has the wrong shape.
         """
         if os.path.exists(file):
-            with open(file, "r") as f:
+            with open(file, "r", encoding="utf-8") as f:
                 try:
                     data = f.readline()
                     new_matrix = np.matrix(json.loads(data))

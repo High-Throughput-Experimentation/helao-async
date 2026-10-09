@@ -15,7 +15,7 @@ from helao.ui.reflex import data_browser as dbx
 
 def _write_hlo(path):
     """Minimal HLO file: YAML header, %% marker, JSONL body."""
-    with open(path, "w") as fh:
+    with open(path, "w", encoding="utf-8") as fh:
         fh.write("hlo_version: 1.0\n")
         fh.write("action_name: cv\n")
         fh.write("column_headings: [t_s, Ewe_V]\n")
@@ -34,11 +34,11 @@ def run_tree(tmp_path):
     exp = seq / "260801.120000__exp--cv"
     act = exp / "0__0__PSTAT__cv"
     act.mkdir(parents=True)
-    with open(seq / "260801.120000000000-seq.yml", "w") as fh:
+    with open(seq / "260801.120000000000-seq.yml", "w", encoding="utf-8") as fh:
         yaml.safe_dump({"sequence_name": "cv", "run_type": "test"}, fh)
-    with open(exp / "260801.120000000000-exp.yml", "w") as fh:
+    with open(exp / "260801.120000000000-exp.yml", "w", encoding="utf-8") as fh:
         yaml.safe_dump({"experiment_name": "cv"}, fh)
-    with open(act / "260801.120000000000-act.yml", "w") as fh:
+    with open(act / "260801.120000000000-act.yml", "w", encoding="utf-8") as fh:
         yaml.safe_dump({"action_name": "cv", "technique_name": "cv"}, fh)
     _write_hlo(str(act / "cv_data.hlo"))
     return str(tmp_path)

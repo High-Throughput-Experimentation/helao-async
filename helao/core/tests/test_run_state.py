@@ -47,7 +47,7 @@ def test_stored_path_is_forward_slash(tmp_path: Path):
     """Spec §9: a journal is byte-identical across platforms."""
     j = RunStateJournal(tmp_path, "SIM")
     j.append(UUID_A, "action", ACTIVE, "RUNS\\2026\\0925\\seq")
-    line = json.loads(j.path.read_text().splitlines()[0])
+    line = json.loads(j.path.read_text(encoding="utf-8").splitlines()[0])
     assert line["path"] == "RUNS/2026/0925/seq"
 
 
@@ -56,7 +56,7 @@ def test_torn_final_line_is_discarded_and_warned(tmp_path: Path, caplog):
     j = RunStateJournal(tmp_path, "SIM")
     j.append(UUID_A, "action", ACTIVE, "RUNS/a")
     j.append(UUID_B, "action", ACTIVE, "RUNS/b")
-    with j.path.open("a") as f:
+    with j.path.open("a", encoding="utf-8") as f:
         f.write('{"uuid": "333')  # truncated, no newline
 
     with caplog.at_level("WARNING"):
@@ -69,8 +69,8 @@ def test_corruption_before_the_last_line_raises(tmp_path: Path):
     """A bad line anywhere else is real corruption, not a torn write."""
     j = RunStateJournal(tmp_path, "SIM")
     j.append(UUID_A, "action", ACTIVE, "RUNS/a")
-    lines = j.path.read_text().splitlines()
-    j.path.write_text("not json at all\n" + "\n".join(lines) + "\n")
+    lines = j.path.read_text(encoding="utf-8").splitlines()
+    j.path.write_text("not json at all\n" + "\n".join(lines) + "\n", encoding="utf-8")
     with pytest.raises(ValueError):
         j.working_set()
 
@@ -102,11 +102,11 @@ def test_compaction_drops_tombstones_and_preserves_survivors(tmp_path: Path):
         _raw_append(j, UUID_A, ACTIVE, "RUNS/a")
         _raw_append(j, UUID_A, DONE, "RUNS/a")
     _raw_append(j, UUID_B, ACTIVE, "RUNS/b")
-    before = len(j.path.read_text().splitlines())
+    before = len(j.path.read_text(encoding="utf-8").splitlines())
     assert before > 1000
 
     j.compact()
-    after = j.path.read_text().splitlines()
+    after = j.path.read_text(encoding="utf-8").splitlines()
     assert len(after) == 1
     assert json.loads(after[0])["uuid"] == UUID_B
     assert set(j.working_set()) == {UUID_B}
@@ -118,7 +118,7 @@ def test_compaction_does_not_fire_below_the_line_floor(tmp_path: Path):
     for _ in range(20):
         j.append(UUID_A, "action", ACTIVE, "RUNS/a")
         j.append(UUID_A, "action", DONE, "RUNS/a")
-    assert len(j.path.read_text().splitlines()) == 40
+    assert len(j.path.read_text(encoding="utf-8").splitlines()) == 40
 
 
 def test_compaction_fires_automatically_once_both_thresholds_are_met(tmp_path):
@@ -128,7 +128,7 @@ def test_compaction_fires_automatically_once_both_thresholds_are_met(tmp_path):
         j.append(UUID_A, "action", ACTIVE, "RUNS/a")
         j.append(UUID_A, "action", DONE, "RUNS/a")
     # 1201 lines written, working set is 1 -> 1201 > 1000 and 1201 > 10*1
-    assert len(j.path.read_text().splitlines()) < 1000
+    assert len(j.path.read_text(encoding="utf-8").splitlines()) < 1000
     assert set(j.working_set()) == {UUID_B}
 
 
@@ -187,12 +187,13 @@ def _record(
     d = runs_root / rel
     d.mkdir(parents=True, exist_ok=True)
     yml = d / f"{stem}.yml"
-    yml.write_text(_yml_text(stem, parent_stem))
+    yml.write_text(_yml_text(stem, parent_stem), encoding="utf-8")
     if prg:
         state = "true" if complete else "false"
         (d / f"{stem}.prg").write_text(
             f"yml: {yml}\napi: {state}\ns3: {state}\n"
-            "files_pending: []\nfiles_s3: {}\n"
+            "files_pending: []\nfiles_s3: {}\n",
+            encoding="utf-8",
         )
     return d
 
@@ -248,7 +249,7 @@ def test_rebuild_overwrites_a_corrupt_journal(tmp_path: Path):
     runs = tmp_path / "RUNS"
     states = tmp_path / "STATES"
     states.mkdir()
-    (states / "runstate_SYNC.jsonl").write_text("garbage\ngarbage\n")
+    (states / "runstate_SYNC.jsonl").write_text("garbage\ngarbage\n", encoding="utf-8")
     _record(runs, "2026/0925/seq", "260925.120000000000-seq", prg=False, complete=False)
     assert len(rebuild_from_tree(runs, states, "SYNC").working_set()) == 1
 
@@ -301,7 +302,7 @@ def test_unreadable_uuid_falls_back_to_the_stem_and_warns(tmp_path: Path, caplog
     ):
         d = runs / stem
         d.mkdir(parents=True)
-        (d / f"{stem}.yml").write_text(body)
+        (d / f"{stem}.yml").write_text(body, encoding="utf-8")
 
     with caplog.at_level("WARNING"):
         ws = rebuild_from_tree(runs, tmp_path / "STATES", "SYNC").working_set()
@@ -350,7 +351,8 @@ def test_uuid_past_the_head_window_is_still_found(tmp_path: Path, caplog):
     yml = tmp_path / "260928.134349843994-seq.yml"
     yml.write_text(
         f"file_type: sequence\nsequence_params:\n{params}"
-        f"sequence_uuid: {UUID_A}\nexperiment_list:\n{tail}"
+        f"sequence_uuid: {UUID_A}\nexperiment_list:\n{tail}",
+        encoding="utf-8",
     )
     assert identify_record(yml)[0] == UUID_A
     assert "No parseable" not in caplog.text
@@ -363,7 +365,7 @@ async def test_replace_retries_while_the_target_is_held(tmp_path: Path, monkeypa
     import helao.helpers.file_utils as fu
 
     src, dst = tmp_path / "s.tmp", tmp_path / "d.yml"
-    src.write_text("new")
+    src.write_text("new", encoding="utf-8")
     real, calls = os.replace, []
 
     def busy_twice(a, b):
@@ -374,9 +376,9 @@ async def test_replace_retries_while_the_target_is_held(tmp_path: Path, monkeypa
 
     monkeypatch.setattr(fu.os, "replace", busy_twice)
     await fu.replace_when_free(src, dst)
-    assert dst.read_text() == "new" and len(calls) == 3
+    assert dst.read_text(encoding="utf-8") == "new" and len(calls) == 3
 
-    src.write_text("never")
+    src.write_text("never", encoding="utf-8")
     monkeypatch.setattr(
         fu.os, "replace", lambda a, b: (_ for _ in ()).throw(PermissionError())
     )
@@ -387,7 +389,7 @@ async def test_replace_retries_while_the_target_is_held(tmp_path: Path, monkeypa
 
 def _prg(tmp_path: Path, text: str) -> Path:
     p = tmp_path / "x.prg"
-    p.write_text(text)
+    p.write_text(text, encoding="utf-8")
     return p
 
 

@@ -52,13 +52,13 @@ EXPECTED_WEBSOCKETS: Final[tuple[str, ...]] = ("ws_status", "ws_data", "ws_live"
 
 def test_every_private_route_is_a_post() -> None:
     """The frozen checklist marked five of these GET. They are all POST."""
-    frozen = json.loads(FROZEN.read_text())
+    frozen = json.loads(FROZEN.read_text(encoding="utf-8"))
     methods = {r["method"] for r in frozen["routes"] if r["path"] in EXPECTED_PRIVATE}
     assert methods == {"post"}, f"non-POST private routes: {methods}"
 
 
 def test_frozen_surface_matches_the_expected_private_set() -> None:
-    frozen = json.loads(FROZEN.read_text())
+    frozen = json.loads(FROZEN.read_text(encoding="utf-8"))
     got = {r["path"] for r in frozen["routes"] if "private" in (r["tags"] or [])}
     assert got == EXPECTED_PRIVATE, (
         f"missing: {sorted(EXPECTED_PRIVATE - got)}\n"
@@ -158,7 +158,7 @@ def test_the_host_surface_matches_the_frozen_capture() -> None:
     """The whole point: a host that under-builds the captured surface fails."""
     frozen = {
         r["path"]
-        for r in json.loads(FROZEN.read_text())["routes"]
+        for r in json.loads(FROZEN.read_text(encoding="utf-8"))["routes"]
         if r["path"] != "/SIM/acquire_data"
     }
     frozen -= {"/SIM/cancel_acquire_data"}  # the sim's own action routes

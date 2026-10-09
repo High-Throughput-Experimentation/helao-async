@@ -62,18 +62,24 @@ def build_tree(
     ana_dir = root / "ANALYSES" / "26.31" / "0808" / dir_name
     ana_dir.mkdir(parents=True)
     disk = model_dict()
-    (ana_dir / f"{UUID}.yml").write_text(json.dumps(disk))  # JSON is valid YAML
+    (ana_dir / f"{UUID}.yml").write_text(
+        json.dumps(disk), encoding="utf-8"
+    )  # JSON is valid YAML
 
     scalar = {"mean": 1.5, "n": 3} if scalar is None else scalar
     array = {"trace": [1.0, 2.0, 3.0]} if array is None else array
     for group, payload in (("scalar", scalar), ("array", array)):
-        (ana_dir / f"{UUID}_output_{group}.json").write_text(json.dumps(payload))
+        (ana_dir / f"{UUID}_output_{group}.json").write_text(
+            json.dumps(payload), encoding="utf-8"
+        )
 
     s3_dir = root / "S3_SIM" / "helao-sim" / "analysis"
     s3_dir.mkdir(parents=True)
-    (s3_dir / f"{UUID}.json").write_text(json.dumps(s3_model or disk))
+    (s3_dir / f"{UUID}.json").write_text(json.dumps(s3_model or disk), encoding="utf-8")
     for group, payload in (("scalar", scalar), ("array", array)):
-        (s3_dir / f"{UUID}_output_{group}.json").write_text(json.dumps(payload))
+        (s3_dir / f"{UUID}_output_{group}.json").write_text(
+            json.dumps(payload), encoding="utf-8"
+        )
     return root
 
 

@@ -576,14 +576,18 @@ class Galil(HelaoDriver):
             main_dmc = "galil_toggle_main.dmc"
         else:
             main_dmc = "galil_toggle_main_nostop.dmc"
-        mainprog = pathlib.Path(os.path.join(driver_path, main_dmc)).read_text()
+        mainprog = pathlib.Path(os.path.join(driver_path, main_dmc)).read_text(
+            encoding="utf-8"
+        )
         if req_out_name is not None:
             req_port = self.dev_do[req_out_name]
             subprog_dmc = "galil_toggle_sub_req.dmc"
         else:
             req_port = ""
             subprog_dmc = "galil_toggle_sub.dmc"
-        subprog = pathlib.Path(os.path.join(driver_path, subprog_dmc)).read_text()
+        subprog = pathlib.Path(os.path.join(driver_path, subprog_dmc)).read_text(
+            encoding="utf-8"
+        )
         mainlines = mainprog.split("\n")
         subindex = [i for i, x in enumerate(mainlines) if x.strip().startswith("XQ")][0]
         subline = mainlines.pop(subindex)

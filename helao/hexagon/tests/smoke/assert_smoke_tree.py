@@ -59,7 +59,9 @@ def main(root: str) -> int:
         check((root_p / "LOGS" / f"{key}.log").is_file(), f"LOGS/{key}.log exists")
 
     # 6. the hexagon loop actually ran (its parked/started log line)
-    orch_log = (root_p / "LOGS" / "ORCH.log").read_text(errors="replace")
+    orch_log = (root_p / "LOGS" / "ORCH.log").read_text(
+        errors="replace", encoding="utf-8"
+    )
     check("--- started operator orch ---" in orch_log, "hexagon loop started")
     check("FAKE PORT IN USE" not in orch_log, "no fake adapters in composition")
     check("Traceback" not in orch_log, "no tracebacks in ORCH.log")

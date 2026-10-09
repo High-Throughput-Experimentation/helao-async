@@ -284,7 +284,7 @@ def write_json(obj: dict, path: str) -> None:
     than serializing potentially multi-megabyte array outputs on the event loop.
     """
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f)
 
 
@@ -301,7 +301,7 @@ def write_model_yml(local_ana_dir: str, analysis_uuid, model_dict: dict) -> str:
     """
     os.makedirs(local_ana_dir, exist_ok=True)
     path = os.path.join(local_ana_dir, f"{analysis_uuid}.yml")
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         f.write(yml_dumps(model_dict))
     return path
 

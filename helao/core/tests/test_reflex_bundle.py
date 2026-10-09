@@ -187,7 +187,7 @@ def test_every_differing_field_is_reported_not_only_the_first():
 def test_an_unreadable_stamp_reads_as_absent(tmp_path):
     """The safe direction: a corrupt stamp makes the bundle stale, not trusted."""
     path = tmp_path / "bundle.json"
-    path.write_text("{not json")
+    path.write_text("{not json", encoding="utf-8")
     assert rb.read_stamp(str(path)) is None
     assert rb.read_stamp(str(tmp_path / "nope.json")) is None
 
@@ -624,11 +624,11 @@ def test_syncing_a_staged_tree_keeps_web_and_drops_removed_sources(tmp_path):
     """A panel deleted in the repository must disappear from the build too."""
     source = tmp_path / "src"
     (source / "helao_ui").mkdir(parents=True)
-    (source / "rxconfig.py").write_text("config = 1")
+    (source / "rxconfig.py").write_text("config = 1", encoding="utf-8")
     staged = tmp_path / "staged"
     (staged / ".web" / "node_modules").mkdir(parents=True)
     (staged / "helao_ui").mkdir()
-    (staged / "helao_ui" / "gone.py").write_text("deleted upstream")
+    (staged / "helao_ui" / "gone.py").write_text("deleted upstream", encoding="utf-8")
 
     rb._sync_app_sources(str(source), str(staged))
 
@@ -667,7 +667,9 @@ def test_a_worktree_checkout_is_still_recognised_as_a_repo(tmp_path):
     hot-reload watcher that shares this reader -- silently watched only the
     deployments.
     """
-    (tmp_path / ".git").write_text("gitdir: /elsewhere/.git/worktrees/wt\n")
+    (tmp_path / ".git").write_text(
+        "gitdir: /elsewhere/.git/worktrees/wt\n", encoding="utf-8"
+    )
     assert launch.discover_git_repos(str(tmp_path)) == [str(tmp_path)]
 
 
@@ -677,7 +679,7 @@ def test_a_dirty_tree_gets_a_different_digest_than_a_clean_one(tmp_path):
 
     repo = str(tmp_path)
     subprocess.run(["git", "init", "-q", repo], check=True, capture_output=True)
-    (tmp_path / "a.py").write_text("x = 1")
+    (tmp_path / "a.py").write_text("x = 1", encoding="utf-8")
     subprocess.run(["git", "-C", repo, "add", "a.py"], check=True, capture_output=True)
     subprocess.run(
         [
@@ -696,7 +698,7 @@ def test_a_dirty_tree_gets_a_different_digest_than_a_clean_one(tmp_path):
         capture_output=True,
     )
     clean = rb._git_dirty_digest(repo)
-    (tmp_path / "a.py").write_text("x = 2")
+    (tmp_path / "a.py").write_text("x = 2", encoding="utf-8")
     assert clean == ""
     assert rb._git_dirty_digest(repo) not in ("", "unknown")
 

@@ -141,8 +141,8 @@ class FakeGroup:
 def make_fixture(tmp_path: Path, name: str = "0000_sample") -> Path:
     fixture = tmp_path / "fixtures" / name
     (fixture / "raw").mkdir(parents=True)
-    (fixture / "raw" / "scan.dat").write_text("1 2 3\n")
-    (fixture / "meta.txt").write_text("sanitized\n")
+    (fixture / "raw" / "scan.dat").write_text("1 2 3\n", encoding="utf-8")
+    (fixture / "meta.txt").write_text("sanitized\n", encoding="utf-8")
     return fixture
 
 
@@ -227,7 +227,7 @@ def test_batch_scenario_stages_the_fixture_and_posts_run_directory(tmp_path):
         name, params = driver(root, fake.endpoints())
 
     staged = drop / fixture.name
-    assert (staged / "raw" / "scan.dat").read_text() == "1 2 3\n"
+    assert (staged / "raw" / "scan.dat").read_text(encoding="utf-8") == "1 2 3\n"
     assert (fixture / "raw" / "scan.dat").exists()  # source untouched
 
     routes = [r for r, _ in fake.calls]
@@ -334,7 +334,9 @@ def test_stage_fixture_copies_rather_than_moves(tmp_path):
     root = tmp_path / "root"
     staged = stage_fixture(fixture, root / "drop", allowed_roots=[root])
     assert staged.is_dir() and fixture.is_dir()
-    assert (staged / "meta.txt").read_text() == (fixture / "meta.txt").read_text()
+    assert (staged / "meta.txt").read_text(encoding="utf-8") == (
+        fixture / "meta.txt"
+    ).read_text(encoding="utf-8")
 
 
 # --- endpoints are config-derived, not module constants ----------------------
@@ -367,7 +369,7 @@ def test_absent_optional_roles_are_none_and_required_roles_raise():
 
 # --- the deployment scenario-table loader ------------------------------------
 def write_scenario_module(tmp_path: Path, name: str, body: str, monkeypatch) -> str:
-    (tmp_path / f"{name}.py").write_text(body)
+    (tmp_path / f"{name}.py").write_text(body, encoding="utf-8")
     monkeypatch.syspath_prepend(str(tmp_path))
     return name
 
@@ -561,7 +563,7 @@ def test_a_full_config_path_is_used_as_given(tmp_path):
     from harness.capture import resolve_config_path
 
     cfg = tmp_path / "privcap_legacy.yml"
-    cfg.write_text("dummy: true\n")
+    cfg.write_text("dummy: true\n", encoding="utf-8")
     assert resolve_config_path(str(cfg)) == cfg.resolve()
 
 

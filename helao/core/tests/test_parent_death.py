@@ -210,7 +210,7 @@ def test_a_real_orphan_notification_escalates_to_sigterm(tmp_path):
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     )
     script = tmp_path / "orphan.py"
-    script.write_text(_ORPHAN_SCRIPT.format(repo=repo))
+    script.write_text(_ORPHAN_SCRIPT.format(repo=repo), encoding="utf-8")
     out = subprocess.run(
         [sys.executable, str(script)], capture_output=True, text=True, timeout=60
     )

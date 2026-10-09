@@ -33,16 +33,16 @@ class SpecParser:
 
 def _parser_file(tmp_path, source=PARSER_SOURCE, name="stub_parser.py"):
     path = tmp_path / name
-    path.write_text(source)
+    path.write_text(source, encoding="utf-8")
     return str(path)
 
 
 def _spec_folder(tmp_path):
     folder = tmp_path / "specs"
     folder.mkdir()
-    (folder / "b.txt").write_text("b")
-    (folder / "a.txt").write_text("a")
-    (folder / "notes.md").write_text("ignored")
+    (folder / "b.txt").write_text("b", encoding="utf-8")
+    (folder / "a.txt").write_text("a", encoding="utf-8")
+    (folder / "notes.md").write_text("ignored", encoding="utf-8")
     return str(folder)
 
 

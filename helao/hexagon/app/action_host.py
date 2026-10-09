@@ -1279,7 +1279,9 @@ class ActionHost(HelaoFastAPI):
                 self.fault_dir = os.path.join(self.root_dir, "FAULTS")
                 os.makedirs(self.fault_dir, exist_ok=True)
                 self.fault_file = open(
-                    os.path.join(self.fault_dir, f"{self.server_key}_faults.txt"), "a"
+                    os.path.join(self.fault_dir, f"{self.server_key}_faults.txt"),
+                    "a",
+                    encoding="utf-8",
                 )
                 faulthandler.enable(self.fault_file)
 

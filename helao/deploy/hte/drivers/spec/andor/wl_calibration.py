@@ -122,13 +122,13 @@ def save(calib: WavelengthCalibration, path: Path) -> None:
         prev_tmp.write_bytes(path.read_bytes())
         prev_tmp.replace(prev)
     tmp = path.with_name(f".{path.name}.tmp")
-    tmp.write_text(json.dumps(asdict(calib), indent=2) + "\n")
+    tmp.write_text(json.dumps(asdict(calib), indent=2) + "\n", encoding="utf-8")
     tmp.replace(path)
 
 
 def load(path: Path) -> WavelengthCalibration:
     """Read a calibration, refusing a model this build cannot evaluate."""
-    raw = json.loads(path.read_text())
+    raw = json.loads(path.read_text(encoding="utf-8"))
     if raw.get("model") not in (MODEL_CHEB, MODEL_POLY):
         raise UnknownCalibrationModel(
             f"{raw.get('model')!r} in {path}; this build evaluates "

@@ -47,10 +47,12 @@ def _write_fake_sdk(root: Path) -> Path:
         "\n"
         "class VsInitial(Enum):\n"
         "    EC_SDK_VS_EREF = 0\n"
-        "    EC_SDK_VS_IREF = 0\n"
+        "    EC_SDK_VS_IREF = 0\n",
+        encoding="utf-8",
     )
     (pkg / "Constants" / "__init__.py").write_text(
-        "from .bl_constants import ErrorCode, IRangeValue, VsInitial\n"
+        "from .bl_constants import ErrorCode, IRangeValue, VsInitial\n",
+        encoding="utf-8",
     )
     # The one absolute import in the shipped package.
     (pkg / "Exceptions" / "EC_SDK_Runtime_Error.py").write_text(
@@ -59,10 +61,11 @@ def _write_fake_sdk(root: Path) -> Path:
         "class EC_SDK_Runtime_Error(Exception):\n"
         "    def __init__(self, message, code):\n"
         "        super().__init__(message)\n"
-        "        self.code = code\n"
+        "        self.code = code\n",
+        encoding="utf-8",
     )
     (pkg / "Exceptions" / "__init__.py").write_text(
-        "from .EC_SDK_Runtime_Error import EC_SDK_Runtime_Error\n"
+        "from .EC_SDK_Runtime_Error import EC_SDK_Runtime_Error\n", encoding="utf-8"
     )
     (pkg / "ECLibAPI.py").write_text(
         "from .Constants import IRangeValue\n"
@@ -71,9 +74,12 @@ def _write_fake_sdk(root: Path) -> Path:
         "class ECLibAPI:\n"
         "    def __init__(self, path):\n"
         "        self.path = path\n"
-        "        self.MAX_NUMBER_OF_CHANNELS = 16\n"
+        "        self.MAX_NUMBER_OF_CHANNELS = 16\n",
+        encoding="utf-8",
     )
-    (pkg / "__init__.py").write_text("from .ECLibAPI import ECLibAPI\n")
+    (pkg / "__init__.py").write_text(
+        "from .ECLibAPI import ECLibAPI\n", encoding="utf-8"
+    )
 
     (root / "lib").mkdir()
     (root / "lib" / "eclib64.dll").write_bytes(b"not really a dll")
@@ -168,7 +174,7 @@ def test_a_failed_import_does_not_leave_a_half_built_module_registered(tmp_path)
     root = tmp_path / "broken"
     pkg = root / "Python"
     pkg.mkdir(parents=True)
-    (pkg / "__init__.py").write_text("raise RuntimeError('boom')\n")
+    (pkg / "__init__.py").write_text("raise RuntimeError('boom')\n", encoding="utf-8")
     with pytest.raises(RuntimeError, match="boom"):
         vendor.load_sdk(root)
     # A registered-but-unexecuted module would make the next load silently
@@ -188,7 +194,7 @@ def test_unload_releases_the_name_for_a_different_root(tmp_path):
 def test_the_dll_and_license_paths_are_derived_from_the_root(fake_sdk):
     assert vendor.dll_path(fake_sdk) == fake_sdk / "lib" / "eclib64.dll"
     assert vendor.has_license(fake_sdk) is False
-    (fake_sdk / "license_biologic_deadbeef.lic").write_text("x")
+    (fake_sdk / "license_biologic_deadbeef.lic").write_text("x", encoding="utf-8")
     assert vendor.has_license(fake_sdk) is True
 
 

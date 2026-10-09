@@ -1,4 +1,5 @@
 """Python 3.9 sim env: sidecar FastAPI app over fakes."""
+
 import os
 import subprocess
 import time
@@ -13,13 +14,24 @@ from helao.deploy.hte.drivers.xafs.sidecar import xafs_sidecar
 
 def scan_def(n_points=4):
     return {
-        "type": "NormalScan", "element": "Zn", "measurement_mode": "XAFS_Fluorescence",
-        "crystal2d": "Si(5,5,3)", "beta_offset": 0, "theta_offset": 0,
-        "analyzer_radius": 500, "alpha": 0,
+        "type": "NormalScan",
+        "element": "Zn",
+        "measurement_mode": "XAFS_Fluorescence",
+        "crystal2d": "Si(5,5,3)",
+        "beta_offset": 0,
+        "theta_offset": 0,
+        "analyzer_radius": 500,
+        "alpha": 0,
         "ROI": {"roi_bragg": 80, "roi_min": 800, "roi_max": 1000},
-        "zone_defs": [{"mode": "constant_step", "energy_min": 9600,
-                       "energy_max": 9600 + 5 * n_points, "energy_step": 5,
-                       "duration": 0.01}],
+        "zone_defs": [
+            {
+                "mode": "constant_step",
+                "energy_min": 9600,
+                "energy_max": 9600 + 5 * n_points,
+                "energy_step": 5,
+                "duration": 0.01,
+            }
+        ],
     }
 
 
@@ -28,7 +40,9 @@ def ctx(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     lock = str(tmp_path / "sidecar.lock")
     exits = []
-    app = xafs_sidecar.create_app(True, lock, str(tmp_path), exit_fn=lambda: exits.append(1))
+    app = xafs_sidecar.create_app(
+        True, lock, str(tmp_path), exit_fn=lambda: exits.append(1)
+    )
     (tmp_path / "save").mkdir()
     return TestClient(app), app.state.sim, lock, str(tmp_path / "save"), exits
 
@@ -40,9 +54,15 @@ def hw(ctx):
 
 
 def body(save_dir, **kw):
-    d = {"scan_def": scan_def(), "x_mm": 1.0, "y_mm": 2.0, "xchanger_station": 1,
-         "savename": "Zn_Scan0000_Sample1_X1.000_Y2.000", "save_dir": save_dir,
-         "duration_scale": 1.0}
+    d = {
+        "scan_def": scan_def(),
+        "x_mm": 1.0,
+        "y_mm": 2.0,
+        "xchanger_station": 1,
+        "savename": "Zn_Scan0000_Sample1_X1.000_Y2.000",
+        "save_dir": save_dir,
+        "duration_scale": 1.0,
+    }
     d.update(kw)
     return d
 
@@ -83,7 +103,7 @@ def test_initialize_lock_held(ctx):
     h.mono.initialize = lambda: calls.append(1)
     p = subprocess.Popen(["sleep", "30"])
     try:
-        with open(lock, "w") as f:
+        with open(lock, "w", encoding="utf-8") as f:
             f.write(str(p.pid))
         r = c.post("/initialize", json={})
         assert r.status_code == 423
@@ -98,10 +118,10 @@ def test_stale_lock_replaced(ctx):
     c, lock = ctx[0], ctx[2]
     p = subprocess.Popen(["true"])
     p.wait()
-    with open(lock, "w") as f:
+    with open(lock, "w", encoding="utf-8") as f:
         f.write(str(p.pid))
     assert c.post("/initialize", json={}).status_code == 200
-    assert open(lock).read().strip() == str(os.getpid())
+    assert open(lock, encoding="utf-8").read().strip() == str(os.getpid())
 
 
 def test_scan_roundtrip(hw):
@@ -199,10 +219,10 @@ def test_shutdown_keeps_foreign_lock(ctx):
     c, lock = ctx[0], ctx[2]
     p = subprocess.Popen(["sleep", "30"])
     try:
-        with open(lock, "w") as f:
+        with open(lock, "w", encoding="utf-8") as f:
             f.write(str(p.pid))
         assert c.post("/shutdown").status_code == 200
-        assert open(lock).read() == str(p.pid)
+        assert open(lock, encoding="utf-8").read() == str(p.pid)
         assert ctx[1].proto.shutter == "Open"
     finally:
         p.kill()
@@ -214,20 +234,31 @@ def test_shutdown_waits_for_scan(hw):
     h.mono.move_delay = 0.2
     sid = c.post("/scans", json=body(save_dir)).json()["scan_id"]
     assert c.post("/shutdown").status_code == 200
-    assert c.get("/scans/" + sid).json()["state"] not in ("queued", "moving", "running", "saving")
+    assert c.get("/scans/" + sid).json()["state"] not in (
+        "queued",
+        "moving",
+        "running",
+        "saving",
+    )
 
 
 def test_logging_survives_easyxafs_import(ctx):
     import logging
     import importlib
     import easyxafs.logging_setup as ls
+
     importlib.reload(ls)  # what a late first import would do: clears root handlers
     xafs_sidecar.create_app(True, ctx[2], str(ctx[3]) + "_x", exit_fn=None)
     assert any(getattr(x, "_xafs_sidecar", False) for x in logging.getLogger().handlers)
 
 
 def test_status_has_bragg(hw):
-    assert set(hw[0].get("/status").json()["mono_bragg"]) == {"Beta", "Detector", "Rho", "Theta"}
+    assert set(hw[0].get("/status").json()["mono_bragg"]) == {
+        "Beta",
+        "Detector",
+        "Rho",
+        "Theta",
+    }
 
 
 def test_hw_routes_423_without_lock(ctx):
@@ -246,6 +277,7 @@ def test_bad_request_422(hw):
 def test_calibrate_vs_scan_guards(hw):
     c, h, save_dir = hw[0], hw[1], hw[3]
     import threading
+
     gate = threading.Event()
     h.mono.calibrate_all = lambda: gate.wait(10)
     jid = c.post("/calibrate", json={"devices": ["mono"]}).json()["job_id"]
@@ -282,6 +314,7 @@ def test_unknown_field_422(hw):
 
 def test_calibrate_during_scan_start_interlock_window_409(hw):
     import threading
+
     c, h, save_dir = hw[0], hw[1], hw[3]
     real = h.proto.readback_kv_ma
     entered = threading.Event()
@@ -294,7 +327,8 @@ def test_calibrate_during_scan_start_interlock_window_409(hw):
     h.proto.readback_kv_ma = slow
     out = {}
     t = threading.Thread(
-        target=lambda: out.update(r=c.post("/scans", json=body(save_dir))))
+        target=lambda: out.update(r=c.post("/scans", json=body(save_dir)))
+    )
     t.start()
     assert entered.wait(5)
     cal = c.post("/calibrate", json={"devices": ["mono"]})
@@ -308,6 +342,7 @@ def test_calibrate_during_scan_start_interlock_window_409(hw):
 
 def test_scan_while_calibrate_running_409(hw):
     import threading
+
     c, h, save_dir = hw[0], hw[1], hw[3]
     gate = threading.Event()
     h.mono.calibrate_all = lambda: gate.wait(10)
@@ -325,11 +360,16 @@ def test_scan_while_calibrate_running_409(hw):
 @pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
 def test_calibrate_409_while_watchdog_hung_thread_alive(ctx, monkeypatch):
     from helao.deploy.hte.drivers.xafs.sidecar.runner import ScanRunner
-    monkeypatch.setattr(xafs_sidecar, "ScanRunner", lambda: ScanRunner(watchdog_margin_s=0.3))
+
+    monkeypatch.setattr(
+        xafs_sidecar, "ScanRunner", lambda: ScanRunner(watchdog_margin_s=0.3)
+    )
     app = xafs_sidecar.create_app(True, ctx[2], ctx[3] + "_x", exit_fn=None)
     c, h, save_dir = TestClient(app), app.state.sim, ctx[3]
     assert c.post("/initialize", json={}).status_code == 200
-    h.ketek.hang = True  # hangs scan.start(): watchdog errors the record, thread stays alive
+    h.ketek.hang = (
+        True  # hangs scan.start(): watchdog errors the record, thread stays alive
+    )
     try:
         sid = c.post("/scans", json=body(save_dir)).json()["scan_id"]
         assert wait_done(c, sid)["state"] == "error"
@@ -344,6 +384,7 @@ def test_calibrate_409_while_watchdog_hung_thread_alive(ctx, monkeypatch):
 
 def test_shutdown_waits_for_calibrate_job(hw):
     import threading
+
     c, h = hw[0], hw[1]
     gate = threading.Event()
     h.mono.calibrate_all = lambda: gate.wait(10)

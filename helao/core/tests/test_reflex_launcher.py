@@ -53,7 +53,7 @@ def test_resolve_bundle_finds_an_exported_bundle(tmp_path):
 
     bundle = tmp_path / ".reflex-bundle" / "golden_UI" / "helao_ui"
     bundle.mkdir(parents=True)
-    (bundle / "index.html").write_text("<html></html>")
+    (bundle / "index.html").write_text("<html></html>", encoding="utf-8")
     rb.write_stamp(
         rb.stamp_path(str(tmp_path), None, "golden", "UI"), _believable_stamp()
     )
@@ -253,7 +253,7 @@ def test_resolve_bundle_rejects_a_zero_byte_index_html(tmp_path):
     """
     bundle = tmp_path / ".reflex-bundle" / "golden_UI" / "helao_ui"
     bundle.mkdir(parents=True)
-    (bundle / "index.html").write_text("")
+    (bundle / "index.html").write_text("", encoding="utf-8")
     assert rl.resolve_bundle(str(tmp_path), None, "golden", "UI", {}).path == ""
 
 
@@ -308,7 +308,8 @@ def test_launcher_exits_nonzero_when_no_bundle_and_no_opt_in(tmp_path):
         "    host: 127.0.0.1\n"
         "    port: 15010\n"
         "    group: operator\n"
-        "    reflex: app\n"
+        "    reflex: app\n",
+        encoding="utf-8",
     )
 
     env = dict(os.environ)
@@ -417,7 +418,7 @@ def test_rxconfig_does_not_set_frontend_port():
     import ast
     import pathlib as _p
 
-    tree = ast.parse(_p.Path(rl.APP_DIR, "rxconfig.py").read_text())
+    tree = ast.parse(_p.Path(rl.APP_DIR, "rxconfig.py").read_text(encoding="utf-8"))
     kwargs = [
         kw.arg
         for node in ast.walk(tree)
@@ -501,7 +502,7 @@ def test_frontend_proxies_the_buffer_route_to_the_backend():
             methods=["GET"],
         )
         with tempfile.TemporaryDirectory() as bundle:
-            with open(os.path.join(bundle, "index.html"), "w") as fh:
+            with open(os.path.join(bundle, "index.html"), "w", encoding="utf-8") as fh:
                 fh.write("<html></html>")
             front.mount("/", StaticFiles(directory=bundle, html=True), name="frontend")
 

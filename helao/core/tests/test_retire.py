@@ -32,7 +32,9 @@ def test_indented_sequence_uuid_creates_no_location(tmp_path):
     root = str(tmp_path)
     d = tmp_path / "RUNS" / "26.40" / "1005" / "s"
     d.mkdir(parents=True)
-    (d / "a-seq.yml").write_text(f"sequence_name: x\n  sequence_uuid: {U}\n")
+    (d / "a-seq.yml").write_text(
+        f"sequence_name: x\n  sequence_uuid: {U}\n", encoding="utf-8"
+    )
     assert retire.locate(root, U) == []
 
 
@@ -57,9 +59,11 @@ def test_locate_reads_label_name_campaign(tmp_path):
     )
     make_run_tree(root, "RUNS_SYNCED", REL, sequence_uuid=U, label="L2", name="N2")
     yml = os.path.join(root, "RUNS", REL, "20261001.000000-seq.yml")
-    with open(yml) as f:
+    with open(yml, encoding="utf-8") as f:
         text = f.read()
-    with open(yml, "w") as f:  # a later top-level duplicate must not win
+    with open(
+        yml, "w", encoding="utf-8"
+    ) as f:  # a later top-level duplicate must not win
         f.write(text.replace("sequence_name:", "sequence_label: later\nsequence_name:"))
     a, b = retire.locate(root, U)
     assert (a.run_tree, a.label, a.name, a.campaign) == ("RUNS", "L1", "N1", "C1")
@@ -70,7 +74,7 @@ def test_locate_reads_label_name_campaign(tmp_path):
 def _state(d, name, body):
     d.mkdir(parents=True, exist_ok=True)
     p = d / name
-    p.write_text(body if isinstance(body, str) else json.dumps(body))
+    p.write_text(body if isinstance(body, str) else json.dumps(body), encoding="utf-8")
     return str(p)
 
 
@@ -264,10 +268,10 @@ def test_analysis_dirs_are_reported_not_required(tmp_path):
     assert inv.analysis_dirs == []
     d = tmp_path / "ANALYSES" / "2026" / "1005" / "120000__x"
     d.mkdir(parents=True)
-    (d / "out.yml").write_text("process_uuid: P2\n")
+    (d / "out.yml").write_text("process_uuid: P2\n", encoding="utf-8")
     other = tmp_path / "ANALYSES" / "2026" / "1005" / "130000__y"
     other.mkdir()
-    (other / "out.json").write_text('{"process_uuid": "unrelated"}')
+    (other / "out.json").write_text('{"process_uuid": "unrelated"}', encoding="utf-8")
     inv = asyncio.run(retire.inventory(client, root, U, _noprogress))
     assert inv.analysis_dirs == [str(d)]
 
@@ -280,7 +284,7 @@ def test_analysis_dirs_read_only_yml_and_skip_non_files(tmp_path):
     base = tmp_path / "ANALYSES" / "2026" / "1005"
     only_json = base / "120000__j"
     only_json.mkdir(parents=True)
-    (only_json / "out.json").write_text('{"process_uuid": "P2"}')
+    (only_json / "out.json").write_text('{"process_uuid": "P2"}', encoding="utf-8")
     bad = base / "130000__bad"
     bad.mkdir()
     (bad / "x.yml").mkdir()  # a directory named x.yml: not a file, skipped
@@ -292,7 +296,7 @@ def test_unreadable_yml_oserror_is_skipped(tmp_path, monkeypatch):
     """Mutation: removing the except OSError in _analysis_dirs."""
     d = tmp_path / "ANALYSES" / "2026" / "1005" / "120000__x"
     d.mkdir(parents=True)
-    (d / "a.yml").write_text("P2")
+    (d / "a.yml").write_text("P2", encoding="utf-8")
     real_open = open
 
     def boom(path, *a, **k):
@@ -401,7 +405,7 @@ def _run(client, root, inv, ledger, progress=_noprogress):
 
 
 def _lines(ledger):
-    with open(ledger) as f:
+    with open(ledger, encoding="utf-8") as f:
         return [json.loads(x) for x in f]
 
 
@@ -591,9 +595,9 @@ def test_changed_seq_yml_refuses_with_zero_deletes(tmp_path):
     """Mutation: removing the re-verify."""
     root, client, inv, ledger = _setup(tmp_path)
     yml = inv.locations[0].seq_yml
-    with open(yml) as f:
+    with open(yml, encoding="utf-8") as f:
         text = f.read()
-    with open(yml, "w") as f:
+    with open(yml, "w", encoding="utf-8") as f:
         f.write(text.replace(f"\nsequence_uuid: {U}\n", "\nsequence_uuid: other\n"))
     res = _run(client, root, inv, ledger)
     assert not res.ok and "re-gather" in res.error
@@ -675,7 +679,7 @@ def test_unwritable_ledger_fails_before_any_delete(tmp_path):
     """Mutation: opening the ledger lazily on the first outcome."""
     root, client, inv, _ = _setup(tmp_path)
     blocker = tmp_path / "notadir"
-    blocker.write_text("x")
+    blocker.write_text("x", encoding="utf-8")
     res = _run(client, root, inv, str(blocker / "sub" / "l.jsonl"))
     assert not res.ok and client.calls == []
     assert os.path.isdir(_src(root))
@@ -933,7 +937,7 @@ def _prg(root, rt, body):
     if body is None:
         os.remove(p)
     else:
-        with open(p, "w") as f:
+        with open(p, "w", encoding="utf-8") as f:
             f.write(body)
 
 

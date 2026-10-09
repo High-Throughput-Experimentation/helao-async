@@ -1072,7 +1072,7 @@ def test_the_ceiling_outlasts_any_move_the_hardware_can_actually_perform():
     # ceiling -- a move it has abandoned cannot still be running.
     slowest_mm_per_s = None
     for path in sorted(glob.glob(HTE_CONFIG_GLOB)):
-        with open(path) as handle:
+        with open(path, encoding="utf-8") as handle:
             cfg = yaml.safe_load(handle) or {}
         for server in (cfg.get("servers") or {}).values():
             params = (server or {}).get("params") or {}

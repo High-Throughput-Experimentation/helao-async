@@ -435,7 +435,7 @@ def _run_controller_harness():
     script = _HARNESS % {"controller": controller}
     with tempfile.TemporaryDirectory() as tmp:
         path = os.path.join(tmp, "harness.mjs")
-        with open(path, "w") as fh:
+        with open(path, "w", encoding="utf-8") as fh:
             fh.write(script)
         proc = subprocess.run(
             [_JS_RUNTIME, path], capture_output=True, text=True, timeout=60

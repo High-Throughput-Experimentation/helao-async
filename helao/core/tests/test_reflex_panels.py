@@ -644,7 +644,7 @@ def test_the_sim_panels_do_not_use_gridjs(module_name):
     module = importlib.import_module(f"helao.deploy.test.servers.reflex.{module_name}")
     # The call, not the name: the comment explaining the replacement must not
     # fail the check it explains.
-    source = pathlib.Path(module.__file__).read_text()
+    source = pathlib.Path(module.__file__).read_text(encoding="utf-8")
     assert "rx.data_table(" not in source
     assert "rx.table.root(" in source
 

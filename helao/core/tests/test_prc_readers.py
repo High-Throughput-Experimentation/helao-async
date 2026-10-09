@@ -52,7 +52,7 @@ def test_a_process_present_in_both_places_is_indexed_once(tmp_path):
         / "260828.120000__exp"
     )
     mirror.mkdir(parents=True)
-    (mirror / PRC_A).write_text(BODY_A)
+    (mirror / PRC_A).write_text(BODY_A, encoding="utf-8")
     loader = LocalLoader(str(zpath))
     assert len(loader._yml_paths["prc"]) == 1, "the same process must not appear twice"
 
@@ -62,8 +62,12 @@ def test_helao_data_picks_the_record_yml_not_the_process(tmp_path):
 
     exp_dir = tmp_path / "RUNS_SYNCED" / "26.35" / "0828" / "seq" / "260828.120000__exp"
     exp_dir.mkdir(parents=True)
-    (exp_dir / "260828.120000000000-exp.yml").write_text("experiment_name: SIM_exp\n")
-    (exp_dir / PRC_A).write_text(BODY_A)  # sorts first under a bare glob
+    (exp_dir / "260828.120000000000-exp.yml").write_text(
+        "experiment_name: SIM_exp\n", encoding="utf-8"
+    )
+    (exp_dir / PRC_A).write_text(
+        BODY_A, encoding="utf-8"
+    )  # sorts first under a bare glob
     hd = HelaoData(str(exp_dir))
     assert hd.ymlpath.endswith("-exp.yml")
     assert hd.type == "exp"
@@ -79,10 +83,14 @@ def test_processors_picks_the_experiment_yml_not_the_process(tmp_path):
     exp_dir = tmp_path / "RUNS_ACTIVE" / rel
     act_dir = exp_dir / "0__0__SIM__do_thing"
     act_dir.mkdir(parents=True)
-    (exp_dir / "260828.120000000000-exp.yml").write_text("experiment_name: SIM_exp\n")
-    (exp_dir / PRC_A).write_text(BODY_A)  # sorts first under a bare glob
+    (exp_dir / "260828.120000000000-exp.yml").write_text(
+        "experiment_name: SIM_exp\n", encoding="utf-8"
+    )
+    (exp_dir / PRC_A).write_text(
+        BODY_A, encoding="utf-8"
+    )  # sorts first under a bare glob
     (exp_dir.parent / "260828.115959000000-seq.yml").write_text(
-        "sequence_name: SIM_seq\n"
+        "sequence_name: SIM_seq\n", encoding="utf-8"
     )
 
     class _Proc(HloPostProcessor):
@@ -106,8 +114,10 @@ def test_a_record_copied_outside_a_runs_tree_is_indexed_once(tmp_path):
     actdir = expdir / "00__0__SIM_server__SIM_act"
     actdir.mkdir(parents=True)
     exp_yml = expdir / "260828.120000000000-exp.yml"
-    exp_yml.write_text("experiment_name: SIM_exp\n")
-    (actdir / "260828.120001000000-act.yml").write_text("action_name: SIM_act\n")
+    exp_yml.write_text("experiment_name: SIM_exp\n", encoding="utf-8")
+    (actdir / "260828.120001000000-act.yml").write_text(
+        "action_name: SIM_act\n", encoding="utf-8"
+    )
 
     loader = LocalLoader(str(exp_yml))
     assert (

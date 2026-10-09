@@ -66,7 +66,7 @@ def test_the_server_module_imports_on_linux_with_eclib_in_backends():
 
 
 def _imports_easy_biologic(path: Path) -> bool:
-    tree = ast.parse(path.read_text())
+    tree = ast.parse(path.read_text(encoding="utf-8"))
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             if any(a.name.split(".")[0] == "easy_biologic" for a in node.names):
@@ -110,7 +110,9 @@ def test_both_drivers_satisfy_the_backend_protocol():
 
 def test_the_endpoints_no_longer_coerce_the_range_enums():
     """Coercion belongs in each backend's setup(), not the shared layer."""
-    source = Path("helao/deploy/hte/servers/action/biologic_server.py").read_text()
+    source = Path("helao/deploy/hte/servers/action/biologic_server.py").read_text(
+        encoding="utf-8"
+    )
     assert "EC_IRange_map[" not in source
     assert "EC_ERange_map[" not in source
     assert "EC_Bandwidth_map[" not in source

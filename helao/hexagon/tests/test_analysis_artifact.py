@@ -237,10 +237,12 @@ def test_publish_writes_the_golden_layout(tmp_path):
     ]
     assert yml_load(d / f"{UUID_A}.yml")["analysis_uuid"] == UUID_A
     # each group's JSON carries that group's values, arrays included
-    assert json.loads((d / f"{UUID_A}_output_array.json").read_text()) == {
-        "processed_Energy": [1.0, 2.0, 3.0]
-    }
-    assert json.loads((d / f"{UUID_A}_output_scalar.json").read_text()) == {
+    assert json.loads(
+        (d / f"{UUID_A}_output_array.json").read_text(encoding="utf-8")
+    ) == {"processed_Energy": [1.0, 2.0, 3.0]}
+    assert json.loads(
+        (d / f"{UUID_A}_output_scalar.json").read_text(encoding="utf-8")
+    ) == {
         "e0": 9665.5,
         "flat_coefs": [1.0, 2.0],
     }

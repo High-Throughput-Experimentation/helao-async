@@ -3,6 +3,7 @@
 easyxafs / pyprotohv singletons are only reached through module attributes so
 the sim patches apply.
 """
+
 import os
 from typing import Any, Dict, List, Optional
 
@@ -21,19 +22,19 @@ class LockHeldError(Exception):
 
 def acquire_lock(lock_path: str) -> None:
     try:
-        with open(lock_path) as f:
+        with open(lock_path, encoding="utf-8") as f:
             pid = int(f.read().strip())
     except (OSError, ValueError):
         pid = None
     if pid is not None and pid != os.getpid() and psutil.pid_exists(pid):
         raise LockHeldError(pid)
-    with open(lock_path, "w") as f:
+    with open(lock_path, "w", encoding="utf-8") as f:
         f.write(str(os.getpid()))
 
 
 def owns_lock(lock_path: str) -> bool:
     try:
-        with open(lock_path) as f:
+        with open(lock_path, encoding="utf-8") as f:
             return int(f.read().strip()) == os.getpid()
     except (OSError, ValueError):
         return False
@@ -68,6 +69,7 @@ def _init_device(name: str) -> None:
     elif name == "proto":
         import pyprotohv
         from pyprotohv import proto_controller  # noqa: F401  (notebook setup)
+
         if pyprotohv.proto_controller is None:
             raise RuntimeError("pyprotohv.proto_controller is None")
 
@@ -91,6 +93,7 @@ def initialize(flags: dict) -> dict:
 
 def _proto() -> Any:
     import pyprotohv
+
     return pyprotohv.proto_controller
 
 
@@ -107,17 +110,31 @@ def status() -> dict:
     return {
         "mono_calibrated": bool(mono._calibrated),
         "mono_positions": {k: int(v) for k, v in mono.get_positions().items()},
-        "mono_bragg": {k: float(v) for k, v in mono.get_current_positions_bragg().items()},
-        "wafer_xy": list(stage.get_current_position_wafer_xy()) if stage is not None else None,
-        "xchanger_station": xch.get_current_station() if xch is not None else None,
-        "proto": None if proto is None else {
-            "kv": kv_ma[0], "ma": kv_ma[1], "shutter": proto.get_shutter_status(),
+        "mono_bragg": {
+            k: float(v) for k, v in mono.get_current_positions_bragg().items()
         },
+        "wafer_xy": (
+            list(stage.get_current_position_wafer_xy()) if stage is not None else None
+        ),
+        "xchanger_station": xch.get_current_station() if xch is not None else None,
+        "proto": (
+            None
+            if proto is None
+            else {
+                "kv": kv_ma[0],
+                "ma": kv_ma[1],
+                "shutter": proto.get_shutter_status(),
+            }
+        ),
     }
 
 
-def xray(kv: Optional[float] = None, ma: Optional[float] = None,
-         shutter: Optional[str] = None, off: bool = False) -> dict:
+def xray(
+    kv: Optional[float] = None,
+    ma: Optional[float] = None,
+    shutter: Optional[str] = None,
+    off: bool = False,
+) -> dict:
     proto = _proto()
     if proto is None:
         raise RuntimeError("proto not initialized")

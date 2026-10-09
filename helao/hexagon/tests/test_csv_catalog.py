@@ -40,7 +40,7 @@ TABLE = (
 @pytest.fixture
 def table_path(tmp_path):
     path = tmp_path / "reference_table.csv"
-    path.write_text(TABLE)
+    path.write_text(TABLE, encoding="utf-8")
     return path
 
 
@@ -132,7 +132,8 @@ def test_prime_reads_at_wiring_time_and_pins_that_snapshot(table_path):
 
     table_path.write_text(
         "bank_id,slot_no,Contents label,Contents value\n"
-        "bank_a,1,REWRITTEN EXTERNALLY,9.9\n"
+        "bank_a,1,REWRITTEN EXTERNALLY,9.9\n",
+        encoding="utf-8",
     )
 
     row = catalog.lookup_one(bank_id="bank_a", slot_no=1)
@@ -149,7 +150,8 @@ def test_read_is_cached_until_reload(table_path):
     assert catalog.lookup_one(bank_id="bank_a", slot_no=1) is not None
 
     table_path.write_text(
-        "bank_id,slot_no,Contents label,Contents value\nbank_a,1,EDITED,9.9\n"
+        "bank_id,slot_no,Contents label,Contents value\nbank_a,1,EDITED,9.9\n",
+        encoding="utf-8",
     )
     cached = catalog.lookup_one(bank_id="bank_a", slot_no=1)
     assert cached is not None and cached["Contents label"] == "alpha"

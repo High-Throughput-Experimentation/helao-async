@@ -31,12 +31,21 @@ def manifest():
 
 def test_meta_json_payloads_are_normalized_and_diffed(tmp_path):
     g, c = tmp_path / "g.json", tmp_path / "c.json"
-    g.write_text(json.dumps({"action_uuid": U1, "action_params": {"duration": 2.0}}))
-    c.write_text(json.dumps({"action_uuid": U2, "action_params": {"duration": 2.0}}))
+    g.write_text(
+        json.dumps({"action_uuid": U1, "action_params": {"duration": 2.0}}),
+        encoding="utf-8",
+    )
+    c.write_text(
+        json.dumps({"action_uuid": U2, "action_params": {"duration": 2.0}}),
+        encoding="utf-8",
+    )
     mg, mc = UuidMapper(), UuidMapper()
     norm = "S3_SIM/helao-sim/action/UUID-0.json"
     assert diff_s3_record(norm, g, c, mg, mc, manifest()) == []
-    c.write_text(json.dumps({"action_uuid": U2, "action_params": {"duration": 9.0}}))
+    c.write_text(
+        json.dumps({"action_uuid": U2, "action_params": {"duration": 9.0}}),
+        encoding="utf-8",
+    )
     diffs = diff_s3_record(norm, g, c, mg, mc, manifest())
     assert any("duration" in d["key"] for d in diffs)
 
@@ -51,8 +60,8 @@ def test_hlo_json_payload_uses_body_masking(tmp_path):
         "data": {"series_0": [0.9]},
     }
     g, c = tmp_path / "g.hlo.json", tmp_path / "c.hlo.json"
-    g.write_text(json.dumps(payload_g))
-    c.write_text(json.dumps(payload_c))
+    g.write_text(json.dumps(payload_g), encoding="utf-8")
+    c.write_text(json.dumps(payload_c), encoding="utf-8")
     m = manifest()
     m.masked_hlo_columns = {"*WsSim*.hlo.json": ["series_0"]}
     norm = "S3_SIM/helao-sim/raw_data/UUID-0/WsSim-0.0.0.0__0.hlo.json"
@@ -70,7 +79,8 @@ def test_s3_manifest_jsonl_compares_mapped_key_sets(tmp_path):
                 "gzip": False,
             }
         )
-        + "\n"
+        + "\n",
+        encoding="utf-8",
     )
     c.write_text(
         json.dumps(
@@ -81,7 +91,8 @@ def test_s3_manifest_jsonl_compares_mapped_key_sets(tmp_path):
                 "gzip": False,
             }
         )
-        + "\n"
+        + "\n",
+        encoding="utf-8",
     )
     mg, mc = UuidMapper(), UuidMapper()
     mg.map(U1)
@@ -91,7 +102,8 @@ def test_s3_manifest_jsonl_compares_mapped_key_sets(tmp_path):
         json.dumps(
             {"bucket": "b", "key": f"action/{U2}.json", "mode": "fileobj", "gzip": True}
         )
-        + "\n"
+        + "\n",
+        encoding="utf-8",
     )
     assert diff_s3_manifest(g, c, mg, mc) != []
 

@@ -28,7 +28,7 @@ async def test_write_act_layout(tmp_path):
     out_dir = os.path.join(save_root, str(action.action_output_dir))
     files = [f for f in os.listdir(out_dir) if f.endswith("-act.yml")]
     assert files == ["260102.030405678901-act.yml"]
-    text = open(os.path.join(out_dir, files[0])).read()
+    text = open(os.path.join(out_dir, files[0]), encoding="utf-8").read()
     assert text.startswith("file_type: action\n")  # file_type first key
     assert text.endswith("\n")  # trailing newline
     assert not [f for f in os.listdir(out_dir) if f.endswith(".tmp")]
@@ -78,7 +78,7 @@ async def test_write_meta_atomic_tmp_shape(tmp_path):
     # 232-char -act.yml, 270-char temp, FileNotFoundError).
     assert len(tmp_base) <= len(os.path.basename(target))
     assert os.path.dirname(seen["src"]) == os.path.dirname(target)
-    assert open(target).read() == "k: v\n"
+    assert open(target, encoding="utf-8").read() == "k: v\n"
 
 
 @pytest.mark.asyncio
@@ -107,7 +107,8 @@ async def test_write_exp_and_seq(tmp_path):
     exp_text = open(
         os.path.join(
             exp_dir, [f for f in os.listdir(exp_dir) if f.endswith("-exp.yml")][0]
-        )
+        ),
+        encoding="utf-8",
     ).read()
     assert exp_text.startswith("file_type: experiment\n")
 

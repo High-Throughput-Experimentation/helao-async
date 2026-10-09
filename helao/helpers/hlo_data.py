@@ -176,7 +176,7 @@ def read_hlo_header(file_path) -> tuple:
     """
     yml_lines = []
     data_start_index = -1
-    with open(file_path) as f:
+    with open(file_path, encoding="utf-8") as f:
         for i, line in enumerate(f):
             if line.strip().startswith("%%"):
                 # Ignore a stray leading ``%%`` written before the real header
@@ -205,7 +205,7 @@ def read_hlo_data_chunks(file_path, data_start_index, chunk_size=100):
         dict of column lists for at most ``chunk_size`` lines and
         ``max_chunk_len`` is the longest column length in that chunk.
     """
-    with open(file_path) as f:
+    with open(file_path, encoding="utf-8") as f:
         chunkd = defaultdict(list)
         for i, line in enumerate(f):
             if i < data_start_index:

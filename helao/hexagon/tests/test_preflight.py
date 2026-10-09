@@ -58,7 +58,7 @@ def _hexagon_configs() -> list[Path]:
         if p.is_file()
         and p.suffix in _CONFIG_SUFFIXES
         and p.name != "__init__.py"
-        and _DECLARES_HEXAGON.search(p.read_text(errors="ignore"))
+        and _DECLARES_HEXAGON.search(p.read_text(errors="ignore", encoding="utf-8"))
     ]
 
 
@@ -177,7 +177,7 @@ def test_code_keys_match_the_launcher():
     SKIPPED at launch (launch.py skips an entry whose key it does not recognize
     rather than failing), which is the worst of both worlds.
     """
-    src = (preflight.REPO_ROOT / "launch.py").read_text()
+    src = (preflight.REPO_ROOT / "launch.py").read_text(encoding="utf-8")
     match = re.search(r"self\.codeKeys\s*=\s*\(([^)]*)\)", src)
     assert match, "could not find codeKeys in launch.py"
     launcher_keys = tuple(

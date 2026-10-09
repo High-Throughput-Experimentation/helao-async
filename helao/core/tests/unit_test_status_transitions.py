@@ -184,7 +184,7 @@ def _check_schema_freeze(reporter: TestReporter) -> None:
     reporter.check(
         f"schema freeze: model_json_schema() equals baseline ({SCHEMA_BASELINE_PATH})",
         lambda: SCHEMA_BASELINE_PATH.is_file()
-        and current == SCHEMA_BASELINE_PATH.read_text(),
+        and current == SCHEMA_BASELINE_PATH.read_text(encoding="utf-8"),
     )
 
 

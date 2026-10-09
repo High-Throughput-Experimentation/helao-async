@@ -41,10 +41,10 @@ def yml_load(input: Union[str, Path]):
     yaml = ruamel.yaml.YAML(typ="rt")
     yaml.version = (1, 2)
     if isinstance(input, Path):
-        with input.open("r") as f:
+        with input.open("r", encoding="utf-8") as f:
             obj = yaml.load(f)
     elif os.path.exists(input):
-        with open(input, "r") as f:
+        with open(input, "r", encoding="utf-8") as f:
             obj = yaml.load(f)
     else:
         obj = yaml.load(input)
@@ -288,7 +288,7 @@ def generate_interpolation_function(
         "offset": offset_fit,
     }
     # write to JSON
-    with open("interpolation.json", "w") as f:
+    with open("interpolation.json", "w", encoding="utf-8") as f:
         json.dump(interpol_write, f)
     return interpolation
 

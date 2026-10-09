@@ -53,7 +53,7 @@ def _offline(monkeypatch):
 
 
 def _body(s3: Path, key: str) -> dict:
-    return json.loads((s3 / BUCKET / key).read_text())
+    return json.loads((s3 / BUCKET / key).read_text(encoding="utf-8"))
 
 
 def _keys(s3: Path, prefix: str) -> set:

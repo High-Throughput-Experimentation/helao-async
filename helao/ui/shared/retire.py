@@ -90,7 +90,7 @@ def top_level(path: str, keys: tuple[str, ...]) -> dict[str, str]:
     """
     found: dict[str, str] = {}
     want = set(keys)
-    with open(path, errors="replace") as f:
+    with open(path, errors="replace", encoding="utf-8") as f:
         for line in f:
             if not line or line[0] in " \t":
                 continue
@@ -156,7 +156,7 @@ def in_flight(sources_root: str, sequence_uuid: str, rel_dirs: list[str]) -> str
         glob.glob(os.path.join(sources_root, "*", "processing", "*.state.json"))
     ):
         try:
-            with open(path) as f:
+            with open(path, encoding="utf-8") as f:
                 state = json.load(f)
             if not isinstance(state, dict):
                 raise ValueError("not a dict")
@@ -274,7 +274,7 @@ def _analysis_dirs(root: str, uuids: set[str]) -> list[str]:
             if not name.endswith(".yml") or not os.path.isfile(path):
                 continue
             try:
-                with open(path, errors="replace") as f:
+                with open(path, errors="replace", encoding="utf-8") as f:
                     text = f.read()
             except OSError as exc:
                 LOGGER.warning(
@@ -425,7 +425,7 @@ def _move_guard(root: str, loc: SeqLocation, src: str, dst: str) -> str:
 
 
 def _append(path: str, rec: dict) -> None:
-    with open(path, "a") as f:
+    with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(rec) + "\n")
         f.flush()
 

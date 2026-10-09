@@ -32,7 +32,7 @@ class UserScript(threading.Thread):
 
     def run(self):
         """Read the script file and execute it in the current namespace."""
-        script_str = open(self._script_path, "r").read()
+        script_str = open(self._script_path, "r", encoding="utf-8").read()
 
         try:
             exec(script_str)

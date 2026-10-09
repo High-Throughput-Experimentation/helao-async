@@ -169,14 +169,18 @@ def test_adjust_nd_is_still_frozen_and_calibrate_wl_is_listed():
     import json
 
     frozen = json.loads(
-        Path("helao/hexagon/tests/checklists/hte/andor_server.json").read_text()
+        Path("helao/hexagon/tests/checklists/hte/andor_server.json").read_text(
+            encoding="utf-8"
+        )
     )
     paths = {r["path"] for r in frozen}
     assert "/ANDOR/adjust_nd" in paths, "the frozen record must not have been edited"
     assert "/ANDOR/calibrate_wl" not in paths, "additions go in _additions.json"
 
     additions = json.loads(
-        Path("helao/hexagon/tests/checklists/hte/_additions.json").read_text()
+        Path("helao/hexagon/tests/checklists/hte/_additions.json").read_text(
+            encoding="utf-8"
+        )
     )
     entry = [a for a in additions if a["path"] == "/ANDOR/calibrate_wl"]
     assert len(entry) == 1, "calibrate_wl must be listed exactly once"

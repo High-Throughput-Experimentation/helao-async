@@ -80,7 +80,9 @@ class LegacyPalTransport:
                 # same latent bug); apparently never hit at the station
                 # because the aux-log directory always pre-exists there.
                 os.makedirs(FIFO_rshs_dir, exist_ok=True, cwd=FIFO_rshs_dir)
-            async with aiofiles.open(aux_output_filepath, mode="w+") as f:
+            async with aiofiles.open(
+                aux_output_filepath, mode="w+", encoding="utf-8"
+            ) as f:
                 await f.write(auxheader)
         elif self._host is not None:
             mysshclient = self._ssh_connect()

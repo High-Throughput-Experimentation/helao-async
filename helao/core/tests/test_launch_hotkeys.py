@@ -42,7 +42,7 @@ def test_a_missing_stdin_is_not_interactive(monkeypatch):
 def test_a_closed_stdin_is_not_interactive(monkeypatch, tmp_path):
     """A real closed file raises ValueError from isatty(). Not a StringIO
     subclass: overriding isatty() would defeat the very check being tested."""
-    handle = open(tmp_path / "stdin", "w")
+    handle = open(tmp_path / "stdin", "w", encoding="utf-8")
     handle.close()
     monkeypatch.setattr(launch.sys, "stdin", handle)
     assert launch.stdin_is_interactive() is False

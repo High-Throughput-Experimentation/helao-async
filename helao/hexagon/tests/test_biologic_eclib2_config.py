@@ -89,7 +89,7 @@ def test_the_ports_do_not_collide_with_another_hte_config():
     mine = set()
     others = set()
     for path in Path("helao/deploy/hte/configs").glob("*.yml"):
-        loaded = yaml.safe_load(path.read_text()) or {}
+        loaded = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         ports = {
             server.get("port")
             for server in (loaded.get("servers") or {}).values()

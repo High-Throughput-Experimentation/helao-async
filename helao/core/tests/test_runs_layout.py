@@ -180,12 +180,12 @@ def test_a_mover_refuses_when_its_substitution_missed(tmp_path: Path, sd):
     d = tmp_path / "RUNS" / "2026" / "0925"
     d.mkdir(parents=True)
     src = d / "260925.094102000000-act.yml"
-    src.write_text("action_name: do_thing\n")
+    src.write_text("action_name: do_thing\n", encoding="utf-8")
 
     SyncDriver.unsync_dir(object(), str(d))  # type: ignore[arg-type]
 
     assert src.exists()
-    assert src.read_text() == "action_name: do_thing\n"
+    assert src.read_text(encoding="utf-8") == "action_name: do_thing\n"
 
 
 # --- Task 10: the syncer stops promoting and stops zipping ------------------
@@ -195,7 +195,7 @@ def _new_layout_seq(tmp_path: Path, status: str = "finished") -> Path:
     d = tmp_path / "RUNS" / "2026" / "0925" / "seq"
     d.mkdir(parents=True)
     yml = d / "260925.094102000000-seq.yml"
-    yml.write_text(f"sequence_name: s\nsequence_status: [{status}]\n")
+    yml.write_text(f"sequence_name: s\nsequence_status: [{status}]\n", encoding="utf-8")
     return yml
 
 
@@ -203,7 +203,7 @@ def _legacy_seq(tmp_path: Path, tree: str = "RUNS_FINISHED") -> Path:
     d = tmp_path / tree / "26.35" / "0925" / "seq"
     d.mkdir(parents=True)
     yml = d / "260925.094102000000-seq.yml"
-    yml.write_text("sequence_name: s\nsequence_status: [finished]\n")
+    yml.write_text("sequence_name: s\nsequence_status: [finished]\n", encoding="utf-8")
     return yml
 
 
@@ -268,8 +268,12 @@ def test_pending_globs_find_records_in_the_new_layout(tmp_path: Path):
     act_dir = tmp_path / "RUNS" / act.get_action_dir()
     exp_dir = act_dir.parent
     seq_dir = exp_dir.parent
-    (seq_dir / "260925.094102000000-seq.yml").write_text("sequence_name: s\n")
-    (exp_dir / "260925.094103000000-exp.yml").write_text("experiment_name: e\n")
+    (seq_dir / "260925.094102000000-seq.yml").write_text(
+        "sequence_name: s\n", encoding="utf-8"
+    )
+    (exp_dir / "260925.094103000000-exp.yml").write_text(
+        "experiment_name: e\n", encoding="utf-8"
+    )
 
     root = str(tmp_path / "RUNS")
     assert len(glob(os.path.join(root, "*", "*", "*", "*-seq.yml"))) == 1
@@ -300,7 +304,7 @@ def test_status_of_a_new_layout_record_is_synced_once_its_prg_is_complete(
 
     yml = _new_layout_seq(tmp_path)
     assert HelaoYml(yml).status == "finished"
-    yml.with_suffix(".prg").write_text("s3: true\napi: true\n")
+    yml.with_suffix(".prg").write_text("s3: true\napi: true\n", encoding="utf-8")
     assert HelaoYml(yml).status == "synced"
 
 
@@ -391,9 +395,13 @@ def test_list_pending_skips_records_whose_prg_says_they_shipped(tmp_path: Path, 
         d = tmp_path / "RUNS" / "2026" / "0925" / name
         d.mkdir(parents=True)
         yml = d / "260925.094102000000-seq.yml"
-        yml.write_text("sequence_name: s\nsequence_status: [finished]\n")
+        yml.write_text(
+            "sequence_name: s\nsequence_status: [finished]\n", encoding="utf-8"
+        )
         if shipped:
-            yml.with_suffix(".prg").write_text("s3: true\napi: true\n")
+            yml.with_suffix(".prg").write_text(
+                "s3: true\napi: true\n", encoding="utf-8"
+            )
 
     drv = SyncDriver.__new__(SyncDriver)
     drv.helaodirs = SimpleNamespace(save_root=tmp_path / "RUNS")  # type: ignore[assignment]
@@ -428,7 +436,7 @@ def test_file_mapper_resolves_a_manual_record_under_diag(tmp_path: Path):
     d = tmp_path / "DIAG" / "2026" / "0925" / "094102__s__l" / "exp"
     d = d / "0__0__SIM__do_thing"
     d.mkdir(parents=True)
-    (d / "data-0.0.0.0__0.hlo").write_text("x")
+    (d / "data-0.0.0.0__0.hlo").write_text("x", encoding="utf-8")
 
     fm = FileMapper(str(d))
     assert fm.is_legacy is False

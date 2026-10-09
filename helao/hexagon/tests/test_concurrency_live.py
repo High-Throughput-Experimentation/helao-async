@@ -162,7 +162,8 @@ def _assert_estopped_exp_yml(root: Path):
     exp_ymls = list(Path(root).rglob("*-exp.yml"))
     assert exp_ymls, "estop finalizer produced no experiment yml"
     statuses = [
-        yaml.safe_load(p.read_text()).get("experiment_status") for p in exp_ymls
+        yaml.safe_load(p.read_text(encoding="utf-8")).get("experiment_status")
+        for p in exp_ymls
     ]
     assert ["finished", "estopped"] in statuses, statuses
     for st in statuses:

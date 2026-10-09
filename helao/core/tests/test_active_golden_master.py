@@ -1359,8 +1359,8 @@ def _write_baseline(target: Path, captured: dict) -> None:
     )
     target.mkdir(parents=True, exist_ok=True)
     for name, data in captured.items():
-        (target / f"{name}.trace.jsonl").write_text(data["trace"])
-        (target / f"{name}.runs.norm").write_text(data["runs"])
+        (target / f"{name}.trace.jsonl").write_text(data["trace"], encoding="utf-8")
+        (target / f"{name}.runs.norm").write_text(data["runs"], encoding="utf-8")
 
 
 def run_freeze() -> int:
@@ -1402,10 +1402,12 @@ def run_check() -> int:
             any_fail = True
             continue
         failures = []
-        if captured[name]["trace"] != trace_ref_p.read_text():
+        if captured[name]["trace"] != trace_ref_p.read_text(encoding="utf-8"):
             failures.append(f"[{name} trace] byte diff vs {trace_ref_p}")
         failures.extend(
-            _compare_norm(name, runs_ref_p.read_text(), captured[name]["runs"])
+            _compare_norm(
+                name, runs_ref_p.read_text(encoding="utf-8"), captured[name]["runs"]
+            )
         )
         if failures:
             any_fail = True

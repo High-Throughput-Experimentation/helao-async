@@ -39,7 +39,8 @@ def build_tree(root: Path, seed: int = 0) -> dict:
         "sequence_label: golden\n"
         "sequence_timestamp: 2025-07-16 13:14:15.123456\n"
         "sequence_status:\n  - finished\n"
-        "dummy: true\n"
+        "dummy: true\n",
+        encoding="utf-8",
     )
     (exp_dir / "250716.131420123456-exp.yml").write_text(
         "file_type: experiment\n"
@@ -47,7 +48,8 @@ def build_tree(root: Path, seed: int = 0) -> dict:
         f"sequence_uuid: {seq_uuid}\n"
         "experiment_name: TEST_exp\n"
         "experiment_timestamp: 2025-07-16 13:14:20.123456\n"
-        "experiment_status:\n  - finished\n"
+        "experiment_status:\n  - finished\n",
+        encoding="utf-8",
     )
     (act_dir / "250716.131421123456-act.yml").write_text(
         "file_type: action\n"
@@ -57,7 +59,8 @@ def build_tree(root: Path, seed: int = 0) -> dict:
         "action_name: acquire_data\n"
         "action_timestamp: 2025-07-16 13:14:21.123456\n"
         "action_status:\n  - finished\n"
-        "action_params:\n  duration: 2.0\n"
+        "action_params:\n  duration: 2.0\n",
+        encoding="utf-8",
     )
     (act_dir / "WsSim-0.0.0.0__0.hlo").write_text(
         "hlo_version: '2025.07.07'\n"
@@ -68,7 +71,8 @@ def build_tree(root: Path, seed: int = 0) -> dict:
         "epoch_ns: 1752671661000000000\n"
         "%%\n"
         '{"t_s": 0.0, "series_0": 0.5}\n'
-        '{"t_s": 0.1, "series_0": 0.6}\n'
+        '{"t_s": 0.1, "series_0": 0.6}\n',
+        encoding="utf-8",
     )
     return {
         "seq_uuid": seq_uuid,

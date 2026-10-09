@@ -411,7 +411,7 @@ def _process_uuids(process_dir: Path, sequence_uuid: str) -> "set[str]":
 def _write_yml(path: Path, doc) -> None:
     staged = staging_path(path)
     try:
-        with open(staged, "w") as fh:
+        with open(staged, "w", encoding="utf-8") as fh:
             fh.write(yml_dumps(doc))
     except BaseException:
         if os.path.exists(staged):

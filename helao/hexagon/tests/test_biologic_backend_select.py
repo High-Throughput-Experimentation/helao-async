@@ -181,7 +181,9 @@ def test_run_protocol_is_recorded_in_the_additions_allowlist():
     from pathlib import Path
 
     additions = json.loads(
-        Path("helao/hexagon/tests/checklists/hte/_additions.json").read_text()
+        Path("helao/hexagon/tests/checklists/hte/_additions.json").read_text(
+            encoding="utf-8"
+        )
     )
     entry = [a for a in additions if a["path"] == "/BIOLOGIC/run_protocol"]
     assert len(entry) == 1
@@ -293,4 +295,4 @@ def test_the_templates_directory_exists_and_explains_itself():
 
     readme = Path("helao/deploy/hte/drivers/pstat/biologic_ole/templates/README.md")
     assert readme.is_file()
-    assert "EC-Lab" in readme.read_text()
+    assert "EC-Lab" in readme.read_text(encoding="utf-8")

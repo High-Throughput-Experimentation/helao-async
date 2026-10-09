@@ -71,10 +71,10 @@ def _build_record(root: Path) -> Path:
     )
     actdir.mkdir(parents=True, exist_ok=True)
     yml = actdir / "260820.202108607974-act.yml"
-    yml.write_text(ACT_YML)
-    (actdir / "xafs_normal-0.0.0.0__0.hlo").write_text("{}\n")
-    (actdir / "xafs_mca-0.0.0.0__0.npz").write_text("npz")
-    (actdir / STAGING_NAME).write_text("half a spectrum")
+    yml.write_text(ACT_YML, encoding="utf-8")
+    (actdir / "xafs_normal-0.0.0.0__0.hlo").write_text("{}\n", encoding="utf-8")
+    (actdir / "xafs_mca-0.0.0.0__0.npz").write_text("npz", encoding="utf-8")
+    (actdir / STAGING_NAME).write_text("half a spectrum", encoding="utf-8")
     return yml
 
 
@@ -97,8 +97,8 @@ def test_misc_files_skips_a_bare_tmp_and_a_bare_dotfile(tmp_path):
     dot. Neither rule subsumes the other, so both are pinned.
     """
     yml = _build_record(tmp_path)
-    (yml.parent / "scratch.tmp").write_text("x")
-    (yml.parent / ".hidden").write_text("x")
+    (yml.parent / "scratch.tmp").write_text("x", encoding="utf-8")
+    (yml.parent / ".hidden").write_text("x", encoding="utf-8")
     names = {p.name for p in HelaoYml(yml).misc_files}
     assert names == {"xafs_mca-0.0.0.0__0.npz"}
 
@@ -108,8 +108,8 @@ def test_misc_files_still_recurses_into_subdirectories(tmp_path):
     yml = _build_record(tmp_path)
     sub = yml.parent / "spectra"
     sub.mkdir()
-    (sub / "scan.SPC").write_text("x")
-    (sub / ".scan.SPC.deadbeef.tmp").write_text("x")
+    (sub / "scan.SPC").write_text("x", encoding="utf-8")
+    (sub / ".scan.SPC.deadbeef.tmp").write_text("x", encoding="utf-8")
     names = {p.name for p in HelaoYml(yml).misc_files}
     assert names == {"xafs_mca-0.0.0.0__0.npz", "scan.SPC"}
 
@@ -183,7 +183,7 @@ def test_an_unreadable_yml_drops_nothing(tmp_path):
     prog = Progress(yml)
     prog.dict["files_pending"] = [STAGING_NAME]
     prog.write_dict()
-    yml.write_text("{[not: valid: yaml\n")
+    yml.write_text("{[not: valid: yaml\n", encoding="utf-8")
     assert Progress(prog.prg).dict["files_pending"] == [STAGING_NAME]
 
 
@@ -205,9 +205,9 @@ def test_pruning_is_not_persisted_by_itself(tmp_path, mod_progress):
     prog = Progress(yml)
     prog.dict["files_pending"] = [STAGING_NAME]
     prog.write_dict()
-    before = prog.prg.read_text()
+    before = prog.prg.read_text(encoding="utf-8")
     mod_progress(yml)
-    assert prog.prg.read_text() == before
+    assert prog.prg.read_text(encoding="utf-8") == before
 
 
 # --- the loop that used to spin forever -------------------------------------
@@ -217,10 +217,13 @@ def _finished_action(root: Path):
     """A finished action with one uploadable misc file, under a seq/exp tree."""
     exp_yml = make_exp_tree(root, "RUNS_FINISHED", mk_uuid(1))
     act_yml = make_action(exp_yml, 0)
-    (act_yml.parent / "artifact.npz").write_text("payload")
+    (act_yml.parent / "artifact.npz").write_text("payload", encoding="utf-8")
     # Registered, not merely present: since Task 3 the upload set is the
     # record's own ``files`` list, never a directory glob (spec §3.5).
-    act_yml.write_text(act_yml.read_text() + "files:\n- file_name: artifact.npz\n")
+    act_yml.write_text(
+        act_yml.read_text(encoding="utf-8") + "files:\n- file_name: artifact.npz\n",
+        encoding="utf-8",
+    )
     return act_yml
 
 

@@ -41,7 +41,9 @@ def finished_action(tmp_path: Path):
 
     act_dir = Path(str(dirs.save_root)) / act.get_action_dir()
     act_dir.mkdir(parents=True)
-    (act_dir / "260925.094102000000-act.yml").write_text("action_name: do_thing\n")
+    (act_dir / "260925.094102000000-act.yml").write_text(
+        "action_name: do_thing\n", encoding="utf-8"
+    )
 
     base = SimpleNamespace(
         helaodirs=dirs,

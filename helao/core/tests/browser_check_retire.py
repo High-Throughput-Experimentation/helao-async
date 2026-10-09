@@ -62,12 +62,12 @@ def prepare(workdir: str) -> int:
             label=label,
             experiments={exp_uuid: [(act_uuid, proc_uuid)]},
         )
-    with open(SOURCE_CONFIG) as f:
+    with open(SOURCE_CONFIG, encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
     cfg["root"] = root
     cfg["servers"]["UI"]["params"]["retire"] = True
     cfg_path = os.path.join(workdir, "retirecheck.yml")
-    with open(cfg_path, "w") as f:
+    with open(cfg_path, "w", encoding="utf-8") as f:
         yaml.safe_dump(cfg, f, sort_keys=False)
     print(f"uuid:  {seq_uuid}")
     print(f"label: {label}")

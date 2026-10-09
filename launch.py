@@ -1681,7 +1681,7 @@ def server_loaded_files(server_entry, server_key, root):
         return set()
     snap = os.path.join(root, "STATES", f"loaded_modules_{server_key}.json")
     try:
-        with open(snap) as f:
+        with open(snap, encoding="utf-8") as f:
             return set(json.load(f).keys())
     except Exception:
         return set()
@@ -1927,7 +1927,7 @@ def main():
             try:
                 timestamp_found = False
                 timestamp = ""
-                with open(old_log, "r") as f:
+                with open(old_log, "r", encoding="utf-8") as f:
                     for line in f:
                         if line.replace("error_[", "[").strip().startswith("["):
                             timestamp_found = True

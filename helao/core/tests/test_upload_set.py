@@ -7,14 +7,14 @@ from helao.helpers.file_utils import _relative_file_name
 
 
 def test_file_in_record_root_is_a_bare_name(tmp_path: Path):
-    (tmp_path / "data.hlo").write_text("x")
+    (tmp_path / "data.hlo").write_text("x", encoding="utf-8")
     assert _relative_file_name(tmp_path / "data.hlo", tmp_path) == "data.hlo"
 
 
 def test_file_in_subdirectory_keeps_its_subdirectory(tmp_path: Path):
     sub = tmp_path / "subdir"
     sub.mkdir()
-    (sub / "instrument.spc").write_text("x")
+    (sub / "instrument.spc").write_text("x", encoding="utf-8")
     assert (
         _relative_file_name(sub / "instrument.spc", tmp_path) == "subdir/instrument.spc"
     )
@@ -24,14 +24,14 @@ def test_separator_is_always_forward_slash(tmp_path: Path):
     """Spec §9: stored paths are forward-slash on every platform."""
     sub = tmp_path / "a" / "b"
     sub.mkdir(parents=True)
-    (sub / "c.spc").write_text("x")
+    (sub / "c.spc").write_text("x", encoding="utf-8")
     assert "\\" not in _relative_file_name(sub / "c.spc", tmp_path)
 
 
 def test_file_outside_the_record_falls_back_to_its_basename(tmp_path: Path):
     """A writer handed an unrelated absolute path must not emit '../..' paths."""
     outside = tmp_path.parent / "elsewhere.spc"
-    outside.write_text("x")
+    outside.write_text("x", encoding="utf-8")
     assert _relative_file_name(outside, tmp_path) == "elsewhere.spc"
 
 
@@ -53,7 +53,8 @@ def _action_tree(tmp_path: Path, files_block: str) -> Path:
         "action_name: do_thing\n"
         "action_uuid: 11111111-1111-1111-1111-111111111111\n"
         "action_status: [finished]\n"
-        "files:\n" + files_block + "\n"
+        "files:\n" + files_block + "\n",
+        encoding="utf-8",
     )
     return act_yml
 
@@ -65,8 +66,8 @@ def test_nosync_files_are_not_in_the_upload_set(tmp_path: Path):
         "  - {file_name: keep.hlo, nosync: false}\n"
         "  - {file_name: withhold.hlo, nosync: true}",
     )
-    (act_yml.parent / "keep.hlo").write_text("x")
-    (act_yml.parent / "withhold.hlo").write_text("x")
+    (act_yml.parent / "keep.hlo").write_text("x", encoding="utf-8")
+    (act_yml.parent / "withhold.hlo").write_text("x", encoding="utf-8")
 
     names = {p.name for p in HelaoYml(act_yml).upload_files}
     assert "keep.hlo" in names
@@ -79,7 +80,7 @@ def test_registered_subdirectory_file_is_in_the_upload_set(tmp_path: Path):
     )
     sub = act_yml.parent / "subdir"
     sub.mkdir()
-    (sub / "instrument.spc").write_text("x")
+    (sub / "instrument.spc").write_text("x", encoding="utf-8")
 
     rels = {
         p.relative_to(act_yml.parent).as_posix() for p in HelaoYml(act_yml).upload_files
@@ -90,8 +91,8 @@ def test_registered_subdirectory_file_is_in_the_upload_set(tmp_path: Path):
 def test_staging_file_is_not_in_the_upload_set(tmp_path: Path):
     """The sync-uploads-glob-not-action-files defect, prevented structurally."""
     act_yml = _action_tree(tmp_path, "  - {file_name: real.hlo, nosync: false}")
-    (act_yml.parent / "real.hlo").write_text("x")
-    (act_yml.parent / ".a1b2c3.tmp").write_text("x")
+    (act_yml.parent / "real.hlo").write_text("x", encoding="utf-8")
+    (act_yml.parent / ".a1b2c3.tmp").write_text("x", encoding="utf-8")
 
     names = {p.name for p in HelaoYml(act_yml).upload_files}
     assert names == {"real.hlo"}
@@ -100,8 +101,8 @@ def test_staging_file_is_not_in_the_upload_set(tmp_path: Path):
 def test_unregistered_file_is_reported_but_not_uploaded(tmp_path: Path, caplog):
     """Spec §3.5.1: the gap is made visible, not silently closed or uploaded."""
     act_yml = _action_tree(tmp_path, "  - {file_name: real.hlo, nosync: false}")
-    (act_yml.parent / "real.hlo").write_text("x")
-    (act_yml.parent / "orphan.spc").write_text("x")
+    (act_yml.parent / "real.hlo").write_text("x", encoding="utf-8")
+    (act_yml.parent / "orphan.spc").write_text("x", encoding="utf-8")
 
     yml = HelaoYml(act_yml)
     names = {p.name for p in yml.upload_files}
@@ -126,7 +127,7 @@ def test_named_file_that_is_not_on_disk_is_reported(tmp_path: Path, caplog):
         "  - {file_name: real.hlo, nosync: false}\n"
         "  - {file_name: elsewhere.spc, nosync: false}",
     )
-    (act_yml.parent / "real.hlo").write_text("x")
+    (act_yml.parent / "real.hlo").write_text("x", encoding="utf-8")
 
     yml = HelaoYml(act_yml)
     assert {p.name for p in yml.upload_files} == {"real.hlo"}
@@ -147,9 +148,11 @@ def test_sidecars_are_not_reported_as_unregistered(tmp_path: Path):
     every record ever synced.
     """
     act_yml = _action_tree(tmp_path, "  - {file_name: real.hlo, nosync: false}")
-    (act_yml.parent / "real.hlo").write_text("x")
-    (act_yml.parent / "260925.120000000000-act.prg").write_text("s3: true\napi: true\n")
-    (act_yml.parent / "260925.120000000000-act.lock").write_text("")
+    (act_yml.parent / "real.hlo").write_text("x", encoding="utf-8")
+    (act_yml.parent / "260925.120000000000-act.prg").write_text(
+        "s3: true\napi: true\n", encoding="utf-8"
+    )
+    (act_yml.parent / "260925.120000000000-act.lock").write_text("", encoding="utf-8")
 
     assert HelaoYml(act_yml).warn_unregistered_files() == []
 
@@ -161,7 +164,7 @@ def test_a_withheld_file_is_not_reported_as_unregistered(tmp_path: Path):
     station to register a file it already registered.
     """
     act_yml = _action_tree(tmp_path, "  - {file_name: withhold.hlo, nosync: true}")
-    (act_yml.parent / "withhold.hlo").write_text("x")
+    (act_yml.parent / "withhold.hlo").write_text("x", encoding="utf-8")
 
     yml = HelaoYml(act_yml)
     assert yml.upload_files == []

@@ -187,7 +187,7 @@ async def test_enqueue_writes_exactly_one_entry_with_the_rebuild_fields(
 
     entries = m.list_journal_entries(str(journal))
     assert len(entries) == 1
-    payload = json.loads((journal / entries[0]).read_text())
+    payload = json.loads((journal / entries[0]).read_text(encoding="utf-8"))
     assert payload["target"] == str(zip_path)
     assert payload["process_uuid"] == str(PROC_A)
     assert payload["analysis_class"] == "_AnaA"
@@ -479,7 +479,7 @@ async def test_an_unwritable_journal_dir_does_not_break_enqueue(tmp_path, logger
     :func:`write_journal_entry` itself.
     """
     blocker = tmp_path / "ana_pending"
-    blocker.write_text("not a directory")
+    blocker.write_text("not a directory", encoding="utf-8")
     syncer = _syncer(blocker)
 
     await syncer.enqueue_calc(_tup(_zip(tmp_path)))
@@ -651,10 +651,13 @@ async def test_a_corrupt_entry_does_not_abort_the_sweep(tmp_path, logger, monkey
     writer = _syncer(journal)
     await writer.enqueue_calc(_tup(zip_path))
 
-    (journal / f"aaa{m.ANA_JOURNAL_SUFFIX}").write_text("{not json at all")
-    (journal / f"bbb{m.ANA_JOURNAL_SUFFIX}").write_text("[1, 2, 3]")
+    (journal / f"aaa{m.ANA_JOURNAL_SUFFIX}").write_text(
+        "{not json at all", encoding="utf-8"
+    )
+    (journal / f"bbb{m.ANA_JOURNAL_SUFFIX}").write_text("[1, 2, 3]", encoding="utf-8")
     (journal / f"ccc{m.ANA_JOURNAL_SUFFIX}").write_text(
-        json.dumps({"process_uuid": str(PROC_B), "analysis_class": "_AnaA"})
+        json.dumps({"process_uuid": str(PROC_B), "analysis_class": "_AnaA"}),
+        encoding="utf-8",
     )
 
     monkeypatch.setattr(m, "LocalLoader", _FakeLoader)
@@ -687,7 +690,8 @@ async def test_a_newer_schema_is_refused_rather_than_guessed_at(
                 "analysis_class": "_AnaA",
                 "params": {},
             }
-        )
+        ),
+        encoding="utf-8",
     )
 
     monkeypatch.setattr(m, "LocalLoader", _FakeLoader)
@@ -740,7 +744,9 @@ async def test_tmp_files_from_an_interrupted_write_are_not_swept(
     half-written payload."""
     journal = tmp_path / "ana_pending"
     journal.mkdir()
-    (journal / f"half{m.ANA_JOURNAL_SUFFIX}.tmp").write_text('{"target": "/x"')
+    (journal / f"half{m.ANA_JOURNAL_SUFFIX}.tmp").write_text(
+        '{"target": "/x"', encoding="utf-8"
+    )
 
     syncer = _syncer(journal)
     summary = await syncer.recover_journal(_classes(_AnaA))
@@ -940,7 +946,7 @@ def test_list_queued_tasks_reports_both_the_queue_and_the_journal(
     journal = tmp_path / "ana_pending"
     journal.mkdir()
     key = m.analysis_journal_key("/data/seq.zip", PROC_A, "AnaA")
-    (journal / key).write_text("{}")
+    (journal / key).write_text("{}", encoding="utf-8")
 
     app = _app(tmp_path, monkeypatch)
     syncer = _syncer(journal)

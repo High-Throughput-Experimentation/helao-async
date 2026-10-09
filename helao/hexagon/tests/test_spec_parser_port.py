@@ -241,8 +241,8 @@ def test_the_module_cache_is_shared_not_per_instance(port, tmp_path):
     SpecParserGateway().load_parser(parser_path)
     SpecParserGateway().load_parser(parser_path)
     legacy.load_parser(parser_path)
-    assert counter.read_text() == "x"
+    assert counter.read_text(encoding="utf-8") == "x"
 
     port.clear_parser_cache()
     SpecParserGateway().load_parser(parser_path)
-    assert counter.read_text() == "xx"
+    assert counter.read_text(encoding="utf-8") == "xx"

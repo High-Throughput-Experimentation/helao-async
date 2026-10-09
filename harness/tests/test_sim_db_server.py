@@ -14,7 +14,9 @@ def test_recording_client_upload_fileobj(tmp_path):
     assert stored.read_bytes() == b'{"a": 1}'
     entries = [
         json.loads(x)
-        for x in (tmp_path / "S3_SIM" / "manifest.jsonl").read_text().splitlines()
+        for x in (tmp_path / "S3_SIM" / "manifest.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
     ]
     assert entries == [
         {
@@ -30,15 +32,17 @@ def test_recording_client_upload_file_and_gzip_flag(tmp_path):
     from helao.deploy.test.servers.action.sim_db_server import RecordingS3Client
 
     src = tmp_path / "payload.hlo"
-    src.write_text("data")
+    src.write_text("data", encoding="utf-8")
     rec = RecordingS3Client(tmp_path / "S3_SIM")
     rec.upload_file(str(src), "helao-sim", "raw_data/u1/payload.hlo.json.gz")
     stored = (
         tmp_path / "S3_SIM" / "helao-sim" / "raw_data" / "u1" / "payload.hlo.json.gz"
     )
-    assert stored.read_text() == "data"
+    assert stored.read_text(encoding="utf-8") == "data"
     entry = json.loads(
-        (tmp_path / "S3_SIM" / "manifest.jsonl").read_text().splitlines()[0]
+        (tmp_path / "S3_SIM" / "manifest.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()[0]
     )
     assert entry["mode"] == "file" and entry["gzip"] is True
 

@@ -161,7 +161,8 @@ def test_a_file_written_by_the_control_path_is_reported(tmp_path):
             f"sequence_uuid: {ids['seq_uuid']}\n"
             "action_name: set_digital_out\n"
             "action_timestamp: 2025-07-16 13:14:22.123456\n"
-            "action_status:\n  - finished\n"
+            "action_status:\n  - finished\n",
+            encoding="utf-8",
         )
 
     result = asyncio.run(
@@ -205,7 +206,9 @@ def test_a_stray_file_that_normalizes_onto_an_existing_one_is_a_failure(tmp_path
     def write_a_sibling():
         stray = ids["act_dir"] / "250716.131422123456-act.yml"
         if not stray.exists():
-            stray.write_text("file_type: action\naction_name: set_digital_out\n")
+            stray.write_text(
+                "file_type: action\naction_name: set_digital_out\n", encoding="utf-8"
+            )
 
     result = asyncio.run(
         run_negative(
@@ -438,7 +441,7 @@ def test_log_and_state_churn_is_not_a_tree_change(tmp_path):
     def churn_the_logs():
         logs = root / "LOGS"
         logs.mkdir(exist_ok=True)
-        (logs / "IOSIM.log").write_text("a control call was logged\n")
+        (logs / "IOSIM.log").write_text("a control call was logged\n", encoding="utf-8")
         states = root / "STATES"
         states.mkdir(exist_ok=True)
         (states / "pids_controlneg_.pck").write_bytes(b"\x00")

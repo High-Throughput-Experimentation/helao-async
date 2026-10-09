@@ -24,7 +24,7 @@ def test_credentials_naming_a_missing_file_are_unavailable(monkeypatch, tmp_path
 
 def test_credentials_naming_a_file_are_available(monkeypatch, tmp_path):
     creds = tmp_path / "helao.env"
-    creds.write_text("")
+    creds.write_text("", encoding="utf-8")
     monkeypatch.setenv("HELAO_CREDENTIALS", str(creds))
     assert app.credentials_available() is True
 
@@ -34,7 +34,7 @@ def test_computed_var_reads_the_environment_at_call_time(monkeypatch, tmp_path):
     monkeypatch.delenv("HELAO_CREDENTIALS", raising=False)
     assert fget(None) is False  # type: ignore[arg-type]
     creds = tmp_path / "helao.env"
-    creds.write_text("")
+    creds.write_text("", encoding="utf-8")
     monkeypatch.setenv("HELAO_CREDENTIALS", str(creds))
     assert fget(None) is True  # type: ignore[arg-type]
 

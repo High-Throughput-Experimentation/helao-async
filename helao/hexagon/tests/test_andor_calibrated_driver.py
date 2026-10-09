@@ -164,7 +164,8 @@ def test_an_unreadable_model_is_refused_not_guessed(tmp_path):
                 "created": "2026-09-04T00:00:00Z",
                 "source_action_uuid": None,
             }
-        )
+        ),
+        encoding="utf-8",
     )
     with pytest.raises(wlc.UnknownCalibrationModel):
         d._wavelengths()

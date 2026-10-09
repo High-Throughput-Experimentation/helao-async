@@ -112,7 +112,7 @@ def _build_processes(tmp_path: Path, *, sequence_uuid: str = SEQ_UUID) -> Path:
     )
     d.mkdir(parents=True, exist_ok=True)
     (d / "0__0690e558-0b51-7466-8000-ccac06b55692__xrds_frame-prc.yml").write_text(
-        _prc_yml(sequence_uuid)
+        _prc_yml(sequence_uuid), encoding="utf-8"
     )
     return d
 
@@ -205,7 +205,7 @@ def test_dry_run_reports_and_writes_nothing(tmp_path):
     z = _build_zip(tmp_path)
     prc_dir = _build_processes(tmp_path)
     prc = next(prc_dir.glob("*-prc.yml"))
-    zip_before, prc_before = z.read_bytes(), prc.read_text()
+    zip_before, prc_before = z.read_bytes(), prc.read_text(encoding="utf-8")
 
     edits, sequence_uuid = rewrite_zip(z, "data", dry_run=True)
     prc_edits = rewrite_processes(prc_dir, sequence_uuid, "data", dry_run=True)
@@ -213,7 +213,7 @@ def test_dry_run_reports_and_writes_nothing(tmp_path):
     assert [e.changed for e in edits if e.changed]
     assert [e.changed for e in prc_edits if e.changed]
     assert z.read_bytes() == zip_before
-    assert prc.read_text() == prc_before
+    assert prc.read_text(encoding="utf-8") == prc_before
 
 
 def test_process_dir_mirrors_the_run_tree(tmp_path):
@@ -239,23 +239,23 @@ def test_an_external_process_yml_is_retagged(tmp_path):
 def test_a_process_yml_from_another_sequence_is_reported_not_retagged(tmp_path):
     prc_dir = _build_processes(tmp_path, sequence_uuid=OTHER_SEQ_UUID)
     prc = next(prc_dir.glob("*-prc.yml"))
-    before = prc.read_text()
+    before = prc.read_text(encoding="utf-8")
 
     edits = rewrite_processes(prc_dir, SEQ_UUID, "data")
 
     assert edits[0].changed == []
     assert "not this record's" in edits[0].note
-    assert prc.read_text() == before
+    assert prc.read_text(encoding="utf-8") == before
 
 
 def test_an_unidentifiable_sequence_leaves_every_process_yml_alone(tmp_path):
     """No readable sequence uuid means the mirrored directory cannot be proved
     to belong to this record, and a path convention alone is not proof."""
     prc_dir = _build_processes(tmp_path)
-    before = next(prc_dir.glob("*-prc.yml")).read_text()
+    before = next(prc_dir.glob("*-prc.yml")).read_text(encoding="utf-8")
     edits = rewrite_processes(prc_dir, None, "data")
     assert edits[0].changed == []
-    assert next(prc_dir.glob("*-prc.yml")).read_text() == before
+    assert next(prc_dir.glob("*-prc.yml")).read_text(encoding="utf-8") == before
 
 
 def test_main_retags_zip_and_processes_together(tmp_path, capsys):
@@ -421,7 +421,7 @@ def test_reset_refuses_a_non_empty_runs_finished_twin(tmp_path):
     z = _build_zip(tmp_path)
     twin = _finished_dir(tmp_path)
     twin.mkdir(parents=True)
-    (twin / "earlier-record.txt").write_text("synced in place")
+    (twin / "earlier-record.txt").write_text("synced in place", encoding="utf-8")
     before = z.read_bytes()
 
     ok, dest, note = reset_to_finished(z)

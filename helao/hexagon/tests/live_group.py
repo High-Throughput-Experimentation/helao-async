@@ -139,7 +139,7 @@ async def live_group(tmp_root: str, ntp_offset_s: float = 0.0):
     from hitting live NTP in-process (spike finding #4)."""
     log_dir = os.path.join(tmp_root, "LOGS")
     os.makedirs(log_dir, exist_ok=True)
-    with open(os.path.join(log_dir, "ntpLastSync.txt"), "w") as f:
+    with open(os.path.join(log_dir, "ntpLastSync.txt"), "w", encoding="utf-8") as f:
         f.write(f"1752600000.0,{ntp_offset_s}")
     world = make_world(tmp_root)
     prev_cfg = config_loader.CONFIG

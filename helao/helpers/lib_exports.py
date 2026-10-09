@@ -71,7 +71,7 @@ def check_library_exports(root: Path) -> list[str]:
     for path, expected in iter_library_files(root):
         rel = path.name
         try:
-            tree = ast.parse(path.read_text())
+            tree = ast.parse(path.read_text(encoding="utf-8"))
         except SyntaxError as exc:
             problems.append(f"{rel}: SyntaxError: {exc}")
             continue

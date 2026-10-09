@@ -77,7 +77,7 @@ async def test_drain_loop_lazy_open_separator_and_rows(tmp_path):
     await active.file_conn_dict[dflt].file.close()
     hlo = [f for f in os.listdir(out_dir) if f.endswith(".hlo")]
     assert len(hlo) == 1
-    text = open(os.path.join(out_dir, hlo[0])).read()
+    text = open(os.path.join(out_dir, hlo[0]), encoding="utf-8").read()
     assert text.count("%%\n") == 1  # separator exactly once
     body = text.split("%%\n", 1)[1]
     lines = body.splitlines()

@@ -24,7 +24,9 @@ def _write_extra(root, act_dir, kind, first):
     if kind == "s3":
         d = root / "S3_SIM" / "helao-sim" / "misc"
         d.mkdir(parents=True)
-        (d / "info.json").write_text(json.dumps({"action_output_dir": value}))
+        (d / "info.json").write_text(
+            json.dumps({"action_output_dir": value}), encoding="utf-8"
+        )
     elif kind == "hlo":
         (act_dir / "WsSim-0.0.0.0__0.hlo").write_text(
             "hlo_version: '2025.07.07'\n"
@@ -33,7 +35,8 @@ def _write_extra(root, act_dir, kind, first):
             "column_headings:\n  - t_s\n"
             "epoch_ns: 1752671661000000000\n"
             "%%\n"
-            '{"t_s": 0.0}\n'
+            '{"t_s": 0.0}\n',
+            encoding="utf-8",
         )
     elif kind == "images_zip":  # an action's own zip output, not a sequence zip
         with zipfile.ZipFile(act_dir / "images.zip", "w") as zf:
@@ -81,13 +84,15 @@ def _write_run(
         "file_type: sequence\n"
         f"sequence_uuid: {_u(seed + 1)}\n"
         "sequence_name: GMTEST\n"
-        f"sequence_output_dir: {y_seq}\n"
+        f"sequence_output_dir: {y_seq}\n",
+        encoding="utf-8",
     )
     (exp_dir / "260929.131420123456-exp.yml").write_text(
         "file_type: experiment\n"
         f"experiment_uuid: {_u(seed + 2)}\n"
         f"sequence_uuid: {_u(seed + 1)}\n"
-        f"experiment_output_dir: {y_exp}\n"
+        f"experiment_output_dir: {y_exp}\n",
+        encoding="utf-8",
     )
     (act_dir / "260929.131421123456-act.yml").write_text(
         "file_type: action\n"
@@ -96,7 +101,8 @@ def _write_run(
         f"sequence_uuid: {_u(seed + 1)}\n"
         "action_name: acquire_data\n"
         f"action_output_dir: {y_act}\n"
-        f"action_params:\n  duration: {duration}\n"
+        f"action_params:\n  duration: {duration}\n",
+        encoding="utf-8",
     )
     return act_dir
 
@@ -238,20 +244,20 @@ def test_remap_does_not_touch_the_callers_capture(tmp_path):
 
 def test_remap_moves_diag_analyses_and_merges_run_trees(tmp_path):
     (tmp_path / "RUNS_ACTIVE/26.39/0929/a").mkdir(parents=True)
-    (tmp_path / "RUNS_ACTIVE/26.39/0929/a/x.txt").write_text("x")
+    (tmp_path / "RUNS_ACTIVE/26.39/0929/a/x.txt").write_text("x", encoding="utf-8")
     (tmp_path / "RUNS_SYNCED/26.39/0929/b").mkdir(parents=True)
-    (tmp_path / "RUNS_SYNCED/26.39/0929/b/y.txt").write_text("y")
+    (tmp_path / "RUNS_SYNCED/26.39/0929/b/y.txt").write_text("y", encoding="utf-8")
     (tmp_path / "RUNS_DIAG/26.39/0929").mkdir(parents=True)
-    (tmp_path / "RUNS_DIAG/26.39/0929/d.txt").write_text("d")
+    (tmp_path / "RUNS_DIAG/26.39/0929/d.txt").write_text("d", encoding="utf-8")
     (tmp_path / "RUNS_NOSYNC/notaweek").mkdir(parents=True)
     (tmp_path / "ANALYSES/26.39/0929").mkdir(parents=True)
-    (tmp_path / "ANALYSES/26.39/0929/z.yml").write_text("z")
+    (tmp_path / "ANALYSES/26.39/0929/z.yml").write_text("z", encoding="utf-8")
     remap_legacy_layout(tmp_path)
-    assert (tmp_path / "RUNS/2026/0929/a/x.txt").read_text() == "x"
-    assert (tmp_path / "RUNS/2026/0929/b/y.txt").read_text() == "y"
-    assert (tmp_path / "DIAG/2026/0929/d.txt").read_text() == "d"
+    assert (tmp_path / "RUNS/2026/0929/a/x.txt").read_text(encoding="utf-8") == "x"
+    assert (tmp_path / "RUNS/2026/0929/b/y.txt").read_text(encoding="utf-8") == "y"
+    assert (tmp_path / "DIAG/2026/0929/d.txt").read_text(encoding="utf-8") == "d"
     assert (tmp_path / "RUNS/notaweek").is_dir()  # non-week entries move as is
-    assert (tmp_path / "ANALYSES/2026/0929/z.yml").read_text() == "z"
+    assert (tmp_path / "ANALYSES/2026/0929/z.yml").read_text(encoding="utf-8") == "z"
     assert not (tmp_path / "ANALYSES/26.39").exists()
     assert sorted(p.name for p in tmp_path.iterdir()) == [
         "ANALYSES",
@@ -262,9 +268,9 @@ def test_remap_moves_diag_analyses_and_merges_run_trees(tmp_path):
 
 def test_remap_is_a_noop_on_a_unified_tree(tmp_path):
     (tmp_path / "RUNS/2026/0929").mkdir(parents=True)
-    (tmp_path / "RUNS/2026/0929/f.txt").write_text("f")
+    (tmp_path / "RUNS/2026/0929/f.txt").write_text("f", encoding="utf-8")
     remap_legacy_layout(tmp_path)
-    assert (tmp_path / "RUNS/2026/0929/f.txt").read_text() == "f"
+    assert (tmp_path / "RUNS/2026/0929/f.txt").read_text(encoding="utf-8") == "f"
 
 
 @pytest.mark.parametrize(
@@ -280,7 +286,7 @@ def test_candidate_only_unparsable_file_fails_and_report_is_written(
     cand = make_unified_candidate(tmp_path)
     bad = cand / rel
     bad.parent.mkdir(parents=True, exist_ok=True)
-    bad.write_text(body)
+    bad.write_text(body, encoding="utf-8")
     out = tmp_path / "report.json"
     report = run_parity(
         make_legacy_golden(tmp_path), cand, out, remap_legacy_layout=True
@@ -321,11 +327,11 @@ def make_zipped_golden(base, week="26.39", mmdd="0929"):
     root = gdir / "root"
     act_dir = _write_run(root, "RUNS_SYNCED", week, mmdd=mmdd)
     seq = root / "RUNS_SYNCED" / week / mmdd / SEQ_NAME
-    (act_dir.parent / PRC_IN).write_text(_prc(0))
+    (act_dir.parent / PRC_IN).write_text(_prc(0), encoding="utf-8")
     _zip_seq(seq)
     proc = root / "PROCESSES" / week / mmdd / SEQ_NAME
     proc.mkdir(parents=True)
-    (proc / PRC_OUT).write_text(_prc(0))
+    (proc / PRC_OUT).write_text(_prc(0), encoding="utf-8")
     attach_manifest(gdir)
     return gdir
 
@@ -333,8 +339,8 @@ def make_zipped_golden(base, week="26.39", mmdd="0929"):
 def make_dir_candidate(base, year="2026", mmdd="0929"):
     cdir = base / "cand"
     act_dir = _write_run(cdir, "RUNS", year, seed=100, mmdd=mmdd)
-    (act_dir.parent / PRC_IN).write_text(_prc(100))
-    (act_dir.parent / PRC_OUT).write_text(_prc(100))
+    (act_dir.parent / PRC_IN).write_text(_prc(100), encoding="utf-8")
+    (act_dir.parent / PRC_OUT).write_text(_prc(100), encoding="utf-8")
     return cdir
 
 

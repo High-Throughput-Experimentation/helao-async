@@ -195,7 +195,7 @@ def main(argv) -> int:
     contents = []
     for path in (tasklist_path, netstat_path):
         try:
-            with open(path, errors="replace") as fh:
+            with open(path, errors="replace", encoding="utf-8") as fh:
                 contents.append(fh.read())
         except OSError as exc:
             print(

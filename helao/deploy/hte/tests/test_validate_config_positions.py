@@ -68,11 +68,13 @@ def _test_real_post_p4_configs_pass():
     files = [
         f
         for f in sorted(glob.glob("helao/deploy/hte/configs/*.yml"))
-        if re.search(r"^\s*fast:\s*sample_server", open(f).read(), re.M)
+        if re.search(
+            r"^\s*fast:\s*sample_server", open(f, encoding="utf-8").read(), re.M
+        )
     ]
     assert files, "no post-P4 hte configs found"
     for f in files:
-        conf = yaml.safe_load(open(f))
+        conf = yaml.safe_load(open(f, encoding="utf-8"))
         owners = [
             s
             for s, d in conf["servers"].items()

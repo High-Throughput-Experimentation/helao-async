@@ -214,7 +214,9 @@ class HelaoData:
             with zipfile.ZipFile(self.target, "r") as zf:
                 yml_dict = yml_load(zf.open(self.ymlpath).read().decode("UTF-8"))
         else:
-            yml_dict = yml_load("".join(builtins.open(self.ymlpath, "r").readlines()))
+            yml_dict = yml_load(
+                "".join(builtins.open(self.ymlpath, "r", encoding="utf-8").readlines())
+            )
         self._yml_cache = yml_dict
         return yml_dict
 

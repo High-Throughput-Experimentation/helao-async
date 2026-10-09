@@ -27,7 +27,7 @@ class Hook(FinishHook):
 def _act_yml(root: str) -> dict:
     ymls = [p for p in Path(root).rglob("*-act.yml")]
     assert len(ymls) == 1, ymls
-    return yml_load(ymls[0].read_text())
+    return yml_load(ymls[0].read_text(encoding="utf-8"))
 
 
 @pytest.mark.asyncio
@@ -51,7 +51,7 @@ async def test_new_key_for_another_action_name_does_not_run():
 @pytest.mark.asyncio
 async def test_raising_hook_is_recorded_and_the_action_still_finishes(tmp_path):
     hook_path = tmp_path / "boom_hook.py"
-    hook_path.write_text(textwrap.dedent(BOOM))
+    hook_path.write_text(textwrap.dedent(BOOM), encoding="utf-8")
     root = tempfile.mkdtemp(prefix="helao_prefinish_")
     await _run_one_action(root, prefinish_hooks={str(hook_path): ["*"]})
     meta = _act_yml(root)

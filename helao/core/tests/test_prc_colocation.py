@@ -15,10 +15,12 @@ def _tree(tmp_path: Path) -> Path:
     act_dir.mkdir(parents=True)
     (exp_dir / "260828.120000000000-exp.yml").write_text(
         "experiment_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n"
-        "experiment_name: SIM_exp\n"
+        "experiment_name: SIM_exp\n",
+        encoding="utf-8",
     )
     (act_dir / "260828.120001000000-act.yml").write_text(
-        "action_uuid: 06a5a2d6-b26c-7673-8000-9f38fe556fd6\naction_order: 0\n"
+        "action_uuid: 06a5a2d6-b26c-7673-8000-9f38fe556fd6\naction_order: 0\n",
+        encoding="utf-8",
     )
     return exp_dir
 
@@ -27,7 +29,9 @@ def test_prc_is_a_known_record_type(tmp_path):
     assert ABR_MAP["prc"] == "process"
     exp_dir = _tree(tmp_path)
     prc = exp_dir / "0__06a5a2d6-b26c-7019-8000-4c2d967e5df1__SIM_exp-prc.yml"
-    prc.write_text("process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n")
+    prc.write_text(
+        "process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n", encoding="utf-8"
+    )
     assert HelaoYml(prc).type == "process"
 
 
@@ -64,7 +68,9 @@ class _StubSyncer:
 def test_enqueue_yml_refuses_a_process_yml(tmp_path):
     exp_dir = _tree(tmp_path)
     prc = exp_dir / "0__06a5a2d6-b26c-7019-8000-4c2d967e5df1__SIM_exp-prc.yml"
-    prc.write_text("process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n")
+    prc.write_text(
+        "process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n", encoding="utf-8"
+    )
     syncer = _StubSyncer()
     asyncio.run(syncer.enqueue_yml(prc, rank=-1))
     assert syncer.task_queue.items == []
@@ -92,7 +98,9 @@ def test_sync_yml_refuses_a_process_yml(tmp_path):
 
     exp_dir = _tree(tmp_path)
     prc = exp_dir / "0__06a5a2d6-b26c-7019-8000-4c2d967e5df1__SIM_exp-prc.yml"
-    prc.write_text("process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n")
+    prc.write_text(
+        "process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n", encoding="utf-8"
+    )
 
     async def _run():
         driver = make_sync_driver(tmp_path, SyncDriver)
@@ -112,9 +120,11 @@ def test_sync_yml_refuses_a_process_yml(tmp_path):
 def test_list_children_ignores_a_colocated_process_yml(tmp_path):
     exp_dir = _tree(tmp_path)
     seq_dir = exp_dir.parent
-    (seq_dir / "260828.115959000000-seq.yml").write_text("sequence_name: SIM_seq\n")
+    (seq_dir / "260828.115959000000-seq.yml").write_text(
+        "sequence_name: SIM_seq\n", encoding="utf-8"
+    )
     (exp_dir / "0__06a5a2d6-b26c-7019-8000-4c2d967e5df1__SIM_exp-prc.yml").write_text(
-        "process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n"
+        "process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n", encoding="utf-8"
     )
     seq_yml = next(seq_dir.glob("*-seq.yml"))
     children = HelaoYml(seq_yml).list_children(seq_yml)
@@ -125,7 +135,7 @@ def test_parent_path_of_an_action_is_the_experiment_not_the_process(tmp_path):
     exp_dir = _tree(tmp_path)
     # sorts before the -exp.yml, so a bare glob's [0] would pick it
     (exp_dir / "0__06a5a2d6-b26c-7019-8000-4c2d967e5df1__SIM_exp-prc.yml").write_text(
-        "process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n"
+        "process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n", encoding="utf-8"
     )
     act = next((exp_dir / "0__0__SIM__do_thing").glob("*-act.yml"))
     assert HelaoYml(act).parent_path.name.endswith("-exp.yml")
@@ -134,10 +144,10 @@ def test_parent_path_of_an_action_is_the_experiment_not_the_process(tmp_path):
 def test_process_ymls_lists_colocated_prc_only(tmp_path):
     exp_dir = _tree(tmp_path)
     (exp_dir / "0__06a5a2d6-b26c-7019-8000-4c2d967e5df1__SIM_exp-prc.yml").write_text(
-        "process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n"
+        "process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n", encoding="utf-8"
     )
     (exp_dir / "1__06a5a2d6-b26c-7673-8000-9f38fe556fd6__SIM_exp-prc.yml").write_text(
-        "process_uuid: 06a5a2d6-b26c-7673-8000-9f38fe556fd6\n"
+        "process_uuid: 06a5a2d6-b26c-7673-8000-9f38fe556fd6\n", encoding="utf-8"
     )
     exp_yml = next(exp_dir.glob("*-exp.yml"))
     found = HelaoYml(exp_yml).process_ymls
@@ -278,14 +288,18 @@ def test_the_zip_carries_the_prc_and_reset_sync_restores_it(tmp_path):
     seq_dir = tmp_path / "RUNS_SYNCED" / "26.35" / "0828" / "260828.115959__seq"
     exp_dir = seq_dir / "260828.120000__exp"
     exp_dir.mkdir(parents=True)
-    (seq_dir / "260828.115959000000-seq.yml").write_text("sequence_name: SIM_seq\n")
-    (exp_dir / "260828.120000000000-exp.yml").write_text("experiment_name: SIM_exp\n")
+    (seq_dir / "260828.115959000000-seq.yml").write_text(
+        "sequence_name: SIM_seq\n", encoding="utf-8"
+    )
+    (exp_dir / "260828.120000000000-exp.yml").write_text(
+        "experiment_name: SIM_exp\n", encoding="utf-8"
+    )
     prc_name = "0__06a5a2d6-b26c-7019-8000-4c2d967e5df1__SIM_exp-prc.yml"
     (exp_dir / prc_name).write_text(
-        "process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n"
+        "process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n", encoding="utf-8"
     )
-    (exp_dir / "260828.120000000000-exp.prg").write_text("{}\n")
-    (seq_dir / "260828.115959000000-seq.prg").write_text("{}\n")
+    (exp_dir / "260828.120000000000-exp.prg").write_text("{}\n", encoding="utf-8")
+    (seq_dir / "260828.115959000000-seq.prg").write_text("{}\n", encoding="utf-8")
 
     zpath = seq_dir.parent / "260828.115959__seq.zip"
     zip_dir(seq_dir, zpath)
@@ -393,9 +407,11 @@ def test_list_pending_exps_does_not_return_a_colocated_prc(tmp_path):
 
     exp_dir = tmp_path / "RUNS_FINISHED" / "26.35" / "0828" / "seqdir" / "expdir"
     exp_dir.mkdir(parents=True)
-    (exp_dir / "260828.120000000000-exp.yml").write_text("experiment_name: SIM_exp\n")
+    (exp_dir / "260828.120000000000-exp.yml").write_text(
+        "experiment_name: SIM_exp\n", encoding="utf-8"
+    )
     (exp_dir / "0__06a5a2d6-b26c-7019-8000-4c2d967e5df1__SIM_exp-prc.yml").write_text(
-        "process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n"
+        "process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n", encoding="utf-8"
     )
 
     # make_sync_driver's SyncDriver.__init__ spawns the syncer worker tasks
@@ -430,7 +446,9 @@ def test_finish_yml_route_drops_a_process_path(tmp_path, monkeypatch):
 
     exp_dir = _tree(tmp_path)
     prc = exp_dir / "0__06a5a2d6-b26c-7019-8000-4c2d967e5df1__SIM_exp-prc.yml"
-    prc.write_text("process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n")
+    prc.write_text(
+        "process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n", encoding="utf-8"
+    )
 
     (tmp_path / "LOGS").mkdir(exist_ok=True)
     monkeypatch.setattr(

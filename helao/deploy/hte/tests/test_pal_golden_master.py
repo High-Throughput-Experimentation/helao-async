@@ -1126,7 +1126,7 @@ async def run_all_scenarios(base_dir: Path) -> dict:
             }
         )
         text = json.dumps(payload, indent=2, sort_keys=True, default=str)
-        (base_dir / f"{name}.json").write_text(text)
+        (base_dir / f"{name}.json").write_text(text, encoding="utf-8")
         results[name] = text
     return results
 

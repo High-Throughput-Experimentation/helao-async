@@ -210,7 +210,7 @@ def _read_text(path: str, found: Findings) -> str:
     """Read *path*, retrying, and record it as unreadable if it never opens."""
     for attempt in range(RETRIES):
         try:
-            with open(path, "r", errors="replace") as handle:
+            with open(path, "r", errors="replace", encoding="utf-8") as handle:
                 return handle.read()
         except OSError as exc:
             last = exc

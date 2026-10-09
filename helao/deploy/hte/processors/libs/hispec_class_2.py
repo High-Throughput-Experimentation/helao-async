@@ -95,7 +95,7 @@ class SpEC:
         Returns:
             The loaded interpolation tuple stored on ``self``.
         """
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             data_dict = json.load(f)
             self.interpolation = tuple(data_dict.values())
         return self.interpolation
@@ -800,10 +800,10 @@ def yml_load(input: Union[str, Path]):
     yaml = ruamel.yaml.YAML(typ="rt")
     yaml.version = (1, 2)
     if isinstance(input, Path):
-        with input.open("r") as f:
+        with input.open("r", encoding="utf-8") as f:
             obj = yaml.load(f)
     elif os.path.exists(input):
-        with open(input, "r") as f:
+        with open(input, "r", encoding="utf-8") as f:
             obj = yaml.load(f)
     else:
         obj = yaml.load(input)
@@ -837,7 +837,7 @@ def read_hlo(
     header_end = False
     data = defaultdict(list)
 
-    with path_to_hlo.open() as f:
+    with path_to_hlo.open(encoding="utf-8") as f:
         for line in f:
             if line == "%%\n":
                 header_end = True

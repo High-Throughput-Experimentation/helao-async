@@ -197,7 +197,7 @@ class _FakeDataActionServer:
             ts = _dt.now().strftime("%y%m%d.%H%M%S%f")
             hlo_name = f"{ts}__data.hlo"
             # the .hlo file (yml header + %% + one json line)
-            with open(os.path.join(abs_dir, hlo_name), "w") as f:
+            with open(os.path.join(abs_dir, hlo_name), "w", encoding="utf-8") as f:
                 f.write("epoch_ns: 0\n%%\n")
                 f.write('{"t": [0.0], "v": [1.0]}\n')
             # the act.yml, referencing the hlo file
@@ -212,7 +212,9 @@ class _FakeDataActionServer:
                 }
             ]
             action_dict["files"] = act_meta["files"]
-            with open(os.path.join(abs_dir, f"{ts}-act.yml"), "w") as f:
+            with open(
+                os.path.join(abs_dir, f"{ts}-act.yml"), "w", encoding="utf-8"
+            ) as f:
                 f.write(_yml_dumps(act_meta))
         return action_dict
 
@@ -520,7 +522,7 @@ async def _drive_yml_writers(reporter: TestReporter) -> None:
         )
         from helao.helpers.yml_tools import yml_load
 
-        with open(exp_file) as f:
+        with open(exp_file, encoding="utf-8") as f:
             exp_meta = yml_load(f.read())
         reporter.check(
             "exp yml has file_type=experiment and matching uuid",
@@ -538,7 +540,7 @@ async def _drive_yml_writers(reporter: TestReporter) -> None:
             "_write_seq returns an existing .yml path under DIAG",
             lambda: os.path.isfile(seq_file) and os.sep + "DIAG" + os.sep in seq_file,
         )
-        with open(seq_file) as f:
+        with open(seq_file, encoding="utf-8") as f:
             seq_meta = yml_load(f.read())
         reporter.check(
             "seq yml has file_type=sequence",
@@ -650,7 +652,7 @@ def _check_track_run(reporter: TestReporter) -> None:
             "260616.120001000000-exp.yml",
         )
         os.makedirs(os.path.dirname(yml_path), exist_ok=True)
-        with open(yml_path, "w") as f:
+        with open(yml_path, "w", encoding="utf-8") as f:
             f.write("file_type: experiment\n")
 
         rec = orch._track_run("experiment", "uuid-1", "exp--x", yml_path)

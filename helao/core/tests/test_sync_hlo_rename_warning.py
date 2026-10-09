@@ -37,11 +37,12 @@ async def test_uploaded_hlo_is_not_reported_missing(tmp_path, mod, monkeypatch, 
     drv = make_sync_driver(tmp_path, mod.SyncDriver)
     try:
         act_yml = make_action(make_exp_tree(tmp_path, "RUNS", mk_uuid(1)), 0)
-        (act_yml.parent / HLO).write_text("x")
+        (act_yml.parent / HLO).write_text("x", encoding="utf-8")
         act_yml.write_text(
-            act_yml.read_text()
+            act_yml.read_text(encoding="utf-8")
             + f"action_status: [finished]\nfiles:\n- file_name: {HLO}\n"
-            + "  file_type: helao__file\n"
+            + "  file_type: helao__file\n",
+            encoding="utf-8",
         )
 
         async def accept(msg=None, target=None, compress=False, retries=5):

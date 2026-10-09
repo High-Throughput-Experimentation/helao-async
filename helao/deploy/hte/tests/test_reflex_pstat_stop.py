@@ -247,7 +247,7 @@ def frozen_stop_route(server_module):
     rows = json.loads(
         (
             root / "helao/hexagon/tests/checklists/hte" / f"{server_module}.json"
-        ).read_text()
+        ).read_text(encoding="utf-8")
     )
     (row,) = [r for r in rows if r["path"].endswith("stop_private")]
     return row

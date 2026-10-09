@@ -79,7 +79,7 @@ def test_old_manifest_without_masked_meta_keys_loads_default_empty(tmp_path):
     data.pop("masked_meta_keys")  # simulate a pre-field manifest on disk
     y = YAML(typ="safe")
     y.default_flow_style = False
-    with open(tmp_path / MANIFEST_NAME, "w") as f:
+    with open(tmp_path / MANIFEST_NAME, "w", encoding="utf-8") as f:
         y.dump(data, f)
     loaded = ProvenanceManifest.load(tmp_path)
     assert loaded.masked_meta_keys == {}

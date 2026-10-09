@@ -420,7 +420,7 @@ def _lib_module_path(
 
 
 def _top_level_funcs(path: Path) -> list[str]:
-    tree = ast.parse(path.read_text())
+    tree = ast.parse(path.read_text(encoding="utf-8"))
     return [
         n.name
         for n in tree.body

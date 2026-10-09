@@ -18,14 +18,20 @@ def _prc_name(pidx: int, uuid: str) -> str:
 def _make(root: Path, colocated: list[str], legacy: list[str]) -> Path:
     exp_dir = root / "RUNS_SYNCED" / REL
     exp_dir.mkdir(parents=True)
-    (exp_dir / "260828.120000000000-exp.yml").write_text("experiment_name: SIM_exp\n")
+    (exp_dir / "260828.120000000000-exp.yml").write_text(
+        "experiment_name: SIM_exp\n", encoding="utf-8"
+    )
     for name in colocated:
-        (exp_dir / name).write_text(f"process_uuid: {name.split('__')[1]}\n")
+        (exp_dir / name).write_text(
+            f"process_uuid: {name.split('__')[1]}\n", encoding="utf-8"
+        )
     if legacy:
         leg = root / "PROCESSES" / REL
         leg.mkdir(parents=True)
         for name in legacy:
-            (leg / name).write_text(f"process_uuid: {name.split('__')[1]}\n")
+            (leg / name).write_text(
+                f"process_uuid: {name.split('__')[1]}\n", encoding="utf-8"
+            )
     return exp_dir
 
 

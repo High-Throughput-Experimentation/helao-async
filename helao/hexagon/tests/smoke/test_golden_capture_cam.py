@@ -67,10 +67,10 @@ def _write_action(root: Path, status: str = "finished", with_hlo: bool = True) -
     d = root / "RUNS_DIAG" / "25.28" / "0716" / "0__0__CAM__acquire_image"
     d.mkdir(parents=True)
     (d / "250716.131421-act.yml").write_text(
-        f"file_type: action\naction_status:\n  - {status}\n"
+        f"file_type: action\naction_status:\n  - {status}\n", encoding="utf-8"
     )
     if with_hlo:
-        (d / "acquire_image-0.hlo").write_text("hlo_version: x\n%%\n")
+        (d / "acquire_image-0.hlo").write_text("hlo_version: x\n%%\n", encoding="utf-8")
         (d / "cam_000000_250716.131421.jpg").write_bytes(b"\xff\xd8\xff")
     return d
 
@@ -80,7 +80,7 @@ def test_snapshot_writes_roundtrippable_provenance_with_cam_masking():
         root = Path(td) / "captroot"
         _write_action(root, status="finished", with_hlo=True)
         (root / "LOGS").mkdir(parents=True)
-        (root / "LOGS" / "CAM.log").write_text("not captured")
+        (root / "LOGS" / "CAM.log").write_text("not captured", encoding="utf-8")
 
         out = Path(td) / "golden" / "run1"
         snapshot(

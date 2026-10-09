@@ -255,7 +255,7 @@ class HTELegacyAPI:
                     lvl = _tab_level(l.decode("ascii"))
                     dlist.append({"name": k.strip(), "value": v.strip(), "level": lvl})
         else:
-            with open(rcppath, "r") as f:
+            with open(rcppath, "r", encoding="utf-8") as f:
                 for l in f:
                     k, v = l.split(":", 1)
                     lvl = _tab_level(l)
@@ -342,7 +342,7 @@ class HTELegacyAPI:
                         )
                     return (p, pmidstr) if return_pmidstr else p
                 LOGGER.info(f"reading {infop}")
-                with open(infop, mode="r") as f:
+                with open(infop, mode="r", encoding="utf-8") as f:
                     s = f.read(1000)
                 if pmfold == "" or (infokey not in s and "prints" not in s):
                     LOGGER.info("PM folder is '' or info has no print.")
@@ -392,7 +392,7 @@ class HTELegacyAPI:
             )
             if not os.path.isfile(p):
                 return None
-            with open(p, mode="r") as f:
+            with open(p, mode="r", encoding="utf-8") as f:
                 lines = f.readlines()
             infofiled = self.filedict_lines(lines)
             self.info_cache[plateid] = infofiled
@@ -639,14 +639,14 @@ class HTELegacyAPI:
         fid = []
         if lines is None:
             try:
-                f = open(p, mode="r")
+                f = open(p, mode="r", encoding="utf-8")
             except:
                 if erroruifcn is None:
                     return dlist, fid
                 p = erroruifcn("bad platemap path")
                 if len(p) == 0:
                     return dlist, fid
-                f = open(p, mode="r")
+                f = open(p, mode="r", encoding="utf-8")
 
             ls = f.readlines()
             f.close()

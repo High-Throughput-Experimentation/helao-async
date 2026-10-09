@@ -121,7 +121,7 @@ def main(argv=None) -> int:
 
     if a.from_snapshot:
         try:
-            pids = json.load(open(a.from_snapshot))
+            pids = json.load(open(a.from_snapshot, encoding="utf-8"))
         except (OSError, ValueError) as exc:
             print(f"no snapshot to kill ({a.from_snapshot}): {exc}")
             return 0
@@ -137,7 +137,7 @@ def main(argv=None) -> int:
 
     pids = _collect(a.root, a.prefix)
     if a.snapshot:
-        with open(a.snapshot, "w") as f:
+        with open(a.snapshot, "w", encoding="utf-8") as f:
             json.dump(pids, f)
         print(f"snapshot {pids} -> {a.snapshot}")
         return 0

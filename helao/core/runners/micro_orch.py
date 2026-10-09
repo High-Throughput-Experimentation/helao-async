@@ -1015,7 +1015,7 @@ class MicroOrch:
         output_path = os.path.dirname(output_file)
         os.makedirs(output_path, exist_ok=True)
         tmp_file = staging_path(output_file)
-        async with aiofiles.open(tmp_file, mode="w") as f:
+        async with aiofiles.open(tmp_file, mode="w", encoding="utf-8") as f:
             await f.write(output_str)
         await replace_when_free(tmp_file, output_file)
 

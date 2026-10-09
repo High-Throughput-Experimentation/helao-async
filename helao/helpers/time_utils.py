@@ -98,7 +98,7 @@ def get_ntp_time(ntp_server, output_path):
     print(f"ntp_offset: {ntp_offset}")
     print(f"ntp_last_sync: {ntp_last_sync}")
 
-    with open(output_path, "w") as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         f.write(f"{ntp_last_sync},{ntp_offset}")
 
 
@@ -112,7 +112,7 @@ def read_saved_offset(file_path):
         ``(last_sync_str, offset_float)`` if the file has two comma-separated
         fields, otherwise ``None`` (implicit).
     """
-    with open(file_path, "r") as f:
+    with open(file_path, "r", encoding="utf-8") as f:
         tmps = f.readline().strip().split(",")
         if len(tmps) == 2:
             ntp_last_sync, ntp_offset = tmps

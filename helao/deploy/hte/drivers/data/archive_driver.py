@@ -315,7 +315,7 @@ class Archive:
         Returns an empty :class:`Positions` if the file is unreadable.
         """
         if self.archivejson is not None:
-            with open(self.archivejson, "r") as f:
+            with open(self.archivejson, "r", encoding="utf-8") as f:
                 try:
                     data = json.load(f)
                     return Positions.model_validate(data)
@@ -336,7 +336,7 @@ class Archive:
     def write_config(self):
         """Serialise the current :attr:`positions` to the archive JSON."""
         if self.archivejson is not None:
-            with open(self.archivejson, "w") as f:
+            with open(self.archivejson, "w", encoding="utf-8") as f:
                 json.dump(self.positions.as_dict(), f)
         # if self.archivejson is not None:
         #     data = {"customs":self.positions.customs_dict, "trays":self.positions.trays_dict}

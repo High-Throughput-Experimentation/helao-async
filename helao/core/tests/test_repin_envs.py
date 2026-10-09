@@ -43,7 +43,8 @@ def test_read_dev_splits_channels_conda_and_pip(tmp_path):
     dev.write_text(
         "name: helao\nchannels:\n  - conda-forge\ndependencies:\n  - pip:\n"
         "    - reflex\n    - https://example.org/a.zip\n  - python=3.14\n"
-        "  - sqlmodel>=0.0.42\n"
+        "  - sqlmodel>=0.0.42\n",
+        encoding="utf-8",
     )
     channels, conda, pip = read_dev(dev)
     assert channels == ["conda-forge"]

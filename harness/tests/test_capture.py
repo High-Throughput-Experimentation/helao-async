@@ -43,9 +43,11 @@ def test_scenario_registry_is_complete():
 def test_snapshot_capture_layout_and_freshness(tmp_path):
     root = tmp_path / "captroot"
     (root / "RUNS_FINISHED" / "x").mkdir(parents=True)
-    (root / "RUNS_FINISHED" / "x" / "a-seq.yml").write_text("file_type: sequence\n")
+    (root / "RUNS_FINISHED" / "x" / "a-seq.yml").write_text(
+        "file_type: sequence\n", encoding="utf-8"
+    )
     (root / "LOGS").mkdir()
-    (root / "LOGS" / "ORCH.log").write_text("not captured")
+    (root / "LOGS" / "ORCH.log").write_text("not captured", encoding="utf-8")
     out = tmp_path / "golden" / "run1"
     snapshot_capture(
         root=root,
@@ -93,7 +95,9 @@ def test_assert_fresh_rejects_a_root_holding_only_a_manual_run(tmp_path):
 
     diag = tmp_path / "RUNS_DIAG" / "26.32" / "0814" / "TS__seq--acquire_data__manual"
     diag.mkdir(parents=True)
-    (diag / "260814.132716737675-seq.yml").write_text("sequence_uuid: x\n")
+    (diag / "260814.132716737675-seq.yml").write_text(
+        "sequence_uuid: x\n", encoding="utf-8"
+    )
 
     with pytest.raises(RuntimeError, match="RUNS_DIAG"):
         assert_fresh(tmp_path)
@@ -112,7 +116,7 @@ def test_assert_fresh_accepts_a_root_with_empty_run_trees(tmp_path):
 def _act(dir_, status: str) -> None:
     dir_.mkdir(parents=True, exist_ok=True)
     (dir_ / "260925.120000000000-act.yml").write_text(
-        f"file_type: action\naction_status:\n- {status}\n"
+        f"file_type: action\naction_status:\n- {status}\n", encoding="utf-8"
     )
 
 
@@ -151,5 +155,7 @@ def test_runs_active_empty_keeps_the_legacy_arm(tmp_path):
 
     (tmp_path / "RUNS_ACTIVE" / "26.39").mkdir(parents=True)
     assert runs_active_empty(tmp_path)
-    (tmp_path / "RUNS_ACTIVE" / "26.39" / "x-act.yml").write_text("file_type: action\n")
+    (tmp_path / "RUNS_ACTIVE" / "26.39" / "x-act.yml").write_text(
+        "file_type: action\n", encoding="utf-8"
+    )
     assert not runs_active_empty(tmp_path)

@@ -48,7 +48,7 @@ def freeze_all(out_dir: Path = OUT) -> list[Path]:
     for module, key in SERVERS:
         routes = extract_routes(HTE_ACTION / module, server_key=key)
         dst = out_dir / (Path(module).stem + ".json")
-        dst.write_text(json.dumps(routes, indent=2) + "\n")
+        dst.write_text(json.dumps(routes, indent=2) + "\n", encoding="utf-8")
         written.append(dst)
     return written
 

@@ -1170,7 +1170,7 @@ class SyncDriver:
         }
         cparser = ConfigParser()
         if "AWS_CONFIG_PATH" in os.environ:
-            with open(os.environ["AWS_CONFIG_PATH"]) as f:
+            with open(os.environ["AWS_CONFIG_PATH"], encoding="utf-8") as f:
                 cparser.read_file(f)
             aws_profile = self.config_dict.get("aws_profile", "default")
             if aws_profile in cparser:
@@ -2176,7 +2176,7 @@ class SyncDriver:
                     save_dir, f"{pidx}__{uuid_key}__{meta['technique_name']}-prc.yml"
                 )
                 os.makedirs(save_dir, exist_ok=True)
-                with open(save_yml_path, "w") as f:
+                with open(save_yml_path, "w", encoding="utf-8") as f:
                     f.write(yml_dumps(model))
                 # sync to s3
                 meta_s3_key = f"process/{uuid_key}.json"

@@ -111,7 +111,7 @@ def test_clock_conformance_and_offset_math():
 
 def test_clock_from_offset_file(tmp_path):
     # ntpLastSync.txt format written by time_utils.get_ntp_time: "<ts>,<offset>"
-    (tmp_path / "ntpLastSync.txt").write_text("1752700000.0,1.25")
+    (tmp_path / "ntpLastSync.txt").write_text("1752700000.0,1.25", encoding="utf-8")
     a = LegacyClockAdapter.from_offset_file(str(tmp_path))
     assert a.offset() == 1.25
 

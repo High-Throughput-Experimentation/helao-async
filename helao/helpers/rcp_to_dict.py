@@ -100,7 +100,7 @@ def rcp_to_dict(rcppath: str) -> dict:
                 lvl = _tab_level(l.decode("ascii"))
                 dlist.append({"name": k.strip(), "value": v.strip(), "level": lvl})
     else:
-        with open(rcppath, "r") as f:
+        with open(rcppath, "r", encoding="utf-8") as f:
             for l in f:
                 k, v = l.split(":", 1)
                 lvl = _tab_level(l)

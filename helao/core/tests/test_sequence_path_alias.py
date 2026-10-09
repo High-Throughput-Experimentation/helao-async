@@ -52,7 +52,9 @@ def test_the_syncer_dispatches_the_new_name():
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[3]
-    dispatch_text = (root / "helao/core/hooks/builtin/dispatch_analysis.py").read_text()
+    dispatch_text = (root / "helao/core/hooks/builtin/dispatch_analysis.py").read_text(
+        encoding="utf-8"
+    )
     assert 'f"{level}_path": str(ctx.yml.target.parent)' in dispatch_text
 
     for src in (
@@ -60,7 +62,7 @@ def test_the_syncer_dispatches_the_new_name():
         "helao/core/drivers/data/sync_driver.py",
         "helao/hexagon/adapters/native/sync_driver.py",
     ):
-        text = (root / src).read_text()
+        text = (root / src).read_text(encoding="utf-8")
         assert "sequence_zip_path" not in text, src
 
 

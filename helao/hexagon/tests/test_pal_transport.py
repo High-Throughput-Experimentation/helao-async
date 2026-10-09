@@ -77,7 +77,7 @@ def test_ensure_aux_logfile_local_writes_header(tmp_path):
         error = await transport.ensure_aux_logfile(aux_path, header)
 
         assert error is ErrorCodes.none
-        with open(aux_path, "r", newline="") as f:
+        with open(aux_path, "r", newline="", encoding="utf-8") as f:
             assert f.read() == header
 
     asyncio.run(_run())

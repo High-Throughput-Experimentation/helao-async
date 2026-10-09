@@ -52,13 +52,13 @@ def mutate_param_value(root: Path) -> str:
     value rather than assuming a fixed key or a fixed old/new literal pair.
     """
     for act in sorted(root.rglob("*-act.yml")):
-        text = act.read_text()
+        text = act.read_text(encoding="utf-8")
         m = _PARAM_RE.search(text)
         if m:
             key, old_val = m.group("key"), m.group("val")
             new_val = str(float(old_val) + 0.5)
             mutated = text[: m.start("val")] + new_val + text[m.end("val") :]
-            act.write_text(mutated)
+            act.write_text(mutated, encoding="utf-8")
             return f"mutated action_params.{key} in {act.name} ({old_val} -> {new_val})"
     raise RuntimeError(
         f"no numeric action_params entry found in any -act.yml under {root}"
@@ -74,7 +74,7 @@ def mutate_drop_file(root: Path) -> str:
 
 def mutate_add_hlo_column(root: Path) -> str:
     hlo = sorted(root.rglob("*.hlo"))[0]
-    with open(hlo, "a") as f:
+    with open(hlo, "a", encoding="utf-8") as f:
         f.write('{"mutated_col": 1}\n')
     return f"appended a row with a new column to {hlo.name}"
 
@@ -82,12 +82,12 @@ def mutate_add_hlo_column(root: Path) -> str:
 def mutate_break_uuid_link(root: Path) -> str:
     """Rewire ONE file's experiment_uuid: the ordinal mapping must notice."""
     act = sorted(root.rglob("*-act.yml"))[0]
-    text = act.read_text()
+    text = act.read_text(encoding="utf-8")
     m = re.search(r"experiment_uuid: ([0-9a-fA-F-]{36})", text)
     if m is None:
         raise RuntimeError(f"no experiment_uuid found in {act}")
     replacement = str(uuid.uuid4())
-    act.write_text(text.replace(m.group(1), replacement, 1))
+    act.write_text(text.replace(m.group(1), replacement, 1), encoding="utf-8")
     return f"rewired experiment_uuid in {act.name}"
 
 

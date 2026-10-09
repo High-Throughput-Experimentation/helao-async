@@ -41,13 +41,15 @@ def test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td) / "captroot"
         (root / "RUNS_FINISHED" / "x").mkdir(parents=True)
-        (root / "RUNS_FINISHED" / "x" / "a-act.yml").write_text("file_type: action\n")
+        (root / "RUNS_FINISHED" / "x" / "a-act.yml").write_text(
+            "file_type: action\n", encoding="utf-8"
+        )
         # include a .hlo too (the full happy path: metadata + data file)
         (root / "RUNS_FINISHED" / "x" / "get_di-0.hlo").write_text(
-            "hlo_version: x\n%%\n"
+            "hlo_version: x\n%%\n", encoding="utf-8"
         )
         (root / "LOGS").mkdir(parents=True)
-        (root / "LOGS" / "IO.log").write_text("not captured")
+        (root / "LOGS" / "IO.log").write_text("not captured", encoding="utf-8")
 
         out = Path(td) / "golden" / "run1"
         snapshot(root=root, out_dir=out, config_prefix="galiliogold")
@@ -77,10 +79,10 @@ def _write_action(root: Path, status: str = "finished", with_hlo: bool = True) -
     d = root / "RUNS_DIAG" / "25.28" / "0716" / "0__0__IO__get_di"
     d.mkdir(parents=True)
     (d / "250716.131421-act.yml").write_text(
-        f"file_type: action\naction_status:\n  - {status}\n"
+        f"file_type: action\naction_status:\n  - {status}\n", encoding="utf-8"
     )
     if with_hlo:
-        (d / "get_di-0.hlo").write_text("hlo_version: x\n%%\n")
+        (d / "get_di-0.hlo").write_text("hlo_version: x\n%%\n", encoding="utf-8")
     return d
 
 

@@ -88,7 +88,7 @@ class TestIsStagingName:
         letting the diagnostic quietly disagree with the code it diagnoses.
         """
         target = tmp_path / Path(name.replace("\\", "/")).name
-        target.write_text("x")
+        target.write_text("x", encoding="utf-8")
         syncable = HelaoYml._is_syncable_misc_file(target)
         if is_staging_name(name):
             # Everything this reports must be something the uploader refuses.
@@ -228,7 +228,7 @@ class TestScanRoot:
     def test_reads_loose_prg_and_zipped_prg(self, tmp_path):
         (tmp_path / "a").mkdir()
         (tmp_path / "a" / "x-act.prg").write_text(
-            _prg(files_s3={REAL_GHOSTS[0]: "raw_data/a/x.tmp"})
+            _prg(files_s3={REAL_GHOSTS[0]: "raw_data/a/x.tmp"}), encoding="utf-8"
         )
         zip_path = tmp_path / "seq.zip"
         with zipfile.ZipFile(zip_path, "w") as archive:
@@ -241,7 +241,9 @@ class TestScanRoot:
         assert found.complete
 
     def test_a_clean_tree_reports_complete_and_empty(self, tmp_path):
-        (tmp_path / "x-act.prg").write_text(_prg(files_s3={"d.hlo": "raw_data/u/d"}))
+        (tmp_path / "x-act.prg").write_text(
+            _prg(files_s3={"d.hlo": "raw_data/u/d"}), encoding="utf-8"
+        )
         found = Findings()
         scan_root(str(tmp_path), found)
         assert found.n_ghosts == 0 and found.complete and found.n_prg == 1
@@ -273,7 +275,9 @@ class TestScanRoot:
     def test_nested_directories_are_walked(self, tmp_path):
         deep = tmp_path / "26.33" / "0820" / "seq" / "exp" / "act"
         deep.mkdir(parents=True)
-        (deep / "z-act.prg").write_text(_prg(files_pending=[REAL_GHOSTS[1]]))
+        (deep / "z-act.prg").write_text(
+            _prg(files_pending=[REAL_GHOSTS[1]]), encoding="utf-8"
+        )
         found = Findings()
         scan_root(str(tmp_path), found)
         assert found.n_prg == 1 and len(found.pending) == 1
@@ -284,7 +288,7 @@ class TestScanRoot:
         blocked = tmp_path / "blocked"
         blocked.mkdir()
         (blocked / "hidden-act.prg").write_text(
-            _prg(files_s3={REAL_GHOSTS[0]: "raw_data/a/x.tmp"})
+            _prg(files_s3={REAL_GHOSTS[0]: "raw_data/a/x.tmp"}), encoding="utf-8"
         )
         blocked.chmod(0o000)
         try:
@@ -298,20 +302,24 @@ class TestScanRoot:
 
 class TestMainExitStatus:
     def test_clean_tree_exits_zero(self, tmp_path, capsys):
-        (tmp_path / "x-act.prg").write_text(_prg(files_s3={"d.hlo": "raw_data/u/d"}))
+        (tmp_path / "x-act.prg").write_text(
+            _prg(files_s3={"d.hlo": "raw_data/u/d"}), encoding="utf-8"
+        )
         assert main([str(tmp_path)]) == 0
         assert "No staging files recorded" in capsys.readouterr().out
 
     def test_a_ghost_exits_one(self, tmp_path, capsys):
         (tmp_path / "x-act.prg").write_text(
-            _prg(files_s3={REAL_GHOSTS[0]: "raw_data/a/x.tmp"})
+            _prg(files_s3={REAL_GHOSTS[0]: "raw_data/a/x.tmp"}), encoding="utf-8"
         )
         assert main([str(tmp_path)]) == 1
         out = capsys.readouterr().out
         assert "UPLOADED" in out and "must be removed by hand" in out
 
     def test_a_pending_ghost_names_the_self_healing_path(self, tmp_path, capsys):
-        (tmp_path / "x-act.prg").write_text(_prg(files_pending=[REAL_GHOSTS[3]]))
+        (tmp_path / "x-act.prg").write_text(
+            _prg(files_pending=[REAL_GHOSTS[3]]), encoding="utf-8"
+        )
         assert main([str(tmp_path)]) == 1
         assert "prune_missing_pending" in capsys.readouterr().out
 
@@ -338,12 +346,14 @@ class TestMainExitStatus:
     def test_run_tree_roots_are_selected_when_present(self, tmp_path, capsys):
         synced = tmp_path / "RUNS_SYNCED"
         synced.mkdir()
-        (synced / "x-act.prg").write_text(_prg(files_s3={"d.hlo": "raw_data/u/d"}))
+        (synced / "x-act.prg").write_text(
+            _prg(files_s3={"d.hlo": "raw_data/u/d"}), encoding="utf-8"
+        )
         # Not a run tree, and so not scanned.
         other = tmp_path / "ANALYSES"
         other.mkdir()
         (other / "y-act.prg").write_text(
-            _prg(files_s3={REAL_GHOSTS[0]: "raw_data/a/x.tmp"})
+            _prg(files_s3={REAL_GHOSTS[0]: "raw_data/a/x.tmp"}), encoding="utf-8"
         )
         assert main([str(tmp_path)]) == 0
         assert "RUNS_SYNCED" in capsys.readouterr().out

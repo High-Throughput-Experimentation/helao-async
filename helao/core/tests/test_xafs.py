@@ -270,7 +270,9 @@ def _local_tree(tmp_path, numbers):
     import json
 
     for n in numbers:
-        (folder / f"an{n}_output_array.json").write_text(json.dumps(_arrays(n)))
+        (folder / f"an{n}_output_array.json").write_text(
+            json.dumps(_arrays(n)), encoding="utf-8"
+        )
     return str(tmp_path)
 
 

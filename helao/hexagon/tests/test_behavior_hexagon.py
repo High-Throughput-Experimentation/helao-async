@@ -43,7 +43,9 @@ def hex_world(tmp_path, monkeypatch):
     world = _world(tmp_path)
     log_dir = tmp_path / "LOGS"
     log_dir.mkdir()
-    (log_dir / "ntpLastSync.txt").write_text(f"1752600000.0,{OFFSET_S}")
+    (log_dir / "ntpLastSync.txt").write_text(
+        f"1752600000.0,{OFFSET_S}", encoding="utf-8"
+    )
     monkeypatch.setattr(config_loader, "CONFIG", world)
     return world
 

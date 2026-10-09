@@ -348,7 +348,7 @@ def rewrite_processes(
             continue
         staged = staging_path(path)
         try:
-            with open(staged, "w") as fh:
+            with open(staged, "w", encoding="utf-8") as fh:
                 fh.write(yml_dumps(doc))
         except BaseException:
             if os.path.exists(staged):

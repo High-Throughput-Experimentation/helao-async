@@ -159,7 +159,7 @@ def _first_sample(meta):
 
 def _safe_yaml(path):
     try:
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
     except Exception:
         return {}

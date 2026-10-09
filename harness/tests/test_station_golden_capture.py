@@ -19,7 +19,9 @@ PRC = "0__0__t-prc.yml"
 
 
 def _stamp_version(seq_dir, version):
-    (next(seq_dir.glob("*-seq.yml"))).open("a").write(f"hlo_version: {version}\n")
+    (next(seq_dir.glob("*-seq.yml"))).open("a", encoding="utf-8").write(
+        f"hlo_version: {version}\n"
+    )
 
 
 def _prc(seed):
@@ -38,11 +40,12 @@ def legacy_root(base, zipped=False, version="1e10"):
     _stamp_version(seq, version)
     proc = root / "PROCESSES/26.39/0929" / SEQ_NAME
     proc.mkdir(parents=True)
-    (proc / PRC).write_text(_prc(0))
-    (proc / "1__0__other-prc.yml").write_text(_prc(50))
+    (proc / PRC).write_text(_prc(0), encoding="utf-8")
+    (proc / "1__0__other-prc.yml").write_text(_prc(50), encoding="utf-8")
     # a foreign process that merely mentions our sequence_uuid in its params
     (proc / "2__0__mention-prc.yml").write_text(
-        _prc(50) + f"process_params:\n  sequence_uuid: {_u(1)}\n  ref: {_u(1)}\n"
+        _prc(50) + f"process_params:\n  sequence_uuid: {_u(1)}\n  ref: {_u(1)}\n",
+        encoding="utf-8",
     )
     if zipped:  # members stored relative to the sequence dir, as the syncer wrote
         shutil.make_archive(str(seq), "zip", root_dir=seq)
@@ -56,7 +59,7 @@ def unified_root(base, version="1e10"):
     _write_run(root, "RUNS", "2026")
     seq = root / "RUNS/2026/0929" / SEQ_NAME
     _stamp_version(seq, version)
-    (seq / "260929.131420__TEST_exp" / PRC).write_text(_prc(0))
+    (seq / "260929.131420__TEST_exp" / PRC).write_text(_prc(0), encoding="utf-8")
     return root
 
 
@@ -192,7 +195,7 @@ def test_nosync_dir_without_seq_yml_does_not_hide_the_zip(tmp_path):
     root = legacy_root(tmp_path, zipped=True)
     nosync = root / "RUNS_NOSYNC/26.39/0929" / SEQ_NAME / "exp" / "act"
     nosync.mkdir(parents=True)
-    (nosync / "data.hlo").write_text("x")
+    (nosync / "data.hlo").write_text("x", encoding="utf-8")
     r = capture(root, tmp_path / "out")
     assert r.returncode == 0, r.stderr
     assert "prc=1" in r.stdout

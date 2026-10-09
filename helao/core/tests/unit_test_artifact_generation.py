@@ -51,7 +51,7 @@ def _write_synthetic_hlo(path: str) -> dict:
         {"t_s": 0.1, "v": 0.2},
         {"t_s": 0.2, "v": 0.3},
     ]
-    with open(path, "w") as fh:
+    with open(path, "w", encoding="utf-8") as fh:
         fh.write(yml_dumps(header))
         fh.write("%%\n")
         for row in rows:
@@ -96,7 +96,7 @@ def artifact_generation_unit_test() -> bool:
         reporter.section("yml_load can read from a Path")
         tmpdir = tempfile.mkdtemp(prefix="helao_test_yml_")
         ypath = os.path.join(tmpdir, "x.yml")
-        with open(ypath, "w") as fh:
+        with open(ypath, "w", encoding="utf-8") as fh:
             fh.write(dumped)
         from_path = yml_load_path(ypath)
         reporter.check(

@@ -7,7 +7,7 @@ import httpx
 
 def _write(path: str, lines: list[str]) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
 
 

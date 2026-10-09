@@ -44,7 +44,10 @@ def test_content_diff_fails_gate(tmp_path):
     a = make_golden(tmp_path, "runA", seed=0)
     b = make_golden(tmp_path, "runB", seed=100)
     act = next((b / "root").rglob("*-act.yml"))
-    act.write_text(act.read_text().replace("duration: 2.0", "duration: 9.0"))
+    act.write_text(
+        act.read_text(encoding="utf-8").replace("duration: 2.0", "duration: 9.0"),
+        encoding="utf-8",
+    )
     report = run_parity(a, b)
     assert report["status"] == "fail"
     assert report["n_diffs"] >= 1
@@ -57,7 +60,10 @@ def test_masked_meta_key_neutralizes_act_yml_value(tmp_path):
     a = make_golden(tmp_path, "runA", seed=0)
     b = make_golden(tmp_path, "runB", seed=100)
     act = next((b / "root").rglob("*-act.yml"))
-    act.write_text(act.read_text().replace("duration: 2.0", "duration: 9.0"))
+    act.write_text(
+        act.read_text(encoding="utf-8").replace("duration: 2.0", "duration: 9.0"),
+        encoding="utf-8",
+    )
     # control: unmasked, the differing action_params value fails the gate
     assert run_parity(a, b)["status"] == "fail"
     # re-attach the golden manifest WITH the meta mask -> value neutralized on
@@ -74,11 +80,11 @@ def test_masked_meta_key_still_catches_other_diffs(tmp_path):
     act = next((b / "root").rglob("*-act.yml"))
     # change action_name (not masked) in addition to the masked duration
     txt = (
-        act.read_text()
+        act.read_text(encoding="utf-8")
         .replace("duration: 2.0", "duration: 9.0")
         .replace("action_name: acquire_data", "action_name: something_else")
     )
-    act.write_text(txt)
+    act.write_text(txt, encoding="utf-8")
     attach_manifest(a, meta_masked={"*-act.yml": ["action_params.duration"]})
     report = run_parity(a, b)
     assert report["status"] == "fail"  # the unmasked action_name diff surfaces
@@ -103,7 +109,7 @@ def test_report_file_is_written(tmp_path):
     assert out.exists()
     import json
 
-    loaded = json.loads(out.read_text())
+    loaded = json.loads(out.read_text(encoding="utf-8"))
     assert loaded["status"] == "pass"
 
 
@@ -124,7 +130,8 @@ def _add_derived_process(gdir, exp_uuid, pidx=0):
         f"experiment_uuid: {exp_uuid}\n"
         "process_group_index: 0\n"
         "process_name: acquire_data\n"
-        "process_timestamp: 2025-07-16 13:14:21.123456\n"
+        "process_timestamp: 2025-07-16 13:14:21.123456\n",
+        encoding="utf-8",
     )
 
 

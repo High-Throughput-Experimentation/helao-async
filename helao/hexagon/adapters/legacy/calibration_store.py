@@ -75,7 +75,7 @@ class JsonFileCalibrationStore:
             if not os.path.exists(filedir):
                 os.makedirs(filedir, exist_ok=True)
 
-            with open(file, "w") as f:
+            with open(file, "w", encoding="utf-8") as f:
                 f.write(json.dumps(matrix.tolist()))
 
     @staticmethod
@@ -88,7 +88,7 @@ class JsonFileCalibrationStore:
         path from inside `connect()`'s outer `try/except`.
         """
         if os.path.exists(file):  # type: ignore[arg-type]
-            with open(file, "r") as f:  # type: ignore[arg-type]
+            with open(file, "r", encoding="utf-8") as f:  # type: ignore[arg-type]
                 try:
                     data = f.readline()
                     new_matrix = np.matrix(json.loads(data))

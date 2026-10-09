@@ -22,8 +22,10 @@ from helao.ui.shared.data_browser import sources
 def _record(day: Path) -> Path:
     d = day / "seqdir" / "expdir" / "0__0__SIM__do_thing"
     d.mkdir(parents=True)
-    (d / "data-0.0.0.0__0.hlo").write_text("x")
-    (d / "260828.120000000000-act.yml").write_text("action_name: do_thing\n")
+    (d / "data-0.0.0.0__0.hlo").write_text("x", encoding="utf-8")
+    (d / "260828.120000000000-act.yml").write_text(
+        "action_name: do_thing\n", encoding="utf-8"
+    )
     return d
 
 
@@ -108,7 +110,7 @@ def test_processes_superseded_does_not_crash(tmp_path: Path):
     """``PROCESSES_SUPERSEDED`` is a real directory and matched nothing (A9)."""
     d = tmp_path / "PROCESSES_SUPERSEDED" / "26.25" / "0624" / "seqdir" / "expdir"
     d.mkdir(parents=True)
-    (d / "a__b__c-prc.yml").write_text("process_name: x\n")
+    (d / "a__b__c-prc.yml").write_text("process_name: x\n", encoding="utf-8")
     fm = FileMapper(str(d))  # used to raise IndexError
     assert fm.relstrs
 
@@ -158,10 +160,12 @@ def _sequence(day: Path, name: str, ts: str = "20260925.094102000000") -> Path:
     exp_dir = seq_dir / f"{ts}__exp--{name}"
     act_dir = exp_dir / "0__0__SIM__do_thing"
     act_dir.mkdir(parents=True)
-    (act_dir / "data-0.0.0.0__0.hlo").write_text("x")
-    (act_dir / f"{ts}-act.yml").write_text(f"action_name: {name}\n")
-    (exp_dir / f"{ts}-exp.yml").write_text(f"experiment_name: {name}\n")
-    (seq_dir / f"{ts}-seq.yml").write_text(f"sequence_name: {name}\n")
+    (act_dir / "data-0.0.0.0__0.hlo").write_text("x", encoding="utf-8")
+    (act_dir / f"{ts}-act.yml").write_text(f"action_name: {name}\n", encoding="utf-8")
+    (exp_dir / f"{ts}-exp.yml").write_text(
+        f"experiment_name: {name}\n", encoding="utf-8"
+    )
+    (seq_dir / f"{ts}-seq.yml").write_text(f"sequence_name: {name}\n", encoding="utf-8")
     return act_dir
 
 
@@ -243,7 +247,8 @@ def test_derived_processes_index_the_new_tree(tmp_path: Path):
     """A colocated prc under RUNS resolves its data file in the same tree."""
     act = _sequence(tmp_path / "RUNS" / "2026" / "0925", "seqA")
     (act.parent / "0__abc__20260925-prc.yml").write_text(
-        "technique_name: CV\nfiles:\n- file_name: data-0.0.0.0__0.hlo\n"
+        "technique_name: CV\nfiles:\n- file_name: data-0.0.0.0__0.hlo\n",
+        encoding="utf-8",
     )
     idx = sources.DerivedSourceIndex(str(tmp_path), "PROCESSES")
     assert idx.list_dates() == ["2026/0925"]

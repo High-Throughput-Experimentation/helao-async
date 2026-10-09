@@ -16,9 +16,9 @@ HLO = "column_headings: [t_s, I_A]\n%%\n" '{"t_s": [1.0, 2.0], "I_A": [0.5, 0.25
 def _act(base: Path) -> Path:
     d = base / "seqdir" / "expdir" / "1__0__PSTAT__run_CA"
     d.mkdir(parents=True)
-    (d / "CA-1.1.0.0__0.hlo").write_text(HLO)
+    (d / "CA-1.1.0.0__0.hlo").write_text(HLO, encoding="utf-8")
     yml = d / "261006.122552210917-act.yml"
-    yml.write_text("file_type: action\naction_name: run_CA\n")
+    yml.write_text("file_type: action\naction_name: run_CA\n", encoding="utf-8")
     return yml
 
 

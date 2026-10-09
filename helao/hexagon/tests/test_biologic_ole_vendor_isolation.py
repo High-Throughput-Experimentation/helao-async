@@ -22,7 +22,7 @@ VENDOR_PREFIXES = ("comtypes", "win32com", "pythoncom", "pywintypes")
 def _imports(path: Path) -> set[str]:
     """Every module name this file imports, however it spells the import."""
     names: set[str] = set()
-    for node in ast.walk(ast.parse(path.read_text())):
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
         if isinstance(node, ast.Import):
             names.update(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
@@ -35,7 +35,7 @@ def _imports(path: Path) -> set[str]:
 def _module_scope_imports(path: Path) -> set[str]:
     """Only the imports at module scope -- the ones that run on import."""
     names: set[str] = set()
-    for node in ast.parse(path.read_text()).body:
+    for node in ast.parse(path.read_text(encoding="utf-8")).body:
         if isinstance(node, ast.Import):
             names.update(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom):

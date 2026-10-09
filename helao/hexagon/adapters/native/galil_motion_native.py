@@ -882,13 +882,13 @@ class NativeGalilMotion(HelaoDriver):
             filedir, _ = os.path.split(file)
             if filedir and not os.path.exists(filedir):
                 os.makedirs(filedir, exist_ok=True)
-            with open(file, "w") as f:
+            with open(file, "w", encoding="utf-8") as f:
                 f.write(json.dumps(self.plate_transfermatrix.tolist()))
 
     def load_transfermatrix(self, file):
         """Read a JSON matrix from ``file`` (None if missing/malformed/wrong-shape)."""
         if os.path.exists(file):
-            with open(file, "r") as f:
+            with open(file, "r", encoding="utf-8") as f:
                 try:
                     new_matrix = np.matrix(json.loads(f.readline()))
                     if new_matrix.shape != self.dflt_matrix.shape:

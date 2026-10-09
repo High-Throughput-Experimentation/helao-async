@@ -20,7 +20,8 @@ def env_file(tmp_path, monkeypatch):
     path = tmp_path / "creds.env"
     path.write_text(
         f"OPENAPI_JSON={SPEC}\nOPENAPI_KEY=k123\nOPENAPI=https://base.test\n"
-        "PLATE_API_KEY=p\nPLATE_API=https://plate.test\n"
+        "PLATE_API_KEY=p\nPLATE_API=https://plate.test\n",
+        encoding="utf-8",
     )
     monkeypatch.setenv("HELAO_CREDENTIALS", str(path))
     for key in ("OPENAPI_JSON", "OPENAPI_KEY", "OPENAPI"):
@@ -39,7 +40,7 @@ def test_credentials_accept_openapi_keys(env_file):
 
 def test_base_url_ignores_spec_location(tmp_path):
     path = tmp_path / "c.env"
-    path.write_text("OPENAPI_JSON=https://meta.test/openapi.json\n")
+    path.write_text("OPENAPI_JSON=https://meta.test/openapi.json\n", encoding="utf-8")
     assert HelaoCredentials(_env_file=path).openapi_base_url == "https://meta.test/api"
 
 

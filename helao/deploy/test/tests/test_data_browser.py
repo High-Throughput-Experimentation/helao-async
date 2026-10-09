@@ -51,7 +51,7 @@ class _RecordingVis(_FakeVis):
 
 def _write_hlo(path):
     """Write a minimal HLO file (YAML header, %% marker, JSONL body)."""
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         f.write("hlo_version: 1.0\n")
         f.write("action_name: cv\n")
         f.write("column_headings: [t_s, Ewe_V]\n")
@@ -73,7 +73,7 @@ def test_read_hlo_file():
 def test_read_json_columnar():
     with tempfile.TemporaryDirectory() as d:
         p = os.path.join(d, "out.json")
-        with open(p, "w") as f:
+        with open(p, "w", encoding="utf-8") as f:
             json.dump({"wl_nm": [400, 500], "abs": [0.1, 0.2], "note": "x"}, f)
         meta, data = readers.read_dataset(p, fmt="json")
         assert data == {"wl_nm": [400, 500], "abs": [0.1, 0.2]}, data
@@ -84,7 +84,7 @@ def test_read_json_columnar():
 def test_read_json_records():
     with tempfile.TemporaryDirectory() as d:
         p = os.path.join(d, "recs.json")
-        with open(p, "w") as f:
+        with open(p, "w", encoding="utf-8") as f:
             json.dump([{"a": 1, "b": 2}, {"a": 3, "b": 4}], f)
         _, data = readers.read_dataset(p, fmt="json")
         assert data == {"a": [1, 3], "b": [2, 4]}, data
@@ -147,7 +147,9 @@ def _make_finished_tree(root):
     )
     os.makedirs(act_dir)
     _write_hlo(os.path.join(act_dir, "cv_data.hlo"))
-    with open(os.path.join(act_dir, "260618.141525-act.yml"), "w") as f:
+    with open(
+        os.path.join(act_dir, "260618.141525-act.yml"), "w", encoding="utf-8"
+    ) as f:
         yaml.safe_dump(
             {
                 "technique_name": "CV",
@@ -186,7 +188,7 @@ def _make_synced_zip(root):
         hlo = os.path.join(tmp, "cv_data.hlo")
         _write_hlo(hlo)
         actyml = os.path.join(tmp, "act.yml")
-        with open(actyml, "w") as f:
+        with open(actyml, "w", encoding="utf-8") as f:
             yaml.safe_dump(
                 {
                     "technique_name": "CV",
@@ -230,7 +232,7 @@ def _make_process(root, technique="CV"):
         "260618.141524__SDC_exp_CV",
     )
     os.makedirs(prc_dir)
-    with open(os.path.join(prc_dir, "0__abc__CV-prc.yml"), "w") as f:
+    with open(os.path.join(prc_dir, "0__abc__CV-prc.yml"), "w", encoding="utf-8") as f:
         yaml.safe_dump(
             {
                 "technique_name": technique,
@@ -255,7 +257,9 @@ def _make_colocated_loose_process(root, state="SYNCED", uuid_str="def"):
         "260618.141524__SDC_exp_CV",
     )
     os.makedirs(exp_dir)
-    with open(os.path.join(exp_dir, f"0__{uuid_str}__CV-prc.yml"), "w") as f:
+    with open(
+        os.path.join(exp_dir, f"0__{uuid_str}__CV-prc.yml"), "w", encoding="utf-8"
+    ) as f:
         yaml.safe_dump(
             {
                 "technique_name": "CV",
@@ -278,7 +282,7 @@ def _make_synced_zip_with_prc(root, uuid_str="abc", technique="CV"):
         hlo = os.path.join(tmp, "cv_data.hlo")
         _write_hlo(hlo)
         actyml = os.path.join(tmp, "act.yml")
-        with open(actyml, "w") as f:
+        with open(actyml, "w", encoding="utf-8") as f:
             yaml.safe_dump(
                 {
                     "technique_name": "CV",
@@ -287,7 +291,7 @@ def _make_synced_zip_with_prc(root, uuid_str="abc", technique="CV"):
                 f,
             )
         prcyml = os.path.join(tmp, "prc.yml")
-        with open(prcyml, "w") as f:
+        with open(prcyml, "w", encoding="utf-8") as f:
             yaml.safe_dump(
                 {
                     "technique_name": technique,
@@ -411,7 +415,7 @@ def test_processes_index_corrupt_zip_skipped():
 def _make_analysis(root, with_local_output=True, year_dir="26.25"):
     ana_dir = os.path.join(root, "ANALYSES", year_dir, "0618", "150305__icpms__plate1")
     os.makedirs(ana_dir)
-    with open(os.path.join(ana_dir, "uuid1234.yml"), "w") as f:
+    with open(os.path.join(ana_dir, "uuid1234.yml"), "w", encoding="utf-8") as f:
         yaml.safe_dump(
             {
                 "analysis_name": "icpms",
@@ -432,7 +436,7 @@ def _make_analysis(root, with_local_output=True, year_dir="26.25"):
             f,
         )
     if with_local_output:
-        with open(os.path.join(ana_dir, "conc.json"), "w") as f:
+        with open(os.path.join(ana_dir, "conc.json"), "w", encoding="utf-8") as f:
             json.dump({"element": ["Ni", "Fe"], "ppm": [12.0, 3.4]}, f)
 
 

@@ -172,7 +172,7 @@ def test_neutral_ramp_is_slate_only() -> None:
 # ===========================================================================
 def test_palette_imports_nothing_heavy() -> None:
     """The module must stay importable by both stacks and by the tests."""
-    source = (REPO_ROOT / "helao/ui/shared/palette.py").read_text()
+    source = (REPO_ROOT / "helao/ui/shared/palette.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
     imported: set[str] = set()
     for node in ast.walk(tree):
@@ -1693,7 +1693,7 @@ def test_palette_module_is_exempt_from_its_own_sweep() -> None:
 
 def test_a_deployment_palette_py_does_not_inherit_the_exemption(tmp_path) -> None:
     decoy = tmp_path / "palette.py"
-    decoy.write_text('x = Div(styles={"color": "#123456"})\n')
+    decoy.write_text('x = Div(styles={"color": "#123456"})\n', encoding="utf-8")
     assert [line for _, line, _ in sweep_color_literals([decoy])] == [1]
 
 

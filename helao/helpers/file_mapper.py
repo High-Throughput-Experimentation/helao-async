@@ -261,7 +261,7 @@ class FileMapper:
             with ZipFile(zip_path, "r") as zf:
                 return zf.read(member).decode().split("\n")
         else:
-            lines = lp.read_text().split("\n")
+            lines = lp.read_text(encoding="utf-8").split("\n")
             return lines
 
     def read_bytes(self, p: str) -> bytes:

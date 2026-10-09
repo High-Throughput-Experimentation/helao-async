@@ -82,7 +82,7 @@ class ProvenanceManifest:
 
     def save(self, golden_dir: Path) -> Path:
         path = Path(golden_dir) / MANIFEST_NAME
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             _yaml.dump(dataclasses.asdict(self), f)
         return path
 
@@ -95,7 +95,7 @@ class ProvenanceManifest:
                 "must be captured from real legacy runs (spec §6.5, D4) — "
                 "hand-built fixture trees are forbidden in the parity suite"
             )
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             data = _yaml.load(f)
         return cls(**{k: v for k, v in dict(data).items()})
 

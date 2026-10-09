@@ -199,7 +199,9 @@ def test_adapters_never_import_app():
 def test_checker_flags_banned_import(tmp_path):
     """Mutation self-test: the walker must actually catch violations."""
     victim = HEXAGON_ROOT / "domain" / "_boundary_selftest_tmp.py"
-    victim.write_text("import httpx\nfrom helao.hexagon.app import x\n")
+    victim.write_text(
+        "import httpx\nfrom helao.hexagon.app import x\n", encoding="utf-8"
+    )
     try:
         hits = iter_violations(victim)
         assert {m for _, m, _ in hits} == {"httpx", "helao.hexagon.app"}
@@ -218,7 +220,7 @@ def test_checker_flags_banned_relative_import(tmp_path):
     equivalent `import helao.hexagon.app`.
     """
     victim = HEXAGON_ROOT / "domain" / "_boundary_selftest_rel_tmp.py"
-    victim.write_text("from . import x\nfrom ..app import z\n")
+    victim.write_text("from . import x\nfrom ..app import z\n", encoding="utf-8")
     try:
         # from . import x  (level=1, no module) -> resolves to the victim's
         # own package, helao.hexagon.domain -- allowed, on the allow-list.
@@ -242,7 +244,8 @@ def test_checker_allows_domain_allowlist(tmp_path):
         "from helao.core.models.hlostatus import HloStatus\n"
         "from helao.helpers.premodels import Action\n"
         "from helao.core.helaodict import HelaoDict\n"
-        "from helao.core.error import ErrorCodes\n"
+        "from helao.core.error import ErrorCodes\n",
+        encoding="utf-8",
     )
     try:
         assert iter_violations(victim) == []
@@ -258,7 +261,8 @@ def test_checker_flags_adapters_importing_app_and_tests(tmp_path):
         "import httpx\n"  # vendors ARE allowed in adapters
         "from helao.core.servers.base import Base\n"  # legacy allowed
         "from helao.hexagon.app import factory\n"  # banned
-        "from helao.hexagon.tests import fakes\n"  # banned
+        "from helao.hexagon.tests import fakes\n",
+        encoding="utf-8",  # banned
     )
     try:
         hits = iter_violations(victim)
@@ -277,7 +281,8 @@ def test_checker_flags_app_importing_tests(tmp_path):
     victim.write_text(
         "import fastapi\n"
         "from helao.hexagon.adapters.fakes import FakeClock\n"  # allowed (opt-in)
-        "from helao.hexagon.tests.test_orchestration import x\n"  # banned
+        "from helao.hexagon.tests.test_orchestration import x\n",
+        encoding="utf-8",  # banned
     )
     try:
         hits = iter_violations(victim)
@@ -306,7 +311,8 @@ def test_checker_flags_native_importing_core_servers(tmp_path):
         "from helao.helpers.yml_tools import yml_dumps\n"  # helpers allowed
         "from helao.core.models.run_dir import RunDir\n"  # models allowed
         "from helao.core.servers.base import Base\n"  # BANNED in native
-        "from helao.core.servers.active_finalizer import ActionFinalizer\n"  # BANNED
+        "from helao.core.servers.active_finalizer import ActionFinalizer\n",
+        encoding="utf-8",  # BANNED
     )
     try:
         hits = iter_violations(victim)
@@ -373,7 +379,7 @@ def test_checker_flags_bokeh_server_outside_app(tmp_path):
     under tests/ on purpose -- the rule is stricter than the general
     per-layer allow-list, which exempts tests/ entirely; this one does not."""
     victim = HEXAGON_ROOT / "tests" / "_boundary_selftest_bokeh_server_tmp.py"
-    victim.write_text("from bokeh.server.server import Server\n")
+    victim.write_text("from bokeh.server.server import Server\n", encoding="utf-8")
     try:
         assert _bokeh_server_import_lines(victim) == [1]
     finally:

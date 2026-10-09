@@ -16,7 +16,9 @@ from helao.deploy.hte.specifications.week_window import WeekWindowSpecParser
 def _seqdir(root, when, name):
     path = os.path.join(root, when.strftime("%Y"), when.strftime("%m%d"), name)
     os.makedirs(path)
-    open(os.path.join(path, f"{name.split('__')[1]}-seq.yml"), "w").close()
+    open(
+        os.path.join(path, f"{name.split('__')[1]}-seq.yml"), "w", encoding="utf-8"
+    ).close()
     return path
 
 
@@ -47,6 +49,6 @@ def test_lists_legacy_zips_under_sunday_start_week(tmp_path, monkeypatch):
     week = os.path.join(tmp_path, now.strftime("%y.%U"), now.strftime("%Y%m%d"))
     os.makedirs(week)
     zpath = os.path.join(week, "seq.zip")
-    open(zpath, "w").close()
+    open(zpath, "w", encoding="utf-8").close()
 
     assert WeekWindowSpecParser().lister(str(tmp_path)) == [zpath]

@@ -73,7 +73,7 @@ async def test_stream_members_require_active_handle(tmp_path):
     active.action_finalizer = finalizer  # type: ignore[reportAttributeAccessIssue]
     bound = store.for_action(active)
     path = await bound.write_one_shot(active.action, "row", "aux__csv", "os.csv", "h")
-    assert path is not None and open(path).read() == "h\n%%\nrow"
+    assert path is not None and open(path, encoding="utf-8").read() == "h\n%%\nrow"
     # write_data_line feeds the data_q (native enqueue re-body)
     await bound.write_data_line(active.action, dflt, {"t_s": 1})
     assert active.num_data_queued == 1
@@ -98,6 +98,6 @@ async def test_zip_dir_maps_to_helper(tmp_path):
     store = _store()
     d = tmp_path / "seqdir"
     d.mkdir()
-    (d / "a.txt").write_text("x")
+    (d / "a.txt").write_text("x", encoding="utf-8")
     out = await store.zip_dir(d)
     assert out.suffix == ".zip" and out.exists()

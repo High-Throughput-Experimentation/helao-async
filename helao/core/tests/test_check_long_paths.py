@@ -55,7 +55,7 @@ def test_probe_reports_the_measured_ceiling_when_one_exists(tmp_path, monkeypatc
 def test_probe_reports_an_unusable_root_rather_than_passing(tmp_path):
     """A root that is a file, not a directory, is a failure -- never a PASS."""
     blocker = tmp_path / "not_a_dir"
-    blocker.write_text("x")
+    blocker.write_text("x", encoding="utf-8")
     result = clp.probe_root(str(blocker), target=300)
     assert not result.ok
     assert result.reached == 0
@@ -67,7 +67,7 @@ def test_main_exit_status_follows_the_probe(tmp_path, capsys):
     assert "RESULT: PASS" in capsys.readouterr().out
 
     blocker = tmp_path / "blocker"
-    blocker.write_text("x")
+    blocker.write_text("x", encoding="utf-8")
     assert clp.main([str(blocker)]) == 1
     assert "RESULT: FAIL" in capsys.readouterr().out
 

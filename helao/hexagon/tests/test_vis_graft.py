@@ -213,7 +213,7 @@ def test_graft_sources_name_no_legacy_deployment():
     can no longer flip that server without this public repo naming it.
     """
     for src in GRAFT_SOURCES:
-        text = src.read_text()
+        text = src.read_text(encoding="utf-8")
         named = set(re.findall(r"helao\.deploy\.([A-Za-z_][A-Za-z0-9_]*)\.", text))
         assert named <= {"hexagon"}, (src.name, sorted(named))
 
@@ -312,7 +312,10 @@ async def test_visualizer_graft_builds_the_real_legacy_document(real_config, tmp
 
         snap = tmp_path / "STATES" / "loaded_modules_LIVE.json"
         assert snap.exists(), sorted(p.name for p in (tmp_path / "STATES").iterdir())
-        loaded = {os.path.relpath(p, REPO_ROOT) for p in json.loads(snap.read_text())}
+        loaded = {
+            os.path.relpath(p, REPO_ROOT)
+            for p in json.loads(snap.read_text(encoding="utf-8"))
+        }
         assert "helao/deploy/hexagon/servers/visualizer/graft.py" in loaded
         assert "helao/deploy/hte/servers/visualizer/live_visualizer.py" in loaded
         # the per-instrument panel named by SIM's `live_vis:` key — the file an
@@ -350,7 +353,10 @@ async def test_operator_graft_builds_the_real_legacy_document(real_config, tmp_p
         # and the watcher silently never restarts it.
         snap = tmp_path / "STATES" / "loaded_modules_OPERATOR.json"
         assert snap.exists()
-        loaded = {os.path.relpath(p, REPO_ROOT) for p in json.loads(snap.read_text())}
+        loaded = {
+            os.path.relpath(p, REPO_ROOT)
+            for p in json.loads(snap.read_text(encoding="utf-8"))
+        }
         assert "helao/deploy/hexagon/servers/operator/graft.py" in loaded
         assert "helao/deploy/hte/servers/operator/standalone_operator.py" in loaded
         assert "helao/ui/bokeh/operator.py" in loaded

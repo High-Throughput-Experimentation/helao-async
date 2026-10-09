@@ -75,7 +75,7 @@ async def test_finish_join_drain_close_chain(tmp_path, monkeypatch):
         str(base.helaodirs.save_root), str(active.action.action_output_dir)
     )
     hlo = [f for f in os.listdir(out_dir) if f.endswith(".hlo")]
-    text = open(os.path.join(out_dir, hlo[0])).read()
+    text = open(os.path.join(out_dir, hlo[0]), encoding="utf-8").read()
     # hlo_json_dumps compact separators (no spaces)
     assert '{"t_s":2,"value":3.0}' in text  # late row landed before close
     assert active.file_conn_dict == {}  # close-all cleared the dict
@@ -196,7 +196,7 @@ async def test_split_keep_active_then_finish_all_finishes_the_chain(
         for fn in files:
             if fn.endswith(".hlo"):
                 rows += (
-                    open(os.path.join(dirpath, fn))
+                    open(os.path.join(dirpath, fn), encoding="utf-8")
                     .read()
                     .split("%%\n", 1)[1]
                     .splitlines()

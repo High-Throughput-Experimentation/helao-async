@@ -19,7 +19,7 @@ def _legacy_tree(root: Path) -> Path:
         / "260828.120000__exp"
     )
     d.mkdir(parents=True)
-    (d / PRC).write_text(BODY)
+    (d / PRC).write_text(BODY, encoding="utf-8")
     return root
 
 
@@ -33,7 +33,7 @@ def _colocated_tree(root: Path) -> Path:
         / "260828.120000__exp"
     )
     d.mkdir(parents=True)
-    (d / PRC).write_text(BODY)
+    (d / PRC).write_text(BODY, encoding="utf-8")
     return root
 
 
@@ -53,7 +53,7 @@ def _colocated_zipdir_tree(root: Path) -> Path:
         / "260828.120000__exp"
     )
     d.mkdir(parents=True)
-    (d / PRC).write_text(BODY)
+    (d / PRC).write_text(BODY, encoding="utf-8")
     return root
 
 
@@ -86,7 +86,7 @@ def _mixed_zipdir_and_origdir_tree(root: Path) -> Path:
         / "260828.120000__exp"
     )
     zipdir.mkdir(parents=True)
-    (zipdir / PRC).write_text(BODY)
+    (zipdir / PRC).write_text(BODY, encoding="utf-8")
 
     origdir = (
         root
@@ -97,7 +97,7 @@ def _mixed_zipdir_and_origdir_tree(root: Path) -> Path:
         / "260828.120000__exp"
     )
     origdir.mkdir(parents=True)
-    (origdir / PRC).write_text(BODY)
+    (origdir / PRC).write_text(BODY, encoding="utf-8")
     return root
 
 

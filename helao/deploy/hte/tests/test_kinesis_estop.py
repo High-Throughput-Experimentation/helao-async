@@ -277,4 +277,4 @@ def test_latch_landing_after_the_gate_stops_the_executor_before_it_moves(
     time.sleep(0.3)
     assert _move_calls(host.driver) == []
     assert acts, "the action never finished"
-    assert "error_code: estop" in open(acts[0]).read()
+    assert "error_code: estop" in open(acts[0], encoding="utf-8").read()

@@ -278,7 +278,7 @@ def test_nidaqmx_do_groups_match_the_endpoints_that_take_on_bool():
     from helao.deploy.hte.servers.action import nidaqmx_server
     from helao.deploy.hte.servers.action.nidaqmx_server import DO_GROUPS
 
-    src = Path(nidaqmx_server.__file__).read_text()
+    src = Path(nidaqmx_server.__file__).read_text(encoding="utf-8")
     # Each toggle endpoint is registered under `if dev_<group>:` and takes a
     # `<x>items` enum built from that group.
     togglable = set()

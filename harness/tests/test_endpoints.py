@@ -65,7 +65,8 @@ def test_action_decorator_honours_an_explicit_path_and_tags(tmp_path):
         "        pass\n"
         '    @app.action(tags=["private"])\n'
         "    async def internal(ctx: ActionContext):\n"
-        "        pass\n"
+        "        pass\n",
+        encoding="utf-8",
     )
     by_path = {r["path"]: r for r in extract_routes(module, server_key="SAMPLE")}
 
