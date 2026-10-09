@@ -35,7 +35,7 @@ class HelaoCredentials(BaseSettings):
         JUMPBOX_KEYFILE (str): SSH private key file.
         OPENAPI_JSON (str): URL of the metadata API's OpenAPI JSON definition.
         OPENAPI_KEY (str): API key for the metadata API.
-        OPENAPI (str): Base URL for the metadata API.
+        OPENAPI (str): Base URL for the metadata API, including ``/api``.
         PLATE_API_JSON (str): Path/URL of the plate API definition.
         PLATE_API_KEY (str): API key for the plate service.
         PLATE_API (str): Base URL for the plate service.
@@ -89,13 +89,12 @@ class HelaoCredentials(BaseSettings):
 
     @property
     def openapi_base_url(self) -> str:
-        """The metadata API root, ``<host>/api``.
+        """The metadata API root, ``<host>/api``: ``OPENAPI`` when set.
 
-        The spec declares no ``servers`` and every path starts with ``/api/``,
-        so the generated client resolves calls against the host root; this
-        matches it wherever ``openapi.json`` itself is served.
+        Otherwise ``<host>/api`` of ``openapi_json_url``, which is where the
+        generated client resolves the spec's ``/api/...`` paths.
         """
-        return urljoin(self.openapi_json_url, "/api")
+        return (self.OPENAPI or urljoin(self.openapi_json_url, "/api")).rstrip("/")
 
     @property
     def openapi_headers(self) -> dict:

@@ -19,7 +19,7 @@ SPEC = "https://meta.test/api/openapi.json"
 def env_file(tmp_path, monkeypatch):
     path = tmp_path / "creds.env"
     path.write_text(
-        f"OPENAPI_JSON={SPEC}\nOPENAPI_KEY=k123\nOPENAPI=https://meta.test\n"
+        f"OPENAPI_JSON={SPEC}\nOPENAPI_KEY=k123\nOPENAPI=https://base.test/api\n"
         "PLATE_API_KEY=p\nPLATE_API=https://plate.test\n"
     )
     monkeypatch.setenv("HELAO_CREDENTIALS", str(path))
@@ -33,7 +33,7 @@ def env_file(tmp_path, monkeypatch):
 def test_credentials_accept_openapi_keys(env_file):
     hcred = HelaoCredentials(_env_file=env_file)
     assert hcred.openapi_json_url == SPEC
-    assert hcred.openapi_base_url == "https://meta.test/api"
+    assert hcred.openapi_base_url == "https://base.test/api"
     assert hcred.openapi_headers == {"X-Api-Key": "k123"}
 
 
@@ -78,4 +78,4 @@ def test_lookup_key_sends_header(env_file, monkeypatch):
         lambda **kw: real(transport=httpx.MockTransport(handler), **kw),
     )
     assert asyncio.run(api._lookup_key("u", "f.hlo")) == "raw_data/u/f.hlo"
-    assert seen == {"url": "https://meta.test/api/file/metadata", "key": "k123"}
+    assert seen == {"url": "https://base.test/api/file/metadata", "key": "k123"}
