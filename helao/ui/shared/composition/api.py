@@ -1,7 +1,9 @@
 # helao/ui/shared/composition/api.py
 """The HELAO metadata-API calls the composition page makes.
 
-Every call here is unauthenticated HTTP against the public metadata API. The
+Every call here goes to the metadata API named by the ``HELAO_CREDENTIALS``
+file (``OPENAPI_JSON``), authenticated with its ``OPENAPI_KEY`` as the
+``X-Api-Key`` header, the same way the plate API sends ``PLATE_API_KEY``. The
 platemap is the one thing this module does not fetch -- it needs S3 credentials
 and comes from `helao.ui.shared.platemap` instead.
 
@@ -12,6 +14,7 @@ network round-trip in the import graph of every module that imports this one.
 
 from __future__ import annotations
 
+import os
 import threading
 
 import httpx
@@ -21,17 +24,11 @@ from helao.ui.shared.composition.model import SPECTRUM_FILE_TYPE
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
-#: The metadata API's OpenAPI document.
-API_SPEC_URL = "https://helao-api.caltech-hte.modelyst.com/api/openapi.json"
-
-#: The metadata API root. Used only by :func:`_lookup_key`, which cannot go
-#: through the client; see that function.
-API_BASE = "https://helao-api.caltech-hte.modelyst.com/api"
-
 #: Request timeout for the one call that bypasses the client, in seconds.
 _TIMEOUT_S = 30
 
 _CLIENT = None
+_CREDS = None
 _CLIENT_LOCK = threading.Lock()
 
 #: Quantification results, keyed by ``(action_uuid, file_name)``. A record's
@@ -40,6 +37,16 @@ _CLIENT_LOCK = threading.Lock()
 #: wants a clean slate, ever calls :func:`reset_quant_cache`.
 _QUANT_CACHE: dict = {}
 _QUANT_CACHE_LOCK = threading.Lock()
+
+
+def _credentials():
+    """The ``HELAO_CREDENTIALS`` settings: metadata-API URLs and key, read once."""
+    global _CREDS
+    if _CREDS is None:
+        from helao.core.models.credentials import HelaoCredentials
+
+        _CREDS = HelaoCredentials(_env_file=os.environ.get("HELAO_CREDENTIALS", ""))
+    return _CREDS
 
 
 def get_client():
@@ -54,15 +61,19 @@ def get_client():
         if _CLIENT is None:
             from helao.helpers.openapi_client import AsyncOpenAPIClient
 
-            _CLIENT = AsyncOpenAPIClient(API_SPEC_URL)
+            creds = _credentials()
+            _CLIENT = AsyncOpenAPIClient(
+                creds.openapi_json_url, api_key=creds.OPENAPI_KEY
+            )
         return _CLIENT
 
 
 def reset_client() -> None:
     """Drop the cached client. For tests and for a credentials change."""
-    global _CLIENT
+    global _CLIENT, _CREDS
     with _CLIENT_LOCK:
         _CLIENT = None
+        _CREDS = None
 
 
 def reset_quant_cache() -> None:
@@ -148,9 +159,12 @@ async def _lookup_key(action_uuid: str, file_name: str) -> str:
     all. Do not "simplify" this back into the client without fixing that
     derivation first.
     """
-    async with httpx.AsyncClient(timeout=_TIMEOUT_S) as client:
+    creds = _credentials()
+    async with httpx.AsyncClient(
+        timeout=_TIMEOUT_S, headers=creds.openapi_headers
+    ) as client:
         response = await client.post(
-            f"{API_BASE}/file/metadata",
+            f"{creds.openapi_base_url}/file/metadata",
             json={"file_name": file_name, "action_uuid": action_uuid},
         )
     response.raise_for_status()

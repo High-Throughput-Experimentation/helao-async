@@ -4,9 +4,13 @@ import urllib
 from pathlib import Path
 from textwrap import dedent
 from typing import ClassVar
+from urllib.parse import urljoin
 
 from pydantic import PostgresDsn, SecretStr
 from pydantic_settings import BaseSettings
+
+#: The metadata API's OpenAPI document, used when ``OPENAPI_JSON`` is unset.
+DEFAULT_OPENAPI_JSON = "https://helao-api.caltech-hte.modelyst.com/api/openapi.json"
 
 
 class HelaoCredentials(BaseSettings):
@@ -29,7 +33,9 @@ class HelaoCredentials(BaseSettings):
         JUMPBOX_HOST (str): SSH jumpbox host.
         JUMPBOX_USER (str): SSH jumpbox user.
         JUMPBOX_KEYFILE (str): SSH private key file.
-        OPENAPI_JSON (str): Path/URL of an OpenAPI JSON definition.
+        OPENAPI_JSON (str): URL of the metadata API's OpenAPI JSON definition.
+        OPENAPI_KEY (str): API key for the metadata API.
+        OPENAPI (str): Base URL for the metadata API.
         PLATE_API_JSON (str): Path/URL of the plate API definition.
         PLATE_API_KEY (str): API key for the plate service.
         PLATE_API (str): Base URL for the plate service.
@@ -49,6 +55,8 @@ class HelaoCredentials(BaseSettings):
     JUMPBOX_USER: str = ""
     JUMPBOX_KEYFILE: str = ""
     OPENAPI_JSON: str = ""
+    OPENAPI_KEY: str = ""
+    OPENAPI: str = ""
     PLATE_API_JSON: str = ""
     PLATE_API_KEY: str = ""
     PLATE_API: str = ""
@@ -73,6 +81,26 @@ class HelaoCredentials(BaseSettings):
     def set_api_port(self, port: int):
         """Override the API port (e.g. when tunneling)."""
         self.API_PORT = port
+
+    @property
+    def openapi_json_url(self) -> str:
+        """The metadata API's ``openapi.json`` URL."""
+        return self.OPENAPI_JSON or DEFAULT_OPENAPI_JSON
+
+    @property
+    def openapi_base_url(self) -> str:
+        """The metadata API root, ``<host>/api``.
+
+        The spec declares no ``servers`` and every path starts with ``/api/``,
+        so the generated client resolves calls against the host root; this
+        matches it wherever ``openapi.json`` itself is served.
+        """
+        return urljoin(self.openapi_json_url, "/api")
+
+    @property
+    def openapi_headers(self) -> dict:
+        """``X-Api-Key`` auth header for the metadata API, as for the plate API."""
+        return {"X-Api-Key": self.OPENAPI_KEY} if self.OPENAPI_KEY else {}
 
     @property
     def api_dsn(self) -> str:
