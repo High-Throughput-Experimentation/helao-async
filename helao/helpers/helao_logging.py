@@ -242,6 +242,7 @@ class DedupTimedRotatingFileHandler(TimedRotatingFileHandler):
             **kwargs: Keyword arguments forwarded to
                 ``TimedRotatingFileHandler``.
         """
+        kwargs.setdefault("encoding", "utf-8")
         super().__init__(*args, **kwargs)
         self.dedup_interval = dedup_interval
         self._dedup_last_message = None

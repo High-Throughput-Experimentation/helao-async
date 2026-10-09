@@ -165,10 +165,10 @@ def yml_load(input: Union[str, Path], fast: bool = False):
     yaml = _get_loader(fast)
     try:
         if isinstance(input, Path):
-            with input.open("r") as f:
+            with input.open("r", encoding="utf-8") as f:
                 obj = yaml.load(f)
         elif os.path.exists(input):
-            with open(input, "r") as f:
+            with open(input, "r", encoding="utf-8") as f:
                 obj = yaml.load(f)
         else:
             obj = yaml.load(input)
