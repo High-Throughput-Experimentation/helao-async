@@ -19,7 +19,7 @@ SPEC = "https://meta.test/api/openapi.json"
 def env_file(tmp_path, monkeypatch):
     path = tmp_path / "creds.env"
     path.write_text(
-        f"OPENAPI_JSON={SPEC}\nOPENAPI_KEY=k123\nOPENAPI=https://base.test/api\n"
+        f"OPENAPI_JSON={SPEC}\nOPENAPI_KEY=k123\nOPENAPI=https://base.test\n"
         "PLATE_API_KEY=p\nPLATE_API=https://plate.test\n"
     )
     monkeypatch.setenv("HELAO_CREDENTIALS", str(path))
