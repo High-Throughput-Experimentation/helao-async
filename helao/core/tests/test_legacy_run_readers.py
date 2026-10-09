@@ -270,4 +270,4 @@ def test_a_process_file_resolves_against_a_sequence_directory(tmp_path: Path):
     seq_dir = act_dir.parent.parent
     fn = act_dir.relative_to(tmp_path / "RUNS").as_posix() + "/spec.parquet"
 
-    assert LocalLoader(str(seq_dir)).get_bytes("", fn) == b"PAR1"
+    assert LocalLoader(str(seq_dir)).get_bytes("", fn).read() == b"PAR1"

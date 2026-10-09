@@ -17,6 +17,27 @@ from pydantic import PrivateAttr
 from helao.core.models.file import FileInfo
 
 
+class HloPayload(dict):
+    """An HLO file's ``{"meta": ..., "data": ...}``, also unpackable as ``(meta, data)``.
+
+    The remote loader reads the S3 ``.hlo.json`` (that dict); the local loader
+    used to return a ``(meta, data)`` tuple. This is both, so callers written
+    against either keep working: every dict operation behaves as for the plain
+    dict, except iteration, which yields ``meta`` then ``data`` rather than the
+    keys. A plain dict would unpack to the key strings without raising.
+    """
+
+    def __init__(self, meta: Optional[dict] = None, data: Optional[dict] = None):
+        super().__init__(meta=meta or {}, data=data or {})
+
+    def __iter__(self):
+        return iter((self["meta"], self["data"]))
+
+    def copy(self) -> "HloPayload":
+        """Shallow copy that stays an ``HloPayload`` (``{**p}`` and ``p | x`` do not)."""
+        return HloPayload(self["meta"], self["data"])
+
+
 class HelaoArtifact(FileInfo):
     """``FileInfo`` that can fetch its own bytes via the loader that produced it.
 

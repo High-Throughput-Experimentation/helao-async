@@ -8,6 +8,7 @@ their metadata and primary HLO file via a module-level ``LOADER`` instance.
 
 import io
 import json
+import warnings
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
@@ -19,8 +20,34 @@ from sqlmodel import Session, create_engine, text
 from helao.core.drivers.data.loaders.model_base import (
     HelaoArtifact,
     HelaoDataModelMixin,
+    HloPayload,
 )
 from helao.core.models.credentials import HelaoCredentials
+
+#: The SQL metadata backend is being retired and no deployment queries it.
+_SQL_DEPRECATED = (
+    "the HELAO SQL metadata backend is deprecated and will be shut off; "
+    "use the S3 JSON (get_json / .json) instead"
+)
+
+
+def _warn_sql(stacklevel: int = 3):
+    """Warn at the caller of the deprecated API (``stacklevel`` frames up)."""
+    warnings.warn(_SQL_DEPRECATED, DeprecationWarning, stacklevel=stacklevel)
+
+
+def _as_datetime(value):
+    """Parse an ISO timestamp string from S3 JSON; anything else passes through.
+
+    The local loader's yml parser yields ``datetime``; this gives the remote
+    wrappers the same type.
+    """
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            return value
+    return value
 
 
 class HelaoSolid:
@@ -68,9 +95,13 @@ class HelaoModel:
             helao_type: Record kind.
             uuid: Record UUID.
             query_df: Optional SQL result frame to source metadata from.
+                Deprecated with the SQL backend.
         """
         self.uuid = uuid
         self.helao_type = helao_type
+        if query_df is not None:
+            # Reached through a subclass __init__'s super() call: one frame more.
+            _warn_sql(stacklevel=4)
         if (
             query_df is not None
             and query_df.query(f"{helao_type}_uuid==@uuid").shape[0] > 1
@@ -80,10 +111,7 @@ class HelaoModel:
             )
         else:
             self.meta_dict = self.json
-        self.timestamp = self.meta_dict.get(
-            f"{helao_type}_timestamp",
-            self.meta_dict.get(f"{helao_type}_timestamp", None),
-        )
+        self.timestamp = _as_datetime(self.meta_dict.get(f"{helao_type}_timestamp"))
         self.params = self.meta_dict.get(
             f"{helao_type}_params", self.meta_dict.get(f"{helao_type}_params", {})
         )
@@ -103,8 +131,9 @@ class HelaoModel:
 
     @property
     def _meta_dict(self) -> dict:
-        """SQL row for this record fetched via the module ``LOADER``."""
-        return LOADER.get_sql(self.helao_type, self.uuid)
+        """SQL row for this record fetched via the module ``LOADER``. Deprecated."""
+        _warn_sql()
+        return LOADER._get_sql(self.helao_type, self.uuid)
 
 
 class HelaoDataModel(HelaoDataModelMixin, HelaoModel):
@@ -139,10 +168,10 @@ class HelaoDataModel(HelaoDataModelMixin, HelaoModel):
         ]
 
     @property
-    def hlo(self) -> dict:
-        """Parsed HLO JSON for the primary data file (empty dict if none)."""
-        if not self.hlo_file:
-            return {}
+    def hlo(self) -> HloPayload:
+        """:class:`HloPayload` of the primary data file (empty if none)."""
+        if not self.data_files:
+            return HloPayload()
         return LOADER.get_hlo(self.hlo_file["action_uuid"], self.hlo_file["file_name"])
 
 
@@ -294,6 +323,7 @@ class HelaoLoader:
         self.s3_region = self.hcred.AWS_REGION.get_secret_value()
         self.cli = self.sess.client("s3")
         self.res = self.sess.resource("s3")
+        # Deprecated with the SQL backend; create_engine does not connect.
         self.engine = create_engine(self.hcred.api_dsn)
 
     def reconnect(self):
@@ -307,10 +337,13 @@ class HelaoLoader:
             self.connect()
 
     def run_raw_query(self, query: str) -> list:
-        """Execute a raw SQL ``query`` against the metadata DB and return all rows."""
+        """Execute a raw SQL ``query`` against the metadata DB. Deprecated."""
+        _warn_sql()
+        return self._query(query)
+
+    def _query(self, query: str) -> list:
         with Session(self.engine) as session:
-            result = session.exec(text(query)).all()
-        return result
+            return session.exec(text(query)).all()
 
     def clear_cache(self):
         """Drop every in-memory cache (action/experiment/sequence/process/S3/SQL)."""
@@ -396,7 +429,7 @@ class HelaoLoader:
             return HelaoProcess(process_uuid)
         return jd
 
-    def get_hlo(self, action_uuid: UUID, hlo_fn: str) -> dict:
+    def get_hlo(self, action_uuid: UUID, hlo_fn: str) -> HloPayload:
         """Fetch and decode the HLO JSON for ``hlo_fn`` under the action's raw_data prefix.
 
         Args:
@@ -404,7 +437,8 @@ class HelaoLoader:
             hlo_fn: HLO/JSON file name as recorded in the action's ``files``.
 
         Returns:
-            Parsed JSON dict, or ``{}`` if the file name is not a valid HLO.
+            :class:`HloPayload` of the ``.hlo.json``; empty if the file name is
+            not a valid HLO.
         """
         if hlo_fn.endswith(".hlo"):
             keystr = f"raw_data/{str(action_uuid)}/{hlo_fn}.json"
@@ -416,18 +450,23 @@ class HelaoLoader:
 
         else:
             print(f"{hlo_fn} is not a valid named hlo file.")
-            return {}
+            return HloPayload()
         if keystr in self.s3_cache:
             return self.s3_cache[keystr]
         obj = self.res.Object(bucket_name="helao.data", key=keystr)
         obytes = io.BytesIO(obj.get()["Body"].read())
-        jd = json.load(obytes)
+        raw = json.load(obytes)
+        jd = HloPayload(raw.get("meta"), raw.get("data"))
         if self.cache_s3:
             self.s3_cache[keystr] = jd
         return jd
 
     def get_sql(self, helao_type: str, obj_uuid: UUID) -> dict:
-        """Return the metadata DB row for ``(helao_type, obj_uuid)`` as a dict."""
+        """Return the metadata DB row for ``(helao_type, obj_uuid)``. Deprecated."""
+        _warn_sql()
+        return self._get_sql(helao_type, obj_uuid)
+
+    def _get_sql(self, helao_type: str, obj_uuid: UUID) -> dict:
         cache_key = (helao_type, obj_uuid)
         if self.cache_sql and cache_key in self.sql_cache:
             return self.sql_cache[cache_key]
@@ -438,7 +477,7 @@ class HelaoLoader:
             WHERE ht.{helao_type}_uuid = '{obj_uuid}'
             LIMIT 1
         """
-        resp = self.run_raw_query(sql_command)
+        resp = self._query(sql_command)
         row = resp[0]._asdict() if resp else {}
         # Only retain the row when caching is on: the previous version wrote
         # every result into sql_cache even with cache_sql=False, so the dict

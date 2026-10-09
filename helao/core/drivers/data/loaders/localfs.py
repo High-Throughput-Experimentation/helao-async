@@ -19,6 +19,7 @@ import pandas as pd
 from helao.core.drivers.data.loaders.model_base import (
     HelaoArtifact,
     HelaoDataModelMixin,
+    HloPayload,
 )
 from helao.core.drivers.data.process_locator import process_uuid_of
 from helao.core.models.run_dir import RunDir, is_legacy_path, is_run_root
@@ -410,15 +411,19 @@ class LocalLoader:
             metad = FM.read_yml(path)
         return metad
 
-    def get_act(self, index=None, path: Optional[str] = None) -> "HelaoAction":
+    def get_act(
+        self, index=None, path: Optional[str] = None, hmod: bool = True
+    ) -> "dict | HelaoAction":
         """Load an action from the indexed target by dataframe ``index`` or yml ``path``.
 
         Args:
             index: Row index in ``self.actions``.
             path: Direct path to the action yml.
+            hmod: Return the ``HelaoAction`` wrapper; ``False`` returns the
+                parsed yml dict, as ``HelaoLoader.get_act`` does.
 
         Returns:
-            ``HelaoAction`` wrapping the parsed yml.
+            ``HelaoAction`` wrapping the parsed yml, or the dict.
 
         Raises:
             IndexError: If neither ``index`` nor ``path`` was supplied.
@@ -429,6 +434,8 @@ class LocalLoader:
             path = self.actions.iloc[index].action_localpath
         if path not in self.act_cache:
             self.act_cache[path] = self.get_yml(path)
+        if not hmod:
+            return self.act_cache[path]
         return HelaoAction(path, self.act_cache[path], self)
 
     def resolve_action(self, action_uuid, action_output_dir: str) -> "HelaoAction":
@@ -494,15 +501,18 @@ class LocalLoader:
             "another run's data to this process."
         )
 
-    def get_exp(self, index=None, path: Optional[str] = None) -> "HelaoExperiment":
+    def get_exp(
+        self, index=None, path: Optional[str] = None, hmod: bool = True
+    ) -> "dict | HelaoExperiment":
         """Load an experiment by dataframe ``index`` or yml ``path``.
 
         Args:
             index: Row index in ``self.experiments``.
             path: Direct path to the experiment yml.
+            hmod: ``False`` returns the parsed yml dict instead of the wrapper.
 
         Returns:
-            ``HelaoExperiment`` wrapping the parsed yml.
+            ``HelaoExperiment`` wrapping the parsed yml, or the dict.
 
         Raises:
             IndexError: If neither ``index`` nor ``path`` was supplied.
@@ -513,17 +523,22 @@ class LocalLoader:
             path = self.experiments.iloc[index].experiment_localpath
         if path not in self.exp_cache:
             self.exp_cache[path] = self.get_yml(path)
+        if not hmod:
+            return self.exp_cache[path]
         return HelaoExperiment(path, self.exp_cache[path], self)
 
-    def get_seq(self, index=None, path: Optional[str] = None) -> "HelaoSequence":
+    def get_seq(
+        self, index=None, path: Optional[str] = None, hmod: bool = True
+    ) -> "dict | HelaoSequence":
         """Load a sequence by dataframe ``index`` or yml ``path``.
 
         Args:
             index: Row index in ``self.sequences``.
             path: Direct path to the sequence yml.
+            hmod: ``False`` returns the parsed yml dict instead of the wrapper.
 
         Returns:
-            ``HelaoSequence`` wrapping the parsed yml.
+            ``HelaoSequence`` wrapping the parsed yml, or the dict.
 
         Raises:
             IndexError: If neither ``index`` nor ``path`` was supplied.
@@ -534,17 +549,22 @@ class LocalLoader:
             path = self.sequences.iloc[index].sequence_localpath
         if path not in self.seq_cache:
             self.seq_cache[path] = self.get_yml(path)
+        if not hmod:
+            return self.seq_cache[path]
         return HelaoSequence(path, self.seq_cache[path], self)
 
-    def get_prc(self, index=None, path: Optional[str] = None) -> "HelaoProcess":
+    def get_prc(
+        self, index=None, path: Optional[str] = None, hmod: bool = True
+    ) -> "dict | HelaoProcess":
         """Load a process by dataframe ``index`` or yml ``path``.
 
         Args:
             index: Row index in ``self.processes``.
             path: Direct path to the process yml.
+            hmod: ``False`` returns the parsed yml dict instead of the wrapper.
 
         Returns:
-            ``HelaoProcess`` wrapping the parsed yml.
+            ``HelaoProcess`` wrapping the parsed yml, or the dict.
 
         Raises:
             IndexError: If neither ``index`` nor ``path`` was supplied.
@@ -555,10 +575,12 @@ class LocalLoader:
             path = self.processes.iloc[index].process_localpath
         if path not in self.prc_cache:
             self.prc_cache[path] = self.get_yml(path)
+        if not hmod:
+            return self.prc_cache[path]
         return HelaoProcess(path, self.prc_cache[path], self)
 
-    def get_hlo(self, yml_path: str, hlo_fn: str) -> tuple:
-        """Read an HLO file as ``(meta_dict, data_dict)`` (zip-aware).
+    def get_hlo(self, yml_path: str, hlo_fn: str) -> HloPayload:
+        """Read an HLO file as an :class:`HloPayload` (zip-aware).
 
         For zip targets the YAML header and JSONL data section are parsed
         directly from the archive; otherwise ``FileMapper.read_hlo`` is used.
@@ -568,28 +590,30 @@ class LocalLoader:
             hlo_fn: HLO file name relative to ``yml_path``.
 
         Returns:
-            ``(meta, data)`` where ``data`` aggregates JSONL values per key.
+            ``{"meta": ..., "data": ...}``, the shape ``HelaoLoader.get_hlo``
+            returns, still unpackable as ``(meta, data)``. ``data`` aggregates
+            JSONL values per key.
         """
         if self.target.endswith(".zip"):
             hlotarget = "/".join([os.path.dirname(yml_path), hlo_fn])
             with ZipFile(self.target, "r") as zf:
                 content = zf.open(hlotarget).read()
-            return read_hlo_bytes(content)
+            return HloPayload(*read_hlo_bytes(content))
         else:
             # return read_hlo(os.path.join(os.path.dirname(yml_path), hlo_fn))
             FM = FileMapper(yml_path)
             hlo_path = os.path.join(os.path.dirname(yml_path), hlo_fn)
-            return FM.read_hlo(hlo_path)
+            return HloPayload(*FM.read_hlo(hlo_path))
 
-    def get_bytes(self, yml_path: str, fn: str) -> bytes:
-        """Return raw bytes of ``fn`` (zip-aware) relative to ``yml_path``.
+    def get_bytes(self, yml_path: str, fn: str) -> BytesIO:
+        """Return ``fn``'s bytes (zip-aware), relative to ``yml_path``, as ``BytesIO``.
 
         Args:
             yml_path: Path of the owning yml file (``""`` for a top-level zip lookup).
             fn: Target file path.
 
         Returns:
-            Raw file bytes.
+            File contents as ``BytesIO``, as ``HelaoLoader.get_bytes`` returns.
         """
         if self.target.endswith(".zip") and yml_path == "":
             rel_seqzip_path = fn
@@ -629,7 +653,7 @@ class LocalLoader:
             FM = FileMapper(yml_path)
             fpath = os.path.join(os.path.dirname(yml_path), fn)
             fbytes = FM.read_bytes(fpath)
-        return fbytes
+        return BytesIO(fbytes)
 
     def read_artifact_bytes(self, artifact: "HelaoArtifact") -> BytesIO:
         """Read a :class:`HelaoArtifact`'s body via ``get_bytes`` as a ``BytesIO``.
@@ -638,7 +662,7 @@ class LocalLoader:
         :meth:`get_bytes`' signature (``yml_path=""`` routes through the
         zip/sequence resolver for process-aggregated files).
         """
-        return BytesIO(self.get_bytes(*artifact.locator))
+        return self.get_bytes(*artifact.locator)
 
     def get_parquet(self, yml_path: str, par_fn: str) -> pd.DataFrame:
         """Read a parquet file (zip-aware) into a dataframe.
@@ -650,8 +674,7 @@ class LocalLoader:
         Returns:
             Decoded parquet contents.
         """
-        parbytes = self.get_bytes(yml_path, par_fn)
-        return pd.read_parquet(BytesIO(parbytes))
+        return pd.read_parquet(self.get_bytes(yml_path, par_fn))
 
 
 ABBR_MAP = {"act": "action", "exp": "experiment", "seq": "sequence", "prc": "process"}
@@ -693,13 +716,15 @@ class HelaoModel:
         helao_type = ABBR_MAP[yml_type]
         self.yml_path = yml_path
         self.helao_type = helao_type
+        # ``.get`` with the remote loader's defaults: a missing key is None
+        # (or {} for params) on both backends rather than a KeyError here.
         if helao_type != "process":
-            self.name = meta_dict[f"{helao_type}_name"]
+            self.name = meta_dict.get(f"{helao_type}_name")
         else:
-            self.name = meta_dict["technique_name"]
-        self.uuid = meta_dict[f"{helao_type}_uuid"]
-        self.timestamp = meta_dict[f"{helao_type}_timestamp"]
-        self.params = meta_dict[f"{helao_type}_params"]
+            self.name = meta_dict.get("technique_name")
+        self.uuid = meta_dict.get(f"{helao_type}_uuid")
+        self.timestamp = meta_dict.get(f"{helao_type}_timestamp")
+        self.params = meta_dict.get(f"{helao_type}_params", {})
         self.meta_dict = meta_dict
         self._meta_dict = self.meta_dict  # alias for HelaoLoader parity
         self.loader = loader
@@ -719,11 +744,13 @@ class HelaoDataModel(HelaoDataModelMixin, HelaoModel):
     """
 
     @property
-    def hlo(self) -> tuple:
-        """``(meta, data)`` for the primary HLO file via the owning loader."""
+    def hlo(self) -> HloPayload:
+        """:class:`HloPayload` of the primary HLO file (empty if none), as remote."""
+        if not self.data_files:
+            return HloPayload()
         return self.loader.get_hlo(self.yml_path, self.hlo_file["file_name"])
 
-    def read_hlo_file(self, filename) -> tuple:
+    def read_hlo_file(self, filename) -> HloPayload:
         """Read an arbitrary HLO ``filename`` from this record's directory."""
         return self.loader.get_hlo(self.yml_path, filename)
 
@@ -839,8 +866,8 @@ class HelaoSequence(HelaoModel):
         self.sequence_label = meta_dict.get("sequence_label", "")
 
 
-class HelaoProcess(HelaoModel):
-    """Process record loaded from a local yml tree.
+class HelaoProcess(HelaoDataModelMixin, HelaoModel):
+    """Process record loaded from a local yml tree, with HLO accessors.
 
     Attributes:
         technique_name: Technique name from the source process.
@@ -913,6 +940,28 @@ class HelaoProcess(HelaoModel):
             )
             for fd in self.json.get("files", [])
         ]
+
+    @property
+    def hlo(self) -> HloPayload:
+        """:class:`HloPayload` of the primary data file, read from its action.
+
+        Empty when the process names no data file, as on the remote loader.
+        """
+        if not self.data_files:
+            return HloPayload()
+        fd = self.hlo_file
+        rel = f"{self._artifact_paths[fd['action_uuid']]}/{fd['file_name']}"
+        # Through get_bytes("", ...) like ``artifacts``, so a synced sequence
+        # zip works too. Process files name the S3 ``.hlo.json`` conversion;
+        # on disk and in the zip it is the raw ``.hlo``.
+        names = [rel, rel[: -len(".json")]] if rel.endswith(".hlo.json") else [rel]
+        for name in names:
+            try:
+                raw = self.loader.get_bytes("", name).read()
+            except (FileNotFoundError, KeyError):
+                continue
+            return HloPayload(*read_hlo_bytes(raw))
+        raise FileNotFoundError(f"{rel} not found under {self.loader.target}")
 
     def read_action_file(self, relative_path: str) -> bytes:
         """Read the raw bytes of an action file by its run-tree-relative path.
