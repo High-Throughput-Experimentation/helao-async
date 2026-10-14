@@ -1,9 +1,9 @@
 # STANDALONE co2sensor_server canary config (P3a special-split, CO2). Mirrors
 # spec.yml/galil.yml/gamry.yml's 2-server shape (one action server + one
 # action_visualizer) so an at-station openapi/runtime golden diff can compare
-# legacy vs hexagon like-for-like without pulling in the full ccsi1 station
+# legacy vs hexagon like-for-like without pulling in the full CO2 station
 # (ORCH, the syringe/MFC/valve servers, DB, ...). CO2SENSOR params (port,
-# start_margin) are copied VERBATIM from ccsi1.yml's CO2SENSOR block so
+# start_margin) are copied VERBATIM from the full station config's CO2SENSOR block so
 # acquire_co2 registers identically. This is the SprintIR-6S NDIR CO2 sensor
 # (serial COM12 via pyserial) -- WINDOWS-STATION hardware; the runtime golden
 # diff requires the sensor attached (see golden_capture_co2.py's docstring).

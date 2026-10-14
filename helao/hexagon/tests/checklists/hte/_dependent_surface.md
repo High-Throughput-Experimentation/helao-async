@@ -180,29 +180,18 @@ for f in sorted(cfgs.glob("*.yml")):
     print(f"{f.name}: fast={fasts} bokeh={bokehs} bokeh_port={bports}")
 ```
 
-Real (corrected) output:
+Real (corrected) output (rows for the 11 since-deleted archived configs are omitted; the prose below still refers to them):
 
 ```
-adss.yml: fast=['async_orch2', 'sync_server', 'galil_motion', 'gamry_server2', 'nidaqmx_server', 'pal_server', 'sample_server', 'syringe_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=['5003']
 adss3.yml: fast=['async_orch2', 'sync_server', 'galil_motion', 'gamry_server2', 'nidaqmx_server', 'pal_server', 'sample_server', 'syringe_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=['5003']
 anec.yml: fast=['async_orch2', 'sync_server', 'galil_io', 'galil_motion', 'gamry_server2', 'nidaqmx_server', 'pal_server', 'sample_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=['5003']
-ccsi1.yml: fast=['async_orch2', 'calc_server', 'co2sensor_server', 'sync_server', 'galil_io', 'mfc_server', 'nidaqmx_server', 'sample_server', 'syringe_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=[]
 ccsi2.yml: fast=['async_orch2', 'calc_server', 'co2sensor_server', 'sync_server', 'diapump_server', 'mfc_server', 'nidaqmx_server', 'sample_server', 'syringe_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=[]
 clad.yml: fast=['async_orch2', 'sync_server', 'galil_motion', 'gamry_server2', 'nidaqmx_server', 'pal_server', 'sample_server', 'syringe_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=['5003']
 eche10.yml: fast=['async_orch2', 'cam_server', 'sync_server', 'galil_io', 'galil_motion', 'gamry_server2', 'kinesis_server', 'sample_server', 'spec_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=['5003']
-eche4.yml: fast=['async_orch2', 'biologic_server'] bokeh=['standalone_operator'] bokeh_port=[]
-eche5.yml: fast=['async_orch2', 'gamry_server2', 'sample_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=[]
-eche6.yml: fast=['async_orch2', 'sync_server', 'galil_io', 'galil_motion', 'gamry_server2', 'sample_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=['5003']
-eche7.yml: fast=['async_orch2', 'sync_server', 'galil_io', 'galil_motion', 'gamry_server2', 'sample_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=['5003']
-eche8.yml: fast=['async_orch2', 'sync_server', 'galil_io', 'galil_motion', 'gamry_server2', 'sample_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=['5003']
 ecms3.yml: fast=['async_orch2', 'calc_server', 'sync_server', 'gamry_server2', 'mfc_server', 'nidaqmx_server', 'sample_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=[]
-ecms2.yml: fast=['async_orch2', 'calc_server', 'sync_server', 'mfc_server', 'nidaqmx_server', 'sample_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=[]
 gamry.yml: fast=['gamry_server2'] bokeh=['action_visualizer'] bokeh_port=[]
 hispec.yml: fast=['andor_server', 'async_orch2', 'biologic_server', 'calc_server', 'sync_server', 'galil_io', 'galil_motion', 'kinesis_server', 'sample_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=['5003']
 icpm1.yml: fast=['analysis_server', 'async_orch2', 'sync_server', 'sample_server'] bokeh=['standalone_operator'] bokeh_port=[]
-partialccsi1.yml: fast=['async_orch2', 'calc_server', 'co2sensor_server', 'sync_server', 'mfc_server', 'nidaqmx_server', 'sample_server', 'syringe_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=[]
-power_supply_test.yml: fast=['async_orch2', 'power_supply_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=[]
-uvis.yml: fast=['async_orch2', 'galil_io', 'galil_motion', 'sample_server', 'spec_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=['5003']
 xrfs1.yml: fast=['analysis_server', 'async_orch2', 'sync_server', 'sample_server'] bokeh=['standalone_operator'] bokeh_port=[]
 ```
 
@@ -237,7 +226,7 @@ numbers above are the ones this inventory relies on.)
 
 ## (d) `bokeh_port` claims (the "invisible port" hazard)
 
-10 of 21 configs declare an explicit `bokeh_port: 5003` (the operator's
+10 of 21 configs (pre-deletion count) declare an explicit `bokeh_port: 5003` (the operator's
 Bokeh port): `adss.yml`, `adss3.yml`, `anec.yml`, `clad.yml`, `eche10.yml`,
 `eche6.yml`, `eche7.yml`, `eche8.yml`, `hispec.yml`, `uvis.yml`. The
 remaining 11 declare none (`bokeh_port=[]`) — meaning those groups either

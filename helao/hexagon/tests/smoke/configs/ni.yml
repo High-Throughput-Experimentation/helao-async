@@ -1,21 +1,21 @@
 # STANDALONE nidaqmx_server canary config (P3a special-split, NI). Mirrors
 # spec.yml / galil.yml / gamry.yml's 2-server shape (one action server + one
 # action_visualizer) so an at-station openapi golden diff can compare legacy vs
-# hexagon like-for-like without pulling in the full ccsi1 station (ORCH, SAMPLE,
+# hexagon like-for-like without pulling in the full station (ORCH, SAMPLE,
 # DB, CO2SENSOR, MFC, syringes, ...). The NI `params:` (dev_gasvalve /
 # dev_multivalve / dev_liquidvalve / dev_pump device maps) are copied VERBATIM
-# from ccsi1.yml's NI block so nidaqmx_dyn_endpoints registers exactly the same
+# from the full station config's NI block so nidaqmx_dyn_endpoints registers exactly the same
 # route surface -- these dev_* maps GATE which action endpoints exist, so an
 # incomplete params block would change the registered routes and break the
 # openapi diff.
 #
-# OPENAPI-ONLY canary (no runtime golden-diff counterpart): ccsi1's NI block
+# OPENAPI-ONLY canary (no runtime golden-diff counterpart): the full station's NI block
 # declares NO `dev_monitor` (nor dev_heat / dev_cellcurrent+dev_cellvoltage),
 # so the only SAFE, non-perturbing read action (`acquire_monitors`, gated on
 # `if dev_monitor:` in nidaqmx_server.py) is NOT registered here. Every action
 # route this config DOES expose (pump / gasvalve / liquidvalve / multivalve /
 # stop) drives real hardware and must never be dispatched as a canary. So there
-# is no runtime data-capture scenario for NI under the verbatim ccsi1 params;
+# is no runtime data-capture scenario for NI under the verbatim station params;
 # the openapi-surface diff is the topology- and
 # safety-appropriate parity check. cNIMAX.connect() opens NI-DAQmx tasks against
 # the cDAQ chassis -- WINDOWS-ONLY hardware; simulation:true is cosmetic (banner
