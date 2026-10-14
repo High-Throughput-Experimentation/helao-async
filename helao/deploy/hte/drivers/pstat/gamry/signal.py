@@ -26,6 +26,24 @@ class ControlMode(StrEnum):
     GstatMode = "GstatMode"
 
 
+class SamplingMode(StrEnum):
+    """Current sampling within each signal step (GamryCOM ``gcSAMPLINGMODE``).
+
+    Passed as the fourth argument of ``Signal.SetAcquisitionControl``, as the
+    Framework's ``sequencerCV.exp`` does. Values name the GamryCOM constants.
+
+    Attributes:
+        Fast: One sample per step, no oversampling.
+        NoiseReject: Average over the last 20% of each step.
+        Surface: Continuous sampling over the whole step; counts the charging
+            current a staircase ``Fast`` sample misses (Cdl / ECSA work).
+    """
+
+    Fast = "SamplingModeFast"
+    NoiseReject = "SamplingModeNoiseReject"
+    Surface = "SamplingModeSurface"
+
+
 @dataclass
 class GamrySignal:
     """Description of a GamryCOM signal COM class and its parameters.

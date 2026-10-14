@@ -47,6 +47,7 @@ from helao.hexagon.adapters.native.gamry_com import GamryComAdapter
 
 from ...drivers.pstat.gamry.driver import ControlMode, DriverStatus, GamryDriver
 from ...drivers.pstat.gamry.readz import ReadZ, measure_ocv
+from ...drivers.pstat.gamry.signal import SamplingMode as GamrySamplingMode
 from ...drivers.pstat.gamry.technique import (
     TECH_CA,
     TECH_CP,
@@ -637,6 +638,7 @@ async def gamry_dyn_endpoints(app: ActionHost):
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         IErange: model_ierange = "auto",
+        SamplingMode: Optional[GamrySamplingMode] = None,  # None keeps pstat default
         SetStopIMin: Optional[float] = None,
         SetStopIMax: Optional[float] = None,
         SetStopDIMin: Optional[float] = None,
@@ -673,6 +675,8 @@ async def gamry_dyn_endpoints(app: ActionHost):
             TTLwait: TTL channel to wait on (``-1`` disables).
             TTLsend: TTL channel to assert on start (``-1`` disables).
             IErange: Current range setting; ``"auto"`` for autoranging.
+            SamplingMode: Per-step current sampling (``Surface`` for
+                Cdl/ECSA); ``None`` leaves the instrument default.
             SetStopIMin: Lower current threshold for early stop.
             SetStopIMax: Upper current threshold for early stop.
             SetStopDIMin: Lower dI/dt threshold for early stop.
@@ -849,6 +853,7 @@ async def gamry_dyn_endpoints(app: ActionHost):
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         IErange: model_ierange = "auto",
+        SamplingMode: Optional[GamrySamplingMode] = None,  # None keeps pstat default
         SetStopIMin: Optional[
             float
         ] = None,  # lower current threshold to trigger early stopping
@@ -888,6 +893,8 @@ async def gamry_dyn_endpoints(app: ActionHost):
             TTLwait: TTL channel to wait on (``-1`` disables).
             TTLsend: TTL channel to assert on start (``-1`` disables).
             IErange: Current range setting; ``"auto"`` for autoranging.
+            SamplingMode: Per-step current sampling (``Surface`` for
+                Cdl/ECSA); ``None`` leaves the instrument default.
             SetStopIMin: Lower current threshold for early stop.
             SetStopIMax: Upper current threshold for early stop.
             SetStopAtDelayIMin: Consecutive-point delay for ``SetStopIMin``.

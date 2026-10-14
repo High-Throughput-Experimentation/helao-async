@@ -33,7 +33,7 @@ from helao.core.drivers.helao_driver import (
 from .device import GAMRY_DEVICES, TTL_OFF, TTL_OUTPUTS, GamryPstat
 from .range import RANGES, get_range
 from .readz import ReadZ
-from .signal import ControlMode
+from .signal import ControlMode, SamplingMode
 from .sink import DummySink, GamryDtaqSink
 from .technique import GamryTechnique
 
@@ -223,7 +223,8 @@ class GamryDriver(HelaoDriver):
                 appear in ``technique.dtaq.int_param_keys`` or
                 ``bool_param_keys``.
             action_params: Action-server parameters used to fill in any
-                signal map keys that name a string source.
+                signal map keys that name a string source, and the optional
+                ``SamplingMode`` (a ``SamplingMode`` value).
             ierange: Requested current range identifier. Resolved against the
                 model-specific range enum by ``get_range``.
 
@@ -368,6 +369,18 @@ class GamryDriver(HelaoDriver):
             LOGGER.debug(signal_paramlist)
             self.signal = client.CreateObject(technique.signal.name)
             self.signal.Init(*signal_paramlist)
+            # Framework sequencerCV.exp: Signal.SetAcquisitionControl(NIL, NIL,
+            # NIL, SamplingMode) before SetSignal; absent key keeps the default
+            sampling_mode = action_params.get("SamplingMode")
+            if sampling_mode is not None:
+                from comtypes.automation import VARIANT
+
+                self.signal.SetAcquisitionControl(
+                    VARIANT.empty,
+                    VARIANT.empty,
+                    VARIANT.empty,
+                    getattr(self.GamryCOM, SamplingMode(sampling_mode).value),
+                )
             self.pstat.SetSignal(self.signal)
             time.sleep(0.01)
             response = DriverResponse(
