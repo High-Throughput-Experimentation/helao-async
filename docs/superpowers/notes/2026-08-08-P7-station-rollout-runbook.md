@@ -29,8 +29,9 @@ The sections below this block are dated provenance and still name the retired la
    exported under `<x>_hex` are imported. Expect one Reflex bundle rebuild.
 6. **Bookmarks:** Bokeh servers that served at `/graft` now serve at `/<module>` (for example
    `/control_visualizer`). Update any bookmark or wall display.
-7. **Rollback:** stop the group, check out `freeze/pre-b7c-rename_2610` in every repo, and
-   launch `<x>_hex`.
+7. **Rollback:** stop the group, check out `freeze/pre-b7c-rename_2610` in every repo, then
+   launch the prefix the station ran before B7c (its `<x>_hex` variant if it used one, otherwise `<x>`).
+8. A leftover `STATES/pids_<x>_hex_.pck` from the old variant is harmless and may be deleted.
 
 ---
 
