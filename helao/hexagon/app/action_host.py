@@ -179,6 +179,8 @@ class ActionHost(HelaoFastAPI):
         self.root_dir = self.helao_cfg.get("root", None)
         self.fault_dir: Optional[str] = None
         self.fault_file = None
+        #: The one shutdown run; see :meth:`shutdown`.
+        self._shutdown_task: Optional[asyncio.Future] = None
 
         self.live_buffer: dict = {}
         #: Non-concurrent executors serialize through this queue, by action
@@ -1344,6 +1346,24 @@ class ActionHost(HelaoFastAPI):
             await self.shutdown()
 
     async def shutdown(self) -> dict:
+        """Run :meth:`_shutdown_once` once; every later or concurrent call awaits it.
+
+        A group stop reaches each host twice: the launcher's ``POST /shutdown``,
+        then uvicorn's lifespan ``shutdown`` event when the process is
+        signalled. Running the driver hooks again sent a second safe-state
+        command to already-closed ports -- the Alicat MFCs re-ran
+        ``hold_valve_closed`` on closed serial ports, raising out of the
+        lifespan hook (to the console, not the log) and adding ~2.5 s per MFC
+        server to every Ctrl-X. Shielded, so a cancelled ``/shutdown`` request
+        cannot leave the drivers half shut down.
+        """
+        if self._shutdown_task is None:
+            self._shutdown_task = asyncio.ensure_future(self._shutdown_once())
+        else:
+            LOGGER.info("action shutdown already ran; not repeating driver hooks")
+        return await asyncio.shield(self._shutdown_task)
+
+    async def _shutdown_once(self) -> dict:
         """Stop the poller, run driver shutdown hooks, close the fault log.
 
         The poller stops **before** the driver disconnects: it loops on
