@@ -2,10 +2,10 @@
 
 **Date:** 2026-10-13
 **Program:** Legacy separation (`2026-08-14-legacy-separation-program-design.md`), sub-project B7, third of three parts
-**Branch:** parent `feat/b7c-rename` off `unstable` `cc07dbd7`, one PR, ordered commits. Each of
+**Branch:** parent `feat/b7c-rename` off `unstable` `7592729b`, one PR, ordered commits. Each of
 Deployment-A/B/C gets its own `feat/b7c-rename` branch off its `main`. The fourth private
 deployment has no B7c surface and is not touched.
-**Recovery point:** `freeze/pre-b7c-rename_2610`, taken at `cc07dbd7` in the parent and at the current
+**Recovery point:** `freeze/pre-b7c-rename_2610`, taken at `7592729b` in the parent and at the current
 `main` head of Deployment-A/B/C (Q7)
 **Status:** design approved with one user decision recorded below; reviewed (approve-with-fixes,
 fixes applied); this spec records the measurements and settles what the approval left open
@@ -370,7 +370,7 @@ resolution rule, **without editing any launcher**, which keep their warning.
    - **Which checklist:** the one for the module's **owning** deployment only, never the
      config's own directory.
    - **Which servers:** the gate fails only for an action server whose owning deployment has a
-     checklist directory *and* whose module had a checklist at `cc07dbd7` but no longer does.
+     checklist directory *and* whose module had a checklist at `7592729b` but no longer does.
      Every other action server with no checklist is listed in the output as `no checklist`,
      not failed.
    - **Why:** `xafs_server` and the 15 `cpsim_server` entries (§2.8) would otherwise fail a gate
@@ -481,7 +481,7 @@ directory is ignored rather than tracked.
 
 ### 5.0 Task 0 — baselines (no commit)
 
-On `cc07dbd7`, in the bare worktree (B7b §7 gate-5 procedure for private copies):
+On `7592729b`, in the bare worktree (B7b §7 gate-5 procedure for private copies):
 
 - **F0 / F0p.** The failing set of `run_tests.py` without, then with, the private copies.
 - **R0, the resolved composition** of every config in all four repos, computed with all private
@@ -751,7 +751,7 @@ Each question has a default, which the plan adopts unless the user overrides it.
 - **Q14: a cross-prefix running-group check in `launch.py`.** **Default:** no, because the
   runbook covers it. It would be the first launcher edit in the program for a one-time cut-over.
 - **Q15: checklist gate scope.** **Default:** look up only the owning deployment's checklist
-  directory. Fail only when a checklist that existed at `cc07dbd7` is gone; report any other
+  directory. Fail only when a checklist that existed at `7592729b` is gone; report any other
   missing checklist without failing; freeze no new checklists in B7c (D-B7c.6 gate 3).
   Alternative: freeze `xafs_server` and `cpsim_server` checklists now. That needs live captures
   B7c's gates do not otherwise require.
