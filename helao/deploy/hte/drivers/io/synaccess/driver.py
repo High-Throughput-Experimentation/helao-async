@@ -6,6 +6,7 @@ base object; async handling is the server's responsibility. All public methods
 return a `DriverResponse`.
 """
 
+import os
 import time
 
 import httpx
@@ -27,7 +28,8 @@ from helao.core.drivers.helao_driver import (
 class NetbooterDriver(HelaoDriver):
     """HelaoDriver wrapping the Synaccess Netbooter CGI HTTP interface.
 
-    The driver reads `hostname`, `username`, and `password` from `config` and
+    The driver reads `hostname`, `username`, and `password` from `config` (or the
+    password from the environment variable named by `password_env`) and
     builds an `httpx.Client` that sends HTTP basic auth to
     `http://<hostname>/cmd.cgi?`. Public methods send `$A3`/`$A7` outlet commands
     and return a `DriverResponse`. A command succeeds only when the PDU answers
@@ -41,7 +43,11 @@ class NetbooterDriver(HelaoDriver):
 
         Args:
             config: Driver configuration dict. Required keys: `hostname`,
-                `username`, `password`. Optional: `timeout` (seconds per request,
+                `username`, and `password` or `password_env`. `password_env` names
+                an environment variable holding the password; it is consulted only
+                when `password` is absent, so an explicit `password` wins. A
+                named variable that is unset or empty counts as a missing
+                password and logs an error naming the variable. Optional: `timeout` (seconds per request,
                 default 5) and `retry_delay` (seconds between attempts, default
                 0.5). Missing required keys leave the client unconfigured, log an
                 error, and make every command return a failed response.
@@ -51,13 +57,20 @@ class NetbooterDriver(HelaoDriver):
         hostname = self.config.get("hostname", None)
         username = self.config.get("username", None)
         password = self.config.get("password")
+        password_env = self.config.get("password_env")
+        if password is None and password_env:
+            password = os.environ.get(password_env) or None
+            if password is None:
+                LOGGER.error(
+                    f"Environment variable '{password_env}' named by 'password_env' is unset or empty."
+                )
         self.retry_delay = self.config.get("retry_delay", 0.5)
         self.auth = None
         self.client = None
         self.host_url = None
         if hostname is None or username is None or password is None:
             LOGGER.error(
-                "Missing parameters, check 'hostname', 'username', and 'password' in supplied config."
+                "Missing parameters, check 'hostname', 'username', and 'password' (or 'password_env') in supplied config."
             )
         else:
             self.auth = httpx.BasicAuth(username=username, password=password)

@@ -105,3 +105,71 @@ def test_bad_credentials_fail(make_stub):
 def test_missing_config_fails_instead_of_raising():
     resp = NetbooterDriver(config={}).switch_outlet(1, True)
     assert resp.response == DriverResponseType.failed
+
+
+def _env_driver(stub, **extra):
+    cfg = {
+        "hostname": f"127.0.0.1:{stub.server.server_port}",
+        "username": "admin",
+        "retry_delay": 0.0,
+    }
+    cfg.update(extra)
+    return NetbooterDriver(config=cfg)
+
+
+@pytest.fixture
+def captured_logs(caplog):
+    """Route the driver's (possibly non-propagating) logger into caplog."""
+    from helao.deploy.hte.drivers.io.synaccess import driver as mod
+
+    caplog.set_level(0)
+    mod.LOGGER.addHandler(caplog.handler)
+    yield caplog
+    mod.LOGGER.removeHandler(caplog.handler)
+
+
+def test_password_read_from_named_env_var(make_stub, monkeypatch, captured_logs):
+    monkeypatch.setenv("TEST_PDU_PW", "secret")
+    stub = make_stub()
+    resp = _env_driver(stub, password_env="TEST_PDU_PW").switch_outlet(3, True)
+    assert resp.response == DriverResponseType.success
+    assert stub.requests == [("/cmd.cgi?$A3%203%201", AUTH)]
+    assert "secret" not in captured_logs.text
+    assert "secret" not in resp.message
+
+
+def test_env_sourced_bad_credentials_do_not_leak(make_stub, monkeypatch, captured_logs):
+    monkeypatch.setenv("TEST_PDU_PW", "hunter2-wrong")
+    stub = make_stub()
+    drv = _env_driver(stub, password_env="TEST_PDU_PW")
+    resp = drv.switch_outlet(1, False, repeat=1)
+    assert resp.response == DriverResponseType.failed
+    assert "401" in resp.message
+    assert "hunter2-wrong" not in captured_logs.text
+    assert "hunter2-wrong" not in resp.message
+
+
+def test_explicit_password_beats_env(make_stub, monkeypatch):
+    monkeypatch.setenv("TEST_PDU_PW", "from-env")
+    stub = make_stub()
+    drv = _env_driver(stub, password="secret", password_env="TEST_PDU_PW")
+    assert drv.switch_outlet(3, True).response == DriverResponseType.success
+    assert stub.requests[0][1] == AUTH
+
+
+@pytest.mark.parametrize("value", [None, ""])
+def test_named_but_unset_env_is_unconfigured_and_logged(make_stub, monkeypatch, value):
+    from helao.deploy.hte.drivers.io.synaccess import driver as mod
+
+    if value is None:
+        monkeypatch.delenv("TEST_PDU_PW", raising=False)
+    else:
+        monkeypatch.setenv("TEST_PDU_PW", value)
+    errors = []
+    monkeypatch.setattr(mod.LOGGER, "error", lambda msg, *a, **k: errors.append(msg))
+    stub = make_stub()
+    drv = _env_driver(stub, password_env="TEST_PDU_PW")
+    assert drv.client is None
+    assert drv.switch_outlet(1, True).response == DriverResponseType.failed
+    assert stub.requests == []
+    assert any("TEST_PDU_PW" in m for m in errors)
