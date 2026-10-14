@@ -51,6 +51,7 @@ class _StubSyncer:
     (helao_dirs.py:138), and SyncDriver.__init__ leaves ``run_journal`` None
     in that case. So the real ``_journal`` is borrowed alongside
     ``enqueue_yml`` and exercises its own None-guard here.
+    ``release_quarantine`` is borrowed because ``/finish_yml`` calls it first.
     """
 
     def __init__(self):
@@ -63,6 +64,7 @@ class _StubSyncer:
 
     enqueue_yml = SyncDriver.enqueue_yml
     _journal = SyncDriver._journal
+    release_quarantine = SyncDriver.release_quarantine
 
 
 def test_enqueue_yml_refuses_a_process_yml(tmp_path):
