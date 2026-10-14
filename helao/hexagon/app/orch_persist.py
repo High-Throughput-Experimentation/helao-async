@@ -30,8 +30,11 @@ import re
 from datetime import datetime
 from typing import Optional
 
+from helao.core.models.hlostatus import HloStatus
+from helao.core.models.orchstatus import LoopIntent, LoopStatus
 from helao.helpers import helao_logging as logging
 from helao.helpers.dequedict import DequeDict
+from helao.helpers.premodels import Action
 from helao.helpers.time_utils import gen_uuid
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -51,6 +54,26 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 # unpickling resolves the class; :meth:`QueuePersister.import_queues` quarantines
 # that case separately.
 QUEUE_PCK_SCHEMA = 1
+
+# Action fields the orchestrator or action server fills in while an action runs;
+# a re-run copy gets them back at the model default so it dispatches as new.
+_RUNTIME_ACTION_FIELDS = (
+    "action_uuid",
+    "action_timestamp",
+    "action_status",
+    "action_output_dir",
+    "action_output",
+    "action_finished_timestamp",
+    "orch_submit_order",
+    "files",
+    "file_conn_keys",
+    "data_stream_status",
+    "error_code",
+    "samples_out",
+    "parent_action_uuid",
+    "child_action_uuid",
+    "prefinish_errors",
+)
 
 # How many timestamped exports to keep. The dispatch post-loop writes one every
 # time the orchestrator stops with non-empty queues, so uncapped they accumulate
@@ -174,6 +197,86 @@ class QueuePersister:
             )
         return removed
 
+    def _requeue_inflight_actions(self) -> None:
+        """Re-run, under a fresh uuid, every action that was in flight at export.
+
+        The new process's action servers never report the old uuids, so left in
+        ``active_dict`` they keep ``actions_idle()`` false forever and hang every
+        wait-for-all, experiment close-out and stop drain. Each one is retired to
+        ``skipped`` (not ``errored``, which trips the errored-uuid ingestion) and a
+        fresh copy goes to the front of ``action_dq`` in the original order. The
+        retry keeps ``action_order`` and bumps ``action_retry``, as an errored-action
+        retry does. ``counter_dispatched_actions`` is left alone: the interrupted
+        attempt keeps its ``orch_submit_order``, so the re-run takes the next one and
+        the two run directories cannot collide.
+        """
+        orch = self.orch
+        gsm = orch.globalstatusmodel
+        inflight = dict(gsm.active_dict)
+        for srv in gsm.server_dict.values():
+            for ep in srv.endpoints.values():
+                for uuid, act in ep.active_dict.items():
+                    inflight.setdefault(uuid, act)
+        if not inflight:
+            return
+        exp = orch.active_experiment
+        exp_uuid = exp.experiment_uuid if exp is not None else None
+        fresh = []
+        for uuid, act in sorted(
+            inflight.items(), key=lambda kv: kv[1].orch_submit_order or 0
+        ):
+            if exp_uuid is None or act.experiment_uuid != exp_uuid:
+                LOGGER.warning(
+                    f"In-flight action {act.action_name} ({uuid}) does not belong to "
+                    "the restored active experiment; retiring it without a re-run."
+                )
+            else:
+                new = act.model_copy(deep=True)
+                for name in _RUNTIME_ACTION_FIELDS:
+                    setattr(
+                        new,
+                        name,
+                        Action.model_fields[name].get_default(
+                            call_default_factory=True
+                        ),
+                    )
+                new.action_retry = (act.action_retry or 0) + 1
+                fresh.append(new)
+            # retire the old uuid: the experiment record shows the attempt as
+            # [skipped, finished], but the killed server's on-disk -act.yml still
+            # reads active (pre-existing on any crash/relaunch; the syncer will not
+            # sync that experiment until the record is repaired -- tracked separately)
+            act.action_status = [HloStatus.skipped, HloStatus.finished]
+            for d in [gsm.active_dict] + [
+                e.active_dict
+                for srv in gsm.server_dict.values()
+                for e in srv.endpoints.values()
+            ]:
+                d.pop(uuid, None)
+            gsm.nonactive_dict.setdefault(HloStatus.skipped, {})[uuid] = act
+            for srv in gsm.server_dict.values():
+                ep = srv.endpoints.get(act.action_name)
+                if ep is not None and srv.action_server.server_name == (
+                    act.action_server.server_name
+                ):
+                    ep.nonactive_dict.setdefault(HloStatus.skipped, {})[uuid] = act
+            if exp is not None:
+                for d in exp.dispatched_actions:
+                    if d.action_uuid == uuid:
+                        d.action_status = [HloStatus.skipped, HloStatus.finished]
+            # both would otherwise point wait_for_previous / the history poll
+            # at an action that will never be acknowledged
+            if str(orch.last_action_uuid) == str(uuid):
+                orch.last_action_uuid = ""
+            if str(orch.last_dispatched_action_uuid) == str(uuid):
+                orch.last_dispatched_action_uuid = None
+        for new in reversed(fresh):
+            orch.action_dq.appendleft(new)
+        LOGGER.info(
+            f"Re-queued {len(fresh)} action(s) that were in flight at export; "
+            f"retired {len(inflight)} old uuid(s) to skipped."
+        )
+
     def import_queues(self, pck_path: Optional[str] = None) -> str:
         """Restore deques/active/last state from a previously exported pickle.
 
@@ -257,6 +360,16 @@ class QueuePersister:
                 orch.last_action_uuid = queue_dict["last_act"]
                 orch.last_dispatched_action_uuid = queue_dict["last_dispatched_act"]
                 orch.globalstatusmodel = queue_dict["globalstatusmodel"]
+                # The dispatch loop does not survive a restart, so its flags must
+                # not either: a pickle written mid-run holds loop_state=started,
+                # which `start` treats as already running -- nothing would ever
+                # dispatch. loop_state=estopped is the E-STOP latch (cleared only
+                # by /clear_estop) and is kept; nothing produces an estop *intent*.
+                gsm = orch.globalstatusmodel
+                if gsm.loop_state != LoopStatus.estopped:
+                    gsm.loop_state = LoopStatus.stopped
+                gsm.loop_intent = LoopIntent.none
+                self._requeue_inflight_actions()
                 orch.active_run_id = queue_dict.get("active_run_id", None)
                 orch.action_history = DequeDict(
                     queue_dict.get("action_history", []), maxlen=1000
