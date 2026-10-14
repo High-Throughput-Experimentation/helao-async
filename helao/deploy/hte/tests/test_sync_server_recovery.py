@@ -468,7 +468,9 @@ async def test_tasks_reports_the_sweep_beside_the_queue_it_already_reported(
     addition -- operators and ``conc_items.py``-style smoke clients read them."""
     app = _make_app(installed_config)
     app.driver = SimpleNamespace(
-        running_tasks={"job-1": None}, task_queue=SimpleNamespace(qsize=lambda: 4)
+        running_tasks={"job-1": None},
+        task_queue=SimpleNamespace(qsize=lambda: 4),
+        quarantined=lambda: [],
     )
     endpoint = next(
         r.endpoint for r in app.routes if getattr(r, "path", None) == "/tasks"
@@ -536,3 +538,54 @@ def test_the_startup_sweep_waits_for_the_port_before_sweeping():
     src = inspect.getsource(sync_server.makeApp)
     body = src[src.index("async def _startup_sweep") :]
     assert body.index("wait_until_listening") < body.index("sweep_pending(")
+
+
+def _route(app, path):
+    return next(r.endpoint for r in app.routes if getattr(r, "path", None) == path)
+
+
+class _QuarantineDriver:
+    """Records the order of release and enqueue calls."""
+
+    def __init__(self, quarantined):
+        self.calls = []
+        self._quarantined = quarantined
+        self.running_tasks = {}
+        self.task_queue = asyncio.Queue()
+
+    def release_quarantine(self, yml_path):
+        self.calls.append(("release", str(yml_path)))
+        return self._quarantined
+
+    async def enqueue_yml(self, upath, rank=0, rank_limit=-5):
+        self.calls.append(("enqueue", str(upath), rank))
+
+    def quarantined(self):
+        return [{"yml": "/x/a-act.yml", "strikes": 5}]
+
+
+@pytest.mark.asyncio
+async def test_finish_yml_releases_quarantine_before_enqueueing(installed_config):
+    app = _make_app(installed_config)
+    drv = _QuarantineDriver(quarantined=True)
+    _prime(app, drv)
+    await _route(app, "/finish_yml")(yml_path="/x/a-act.yml")
+    assert drv.calls == [("release", "/x/a-act.yml"), ("enqueue", "/x/a-act.yml", 0)]
+
+
+@pytest.mark.asyncio
+async def test_finish_yml_on_a_healthy_record_just_enqueues(installed_config):
+    app = _make_app(installed_config)
+    drv = _QuarantineDriver(quarantined=False)
+    _prime(app, drv)
+    await _route(app, "/finish_yml")(yml_path="'/x/b-exp.yml'")
+    assert drv.calls[-1] == ("enqueue", "/x/b-exp.yml", 1)
+
+
+@pytest.mark.asyncio
+async def test_tasks_lists_quarantined_records(installed_config):
+    app = _make_app(installed_config)
+    _prime(app, _QuarantineDriver(quarantined=False))
+    body = await _route(app, "/tasks")()
+    assert body["quarantined"] == [{"yml": "/x/a-act.yml", "strikes": 5}]
+    assert set(body) == {"running", "num_queued", "last_startup_sweep", "quarantined"}
