@@ -40,7 +40,7 @@ from collections import defaultdict
 from configparser import ConfigParser
 from contextlib import AsyncExitStack, asynccontextmanager
 from copy import copy
-from datetime import datetime
+from datetime import datetime, timedelta
 from glob import glob
 from pathlib import Path, PurePosixPath
 from typing import Optional, Protocol, Union
@@ -748,6 +748,26 @@ class HelaoYml:
         )
 
 
+#: ``last_error`` is cut to this many characters so a traceback-sized message
+#: cannot bloat the ``.prg`` (sync quarantine spec §3).
+QUARANTINE_ERROR_CHARS = 500
+
+
+def quarantine_due(block: dict, n: int, hours: float, now: datetime) -> bool:
+    """Whether a ``quarantine`` block has earned quarantine (spec Q3).
+
+    Both thresholds must hold: at least ``n`` strikes, and the first failure
+    at least ``hours`` old. The age floor is what keeps an S3 or API outage
+    from quarantining every record that happened to sync during it. ``n <= 0``
+    disables quarantine. ``now`` is a parameter so the rule is testable
+    without patching the clock.
+    """
+    if n <= 0 or block.get("strikes", 0) < n:
+        return False
+    first = datetime.fromisoformat(block["first_failed"])
+    return now - first >= timedelta(hours=hours)
+
+
 class Progress:
     """Sidecar ``.prg`` file tracking sync state for one ``HelaoYml``.
 
@@ -1122,6 +1142,51 @@ class Progress:
         """Delete the ``.prg`` file from disk."""
         # with self.prglock:
         self.prg.unlink()
+
+    @property
+    def quarantine(self) -> Optional[dict]:
+        """The ``quarantine`` block, or ``None`` if no failure is recorded."""
+        return self.dict.get("quarantine")
+
+    @property
+    def is_quarantined(self) -> bool:
+        """Whether this record is quarantined (``quarantined_at`` is set)."""
+        return bool((self.quarantine or {}).get("quarantined_at"))
+
+    def add_strike(self, error: str, n: int, hours: float, now: datetime) -> bool:
+        """Record one failed sync pass; return True only on entering quarantine.
+
+        A block that does not parse (a hand edit, a foreign writer) is replaced
+        by a fresh one rather than raised on: a strike is bookkeeping, and
+        failing here would turn a failed pass into a crashed worker.
+        """
+        stamp = now.isoformat(timespec="seconds")
+        block = self.quarantine
+        try:
+            strikes = int(block["strikes"]) + 1
+            datetime.fromisoformat(block["first_failed"])
+            first = block["first_failed"]
+            already = bool(block.get("quarantined_at"))
+        except (TypeError, KeyError, ValueError):
+            strikes, first, already = 1, stamp, False
+        block = {
+            "strikes": strikes,
+            "first_failed": first,
+            "last_failed": stamp,
+            "last_error": str(error)[:QUARANTINE_ERROR_CHARS],
+            "quarantined_at": block.get("quarantined_at") if already else None,
+        }
+        entered = not already and quarantine_due(block, n, hours, now)
+        if entered:
+            block["quarantined_at"] = stamp
+        self.dict["quarantine"] = block
+        self.write_dict()
+        return entered
+
+    def clear_quarantine(self) -> None:
+        """Drop the ``quarantine`` block, so the next failure starts afresh."""
+        if self.dict.pop("quarantine", None) is not None:
+            self.write_dict()
 
 
 class SyncDriver:
