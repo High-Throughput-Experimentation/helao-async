@@ -387,10 +387,26 @@ This is a full scan of `RUNS`, which is why `RUNS` is allowed to stay small: it
 accumulates only from cut-over forward (D1 leaves years of history in the legacy
 trees). The scan is not on any hot path — only cold start after a lost journal.
 
-Leftover `active` records at startup mean the server died mid-run. They are
-handed to the **existing** orphan-record path unchanged (the deferral behaviour
-pinned by `test_orphan_record_defer.py`); this design does not redefine what an
-orphan is.
+Leftover `active` records at startup mean the server died mid-run.
+
+*Update 2026-10-14.* The text originally here sent them to the orphan-record
+path (`test_orphan_record_defer.py`); that path handles an action whose *parent*
+yml is missing, so it never applied and nothing handled these records. Their
+`-act.yml` stayed `[active]` for ever and the syncer, which blocks a parent on
+non-estopped active children, never shipped the experiment or sequence. The
+startup reader now exists: `ActionHost.reconcile_interrupted()` (a background
+task started from `startup_event`) reads the server's *own* journal, sets each
+still-`active` action yml to `[finished, errored]` with `error_code:
+critical_error` and an explanatory `action_output.error_message`, then hands it
+off through `move_dir` (journal `done`, `/finish_yml` unless manual). A yml that
+is already terminal is not rewritten. The journal is per server key, and the `SYNC` key's file is shared with the
+syncer's `unsynced` lines, so the reconciler touches only `state: active` action
+entries whose yml names this server as owner. A per-key lock in `STATES` stops a
+second process for a live key from reconciling. Files present in the action
+directory are registered in `files` so the partial data ships. It never writes
+to `status_q`, and it does not touch the orchestrator's experiment/sequence
+records. A refused syncer
+connection is logged; the syncer's startup sweep picks the yml up.
 
 ## 5. What the syncer stops doing
 

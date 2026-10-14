@@ -1352,6 +1352,11 @@ first is not yet true. D-B, D-C and the estop defect (A34, A35) are all real
 and their fixes all correct, but they fix *bookkeeping*: a wrong journal has
 no live consequence today because nothing consults it.
 
+*Update 2026-10-14.* One reader now exists: `ActionHost.reconcile_interrupted()`
+reads each action server's own journal at startup and finishes the actions an
+earlier process left `active` (spec §4.5). The journal is therefore load-bearing
+for that one decision; the table above is otherwise unchanged.
+
 Two honest options, and this plan does not choose:
 
 1. **Build the reader.** The journal becomes load-bearing: `has_pending_work`
