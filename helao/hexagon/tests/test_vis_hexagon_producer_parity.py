@@ -17,8 +17,8 @@ frame into a panel living inside a hexagon-composed document. Both are here:
    over a hexagon-produced one -- and compares the resulting Bokeh data source
    column-for-column. Five panels, two deployments, both channels.
 2. :func:`test_hexagon_hosted_document_panel_consumes_hexagon_frames` builds a
-   document through the P7e graft (so ``makeVisApp``, ``build_wiring`` and
-   ``VIS_REQUIRED`` all really run), points the action server it subscribes to
+   document through the hte ``live_visualizer`` module's ``makeBokehApp``
+   directly, points the action server it subscribes to
    at a replay server serving hexagon-produced frames, and lets the panel's own
    unmodified ``IOloop_data`` pull them in.
 3. :func:`test_no_hexagon_orch_ws_producer_exists` and its neighbours pin the
@@ -38,6 +38,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import inspect
+import json
 from importlib import import_module
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -52,7 +53,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 GRAFT_CONFIG = (
     REPO_ROOT / "helao" / "deploy" / "test" / "configs" / "goldenhexgraft.yml"
 )
-VIS_GRAFT = "helao.deploy.hexagon.servers.visualizer.graft"
+VIS_MODULE = "helao.deploy.hte.servers.visualizer.live_visualizer"
 
 
 # ---------------------------------------------------------------------------
@@ -383,7 +384,7 @@ def _find_source(doc: Document, column: str) -> ColumnDataSource:
         if isinstance(m, ColumnDataSource) and column in m.column_names
     ]
     assert found, (
-        f"no ColumnDataSource in the grafted document carries {column!r} -- "
+        f"no ColumnDataSource in the document carries {column!r} -- "
         "the panel did not mount"
     )
     assert len(found) == 1, f"{len(found)} sources carry {column!r}"
@@ -400,12 +401,11 @@ async def _cancel_new_tasks(before):
 async def test_hexagon_hosted_document_panel_consumes_hexagon_frames(
     real_config, tmp_path
 ):
-    """The join P7e could not run: a hexagon-COMPOSED Bokeh document whose
-    panel ingests frames a hexagon action server produced.
+    """The join P7e could not run: a Bokeh document built by the hte
+    ``live_visualizer`` whose panel ingests frames a hexagon action server produced.
 
-    Everything on the consuming side is production code: the generic P7e graft
-    resolves its legacy target from config, ``makeVisApp`` builds the wiring and
-    enforces ``VIS_REQUIRED``, the real ``live_visualizer`` mounts the real
+    Everything on the consuming side is production code: the real
+    ``live_visualizer`` mounts the real
     ``wssim_live_vis`` for ``SIM``, and that panel's own ``IOloop_data`` opens
     its own ``WsSubscriber`` and decodes what arrives. The only substitution is
     the action server itself, replaced by a replay server serving bytes the
@@ -435,15 +435,15 @@ async def test_hexagon_hosted_document_panel_consumes_hexagon_frames(
     async with wf.replay_server({"ws_live": [first, second]}) as (host, port):
         # SIM is the only server in goldenhexgraft.yml declaring `live_vis`, so
         # this is the socket the mounted panel will subscribe to. Rewritten
-        # BEFORE the graft builds, because VisSubscriber resolves host/port at
+        # BEFORE the document builds, because VisSubscriber resolves host/port at
         # construction time.
         real_config["servers"]["SIM"]["host"] = host
         real_config["servers"]["SIM"]["port"] = port
 
-        graft = import_module(VIS_GRAFT)
+        vis = import_module(VIS_MODULE)
         before = asyncio.all_tasks()
         doc = Document()
-        out = graft.makeBokehApp(
+        out = vis.makeBokehApp(
             doc,
             confPrefix="goldenhexgraft",
             server_key="LIVE",
@@ -451,9 +451,17 @@ async def test_hexagon_hosted_document_panel_consumes_hexagon_frames(
         )
         try:
             assert out is doc
-            # composed, not hexagon in name only (P7e's property, restated here
-            # because it is the premise of "hexagon-HOSTED")
-            assert doc.hexagon_wiring is not None  # type: ignore[attr-defined]
+            # mount_visualizers re-snapshots the loaded modules after the
+            # per-instrument panel imports, so hot-reload maps an edited
+            # panel to this bokeh server
+            snap = json.loads(
+                (tmp_path / "STATES" / "loaded_modules_LIVE.json").read_text("utf-8")
+            )
+            for rel in (
+                "helao/deploy/hte/servers/visualizer/live_visualizer.py",
+                "helao/deploy/test/servers/visualizer/wssim_live_vis.py",
+            ):
+                assert str(REPO_ROOT / rel) in snap, rel
             source = _find_source(doc, "series_0")
             assert list(source.data["series_0"]) == [], "panel started non-empty"
 
@@ -473,6 +481,26 @@ async def test_hexagon_hosted_document_panel_consumes_hexagon_frames(
 
 
 @pytest.mark.asyncio
+async def test_standalone_operator_document_mounts_the_operator(real_config):
+    """The real hte standalone_operator builds a document with the operator UI."""
+    operator = import_module("helao.deploy.hte.servers.operator.standalone_operator")
+    before = asyncio.all_tasks()
+    doc = Document()
+    try:
+        out = operator.makeBokehApp(
+            doc,
+            confPrefix="goldenhexgraft",
+            server_key="OPERATOR",
+            helao_repo_root=str(REPO_ROOT),
+        )
+        assert out is doc
+        assert doc.operator is not None  # type: ignore[attr-defined]
+        assert len(doc.roots) >= 1
+    finally:
+        await _cancel_new_tasks(before)
+
+
+@pytest.mark.asyncio
 async def test_hexagon_hosted_document_ingest_can_fail(real_config, tmp_path):
     """Mutation twin for the document test: with the SIM socket pointed at a
     replay server that serves the OTHER channel's frames, the same document
@@ -488,10 +516,10 @@ async def test_hexagon_hosted_document_ingest_can_fail(real_config, tmp_path):
         real_config["servers"]["SIM"]["host"] = host
         real_config["servers"]["SIM"]["port"] = port
 
-        graft = import_module(VIS_GRAFT)
+        vis = import_module(VIS_MODULE)
         before = asyncio.all_tasks()
         doc = Document()
-        graft.makeBokehApp(
+        vis.makeBokehApp(
             doc,
             confPrefix="goldenhexgraft",
             server_key="LIVE",
@@ -529,7 +557,7 @@ async def test_hexagon_hosted_document_ingest_can_fail(real_config, tmp_path):
 async def test_no_hexagon_orch_ws_producer_exists(tmp_path, monkeypatch):
     """THE RESIDUAL for Amendment 1 gate item 1, pinned rather than papered over.
 
-    The orchestrator the shim builds (an ``OrchHost``) has a status adapter
+    The hte orchestrator module builds an ``OrchHost``, which has a status adapter
     with no publish bridge bound, so every ``publish_*`` on it raises. Its
     ``/ws_status`` and ``/ws_data`` are served by the host's own relays
     (``OrchHost._register_orch_ws_routes``), which send a DIFFERENT payload
@@ -545,7 +573,7 @@ async def test_no_hexagon_orch_ws_producer_exists(tmp_path, monkeypatch):
     ``/ws_status`` subscriber -- have never been conformance-tested against a
     model-shaped frame).
     """
-    from helao.deploy.hexagon.servers.orchestrator.async_orch2 import makeApp
+    from helao.deploy.hte.servers.orchestrator.async_orch2 import makeApp
     from helao.helpers import config_loader
     from helao.hexagon.adapters.errors import UnwiredPortError
     from helao.hexagon.adapters.legacy.status import DispatcherStatusAdapter

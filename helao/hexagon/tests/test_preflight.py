@@ -4,148 +4,17 @@ from __future__ import annotations
 
 import re
 import shutil
-from pathlib import Path
 
 import pytest
 
 from helao.hexagon import preflight
+from helao.helpers.config_loader import read_config
 
 # hte canary configs (P3a/P3e) were relocated out of helao/deploy/hte/configs/
 # into this centralized, hte-only directory; bare-prefix resolution (which
 # globs helao/deploy/*/configs/) no longer finds them, so they must be passed
 # by full path.
 SMOKE_CONFIGS = preflight.HTE_SMOKE_CONFIGS
-
-#: A config that composes onto hexagon, in any of the three dialects: a
-#: literal `deployment: hexagon` server block (YAML), its `"deployment":
-#: "hexagon"` form (a .py config), or a DERIVED variant, which declares nothing
-#: literally and instead calls `hexagon_variant()` on its base.
-#:
-#: The derived leg is not redundant. Those files happen to contain the literal
-#: too -- inside the docstring that explains what they do -- so a
-#: literal-only pattern picks them up for the wrong reason and would drop them
-#: from this gate the moment someone reworded a comment. Matching the call is
-#: matching the mechanism.
-_DECLARES_HEXAGON = re.compile(
-    r"""["']?deployment["']?\s*[:=]\s*["']?%s\b|hexagon_variant\s*\("""
-    % preflight.HEXAGON
-)
-
-#: Config suffixes `read_config` accepts.
-_CONFIG_SUFFIXES = (".yml", ".py")
-
-
-def _hexagon_configs() -> list[Path]:
-    """Every config in the tree that flips at least one server to hexagon.
-
-    DERIVED, not hand-listed: a hand list silently misses the next config
-    added, which is the failure mode this pin exists to prevent. Two roots,
-    because the hexagon configs live in two places -- the per-deployment
-    `configs/` directories, and the centralized hte smoke directory the P3a/P3e
-    canaries were relocated into (which is outside helao/deploy/ entirely).
-
-    Selection is by TEXT MATCH, deliberately: a `.py` config is executed by
-    `read_config`, and one belonging to an unrelated deployment can fail to
-    import on this platform (a Windows-only vendor SDK at module scope). That
-    must not turn "which configs exist" into a collection error for everyone
-    else. Loading is left to the preflight run itself, on the selected set.
-    """
-    candidates = sorted((preflight.REPO_ROOT / "helao" / "deploy").glob("*/configs/*"))
-    candidates += sorted(SMOKE_CONFIGS.glob("*"))
-    return [
-        p
-        for p in candidates
-        if p.is_file()
-        and p.suffix in _CONFIG_SUFFIXES
-        and p.name != "__init__.py"
-        and _DECLARES_HEXAGON.search(p.read_text(errors="ignore", encoding="utf-8"))
-    ]
-
-
-#: Hexagon configs whose presence in the derived set is itself asserted. An
-#: inert glob (wrong root, renamed directory, regex drift) yields an empty
-#: parametrization, which pytest reports as PASSED -- so the derivation needs a
-#: floor it cannot pass without. Named by phase: P2's four, P7e's graft, P7f's
-#: Reflex flip, P7k's hte Reflex flip, and the two hte canaries.
-KNOWN_HEXAGON_CONFIGS = frozenset(
-    {
-        "goldenhex",
-        "goldenhexvis",
-        "goldenhexid",
-        "goldenhexconc",
-        "goldenhexgraft",
-        "goldenhexreflex",
-        "htehexreflex",
-        "gamryhex",
-        "samplegraft",
-        # The fully-composed station variants (`<base>_hex`). Only the PUBLIC
-        # ones are pinned by name: a private deployment's config filenames may
-        # not appear in this repo, so its variants are covered by the derived
-        # glob and by `test_hexconfig.py`, which discovers them without naming
-        # them.
-        "test_hex",
-        "ccsi2_hex",
-        "anec_hex",
-        "clad_hex",
-        "adss3_hex",
-        "hispec_hex",
-        "eche10_hex",
-        "ecms3_hex",
-    }
-)
-
-
-def test_gamryhex_canary_passes():
-    """The hte hexagon canary config passes every offline gate."""
-    assert preflight.preflight_config(str(SMOKE_CONFIGS / "gamryhex.yml")) == []
-
-
-def test_the_derived_hexagon_config_set_is_not_vacuous():
-    """The guard on the guard: an empty derived set parametrizes to nothing
-    and reports green. Assert both that it found something and that it found
-    the configs we know exist."""
-    stems = {p.stem for p in _hexagon_configs()}
-    assert stems, "no hexagon configs discovered — the glob is inert"
-    assert KNOWN_HEXAGON_CONFIGS <= stems, sorted(KNOWN_HEXAGON_CONFIGS - stems)
-
-
-@pytest.mark.parametrize("config", _hexagon_configs(), ids=lambda p: p.stem)
-def test_every_hexagon_config_in_the_tree_preflights(config):
-    """Every tracked hexagon-variant config passes every offline gate.
-
-    Covers P2's goldenhex family, P7e's generic graft, P7f's `goldenhexreflex`
-    and P7k's `htehexreflex`, and each per-family canary — and, on a checkout
-    that has them, any private deployment's hexagon configs, without this
-    public file naming one.
-    """
-    assert preflight.preflight_config(str(config)) == [], config.name
-
-
-def test_missing_shim_detected():
-    servers = {
-        "PSTAT": {
-            "host": "127.0.0.1",
-            "port": 8001,
-            "group": "action",
-            "fast": "no_such_server",
-            "deployment": "hexagon",
-        }
-    }
-    issues = preflight._shim_completeness(servers)
-    assert any("hexagon shim missing" in i for i in issues)
-
-
-def test_legacy_server_not_shim_checked():
-    """A server without deployment:hexagon is not shim-checked."""
-    servers = {
-        "PSTAT": {
-            "host": "127.0.0.1",
-            "port": 8001,
-            "group": "action",
-            "fast": "no_such_server",
-        }
-    }
-    assert preflight._shim_completeness(servers) == []
 
 
 def test_config_sanity_duplicate_hostport():
@@ -216,7 +85,7 @@ def test_reflex_backend_port_is_reserved():
 def test_aligner_explicit_bokeh_port_is_reserved():
     """spec §8.3(3d): an explicit `params.bokeh_port` claim collides visibly.
 
-    `uvis4.yml`'s MOTOR server carries `params: {enable_aligner: true,
+    A private deployment's station config gives its MOTOR server `params: {enable_aligner: true,
     bokeh_port: 5003}`; nothing before this change reserved that port, so a
     second server on 5003 preflighted clean and only failed at launch
     (`WinError 10048`, documented as a config comment rather than a gate
@@ -270,69 +139,6 @@ def test_aligner_without_enable_flag_claims_nothing():
     assert preflight._config_sanity(servers) == []
 
 
-def _hexagon_reflex_server():
-    return {
-        "UI": {
-            "host": "127.0.0.1",
-            "port": 5010,
-            "group": "visualizer",
-            "reflex": "helao_ui",
-            "deployment": "hexagon",
-        }
-    }
-
-
-def test_reflex_server_may_be_hexagon_hosted():
-    """P7f lifts the D9 rejection this test used to pin.
-
-    Until P7f a `reflex:` server declaring `deployment: hexagon` was rejected
-    outright ("there is no hexagon UI shim to find"). It is now the supported
-    flip, and it is checked like any other hexagon server: nothing missing,
-    and in particular NOT reported as a missing group/module -- there is no
-    `servers/<group>/<module>.py` for a reflex server to have.
-    """
-    assert preflight._shim_completeness(_hexagon_reflex_server()) == []
-
-
-def test_hexagon_reflex_routing_target_is_resolved_to_a_file():
-    """Presence of the key is a weak gate; the module it routes to is the
-    real precondition. The launcher imports it in-process (for the
-    loaded-modules snapshot and the bundle stamp) and the backend child
-    imports it again, so an absent module is a launch-time
-    ModuleNotFoundError in two processes -- exactly what an offline gate is
-    for. Mirrors `_graft_target_issues`, path resolution and all.
-    """
-    dotted = preflight._hexagon_reflex_app_module()
-    target = preflight.REPO_ROOT.joinpath(*dotted.split("."))
-    assert target.with_suffix(".py").exists(), target
-
-    # and the check is not vacuous: point it at a module that does not exist
-    # and the same config becomes a finding naming it.
-    original = preflight._hexagon_reflex_app_module
-    preflight._hexagon_reflex_app_module = lambda: "helao.hexagon.app.no_such_host"
-    try:
-        issues = preflight._shim_completeness(_hexagon_reflex_server())
-    finally:
-        preflight._hexagon_reflex_app_module = original
-    assert len(issues) == 1
-    assert "no_such_host" in issues[0]
-    assert "resolves to no module on disk" in issues[0]
-
-
-def test_preflight_and_the_launcher_agree_on_the_routing_target():
-    """A preflight that passes while the launcher routes elsewhere is worse
-    than no preflight: it certifies a config that cannot start."""
-    import reflex_bundle
-
-    assert preflight._hexagon_reflex_app_module() == reflex_bundle.HEXAGON_APP_MODULE
-    assert preflight.HEXAGON == reflex_bundle.HEXAGON_DEPLOYMENT
-    # ...including the literal behind the ImportError fallback, which the
-    # equality above can never reach: it only runs when `reflex_bundle` is not
-    # importable, and then there is nothing to compare it against.
-    source = open(preflight.__file__, encoding="utf8").read()
-    assert f'return "{reflex_bundle.HEXAGON_APP_MODULE}"' in source
-
-
 def test_library_collision_detected():
     cfg = {
         "experiment_libraries": ["CCSI_exp", "CSIL_exp"],  # share CCSI_sub_* names
@@ -349,119 +155,147 @@ def test_library_collision_overridable():
     assert preflight._library_collisions(cfg) == []
 
 
-def test_samplegraft_generic_graft_passes():
-    """The generic config-driven graft (fast: graft + legacy_module) passes
-    every offline gate — its checklist resolves from the legacy module."""
-    assert preflight.preflight_config(str(SMOKE_CONFIGS / "samplegraft.yml")) == []
+def _synthetic_tree(tmp_path, own_has_module=False):
+    """helao/deploy/{alpha,beta}/servers/action/twin_server.py, and a config under own/."""
+    deploy = tmp_path / "helao" / "deploy"
+    deps = ["alpha", "beta"] + (["own"] if own_has_module else [])
+    for dep in deps:
+        p = deploy / dep / "servers" / "action"
+        p.mkdir(parents=True)
+        (p / "twin_server.py").write_text("", encoding="utf-8")
+    (deploy / "own" / "configs").mkdir(parents=True, exist_ok=True)
+    return deploy, deploy / "own" / "configs" / "synthetic.yml"
 
 
-def _graft_server(code_key, group, **extra):
-    srv = {
+def _one_server_cfg(cfg_path, **entry):
+    server = {
         "host": "127.0.0.1",
         "port": 8001,
-        "group": group,
-        code_key: "graft",
-        "deployment": "hexagon",
+        "group": "action",
+        "fast": "twin_server",
     }
-    srv.update(extra)
-    return {"G": srv}
+    server.update(entry)
+    return {"loaded_config_path": str(cfg_path), "servers": {"TWIN": server}}
+
+
+def test_a_module_in_two_foreign_deployments_is_ambiguous(tmp_path):
+    """D-B7c.5: the launcher would take sorted order and warn; preflight refuses."""
+    deploy, cfg_path = _synthetic_tree(tmp_path)
+    issues, resolved = preflight._module_resolution(_one_server_cfg(cfg_path), deploy)
+    assert resolved == {}
+    assert len(issues) == 1 and "['alpha', 'beta']" in issues[0], issues
+
+
+def test_an_explicit_deployment_clears_the_ambiguity(tmp_path):
+    deploy, cfg_path = _synthetic_tree(tmp_path)
+    cfg = _one_server_cfg(cfg_path, deployment="beta")
+    assert preflight._module_resolution(cfg, deploy) == ([], {"TWIN": "beta"})
+
+
+def test_an_explicit_deployment_without_the_module_is_an_issue(tmp_path):
+    deploy, cfg_path = _synthetic_tree(tmp_path)
+    issues, resolved = preflight._module_resolution(
+        _one_server_cfg(cfg_path, deployment="gamma"), deploy
+    )
+    assert resolved == {} and len(issues) == 1 and "gamma" in issues[0], issues
+
+
+def test_the_config_s_own_deployment_wins_without_a_key(tmp_path):
+    deploy, cfg_path = _synthetic_tree(tmp_path, own_has_module=True)
+    assert preflight._module_resolution(_one_server_cfg(cfg_path), deploy) == (
+        [],
+        {"TWIN": "own"},
+    )
+
+
+def test_a_module_in_no_deployment_is_an_issue(tmp_path):
+    deploy, cfg_path = _synthetic_tree(tmp_path)
+    issues, resolved = preflight._module_resolution(
+        _one_server_cfg(cfg_path, fast="no_such_server"), deploy
+    )
+    assert resolved == {} and len(issues) == 1 and "no deployment" in issues[0], issues
+
+
+@pytest.mark.parametrize("blank", [None, ""], ids=["null", "empty"])
+def test_a_blank_deployment_key_is_an_issue(tmp_path, blank):
+    """The launcher tests key presence, so a blank value would crash it at import."""
+    deploy, cfg_path = _synthetic_tree(tmp_path, own_has_module=True)
+    issues, resolved = preflight._module_resolution(
+        _one_server_cfg(cfg_path, deployment=blank), deploy
+    )
+    assert resolved == {} and len(issues) == 1 and "blank" in issues[0], issues
+
+
+def test_a_scratch_config_without_a_deployment_key_fails_gate_2(tmp_path):
+    """Outside helao/deploy nothing resolves implicitly: the failure is loud."""
+    deploy, _ = _synthetic_tree(tmp_path)
+    cfg_path = tmp_path / "scratch.yml"
+    issues, resolved = preflight._module_resolution(_one_server_cfg(cfg_path), deploy)
+    assert resolved == {} and len(issues) == 1 and "no deployment" in issues[0], issues
 
 
 @pytest.mark.parametrize(
-    "code_key,group",
-    [("fast", "action"), ("bokeh", "visualizer"), ("bokeh", "operator")],
-)
-def test_graft_without_legacy_module_is_a_finding(code_key, group):
-    """A generic graft names nothing, so an absent `legacy_module:` leaves it
-    with no target at all. It raises only when the launcher calls the factory —
-    for a bokeh server, not until the first browser session — so this gate is
-    the only place it surfaces before a station notices a blank page."""
-    issues = preflight._shim_completeness(_graft_server(code_key, group))
-    assert len(issues) == 1, issues
-    assert "declares no `legacy_module:`" in issues[0]
-    assert f"{code_key}: graft" in issues[0]
-    assert f"servers.{group}.<module>" in issues[0]
-
-
-@pytest.mark.parametrize(
-    "code_key,group,legacy",
+    "entry",
     [
-        ("fast", "action", "helao.deploy.hte.servers.action.sample_server"),
-        (
-            "bokeh",
-            "visualizer",
-            "helao.deploy.hte.servers.visualizer.live_visualizer",
-        ),
-        (
-            "bokeh",
-            "operator",
-            "helao.deploy.hte.servers.operator.standalone_operator",
-        ),
+        {"legacy_module": "helao.deploy.alpha.servers.action.twin_server"},
+        {"deployment": "hexagon"},
+        {"fast": "graft"},
     ],
+    ids=["legacy_module", "deployment_hexagon", "graft"],
 )
-def test_graft_with_a_resolvable_legacy_module_passes(code_key, group, legacy):
-    assert (
-        preflight._shim_completeness(
-            _graft_server(code_key, group, legacy_module=legacy)
-        )
-        == []
-    )
+def test_retired_routing_keys_are_issues_that_cite_the_rule(tmp_path, entry):
+    deploy, cfg_path = _synthetic_tree(tmp_path)
+    issues, _ = preflight._module_resolution(_one_server_cfg(cfg_path, **entry), deploy)
+    assert len(issues) == 1 and "D-B7c.2" in issues[0], issues
 
 
-def test_graft_with_an_unresolvable_legacy_module_is_a_finding():
-    """Presence alone is a weak gate: a typo'd dotted path satisfies it and
-    then fails at launch with ModuleNotFoundError. Resolution is by PATH — the
-    validator is offline and must not import deployment code."""
-    issues = preflight._shim_completeness(
-        _graft_server(
-            "bokeh", "visualizer", legacy_module="helao.deploy.hte.servers.nope.typo"
-        )
-    )
-    assert len(issues) == 1, issues
-    assert "resolves to no module on disk" in issues[0]
+def test_a_missing_checklist_is_reported_not_failed():
+    servers = {"SIM": {"group": "action", "fast": "ws_simulator"}}
+    issues, notes = preflight._checklist_presence(servers, {"SIM": "test"})
+    assert issues == [] and notes == ["no checklist: SIM (test/ws_simulator)"]
 
 
-def test_explicit_hexagon_shims_are_not_graft_checked():
-    """The three explicit vis/operator shims name their target in code, so the
-    `legacy_module:` requirement must not fire on them."""
-    servers = {
-        "OPERATOR": {
-            "host": "127.0.0.1",
-            "port": 5001,
-            "group": "operator",
-            "bokeh": "standalone_operator",
-            "deployment": "hexagon",
-        },
-        "LIVE": {
-            "host": "127.0.0.1",
-            "port": 5002,
-            "group": "visualizer",
-            "bokeh": "live_visualizer",
-            "deployment": "hexagon",
-        },
-        "ACTVIS": {
-            "host": "127.0.0.1",
-            "port": 5003,
-            "group": "visualizer",
-            "bokeh": "action_visualizer",
-            "deployment": "hexagon",
-        },
-    }
-    assert preflight._shim_completeness(servers) == []
+def test_a_checklist_that_existed_at_b7c_and_is_gone_fails(tmp_path, monkeypatch):
+    monkeypatch.setattr(preflight, "_checklist_dir", lambda dep: tmp_path)
+    servers = {"GAMRY": {"group": "action", "fast": "gamry_server2"}}
+    issues, notes = preflight._checklist_presence(servers, {"GAMRY": "hte"})
+    assert len(issues) == 1 and "gamry_server2" in issues[0] and notes == []
 
 
-def test_checklist_module_resolves_graft_from_legacy_module():
-    """fast: graft keys its checklist by the legacy_module basename, not by the
-    generic shim name 'graft'."""
-    graft_srv = {
-        "fast": "graft",
-        "legacy_module": "helao.deploy.hte.servers.action.sample_server",
-    }
-    assert preflight._checklist_module(graft_srv) == "sample_server"
-    # a graft server missing legacy_module resolves to None (no checklist name)
-    assert preflight._checklist_module({"fast": "graft"}) is None
-    # ordinary servers still key by their fast/bokeh module
-    assert preflight._checklist_module({"fast": "gamry_server2"}) == "gamry_server2"
+KNOWN_STATION_CONFIGS = [
+    "adss3",
+    "anec",
+    "ccsi2",
+    "clad",
+    "eche10",
+    "ecms3",
+    "hispec",
+    "test",
+]
+
+
+@pytest.mark.parametrize("prefix", KNOWN_STATION_CONFIGS)
+def test_every_station_config_preflights_with_resolved_servers(prefix, capsys):
+    assert preflight.main([prefix]) == 0
+    out = capsys.readouterr().out
+    m = re.search(r"PREFLIGHT OK: .* \(resolved (\d+) server\(s\)\)", out)
+    assert m and int(m.group(1)) >= 1, out
+
+
+@pytest.mark.parametrize("prefix", ["htereflex", "htehexreflex"])
+def test_the_reflex_configs_pin_ws_simulator_to_test(prefix):
+    """D-B7c.5 / §2.4: with Deployment-A checked out, sorted order would pick its
+    ws_simulator. The pin is the explicit key, so assert the key, not the resolution."""
+    cfg = read_config(prefix)
+    entries = [s for s in cfg["servers"].values() if s.get("fast") == "ws_simulator"]
+    assert len(entries) == 4 and all(s.get("deployment") == "test" for s in entries)
+    issues, resolved = preflight._module_resolution(cfg)
+    assert issues == []
+    assert {
+        resolved[k]
+        for k, s in cfg["servers"].items()
+        if s.get("fast") == "ws_simulator"
+    } == {"test"}
 
 
 #: Deployments whose checklists live centrally, and which this public repo may
@@ -508,48 +342,32 @@ def test_checklist_dir_prefers_private_in_repo_then_central():
     assert preflight._checklist_dir("no_such_deployment") is None
 
 
-def test_a_scratch_copy_of_a_config_does_not_exercise_the_checklist_gate(
+def test_a_scratch_copy_of_a_config_still_exercises_the_checklist_gate(
     tmp_path, monkeypatch
 ):
-    """P4f's silent-pass trap, as a negative control on the pins above.
+    """P4f's silent-pass trap, closed by D-B7c.5, as a positive control.
 
-    `preflight` infers the deployment from the config's PATH, so the very same
-    bytes preflight differently depending on where the file sits: in-tree the
-    checklist gate runs, in a scratch directory there is no deployment, hence
-    no checklist directory, hence nothing checked. Both return `[]`, so the
-    result alone cannot tell them apart — which is exactly why a preflight run
-    against a copied-out config certifies less than it appears to.
-
-    What is asserted is therefore the DIFFERENCE, measured three ways: the
-    inferred deployment, the checklist directory it resolves to, and — the
-    consequence that matters — that with the checklist set emptied the in-tree
-    config reports a real finding while the scratch copy stays clean.
+    `_config_deployment` infers the deployment from the config's PATH, so a
+    scratch copy has none. Gate 3 no longer depends on it: it looks up the
+    OWNING deployment gate 2 resolved (here the explicit `deployment: hte`), so
+    identical bytes are checked identically in-tree and out. With the checklist
+    set emptied, both report the same real finding.
     """
-    src = SMOKE_CONFIGS / "gamryhex.yml"
+    src = SMOKE_CONFIGS / "gamry.yml"
     scratch = tmp_path / src.name
     shutil.copy2(src, scratch)
 
-    # 1. the deployment, which is the only thing the path carries
     assert preflight._config_deployment(str(src)) == "hte"
     assert preflight._config_deployment(str(scratch)) is None
-
-    # 2. and so the gate has no baseline directory to check against
-    assert preflight._checklist_dir(preflight._config_deployment(str(src))) is not None
-    assert preflight._checklist_dir(preflight._config_deployment(str(scratch))) is None
-
-    # 3. identical bytes, identical clean result, in-tree and out
     assert preflight.preflight_config(str(src)) == []
     assert preflight.preflight_config(str(scratch)) == []
 
-    # 4. now make the checklist gate bite: point it at an empty (but existing)
-    #    hte checklist set, so every hexagon action server is missing its
-    #    frozen baseline. The in-tree config notices; the scratch copy cannot.
     empty = tmp_path / "checklists"
     (empty / "hte").mkdir(parents=True)
     monkeypatch.setattr(preflight, "CHECKLIST_ROOT", empty)
-    in_tree = preflight.preflight_config(str(src))
-    assert len(in_tree) == 1 and "frozen endpoint checklist missing" in in_tree[0]
-    assert preflight.preflight_config(str(scratch)) == []
+    for config in (src, scratch):
+        found = preflight.preflight_config(str(config))
+        assert len(found) == 1 and "frozen endpoint checklist" in found[0], found
 
 
 def test_claimed_addresses_agrees_with_the_launcher_on_reflex():

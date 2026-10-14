@@ -1,7 +1,7 @@
-"""P2e gate-config checks (D3): every goldenhex-family config routes DB
-through `deployment: hexagon`, the dotted path import-resolves to the P2e
-shim (same shape fast_launcher builds), and the config still validates.
-Mirrors test_vis_gate_config.py."""
+"""P2e gate-config checks (D3): every goldenhex-family config names the native
+DB module directly (no routing key), the dotted path import-resolves (same
+shape fast_launcher builds), and the config still validates. Mirrors
+test_vis_gate_config.py."""
 
 import os
 import types
@@ -35,14 +35,8 @@ def test_config_validates(prefix):
 
 @pytest.mark.parametrize("prefix", _FAMILY)
 def test_db_is_native_and_keeps_the_s3_leg(prefix):
-    """Was ``test_db_routes_through_hexagon_shim``.
-
-    The shim existed to graft hexagon behaviour onto a legacy BaseAPI. Now
-    that ``sim_db_server`` builds an ``ActionHost`` directly there is nothing
-    to graft, so the gate's claim inverts: SYNC must carry NO ``deployment``
-    key. Re-adding it would route a native host back through the graft, whose
-    startup hook then fails on a ``contain_action`` the host does not have —
-    and uvicorn reports that only as ``SystemExit(3)``.
+    """``sim_db_server`` builds an ``ActionHost`` directly, so SYNC carries NO
+    ``deployment`` routing key.
 
     The S3 params stay asserted here: they are the GM-5 leg's contract, and
     they are config, not code.

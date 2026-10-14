@@ -2,7 +2,7 @@
 items (P1b2b: items 1, 3, 5).
 
 Boots the REAL compositions under uvicorn inside the test's event loop: the
-OrchHost the orchestrator shim builds, the SIM through makeActionApp, and the
+OrchHost the hte orchestrator module builds, the SIM through its own makeApp, and the
 test deployment's sim_db_server — real HTTP routes registered through the
 real registration code, and the co-located ZMQ RPC mirrors HelaoFastAPI
 auto-registers on http_port+10000 (§10.1 fixture-fidelity; boot pattern
@@ -97,7 +97,6 @@ def make_world(root: str) -> dict:
                 "port": ORCH_PORT,
                 "group": "orchestrator",
                 "fast": "async_orch2",
-                "deployment": "hexagon",
                 "params": {},
             },
             "SIM": {
@@ -105,7 +104,6 @@ def make_world(root: str) -> dict:
                 "port": SIM_PORT,
                 "group": "action",
                 "fast": "ws_simulator",
-                "deployment": "hexagon",
                 "params": {},
             },
             "SYNC": {
@@ -148,13 +146,13 @@ async def live_group(tmp_root: str, ntp_offset_s: float = 0.0):
     if helao_logging.LOGGER is None:
         helao_logging.LOGGER = make_logger("hexlive", log_dir=log_dir)
 
-    from helao.deploy.hexagon.servers.orchestrator.async_orch2 import (
+    from helao.deploy.hte.servers.orchestrator.async_orch2 import (
         makeApp as orch_makeApp,
     )
     from helao.deploy.test.servers.action.sim_db_server import makeApp as db_makeApp
-    from helao.hexagon.app.factory import makeActionApp
+    from helao.deploy.test.servers.action.ws_simulator import makeApp as sim_makeApp
 
-    sim_app = makeActionApp("SIM", "helao.deploy.test.servers.action.ws_simulator")
+    sim_app = sim_makeApp("SIM")
     db_app = db_makeApp("SYNC")
     sim_server, sim_task = await _serve(sim_app, SIM_HOST, SIM_PORT)
     db_server, db_task = await _serve(db_app, DB_HOST, DB_PORT)

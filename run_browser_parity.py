@@ -61,18 +61,8 @@ MATRIX_DIR = os.path.join(REPO_ROOT, ".browser-parity")
 #: is that the graft moves the hosting and changes nothing rendered, so the
 #: legacy-hosted and hexagon-hosted runs of the same documents must agree.
 #:
-#: **The Reflex lane has no pair, and that is a measured limitation rather than
-#: an omission.** What is missing is the *host*, not the config:
-#: ``helao/hexagon/app/ui_host.py``'s ``build_ui_app`` raises ``HexagonDeferred
-#: ("Reflex hosting lands in P7f")``, while a config can already select a
-#: hexagon Reflex host today -- ``goldenhexreflex.yml`` pairs ``reflex:
-#: helao_ui`` with ``deployment: hexagon``, which
-#: ``reflex_bundle.app_module_for`` routes to ``HEXAGON_APP_MODULE``. A
-#: ``reflex:`` value names the bundle rather than a module, so the hexagon
-#: routing has to come from that key. The Reflex half of the matrix diff
-#: becomes runnable when P7f lands --
-#: add ``"pair": "reflex_hexagon"`` here and a config beside it. Everything
-#: else about the Reflex lane (styles, pixels, both Q10 branches) runs today.
+#: The Reflex lane has no pair; its styles, pixels and both Q10 branches run
+#: on their own.
 LANES = {
     "bokeh_legacy": {
         "config": "goldenvis",

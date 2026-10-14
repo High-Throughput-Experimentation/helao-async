@@ -13,8 +13,7 @@ This module replaces the previously duplicated per-deployment drivers
 dynamically from ``helao.deploy.<deployment>.drivers.data.analyses`` and must
 follow the local-loader batch contract ``__init__(process_uuid, local_loader,
 analysis_params)``. Which ``<deployment>`` that is comes from
-:func:`resolve_analyses_package`, which survives a hexagon graft (see its
-docstring); a configured analysis that cannot be loaded raises
+:func:`resolve_analyses_package`, (see its docstring); a configured analysis that cannot be loaded raises
 :class:`AnalysisLoadError` rather than leaving the server short a route.
 
 **A queued analysis outlives the process that queued it.** The queue itself
@@ -145,14 +144,6 @@ def _analyses_package(deployment: str) -> str:
     return f"helao.deploy.{deployment}.{_ANALYSES_SUBPKG}"
 
 
-def _deployment_of_module(module_path: Optional[str]) -> Optional[str]:
-    """Return the deployment owning a ``helao.deploy.<dep>...`` module path."""
-    parts = (module_path or "").split(".")
-    if len(parts) > 2 and parts[0] == "helao" and parts[1] == "deploy":
-        return parts[2] or None
-    return None
-
-
 def _deployment_of_config(config_path: Optional[str]) -> Optional[str]:
     """Return the deployment owning ``helao/deploy/<dep>/configs/<name>.yml``."""
     if not config_path:
@@ -174,29 +165,20 @@ def _package_importable(package: str) -> bool:
 
 def resolve_analyses_package(
     deployment: Optional[str],
-    legacy_module: Optional[str] = None,
     config_path: Optional[str] = None,
 ) -> Optional[str]:
     """Return the package to import this server's analysis modules from.
 
-    ``world_cfg["deployment"]`` alone is not enough: ``fast_launcher`` sets it
-    from the server's OWN ``deployment:`` value, so a server grafted onto the
-    hexagon composition (``deployment: hexagon``) would look for its analyses
-    under ``helao.deploy.hexagon.drivers.data.analyses``, which does not exist
-    — the graft would lose every ``analyze_*`` route. The graft nevertheless
-    carries the information, in two shapes, so candidates are tried in order:
+    Candidates are tried in order:
 
-    1. the deployment owning ``legacy_module`` (the ``fast: graft`` shape, where
-       the config names the wrapped legacy module outright),
-    2. ``deployment`` — what this resolved to before, and what every
-       un-grafted server resolves to,
-    3. the deployment owning the loaded config file (the hardcoded-shim shape,
-       ``fast: <name>`` + ``deployment: hexagon``, where no ``legacy_module:``
-       key exists to read).
+    1. ``deployment`` — the deployment ``fast_launcher`` resolved the server's
+       module from,
+    2. the deployment owning the loaded config file, which covers a server
+       whose module lives elsewhere than its config.
 
     Each candidate must name an importable package to be chosen, which is what
     keeps this backwards compatible: whenever the previous behaviour resolved a
-    package that exists, candidate 2 wins and the result is identical. The
+    package that exists, candidate 1 wins and the result is identical. The
     order only takes effect where the old resolution imported nothing at all.
 
     Returns the chosen package, or — when no candidate is importable — the
@@ -205,7 +187,6 @@ def resolve_analyses_package(
     """
     candidates = []
     for candidate in (
-        _deployment_of_module(legacy_module),
         deployment,
         _deployment_of_config(config_path),
     ):
@@ -262,7 +243,6 @@ def _resolve_analysis_class(module, module_name: str, class_name: str):
 def load_analysis_classes(
     analyses,
     deployment: Optional[str],
-    legacy_module: Optional[str] = None,
     config_path: Optional[str] = None,
 ) -> dict:
     """Import and map the analysis classes named in an ``analyses`` config list.
@@ -282,8 +262,6 @@ def load_analysis_classes(
     Args:
         analyses: Iterable of module/class specifiers from the server config.
         deployment: Deployment name from the world config.
-        legacy_module: This server's ``legacy_module:`` value, when it is a
-            hexagon graft.
         config_path: Path of the loaded config file.
 
     Returns:
@@ -296,7 +274,7 @@ def load_analysis_classes(
     requested = list(analyses or [])
     if not requested:
         return {}
-    base_pkg = resolve_analyses_package(deployment, legacy_module, config_path)
+    base_pkg = resolve_analyses_package(deployment, config_path=config_path)
     if base_pkg is None:
         raise AnalysisLoadError(
             "No 'deployment' set in world config; cannot load the configured "
@@ -1457,10 +1435,8 @@ def make_analysis_app(server_key) -> ActionHost:
 
     The analysis classes are resolved from the global ``CONFIG`` at app-build
     time (the driver instance is not created until the FastAPI ``startup``
-    event, so it cannot be queried here). The server's ``legacy_module:`` and
-    the loaded config's path go to :func:`resolve_analyses_package` alongside
-    the world deployment, so a hexagon-grafted server still finds its own
-    deployment's analyses.
+    event, so it cannot be queried here). The loaded config's path goes to
+    :func:`resolve_analyses_package` alongside the world deployment.
 
     Args:
         server_key: Key identifying this server in the orchestration group.
@@ -1478,7 +1454,6 @@ def make_analysis_app(server_key) -> ActionHost:
     analysis_classes = load_analysis_classes(
         analyses,
         world_cfg.get("deployment"),
-        legacy_module=server_cfg.get("legacy_module"),
         config_path=world_cfg.get("loaded_config_path"),
     )
 

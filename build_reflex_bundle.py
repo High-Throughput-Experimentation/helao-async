@@ -33,10 +33,7 @@ from importlib import import_module
 
 from helao.helpers.config_loader import read_config
 from reflex_bundle import (
-    APP_MODULE_ENV,
-    LEGACY_APP_MODULE,
     api_url_for,
-    app_module_for,
     build_lock,
     install_dir,
     node_modules_present,
@@ -128,22 +125,10 @@ def build_bundle(config_arg: str, server_key: str = "") -> str:
     # The export reads the app through the `reflex` CLI in a subprocess, which
     # does not populate *this* process's sys.modules; import it here so the
     # stamp sees the panel modules.
-    #
-    # Routed by the server's `deployment:` key exactly as `reflex_launcher`
-    # routes it (P7f). This import is what the stamp's module map is read
-    # from, so building by hand under one routing and launching under the
-    # other would leave the two stamps permanently different -- each process
-    # rebuilding the bundle the other just installed, forever.
-    app_module = app_module_for(world_cfg["servers"][key])
     os.environ["HELAO_REFLEX_CONFIG"] = str(config_arg)
     os.environ["HELAO_REFLEX_SERVER_KEY"] = key
     os.environ["HELAO_REFLEX_API_URL"] = api_url
-    if app_module != LEGACY_APP_MODULE:
-        os.environ[APP_MODULE_ENV] = app_module
-        print(f"hexagon-hosted server: app taken from {app_module}")
-    else:
-        os.environ.pop(APP_MODULE_ENV, None)
-    import_module(app_module)
+    import_module("helao.ui.reflex.app")
 
     with build_lock(repo_root):
         target = _build_bundle(
@@ -153,7 +138,6 @@ def build_bundle(config_arg: str, server_key: str = "") -> str:
             api_url=api_url,
             root=root,
             config_prefix=config_prefix,
-            app_module=app_module,
         )
     print(f"bundle installed at {target}")
     return target

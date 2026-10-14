@@ -25,7 +25,6 @@ __all__ = [
     "BUNDLE_DIRNAME",
     "backend_port",
     "build_env",
-    "import_app_module",
     "install_pdeathsig",
     "may_build_at_launch",
     "may_build_locally",
@@ -56,13 +55,10 @@ import psutil
 
 from reflex_bundle import (
     APP_DIR,
-    APP_MODULE_ENV,
     APP_NAME,
     ASSETS_DIR,
     BUNDLE_DIRNAME,
-    LEGACY_APP_MODULE,
     api_url_for,
-    app_module_for,
     backend_port,
     resolve_bundle,
     usable_bundle,
@@ -296,9 +292,7 @@ def terminate_tree(
     return not still_alive
 
 
-def build_env(
-    config_path: str, server_key: str, host: str, port: int, root, server_cfg=None
-):
+def build_env(config_path: str, server_key: str, host: str, port: int, root):
     """Return the child environment for the Reflex backend process.
 
     Args:
@@ -307,11 +301,6 @@ def build_env(
         host: Host the servers bind to.
         port: Frontend port; the backend uses ``port + 1``.
         root: HELAO output root, or ``None``.
-        server_cfg: This server's config block, which decides the hosting
-            stack (P7f). ``None`` -- and any entry without
-            ``deployment: hexagon`` -- leaves ``HELAO_REFLEX_APP_MODULE``
-            *unset*, so the child's import path is exactly what it was before
-            the seam existed.
 
     Returns:
         dict: A copy of the parent environment plus the HELAO Reflex vars.
@@ -324,38 +313,7 @@ def build_env(
     env["HELAO_REFLEX_API_URL"] = api_url_for(host, port)
     if root:
         env["HELAO_REFLEX_ROOT"] = str(root)
-    app_module = app_module_for(server_cfg)
-    # Removed rather than left alone on the legacy branch: this launcher's own
-    # environment could carry the variable (a shell that exported it, a parent
-    # that set it), and inheriting it would route a legacy server to the
-    # hexagon host without any config saying so.
-    if app_module != LEGACY_APP_MODULE:
-        env[APP_MODULE_ENV] = app_module
-    else:
-        env.pop(APP_MODULE_ENV, None)
     return env
-
-
-def import_app_module(server_cfg, importer=None):
-    """Import the entry module that will serve one ``reflex:`` server.
-
-    The launcher imports it for two reasons that must not diverge from what
-    the backend child serves: the loaded-modules snapshot the hot-reload
-    watcher reads, and the bundle stamp's module map. Both are captured from
-    this process's ``sys.modules``, so importing the legacy app while the
-    child serves the hexagon facade would leave the watcher blind to the
-    facade and the stamp describing a bundle nobody built.
-
-    Args:
-        server_cfg: This server's config block.
-        importer: Injected for tests; defaults to ``importlib.import_module``.
-
-    Returns:
-        The imported module.
-    """
-    from importlib import import_module
-
-    return (importer or import_module)(app_module_for(server_cfg))
 
 
 def may_build_locally() -> bool:
@@ -603,15 +561,7 @@ if __name__ == "__main__":
     # resolved from config strings *inside* this import. Captured earlier the
     # map is a stub that can never mismatch -- a bundle that is never rebuilt.
     # Same reason bokeh_launcher refreshes its snapshot after mount_visualizers.
-    #
-    # Routed exactly as the backend child will be (P7f), so the snapshot names
-    # the modules that actually serve and the stamp describes the bundle that
-    # will actually be built. `server_config` -- not a literal -- is what makes
-    # that true; passing anything else would decouple the three.
-    app_module = app_module_for(server_config)
-    _reflex_app = import_app_module(server_config)  # noqa: F841
-    if app_module != LEGACY_APP_MODULE:
-        LOGGER.info(f"{server_key} is hexagon-hosted: app served from {app_module}")
+    import helao.ui.reflex.app  # noqa: F401
 
     import reflex_bundle
 
@@ -644,7 +594,6 @@ if __name__ == "__main__":
                     root=root,
                     config_prefix=config_prefix,
                     logger=LOGGER,
-                    app_module=app_module,
                 )
         except Exception as exc:
             # Never fall back to whatever is installed. A bundle built for
@@ -753,7 +702,7 @@ if __name__ == "__main__":
             str(backend_port(servPort)),
         ],
         cwd=os.path.join(helao_repo_root, APP_DIR),
-        env=build_env(confArg, server_key, servHost, servPort, root, server_config),
+        env=build_env(confArg, server_key, servHost, servPort, root),
         start_new_session=(os.name == "posix"),
         preexec_fn=(
             (lambda: install_pdeathsig(signal.SIGTERM))

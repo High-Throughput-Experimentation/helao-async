@@ -1,43 +1,42 @@
-"""P3e — offline preflight validator for hexagon-composed configs (spec §8.3).
+"""Offline preflight validator for a config's servers (spec §8.3; B7c re-scope).
 
-Runs the hexagon-specific static gates that must pass BEFORE a config's
-`deployment: hexagon` servers are launched at a station — with disconnected
-adapters, on Linux, no server launch and no hardware:
+Static gates that must pass BEFORE a config is launched at a station, with no
+server launch and no hardware:
 
-1. **config sanity** — unique server keys, unique host:port, exactly one of
+1. **config sanity** -- unique server keys, unique host:port, exactly one of
    `fast`/`bokeh`/`reflex` per server (the launcher's cross-cutting rule).
    A `reflex:` server occupies TWO consecutive ports (static frontend, then
    backend), so the uniqueness check reserves `port + 1` for it as well.
-2. **shim completeness** — every `deployment: hexagon` server has a hexagon
-   shim module at `helao/deploy/hexagon/servers/<group>/<fast|bokeh>.py`
-   (missing shim = `ModuleNotFoundError` at launch — must be caught here), and
-   a server on the GENERIC `graft` shim declares a `legacy_module:` that
-   resolves to a module on disk (the graft names nothing itself, so without
-   that key it raises at launch — for a bokeh server, not until the first
-   browser session). A `reflex:` server has no shim — its code key names a
-   BUNDLE, not a module — so hexagon routing points the Reflex entry module at
-   `helao/hexagon/app/reflex_host.py` (P7f) and that file is what is checked.
-3. **endpoint-checklist presence** — every hexagon ACTION server has a frozen
-   legacy endpoint checklist under `helao/hexagon/tests/checklists/hte/` (the
-   baseline the runtime `/openapi.json` diff is checked against at station).
-4. **library collision** — the config's `experiment_libraries` +
+2. **module resolution** -- every `fast:`/`bokeh:` module resolves, the way the
+   launcher resolves it, to exactly one `servers/<group>/<module>.py`. Zero
+   matches, an explicit `deployment:` without the module, or a module that sits
+   in several deployments none of which is the config's own (the launcher would
+   take sorted order and only warn) are issues. Retired hexagon routing keys are
+   issues too (D-B7c.2). A `reflex:` server names a bundle, not a module, and is
+   skipped.
+3. **endpoint-checklist presence** -- an action server's frozen endpoint
+   checklist is looked up in its OWNING deployment (the one gate 2 resolved).
+   Fails only when a checklist frozen at B7c's base (`CHECKLISTS_AT_B7C`) is gone;
+   any other absence is reported as a note.
+4. **library collision** -- the config's `experiment_libraries` +
    `sequence_libraries` lists carry no flat-namespace function-name collision
    (spec §4.3.12), unless `allow_shadow: true` is set on the config.
 
-The runtime cross-check (§8.3(2): launch each hexagon server, diff its live
-`/openapi.json` against the frozen checklist) is NOT done here — it needs a
-launch, which for hte is an at-station step (only the sim `gamryhex` config is
-Linux-launchable). This validator is the offline half.
+The runtime cross-check (launch each server, diff its live `/openapi.json`
+against the frozen checklist) is NOT done here; this validator is the offline
+half.
 
-Usage: ``python -m helao.hexagon.preflight <config_prefix_or_path>`` — exits 0
+Usage: ``python -m helao.hexagon.preflight <config_prefix_or_path>`` -- exits 0
 with "PREFLIGHT OK" or 1 listing the issues.
 """
 
 from __future__ import annotations
 
 import ast
+import os
 import sys
 from collections import defaultdict
+from glob import glob
 from pathlib import Path
 from typing import Optional
 
@@ -52,7 +51,6 @@ from helao.helpers.config_loader import read_config
 CODE_KEYS = ("fast", "bokeh", "reflex")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-HEXAGON_SERVERS = REPO_ROOT / "helao" / "deploy" / "hexagon" / "servers"
 CHECKLIST_ROOT = REPO_ROOT / "helao" / "hexagon" / "tests" / "checklists"
 HTE_EXP = REPO_ROOT / "helao" / "deploy" / "hte" / "experiments"
 HTE_SEQ = REPO_ROOT / "helao" / "deploy" / "hte" / "sequences"
@@ -61,13 +59,11 @@ HTE_SEQ = REPO_ROOT / "helao" / "deploy" / "hte" / "sequences"
 # fallback in _config_deployment below.
 HTE_SMOKE_CONFIGS = REPO_ROOT / "helao" / "hexagon" / "tests" / "smoke" / "configs"
 
-HEXAGON = "hexagon"
-
 
 def _config_deployment(config: str) -> Optional[str]:
     """The source deployment a config lives under (helao/deploy/<dep>/configs/).
 
-    Used to locate the per-deployment frozen endpoint checklists. Returns None
+    Feeds gate 4 (library collisions); gate 3 uses the owner gate 2 resolved. Returns None
     if the config is passed as a bare prefix that resolves ambiguously or the
     path shape is unexpected.
     """
@@ -84,7 +80,7 @@ def _config_deployment(config: str) -> Optional[str]:
         # of helao/deploy/hte/configs/, so "deploy" never appears in its path.
         # Every config under this centralized, hte-only directory belongs to
         # "hte" by construction (P3a/P3e relocation) -- infer it directly so
-        # the checklist-presence gate isn't silently skipped post-move.
+        # gate 4's deployment-first library lookup isn't skipped post-move.
         if m.parent == HTE_SMOKE_CONFIGS:
             return "hte"
     return None
@@ -93,22 +89,6 @@ def _config_deployment(config: str) -> Optional[str]:
 def _server_module(server: dict) -> Optional[str]:
     """The fast/bokeh module basename for a server block, or None."""
     return server.get("fast") or server.get("bokeh")
-
-
-def _checklist_module(server: dict) -> Optional[str]:
-    """The module a server's endpoint checklist is keyed by.
-
-    Normally the `fast`/`bokeh` module basename, but a `fast: graft` server
-    (the generic config-driven hexagon graft, helao/deploy/hexagon/servers/
-    action/graft.py) wraps the module named by its top-level `legacy_module:`
-    key, so its checklist is keyed by that legacy module's basename, not by the
-    generic shim name "graft".
-    """
-    module = _server_module(server)
-    if module == "graft":
-        legacy = server.get("legacy_module")
-        return legacy.rsplit(".", 1)[-1] if legacy else None
-    return module
 
 
 def _checklist_dir(deployment: Optional[str]) -> Optional[Path]:
@@ -142,8 +122,8 @@ def _aligner_port(server: dict) -> Optional[int]:
     """The extra Bokeh-aligner port a server claims, or ``None``.
 
     Any server whose ``params.enable_aligner`` is truthy hosts a second Bokeh
-    server for the plate aligner (``GalilAlignerHost`` and its lila
-    equivalent both share this contract) on ``params.bokeh_port`` when set,
+    server for the plate aligner (``GalilAlignerHost`` and a private
+    deployment's equivalent both share this contract) on ``params.bokeh_port`` when set,
     else ``server['port'] + 1000`` -- the fallback every aligner-host
     implementation falls back to (spec §8.3(3d), §9.2 item 6: a station has
     already shipped a control panel on the port a Galil aligner bound). The
@@ -218,176 +198,150 @@ def _config_sanity(servers: dict) -> list[str]:
     return issues
 
 
-def _shim_completeness(servers: dict) -> list[str]:
+DEPLOY_ROOT = REPO_ROOT / "helao" / "deploy"
+
+#: B7c's config rule, cited by every gate-2 message about a retired key.
+_RULE = (
+    "rule D-B7c.2 in docs/config-schema.md: name the module itself in fast:/bokeh:, "
+    "and add deployment: <owner> only where preflight reports the module ambiguous"
+)
+#: The retired routing deployment; matched only to reject it.
+_RETIRED_DEPLOYMENT = "hexagon"
+
+#: E4: the per-server hte checklists tracked at 7592729b. Gate 3 fails only when one
+#: of these goes missing; any other absent checklist is reported.
+CHECKLISTS_AT_B7C: dict[str, frozenset[str]] = {
+    "hte": frozenset(
+        {
+            "HTEdata_server",
+            "analysis_server",
+            "andor_server",
+            "biologic_server",
+            "calc_server",
+            "cam_server",
+            "co2sensor_server",
+            "diapump_server",
+            "galil_io",
+            "galil_motion",
+            "gamry_server2",
+            "kinesis_server",
+            "mfc_server",
+            "nidaqmx_server",
+            "o2sensor_server",
+            "pal_server",
+            "pdu_server",
+            "power_supply_server",
+            "sample_server",
+            "spec_server",
+            "sync_server",
+            "syringe_server",
+            "tec_server",
+        }
+    ),
+}
+
+
+def _launcher_deployment(config_path: str, group: str, module: str):
+    """fast_launcher.py:102-152's auto-detection, with its own string operations.
+
+    Returns ``(deployment or None, candidate deployments)``. ``None`` with candidates
+    means ambiguous: more than one deployment has the module, none is the config's own,
+    and the launcher would take the first in sorted order (and only warn).
+    The glob root is the config's great-grandparent, as in the launcher: for a smoke
+    config that root holds no deployments, so every smoke entry needs deployment:.
+    """
+    search = os.path.dirname(os.path.dirname(os.path.dirname(config_path)))
+    found = sorted(glob(os.path.join(search, "*", "servers", group, f"{module}.py")))
+    deps = [
+        os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(p))))
+        for p in found
+    ]
+    if len(found) == 1:
+        return deps[0], deps
+    own_dir = os.path.dirname(os.path.dirname(config_path))
+    own = [d for p, d in zip(found, deps) if p.startswith(own_dir)]
+    return (own[0] if own else None), deps
+
+
+def _module_resolution(cfg: dict, deploy_root: Path = DEPLOY_ROOT):
+    """Gate 2: every fast:/bokeh: resolves to exactly one module on disk (D-B7c.5/6).
+
+    Returns ``(issues, resolved)``; ``resolved`` maps server key to the deployment the
+    launcher will import its module from. A reflex: server names a bundle, not a module,
+    and is skipped. Retired hexagon routing keys are issues (D-B7c.2).
+    """
     issues: list[str] = []
-    for key, s in servers.items():
-        if s.get("deployment") != HEXAGON:
-            continue
-        if "reflex" in s:
-            issues.extend(_reflex_host_issues(key))
-            continue
-        module = _server_module(s)
-        group = s.get("group")
-        if not module or not group:
-            issues.append(f"{key}: hexagon server missing group/module")
-            continue
-        shim = HEXAGON_SERVERS / group / f"{module}.py"
-        if not shim.exists():
+    resolved: dict[str, str] = {}
+    config_path = str(cfg.get("loaded_config_path") or "")
+    for key, s in (cfg.get("servers") or {}).items():
+        retired = []
+        if "legacy_module" in s:
+            retired.append("`legacy_module:`")
+        if s.get("deployment") == _RETIRED_DEPLOYMENT:
+            retired.append("`deployment: hexagon`")
+        if "graft" in (s.get("fast"), s.get("bokeh")):
+            retired.append("a `graft` code key")
+        if retired:
             issues.append(
-                f"{key}: hexagon shim missing — expected {shim.relative_to(REPO_ROOT)}"
+                f"{key}: {', '.join(retired)} is retired hexagon routing; {_RULE}"
             )
             continue
-        if module == "graft":
-            issues.extend(_graft_target_issues(key, s, group))
-    return issues
-
-
-def _reflex_host_issues(key: str) -> list[str]:
-    """Checks for a ``reflex:`` server declaring ``deployment: hexagon`` (P7f).
-
-    Until P7f this key was REJECTED here, citing spec D9 (both UI stacks stay
-    on legacy core through P0-P6). P7f lifts that: the key now routes the
-    Reflex entry module to the hexagon hosting facade, through
-    ``HELAO_REFLEX_APP_MODULE`` rather than through a ``servers/<group>/``
-    shim -- ``reflex:``'s value is a bundle name, so there is no module to
-    name there.
-
-    What is checked is therefore the facade itself. As with a ``graft``
-    target, the dotted path is resolved to a file on disk rather than assumed:
-    the launcher imports it in-process (for the loaded-modules snapshot and
-    the bundle stamp) and the backend child imports it again, so an absent
-    module is a ``ModuleNotFoundError`` in two processes at launch. Resolved
-    by path, never by import -- preflight runs offline and importing this
-    module would build a whole Reflex app.
-    """
-    dotted = _hexagon_reflex_app_module()
-    target = REPO_ROOT.joinpath(*dotted.split("."))
-    if target.with_suffix(".py").exists() or (target / "__init__.py").exists():
-        return []
-    return [
-        f"{key}: `deployment: hexagon` routes this reflex server to "
-        f"'{dotted}', which resolves to no module on disk (expected "
-        f"{'/'.join(dotted.split('.'))}.py under the repo root)"
-    ]
-
-
-def _hexagon_reflex_app_module() -> str:
-    """The module a hexagon-routed reflex server is served from.
-
-    Read from ``reflex_bundle`` -- the module that owns the routing and sets
-    the environment variable -- so preflight cannot pass while the launcher
-    routes somewhere else. ``reflex_bundle`` is a repo-root module, imported
-    lazily here for the same reason it imports ``launch`` lazily: neither is
-    importable until the repo root is on ``sys.path``, which is true wherever
-    a config is launched or a test is collected, and this keeps
-    ``helao.hexagon.preflight`` importable when it is not.
-    """
-    try:
-        from reflex_bundle import HEXAGON_APP_MODULE
-
-        return HEXAGON_APP_MODULE
-    except ImportError:  # pragma: no cover - repo root always on sys.path
-        return "helao.hexagon.app.reflex_host"
-
-
-def _graft_target_issues(key: str, server: dict, group: str) -> list[str]:
-    """Checks specific to a generic ``graft`` shim (`fast:`/`bokeh: graft`).
-
-    A graft shim names NOTHING — that indirection is what lets a PRIVATE
-    deployment flip a server without this public repo naming it — so its legacy
-    target comes from the server's own top-level ``legacy_module:`` key. Absent,
-    the shim raises only when the launcher calls its factory: for a bokeh
-    server that is on the FIRST BROWSER SESSION, long after the group reports
-    itself up, so nothing short of opening the page would reveal it.
-
-    The target is also resolved to a file on disk. Presence alone is a weak
-    gate: a typo'd dotted path satisfies it and then fails at launch with
-    ModuleNotFoundError. Resolution is by path, never by import — preflight
-    runs offline and must not execute deployment code.
-    """
-    code_key = "fast" if "fast" in server else "bokeh"
-    legacy = server.get("legacy_module")
-    if not legacy:
-        return [
-            f"{key}: `{code_key}: graft` declares no `legacy_module:` — add a "
-            f"top-level `legacy_module: helao.deploy.<deployment>.servers."
-            f"{group}.<module>` to this server block"
-        ]
-    target = REPO_ROOT.joinpath(*legacy.split("."))
-    if not target.with_suffix(".py").exists() and not (target / "__init__.py").exists():
-        return [
-            f"{key}: `legacy_module: {legacy}` resolves to no module on disk "
-            f"(expected {'/'.join(legacy.split('.'))}.py under the repo root)"
-        ]
-    return []
-
-
-def _owning_deployment(server: dict, deployment: Optional[str]) -> Optional[str]:
-    """The deployment whose tree actually holds this server's module.
-
-    NOT the config's deployment. The launcher falls back to `hte` when a
-    deployment has no module of that name, so a config outside `hte` is
-    routinely served by an `hte` module -- and the frozen surface of that module
-    is `hte`'s, wherever the config naming it happens to live.
-
-    A `graft` server states its target outright in `legacy_module:`; anything
-    else is resolved by file existence in the launcher's own search order, so a
-    deployment carrying its OWN module of a colliding name resolves to itself
-    rather than to the fallback.
-    """
-    if _server_module(server) == "graft":
-        legacy = server.get("legacy_module") or ""
-        parts = legacy.split(".")
-        if len(parts) > 2 and parts[0] == "helao" and parts[1] == "deploy":
-            return parts[2]
-        return None
-    module = _server_module(server)
-    group = server.get("group") or "action"
-    for dep in (deployment, "hte", "test"):
-        if not dep:
-            continue
-        if (
-            REPO_ROOT / "helao" / "deploy" / dep / "servers" / group / f"{module}.py"
-        ).is_file():
-            return dep
-    return deployment
-
-
-def _checklist_presence(
-    servers: dict,
-    checklist_dir: Optional[Path],
-    deployment: Optional[str] = None,
-) -> list[str]:
-    # Only enforced for deployments that have a frozen checklist set (hte). A
-    # deployment with no checklist dir (e.g. test) is out of scope for this gate.
-    if checklist_dir is None or not checklist_dir.exists():
-        return []
-    issues: list[str] = []
-    for key, s in servers.items():
-        if s.get("deployment") != HEXAGON or s.get("group") != "action":
-            continue
-        module = _checklist_module(s)
+        module, group = _server_module(s), s.get("group")
         if not module:
             continue
-        # The config's own set first, then the set belonging to the deployment
-        # that actually owns the module. The second leg is what lets a config
-        # graft another deployment's server without a DUPLICATE of that
-        # server's frozen baseline being copied into its repo -- a second copy
-        # of a frozen surface is exactly the thing that drifts silently. This
-        # can only turn a "missing" into a "found"; a module frozen nowhere is
-        # still reported.
-        candidates = [checklist_dir]
-        owner = _owning_deployment(s, deployment)
-        if owner and owner != deployment:
-            owner_dir = _checklist_dir(owner)
-            if owner_dir is not None:
-                candidates.append(owner_dir)
-        if not any((d / f"{module}.json").exists() for d in candidates):
+        if not group:
+            issues.append(f"{key}: no group:, so its module cannot be resolved")
+            continue
+        if "deployment" in s:
+            explicit = s["deployment"]
+            if not explicit:
+                issues.append(
+                    f"{key}: deployment: is blank; the launcher tests key presence "
+                    f"and would import a deployment named {explicit!r}"
+                )
+                continue
+            if (deploy_root / explicit / "servers" / group / f"{module}.py").is_file():
+                resolved[key] = explicit
+            else:
+                issues.append(
+                    f"{key}: deployment: {explicit} has no servers/{group}/{module}.py"
+                )
+            continue
+        dep, found = _launcher_deployment(config_path, group, module)
+        if dep:
+            resolved[key] = dep
+        elif not found:
             issues.append(
-                f"{key}: frozen endpoint checklist missing for '{module}' "
-                f"(run harness.hte_freeze)"
+                f"{key}: {group}/{module}.py exists in no deployment the launcher searches"
             )
-    return issues
+        else:
+            issues.append(
+                f"{key}: {group}/{module}.py exists in {found}, none of them this config's "
+                f"own, so the launcher would pick '{found[0]}' by sorted order; add "
+                f"deployment: <owner>"
+            )
+    return issues, resolved
+
+
+def _checklist_presence(servers: dict, resolved: dict) -> tuple[list[str], list[str]]:
+    """Gate 3 (Q15): look up the OWNING deployment's checklist only. Fail only when a
+    checklist frozen at B7c's base is gone; report every other absence."""
+    issues: list[str] = []
+    notes: list[str] = []
+    for key, s in servers.items():
+        if s.get("group") != "action" or key not in resolved:
+            continue
+        module, owner = _server_module(s), resolved[key]
+        cdir = _checklist_dir(owner)
+        if cdir is not None and (cdir / f"{module}.json").exists():
+            continue
+        if cdir is not None and module in CHECKLISTS_AT_B7C.get(owner, frozenset()):
+            issues.append(
+                f"{key}: frozen endpoint checklist {module}.json is gone from {cdir}"
+            )
+        else:
+            notes.append(f"no checklist: {key} ({owner}/{module})")
+    return issues, notes
 
 
 def _lib_module_path(
@@ -404,7 +358,7 @@ def _lib_module_path(
     if entry.endswith(".py") or "/" in entry:
         p = (REPO_ROOT / entry) if not Path(entry).is_absolute() else Path(entry)
         return p if p.exists() else None
-    if deployment and deployment != HEXAGON:
+    if deployment:
         p = (
             REPO_ROOT
             / "helao"
@@ -452,18 +406,20 @@ def _library_collisions(cfg: dict, deployment: Optional[str] = None) -> list[str
     return issues
 
 
-def preflight_config(config: str) -> list[str]:
-    """Return a list of preflight issues for a config prefix/path (empty = pass)."""
+def preflight_report(config: str) -> tuple[list[str], list[str], dict]:
+    """``(issues, notes, resolved)`` for a config prefix or path."""
     cfg = read_config(config)
     servers = cfg.get("servers", {})
-    deployment = _config_deployment(config)
-    checklist_dir = _checklist_dir(deployment)
-    issues: list[str] = []
-    issues += _config_sanity(servers)
-    issues += _shim_completeness(servers)
-    issues += _checklist_presence(servers, checklist_dir, deployment)
-    issues += _library_collisions(cfg, deployment)
-    return issues
+    issues = _config_sanity(servers)
+    gate2, resolved = _module_resolution(cfg)
+    gate3, notes = _checklist_presence(servers, resolved)
+    issues += gate2 + gate3 + _library_collisions(cfg, _config_deployment(config))
+    return issues, notes, resolved
+
+
+def preflight_config(config: str) -> list[str]:
+    """Return a list of preflight issues for a config prefix/path (empty = pass)."""
+    return preflight_report(config)[0]
 
 
 def main(argv=None) -> int:
@@ -471,14 +427,16 @@ def main(argv=None) -> int:
     if len(argv) != 1:
         print("usage: python -m helao.hexagon.preflight <config_prefix_or_path>")
         return 2
-    issues = preflight_config(argv[0])
+    issues, notes, resolved = preflight_report(argv[0])
     if not issues:
-        print(f"PREFLIGHT OK: {argv[0]}")
-        return 0
-    print(f"PREFLIGHT FAILED: {argv[0]} ({len(issues)} issue(s))")
-    for i in issues:
-        print(f"  - {i}")
-    return 1
+        print(f"PREFLIGHT OK: {argv[0]} (resolved {len(resolved)} server(s))")
+    else:
+        print(f"PREFLIGHT FAILED: {argv[0]} ({len(issues)} issue(s))")
+        for i in issues:
+            print(f"  - {i}")
+    for n in notes:
+        print(f"  - {n}")
+    return 1 if issues else 0
 
 
 if __name__ == "__main__":
