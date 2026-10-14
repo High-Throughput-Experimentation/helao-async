@@ -226,7 +226,7 @@ def makeApp(server_key) -> ActionHost:
             rank = -1
         # Sync quarantine: a hand-POSTed path is the operator's re-queue, so it
         # releases the record first; enqueue_yml would otherwise skip it.
-        app.driver.release_quarantine(clean_path)
+        await asyncio.to_thread(app.driver.release_quarantine, clean_path)
         await app.driver.enqueue_yml(clean_path, rank)
         return yml_path
 
