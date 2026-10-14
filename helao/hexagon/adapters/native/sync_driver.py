@@ -65,9 +65,11 @@ from helao.core.models.run_dir import (
 from helao.helpers import helao_logging as logging
 from helao.helpers.run_state import (
     DONE,
+    QUARANTINED,
     UNSYNCED,
     RunStateJournal,
     _prg_is_complete,
+    _prg_is_quarantined,
     identify_record,
     rebuild_from_tree,
     root_relative,
@@ -1246,6 +1248,11 @@ class SyncDriver:
                 LOGGER.debug(self.config_dict)
 
         self.max_tasks = self.config_dict.get("max_tasks", 1)
+        #: Sync quarantine thresholds (spec Q3/Q4): a record is parked after
+        #: this many failed passes once its first failure is this old.
+        #: ``quarantine_strikes: 0`` disables parking; strikes still record.
+        self.quarantine_strikes = int(self.config_dict.get("quarantine_strikes", 5))
+        self.quarantine_hours = float(self.config_dict.get("quarantine_hours", 24))
         LOGGER.info("checking for aws_config_path")
         if "aws_config_path" in self.config_dict:
             os.environ["AWS_CONFIG_PATH"] = self.config_dict["aws_config_path"]
@@ -1364,6 +1371,72 @@ class SyncDriver:
         ``--restore``, so a restart would drop the in-memory ``task_queue``.
         """
         return self.task_queue.qsize() > 0 or bool(self.running_tasks)
+
+    def _strike(self, yml_path: Path, error: str) -> None:
+        """Record one failed pass for ``yml_path``; park it if it has earned it.
+
+        Raises one ``LOGGER.alert`` on the strike that enters quarantine and
+        journals the record as ``quarantined``. Never raises: a failure to
+        record a strike is logged and dropped, so bookkeeping can never turn a
+        failed pass into a dead worker.
+        """
+        try:
+            prog = Progress(yml_path)
+            entered = prog.add_strike(
+                error, self.quarantine_strikes, self.quarantine_hours, datetime.now()
+            )
+            if not entered:
+                return
+            block = prog.quarantine or {}
+            LOGGER.alert(
+                f"SYNC quarantined {yml_path} after {block.get('strikes')} failed "
+                f"passes ({block.get('first_failed')} .. {block.get('last_failed')}); "
+                f"last error: {block.get('last_error')}. It will not be retried "
+                "automatically. Fix the cause, then POST /finish_yml with this path."
+            )
+            self._journal(yml_path, QUARANTINED)
+        except Exception:
+            LOGGER.error(f"Could not record a sync strike for {yml_path}", exc_info=True)
+
+    def release_quarantine(self, yml_path: Union[Path, str]) -> bool:
+        """Clear ``yml_path``'s quarantine; True if there was one to clear."""
+        yml_path = Path(yml_path)
+        if not _prg_is_quarantined(yml_path.with_suffix(".prg")):
+            return False
+        Progress(yml_path).clear_quarantine()
+        LOGGER.info(f"Operator released {yml_path} from sync quarantine.")
+        return True
+
+    def quarantined(self) -> list:
+        """Quarantined records from the SYNC journal, with their ``.prg`` block.
+
+        Empty when this server keeps no journal. The yml is found by kind
+        suffix inside the journalled record directory; ``yml`` is ``None`` if
+        it is gone.
+        """
+        if self.run_journal is None:
+            return []
+        suffix = {"action": "-act.yml", "experiment": "-exp.yml", "sequence": "-seq.yml"}
+        out = []
+        for rec in self.run_journal.working_set().values():
+            if rec.get("state") != QUARANTINED:
+                continue
+            rec_dir = Path(str(self.helaodirs.root)) / rec["path"]
+            ymls = sorted(rec_dir.glob(f"*{suffix.get(rec['kind'], '.yml')}"))
+            entry = {
+                "uuid": rec["uuid"],
+                "kind": rec["kind"],
+                "path": rec["path"],
+                "yml": str(ymls[0]) if ymls else None,
+            }
+            if ymls:
+                try:
+                    prg = yml_load(ymls[0].with_suffix(".prg"), fast=True)
+                    entry.update((prg or {}).get("quarantine") or {})
+                except Exception:
+                    LOGGER.warning(f"Could not read the .prg beside {ymls[0]}")
+            out.append(entry)
+        return out
 
     def try_remove_empty(self, remove_target) -> bool:
         """Recursively ``rmdir`` ``remove_target`` if it (and its subtree) are empty.
@@ -1553,8 +1626,9 @@ class SyncDriver:
                 async with AsyncExitStack() as locks:
                     await self._acquire_hierarchy_locks(locks, yml_path)
                     await self.sync_yml(yml_path=yml_path, rank=rank)
-            except Exception:
+            except Exception as exc:
                 LOGGER.error(f"Error in syncer worker for {yml_path}", exc_info=True)
+                self._strike(yml_path, f"{type(exc).__name__}: {exc}")
             finally:
                 self.running_tasks.pop(yml_path.name, None)
 
@@ -1612,6 +1686,14 @@ class SyncDriver:
             LOGGER.info(
                 f"{str(yml_path)} is a process artifact, not a syncable record; "
                 "skipping enqueue request."
+            )
+        elif _prg_is_quarantined(yml_path.with_suffix(".prg")):
+            # Sync quarantine: every automatic re-queue (startup sweep,
+            # finish_pending, parent re-walks) routes through here, so this one
+            # check is the whole gate. /finish_yml releases it first.
+            LOGGER.info(
+                f"{str(yml_path)} is in sync quarantine; skipping enqueue request. "
+                "POST /finish_yml with this path once the cause is fixed."
             )
         elif rank < rank_limit:
             LOGGER.debug(
@@ -1849,6 +1931,17 @@ class SyncDriver:
             LOGGER.info(
                 f"{str(prog.yml.target)} is not synced after this pass; it stays "
                 "in place for the next scan."
+            )
+            chain = self.postfinish[prog.yml.type].hooks
+            failed = [
+                f"{name}: {entry.get('error')}"
+                for name, entry in (prog.dict.get("hooks") or {}).items()
+                if entry.get("state") == "failed"
+                and getattr(chain.get(name), "blocking", False)
+            ]
+            self._strike(
+                prog.yml.target,
+                failed[0] if failed else "post-finish chain did not complete",
             )
             return False
 

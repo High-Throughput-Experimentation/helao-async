@@ -146,3 +146,194 @@ def test_add_strike_recovers_from_a_malformed_block(tmp_path, mod):
     block = mod.Progress(act_yml).quarantine
     assert block["strikes"] == 1
     assert block["first_failed"] == T0.isoformat(timespec="seconds")
+
+
+FAILING_HOOK = """
+from helao.core.hooks import FinishHook
+class Hook(FinishHook):
+    blocking = True
+    phase = "postfinish"
+    async def run(self, ctx):
+        raise RuntimeError("push failed")
+"""
+
+QUICK = {"quarantine_strikes": 1, "quarantine_hours": 0}
+
+
+def _driver_with_journal(tmp_path, cls, cfg_extra=None, postfinish_hooks=None):
+    hd = HelaoDirs(
+        root=tmp_path,
+        save_root=tmp_path / RunDir.ACTIVE.value,
+        process_root=tmp_path / "PROCESSES",
+        states_root=tmp_path / "STATES",
+    )
+    cfg = {"aws_bucket": "test-bucket", "max_tasks": 1, **(cfg_extra or {})}
+    if postfinish_hooks is None:
+        return cls(cfg, hd)
+    return cls(cfg, hd, postfinish_hooks=postfinish_hooks)
+
+
+def _count_alerts(monkeypatch, mod):
+    alerts = []
+    monkeypatch.setattr(mod.LOGGER, "alert", lambda msg, *a, **k: alerts.append(msg))
+    return alerts
+
+
+@pytest.mark.parametrize("mod", MODS)
+@pytest.mark.asyncio
+async def test_defaults_are_five_strikes_and_24_hours(tmp_path, mod):
+    drv = make_sync_driver(tmp_path, mod.SyncDriver)
+    try:
+        assert (drv.quarantine_strikes, drv.quarantine_hours) == (5, 24)
+    finally:
+        await teardown_driver(drv)
+
+
+@pytest.mark.parametrize("mod", MODS)
+@pytest.mark.asyncio
+async def test_an_exception_out_of_sync_yml_is_a_strike(tmp_path, mod, monkeypatch):
+    alerts = _count_alerts(monkeypatch, mod)
+    drv = _driver_with_journal(tmp_path, mod.SyncDriver, QUICK)
+    try:
+        act_yml = make_action(make_exp_tree(tmp_path, "RUNS", mk_uuid(1)), 0)
+
+        async def explode(yml_path, rank=5, **kw):
+            raise ValueError("bad yml")
+
+        drv.sync_yml = explode
+        await drv.enqueue_yml(act_yml, 0)
+        await drain(drv, timeout=15)
+        prog = mod.Progress(act_yml)
+        assert prog.is_quarantined
+        assert prog.quarantine["last_error"] == "ValueError: bad yml"
+        assert len(alerts) == 1
+        listed = drv.quarantined()
+        assert [e["yml"] for e in listed] == [str(act_yml)]
+        assert listed[0]["strikes"] == 1
+    finally:
+        await teardown_driver(drv)
+
+
+@pytest.mark.parametrize("mod", MODS)
+@pytest.mark.asyncio
+async def test_a_failed_blocking_hook_is_a_strike(tmp_path, mod):
+    hook = tmp_path / "push_api.py"
+    hook.write_text(textwrap.dedent(FAILING_HOOK), encoding="utf-8")
+    drv = _driver_with_journal(
+        tmp_path,
+        mod.SyncDriver,
+        {"quarantine_strikes": 5, "quarantine_hours": 24},
+        postfinish_hooks={"action": {str(hook): ["*"]}},
+    )
+    try:
+        act_yml = make_action(make_exp_tree(tmp_path, "RUNS", mk_uuid(1)), 0)
+
+        async def no_requeue(upath, rank=0, rank_limit=-5):
+            return None
+
+        drv.enqueue_yml = no_requeue
+        assert (
+            await asyncio.wait_for(drv.sync_yml(yml_path=act_yml, rank=0), 15) is False
+        )
+        block = mod.Progress(act_yml).quarantine
+        assert block["strikes"] == 1
+        assert "push failed" in block["last_error"]
+    finally:
+        await teardown_driver(drv)
+
+
+@pytest.mark.parametrize("mod", MODS)
+@pytest.mark.asyncio
+async def test_a_quarantined_record_is_never_enqueued(tmp_path, mod):
+    drv = make_sync_driver(tmp_path, mod.SyncDriver)
+    try:
+        exp_yml = make_exp_tree(tmp_path, RunDir.FINISHED.value, mk_uuid(1))
+        sick = make_action(exp_yml, 0)
+        healthy = make_action(exp_yml, 1)
+        mod.Progress(sick).add_strike("boom", 1, 0, T0)
+        mod.Progress(healthy).add_strike("blip", 5, 24, T0)  # strikes below N
+        synced = []
+
+        async def record(yml_path, rank=5, **kw):
+            synced.append(str(yml_path))
+
+        drv.sync_yml = record
+        await drv.enqueue_yml(sick, 0)
+        await drv.finish_pending(actions_first=True)
+        await drain(drv, timeout=15)
+        assert str(sick) not in synced
+        assert str(healthy) in synced  # the sweep did find this tree
+    finally:
+        await teardown_driver(drv)
+
+
+@pytest.mark.parametrize("mod", MODS)
+@pytest.mark.asyncio
+async def test_release_quarantine_clears_and_reports(tmp_path, mod):
+    drv = make_sync_driver(tmp_path, mod.SyncDriver)
+    try:
+        act_yml = make_action(make_exp_tree(tmp_path, "RUNS", mk_uuid(1)), 0)
+        assert drv.release_quarantine(act_yml) is False
+        mod.Progress(act_yml).add_strike("boom", 1, 0, T0)
+        assert drv.release_quarantine(str(act_yml)) is True
+        assert mod.Progress(act_yml).quarantine is None
+    finally:
+        await teardown_driver(drv)
+
+
+@pytest.mark.parametrize("mod", MODS)
+@pytest.mark.asyncio
+async def test_zero_strikes_disables_quarantine_but_records(tmp_path, mod, monkeypatch):
+    alerts = _count_alerts(monkeypatch, mod)
+    drv = make_sync_driver(
+        tmp_path, mod.SyncDriver, {"quarantine_strikes": 0, "quarantine_hours": 0}
+    )
+    try:
+        act_yml = make_action(make_exp_tree(tmp_path, "RUNS", mk_uuid(1)), 0)
+        for _ in range(3):
+            drv._strike(act_yml, "boom")
+        prog = mod.Progress(act_yml)
+        assert prog.quarantine["strikes"] == 3 and not prog.is_quarantined
+        assert alerts == []
+    finally:
+        await teardown_driver(drv)
+
+
+@pytest.mark.parametrize("mod", MODS)
+@pytest.mark.asyncio
+async def test_strike_on_a_vanished_record_does_not_kill_the_worker(tmp_path, mod):
+    drv = make_sync_driver(tmp_path, mod.SyncDriver, QUICK)
+    try:
+        ghost = tmp_path / "RUNS" / "gone" / "260610.000001000000-act.yml"
+        drv._strike(ghost, "boom")  # Progress raises loading the missing yml
+        assert not ghost.with_suffix(".prg").exists()
+        act_yml = make_action(make_exp_tree(tmp_path, "RUNS", mk_uuid(1)), 0)
+        seen = []
+
+        async def record(yml_path, rank=5, **kw):
+            seen.append(str(yml_path))
+
+        drv.sync_yml = record
+        await drv.enqueue_yml(act_yml, 0)
+        await drain(drv, timeout=15)
+        assert seen == [str(act_yml)]
+    finally:
+        await teardown_driver(drv)
+
+
+@pytest.mark.parametrize("mod", MODS)
+@pytest.mark.asyncio
+async def test_no_journal_still_quarantines_and_lists_nothing(
+    tmp_path, mod, monkeypatch
+):
+    alerts = _count_alerts(monkeypatch, mod)
+    drv = make_sync_driver(tmp_path, mod.SyncDriver, QUICK)  # no states_root
+    try:
+        assert drv.run_journal is None
+        act_yml = make_action(make_exp_tree(tmp_path, "RUNS", mk_uuid(1)), 0)
+        drv._strike(act_yml, "boom")
+        assert mod.Progress(act_yml).is_quarantined
+        assert len(alerts) == 1
+        assert drv.quarantined() == []
+    finally:
+        await teardown_driver(drv)
