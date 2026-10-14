@@ -4,7 +4,7 @@ and the ORCH_REQUIRED/wiring growth (P2a Task 1)."""
 
 import pytest
 
-from helao.hexagon.adapters.legacy.health import LegacyHealthAdapter
+from helao.hexagon.adapters.shared.health import LegacyHealthAdapter
 from helao.hexagon.app.wiring import ORCH_REQUIRED, PortWiring, UnwiredPortError
 from helao.hexagon.ports.auxiliary import HealthPort
 
@@ -34,7 +34,7 @@ async def test_endpoints_available_converts_to_port_shape(monkeypatch):
         return False, [("http://h:1/S/bad", ["could not connect"])]
 
     monkeypatch.setattr(
-        "helao.hexagon.adapters.legacy.health.legacy_endpoints_available",
+        "helao.hexagon.adapters.shared.health.legacy_endpoints_available",
         fake_probe,
     )
     ad = LegacyHealthAdapter()

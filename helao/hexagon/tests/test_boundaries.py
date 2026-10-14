@@ -298,7 +298,7 @@ def test_app_layer_clean():
 
 def test_checker_flags_native_importing_core_servers(tmp_path):
     """Mutation self-test (P2b-1): adapters/native/ is the hexagon-owned
-    write runtime — unlike adapters/legacy it must NOT wrap legacy server
+    write runtime — unlike adapters/shared it must NOT wrap legacy server
     classes. helao.core.servers.* is banned there (models/helpers stay
     allowed: the native bodies are byte-copies of the collaborator modules,
     which import helao.core.models + helao.helpers only)."""

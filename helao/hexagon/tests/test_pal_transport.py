@@ -1,4 +1,4 @@
-"""Unit tests for `helao.hexagon.adapters.legacy.pal_transport.
+"""Unit tests for `helao.hexagon.adapters.shared.pal_transport.
 LegacyPalTransport` (P3a-PAL slice 4).
 
 Covers construct-disconnected (no SSH/NI-DAQ opened at construction) and
@@ -17,7 +17,7 @@ import asyncio
 import sys
 
 from helao.core.error import ErrorCodes
-from helao.hexagon.adapters.legacy.pal_transport import LegacyPalTransport
+from helao.hexagon.adapters.shared.pal_transport import LegacyPalTransport
 from helao.hexagon.ports.pal_transport import PalTransportPort
 
 

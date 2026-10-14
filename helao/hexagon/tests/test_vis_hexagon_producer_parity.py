@@ -576,7 +576,7 @@ async def test_no_hexagon_orch_ws_producer_exists(tmp_path, monkeypatch):
     from helao.deploy.hte.servers.orchestrator.async_orch2 import makeApp
     from helao.helpers import config_loader
     from helao.hexagon.adapters.errors import UnwiredPortError
-    from helao.hexagon.adapters.legacy.status import DispatcherStatusAdapter
+    from helao.hexagon.adapters.shared.status import DispatcherStatusAdapter
     from helao.hexagon.app import action_host, orch_host
 
     (tmp_path / "LOGS").mkdir()

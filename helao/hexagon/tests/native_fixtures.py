@@ -20,7 +20,7 @@ from helao.helpers.active_params import ActiveParams
 from helao.helpers.dequedict import DequeDict
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.premodels import Action
-from helao.hexagon.adapters.legacy.clock import LegacyClockAdapter
+from helao.hexagon.adapters.shared.clock import LegacyClockAdapter
 from helao.hexagon.adapters.native.artifact_store import NativeArtifactStoreAdapter
 from helao.hexagon.app.action_host import ActionHost
 from helao.hexagon.app.action_session import ActionSession

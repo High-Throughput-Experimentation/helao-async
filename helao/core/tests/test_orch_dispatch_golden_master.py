@@ -139,8 +139,8 @@ from helao.core.models.server import ActionServerModel, EndpointModel, GlobalSta
 from helao.helpers.dequedict import DequeDict
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.zdeque import zdeque
-from helao.hexagon.adapters.legacy.health import LegacyHealthAdapter
-from helao.hexagon.adapters.legacy.logging_adapter import LegacyLoggingAdapter
+from helao.hexagon.adapters.shared.health import LegacyHealthAdapter
+from helao.hexagon.adapters.shared.logging_adapter import LegacyLoggingAdapter
 from helao.hexagon.app.orch_host import OrchHost
 from helao.hexagon.app.wiring import PortWiring
 

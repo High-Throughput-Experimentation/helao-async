@@ -115,7 +115,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import helao.helpers.premodels as premodels_module
-import helao.hexagon.adapters.legacy.clock as clock_module
+import helao.hexagon.adapters.shared.clock as clock_module
 import helao.hexagon.adapters.native.artifact_store as artifact_store_module
 import helao.hexagon.adapters.native.finalizer as finalizer_module
 import helao.hexagon.app.action_host as action_host_module
@@ -130,7 +130,7 @@ from helao.helpers.dequedict import DequeDict
 from helao.helpers.executor import Executor
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.premodels import Action
-from helao.hexagon.adapters.legacy.clock import LegacyClockAdapter
+from helao.hexagon.adapters.shared.clock import LegacyClockAdapter
 from helao.hexagon.adapters.native.artifact_store import NativeArtifactStoreAdapter
 from helao.hexagon.app.action_host import ActionHost
 from helao.hexagon.app.action_session import ActionSession

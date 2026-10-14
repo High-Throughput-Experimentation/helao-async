@@ -4,9 +4,9 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from helao.hexagon.adapters.legacy.clock import LegacyClockAdapter
-from helao.hexagon.adapters.legacy.config import LegacyConfigAdapter
-from helao.hexagon.adapters.legacy.logging_adapter import LegacyLoggingAdapter
+from helao.hexagon.adapters.shared.clock import LegacyClockAdapter
+from helao.hexagon.adapters.shared.config import LegacyConfigAdapter
+from helao.hexagon.adapters.shared.logging_adapter import LegacyLoggingAdapter
 from helao.hexagon.ports.clock import ClockPort
 from helao.hexagon.ports.config import ConfigPort
 from helao.hexagon.ports.logging import LoggingPort

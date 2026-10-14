@@ -48,7 +48,7 @@ from helao.core.drivers.helao_driver import (
 )
 from helao.core.error import ErrorCodes
 from helao.core.models.sample import SolidSample
-from helao.hexagon.adapters.legacy.calibration_store import JsonFileCalibrationStore
+from helao.hexagon.adapters.shared.calibration_store import JsonFileCalibrationStore
 from helao.hexagon.domain.motion_transform import TransformXY
 
 # P3a galil-split slice-4: the Bokeh `Server`/`HelaoVis` construction and the

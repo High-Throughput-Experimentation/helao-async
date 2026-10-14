@@ -113,7 +113,7 @@ def test_build_wiring_status_port_carries_own_identity(installed_config):
     """P1b1 carry: the status adapter must be composed with the server's own
     host/port from config (orch_status_sync keys nonblocking bookkeeping on
     them) — never the ''/0 defaults."""
-    from helao.hexagon.adapters.legacy.status import DispatcherStatusAdapter
+    from helao.hexagon.adapters.shared.status import DispatcherStatusAdapter
     from helao.hexagon.app.factory import build_wiring
     from helao.hexagon.ports.status import StatusPort
 
@@ -132,7 +132,7 @@ async def test_status_wire_send_carries_composed_identity(
 ):
     """send_nonblocking_status must put the COMPOSED host/port on the wire
     (params_dict server_host/server_port), not ''/0."""
-    import helao.hexagon.adapters.legacy.status as status_mod
+    import helao.hexagon.adapters.shared.status as status_mod
     from helao.core.error import ErrorCodes
     from helao.hexagon.app.factory import build_wiring
 
@@ -187,7 +187,7 @@ async def test_status_adapter_unbound_is_fail_loud(installed_config):
     test_vis_hexagon_producer_parity::test_no_hexagon_orch_ws_producer_exists.
     (Bare-adapter check.)"""
     from helao.hexagon.adapters.errors import UnwiredPortError
-    from helao.hexagon.adapters.legacy.status import DispatcherStatusAdapter
+    from helao.hexagon.adapters.shared.status import DispatcherStatusAdapter
 
     a = DispatcherStatusAdapter("ORCH")
     with pytest.raises(UnwiredPortError):

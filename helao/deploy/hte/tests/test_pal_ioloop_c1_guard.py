@@ -46,8 +46,8 @@ import asyncio
 from helao.core.error import ErrorCodes
 from helao.deploy.hte.drivers.robot.enum import Spacingmethod
 from helao.deploy.hte.drivers.robot.pal_driver import PAL, PALJob
-from helao.hexagon.adapters.legacy.pal_transport import LegacyPalTransport
-from helao.hexagon.adapters.legacy.pal_trigger import NullPalTrigger
+from helao.hexagon.adapters.shared.pal_transport import LegacyPalTransport
+from helao.hexagon.adapters.shared.pal_trigger import NullPalTrigger
 
 
 class _FakeAction:

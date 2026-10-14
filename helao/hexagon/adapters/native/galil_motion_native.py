@@ -43,7 +43,7 @@ from helao.core.error import ErrorCodes
 from helao.core.models.sample import SolidSample
 from helao.deploy.hte.drivers.motion.enum import MoveModes, TransformationModes
 from helao.helpers import helao_logging as logging
-from helao.hexagon.adapters.legacy.calibration_store import JsonFileCalibrationStore
+from helao.hexagon.adapters.shared.calibration_store import JsonFileCalibrationStore
 from helao.hexagon.domain.motion_transform import TransformXY
 from helao.hexagon.ports.galil_command_channel import (
     GalilChannelError,
@@ -94,7 +94,7 @@ class NativeGalilMotion(HelaoDriver):
         if channel is None:
             # production default: the at-station gclib channel (lazy import so
             # this module still imports/constructs on Linux without gclib).
-            from helao.hexagon.adapters.legacy.galil_command_channel import (
+            from helao.hexagon.adapters.shared.galil_command_channel import (
                 GclibCommandChannel,
             )
 

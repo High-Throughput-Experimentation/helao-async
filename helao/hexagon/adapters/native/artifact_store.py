@@ -1,6 +1,6 @@
 """ArtifactStorePort adapter over the NATIVE write bodies (P2b-1).
 
-The native counterpart of ``adapters/legacy/artifact_store.py``: the same
+The native counterpart of ``adapters/shared/artifact_store.py``: the same
 port surface and the same for_action/bound-handle pattern, but every write
 body is the hexagon-native re-body (meta_writer/data_file/data_stream/
 finalizer modules in this package) instead of a wrap of live legacy

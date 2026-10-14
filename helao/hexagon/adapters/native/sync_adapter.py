@@ -2,7 +2,7 @@
 ``NativeSyncer``/``SyncDriver`` instance from
 ``helao.hexagon.adapters.native.sync_driver``. All pipeline semantics (locks,
 children gate, priority floor, process reconcile, .prg lifecycle) stay inside
-the wrapped native driver — same shape as adapters/legacy/sync.py, which this
+the wrapped native driver — same shape as adapters/shared/sync.py, which this
 class replaces at the P2e DB cut-over. reset_sync/list_pending are sync in
 the driver — bridged without behavior change. NOT constructed by
 build_wiring in P2c (PortWiring.sync stays Optional-None; no REQUIRED entry)."""

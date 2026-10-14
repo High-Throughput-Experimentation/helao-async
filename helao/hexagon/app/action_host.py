@@ -60,7 +60,7 @@ from helao.helpers.premodels import Action
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.ws_utils import WsPublisher
 from helao.helpers.zdeque import zdeque
-from helao.hexagon.adapters.legacy.status import DispatcherStatusAdapter
+from helao.hexagon.adapters.shared.status import DispatcherStatusAdapter
 from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
 from helao.hexagon.app.wiring import ACTION_REQUIRED, PortWiring
 
