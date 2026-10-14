@@ -228,6 +228,19 @@ def ECMS_initiation_ECSA(
     MS_baseline_duration_2: float = 90,
     tube_clear_time: float = 20,
     liquid_drain_time: float = 60.0,
+    WE_potential_init__V: float = 0,
+    WE_potential_apex1__V: float = -0.2,
+    WE_potential_apex2__V: float = 0,
+    WE_potential_final__V: float = 0,
+    ScanRate_V_s_1: list[float] = [0.02, 0.05, 0.1],
+    SampleRate: float = 0.1,
+    Cycles: int=1,
+    IErange: str = "auto",
+    SamplingMode: str = "SamplingModeSurface",
+    versus_OCV: bool = True,
+    OCV_duration__s: float = 10.0, 
+    OCV_acquisition_period__s: float = 0.1,
+    MS_equilibrium_time: float = 0.0,
 ) -> list:
     """ECMS cell setup variant with electrolyte recirculation reservoir fill.
 
@@ -298,7 +311,26 @@ def ECMS_initiation_ECSA(
             "MS_baseline_duration": MS_baseline_duration_2,
         },
     )
-
+    for cycle, ScanRate in enumerate(ScanRate_V_s_1):
+        epm.add(
+            "ECMS_sub_CV",
+            {
+                "WE_versus": "OCV",
+                "WE_potential_init__V": WE_potential_init__V,
+                "WE_potential_apex1__V": WE_potential_apex1__V,
+                "WE_potential_apex2__V": WE_potential_apex2__V,
+                "WE_potential_final__V": WE_potential_final__V,
+                "ScanRate_V_s": ScanRate,
+                "Cycles": Cycles,
+                "SampleRate": SampleRate,
+                "IErange": IErange,
+                "MS_equilibrium_time": MS_equilibrium_time,
+                "SamplingMode": SamplingMode,
+                "versus_OCV": versus_OCV,
+                "OCV_duration__s": OCV_duration__s, 
+                "OCV_acquisition_period__s": OCV_acquisition_period__s,
+            },
+        )
     epm.add("ECMS_sub_normal_state", {})
     epm.add(
         "ECMS_sub_drain_recirculation",

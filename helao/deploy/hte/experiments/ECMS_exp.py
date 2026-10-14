@@ -925,11 +925,15 @@ def ECMS_sub_pulseCA(
     return apm.planned_actions
 
 
-@experiment(version=1)
+@experiment(version=2)
 def ECMS_sub_CV(
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
+    SamplingMode: str = "SamplingModeFast",
+    versus_OCV: bool = False,
+    OCV_duration__s: float = 0.0, 
+    OCV_acquisition_period__s: float = 0.1,
     WE_potential_init__V: float = 0.0,
     WE_potential_apex1__V: float = -1.0,
     WE_potential_apex2__V: float = -0.5,
@@ -971,6 +975,11 @@ def ECMS_sub_CV(
         potential_apex1_vsRef = WE_potential_apex1__V - 1.0 * ref_offset__V
         potential_apex2_vsRef = WE_potential_apex2__V - 1.0 * ref_offset__V
         potential_final_vsRef = WE_potential_final__V - 1.0 * ref_offset__V
+    elif WE_versus == "OCV":
+        potential_init_vsRef = WE_potential_init__V
+        potential_apex1_vsRef = WE_potential_apex1__V
+        potential_apex2_vsRef = WE_potential_apex2__V 
+        potential_final_vsRef = WE_potential_final__V
     elif WE_versus == "rhe":
         potential_init_vsRef = (
             WE_potential_init__V
@@ -1016,6 +1025,10 @@ def ECMS_sub_CV(
             "Cycles": Cycles,
             "AcqInterval__s": SampleRate,
             "IErange": IErange,
+            "SamplingMode": SamplingMode,
+            "versus_OCV": versus_OCV,
+            "OCV_duration__s": OCV_duration__s, 
+            "OCV_acquisition_period__s": OCV_acquisition_period__s,
         },
         from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         process_finish=True,
