@@ -121,12 +121,12 @@ was in how the list was gathered.
 
 | station | B5-changed servers it runs |
 |---|---|
-| `uvis4` | CAM, IO, MOTOR, PAL, PDU, SAMPLE, SPEC_R, SYNC, ORCH |
-| `amts` | PSTAT (gamry), SYNC, ORCH |
-| `note1` | SYNC, ORCH |
-| `electrode-demo` | ORCH, OPERATOR, VIS, CONTROL, UI |
+| Deployment-C's UV-Vis station | CAM, IO, MOTOR, PAL, PDU, SAMPLE, SPEC_R, SYNC, ORCH |
+| Deployment-B's station | PSTAT (gamry), SYNC, ORCH |
+| a private SYNC station | SYNC, ORCH |
+| Deployment-A's bench config | ORCH, OPERATOR, VIS, CONTROL, UI |
 
-`electrode-demo` was missed a second time, by a subtler version of the same
+Deployment-A's bench config was missed a second time, by a subtler version of the same
 mistake: the three above were found by looking for stations running hte
 **action** servers, and this one runs none. Its deployment owns only
 `servers/action/`, so every *other* group falls back to hte — the orchestrator,
@@ -146,24 +146,24 @@ surface; there is no frozen checklist for `async_orch2`, `standalone_operator`,
 smoke sequence and the on-station golden diff, and the checklist column should be
 read as not-applicable rather than skipped.
 
-Its hexagon variant is `electrode-hex`, already present and derived from
-`electrode-demo` through `hexagon_variant` rather than copied — so unlike the
+Its hexagon variant is a separate config, already present and derived from
+Deployment-A's bench config through `hexagon_variant` rather than copied — so unlike the
 paired `*_hex` YAMLs elsewhere in this programme there is no second copy of the
-station's hardware params to go stale. Launch `electrode-hex` to validate;
-launch `electrode-demo` to roll back.
+station's hardware params to go stale. Launch the hexagon variant to validate;
+launch Deployment-A's bench config to roll back.
 
-`uvis4` carries the most of any station in the programme after ccsi2, and it is
+Deployment-C's UV-Vis station carries the most of any station in the programme after ccsi2, and it is
 the **only** live consumer of `pdu_server` anywhere — the module the B5 spec
 recorded as having no station gate. It has one; it is here.
 
 `SYNC` is worth calling out separately: it runs on all seven hte stations and on
-three of these four — `electrode-demo` is the exception, having no syncer — so it
+three of these four — Deployment-A's bench config is the exception, having no syncer — so it
 is the single highest-blast-radius module B5 touched. A `SYNC` fault is a fault
 almost everywhere.
 
 **Preferred order, where there is a choice: `ccsi2`, `eche10`, `anec`, `adss3`,
-`clad`, `ecms3`, `hispec`, then `uvis4`, `amts`, `note1`, `electrode-demo`.**
-`electrode-demo` sits last because it is a demo station rather than a production
+`clad`, `ecms3`, `hispec`, then Deployment-C's UV-Vis station, Deployment-B's station, a private SYNC station, Deployment-A's bench config.**
+Deployment-A's bench config sits last because it is a demo station rather than a production
 one, not because it is less informative — its five servers are covered nowhere
 else without an action server in front of them. Stations will come
 up in whatever order work demands; this is only what to prefer when two are
@@ -394,21 +394,21 @@ is. Record what failed, on which server, with the log excerpt — not a summary.
 | `clad` | 2026-09-28 | — | waived § | waived § | waived § | dang828 |
 | `ecms3` | 2026-09-17 | `e02a7ff6` | soak ‡ | soak ‡ | soak ‡ | dang828 |
 | `hispec` | 2026-09-24 | `1cd49b17` (PR #213 branch) | soak ‡ | soak ‡ | soak ‡ | dang828 |
-| `uvis4` | 2026-08-17 | ≥ `118660ee` | prod run † | prod run † | prod run † | dang828 |
-| `amts` | 2026-09-28 | — | waived § | waived § | waived § | dang828 |
-| `note1` | 2026-08-17 | ≥ `762cd9f0` | soak ‡ | soak ‡ | soak ‡ | dang828 |
-| `electrode-demo` | 2026-09-28 | — | n/a — no hte action server | waived ¶ | waived ¶ | dang828 |
+| Deployment-C's UV-Vis station | 2026-08-17 | ≥ `118660ee` | prod run † | prod run † | prod run † | dang828 |
+| Deployment-B's station | 2026-09-28 | — | waived § | waived § | waived § | dang828 |
+| a private SYNC station | 2026-08-17 | ≥ `762cd9f0` | soak ‡ | soak ‡ | soak ‡ | dang828 |
+| Deployment-A's bench config | 2026-09-28 | — | n/a — no hte action server | waived ¶ | waived ¶ | dang828 |
 
 B5 is already on `unstable`; this table is the record of hardware confirmation
 accumulating behind it. **B7 (the deletion) should not start until it is
 full** — that is the phase which removes the engine these rows are evidence
 against. B6 (the private deployments) is independent and can proceed.
 
-### `uvis4`, 2026-08-17 — signed off on a production run († )
+### Deployment-C's UV-Vis station, 2026-08-17 — signed off on a production run († )
 
 **† The three gate columns record what the sign-off actually rests on, which is
 a full production sequence rather than the three scripted gates.** A complete
-`UVIS_GAIA_preset` ran on `uvis4_hex` with no errors: the station's nine
+UV-Vis preset sequence ran on Deployment-C's UV-Vis station, hexagon config, with no errors: the station's nine
 B5-changed servers took a real plate end to end on the native `ActionHost`,
 through CAM, IO, MOTOR, PAL, PDU, SAMPLE, SPEC_R, SYNC and ORCH. Signed off by
 the station owner on that basis.
@@ -436,9 +436,9 @@ why the captured rev matters:
 - The first, aborted attempt was caught during calibration, before any sample
   was measured, and that run's records were discarded rather than repaired.
 
-### `note1`, 2026-08-17 — signed off on a continuous soak (‡)
+### A private SYNC station, 2026-08-17 — signed off on a continuous soak (‡)
 
-**‡ `note1` ran continuously from 2026-08-15 through 2026-08-17** — batch
+**‡ a private SYNC station ran continuously from 2026-08-15 through 2026-08-17** — batch
 conversion, `SYNC` and `ANA` — across the whole deduplication campaign. It
 carries `SYNC` and `ORCH`, and `SYNC` is the highest-blast-radius module B5
 touched. Days of unattended operation against a live share is a soak, and a
@@ -458,15 +458,15 @@ volume to expose:
   the records never synced. Now recorded relative and re-anchored on read.
 - `118660ee` — the fix above passed the record-relative path to `read_hlo`,
   which needs the absolute one; the `except` arm then uploaded an empty
-  envelope and marked the file synced. Silent data loss, caught at `uvis4` but
-  present anywhere `SYNC` ran in that window, `note1` included.
+  envelope and marked the file synced. Silent data loss, caught at Deployment-C's UV-Vis station but
+  present anywhere `SYNC` ran in that window, a private SYNC station included.
 - `762cd9f0` — `ANA`'s startup journal sweep re-enqueued every pending entry
   unbounded. With 8,802 entries accumulated it queued thousands of analyses
   into a just-started server and `ANA` became unreachable. Now swept in bounded
   slices.
 
 What a soak does not do is compare against the pre-migration reference or
-exercise the abort path. As with `uvis4`, a regression visible only as a
+exercise the abort path. As with Deployment-C's UV-Vis station, a regression visible only as a
 *difference* from legacy, or only under e-stop, would not have surfaced here.
 
 ### `ecms3`, 2026-09-17 — signed off on a soak (‡)
@@ -488,7 +488,7 @@ B5-changed servers are CALC, CALIBRATIONMFC, CALIBRATIONMFCSECOND, MFC, NI,
 ORCH, PSTAT (gamry), SAMPLE and SYNC; `PSTAT (gamry)` and the two calibration
 MFC servers are covered at no other signed-off station.
 
-Same caveat as `uvis4` and `note1`: a soak does not compare this build's routes
+Same caveat as Deployment-C's UV-Vis station and a private SYNC station: a soak does not compare this build's routes
 and outputs against the pre-migration reference, and does not exercise the abort
 path. A regression visible only as a *difference* from legacy, or only under
 e-stop, would not have surfaced here.
@@ -496,7 +496,7 @@ e-stop, would not have surfaced here.
 ### `eche10`, 2026-09-24 — signed off on a soak (‡)
 
 Signed off by the station owner on a soak of the ECHEUVIS sequences. The row
-records `≥ cfe9c69b` for the same reason `uvis4` records `≥ 118660ee`: the
+records `≥ cfe9c69b` for the same reason Deployment-C's UV-Vis station records `≥ 118660ee`: the
 station was the one that found the defects, and the rev that passes is the one
 carrying their fixes. Seven were found and fixed here on 2026-09-18, which is
 the reason this row matters beyond its count — every one was a native-host or
@@ -567,7 +567,7 @@ this row, none of those had any hardware confirmation on the native host.
 ### `anec`, 2026-09-28 — signed off on a soak (‡)
 
 Signed off by the station owner on a soak. The row records `≥ 164e4dfd` on the
-same convention as `uvis4` and `eche10`: `anec` is where the RPC fast path was
+same convention as Deployment-C's UV-Vis station and `eche10`: `anec` is where the RPC fast path was
 found handing SAMPLE's `new_ref_samples` a raw `dict` for its `Optional[Action]`
 parameter, on every PAL call. The call still succeeded, because the dispatcher
 fell back to HTTP and FastAPI did the conversion, so the cost was one traceback
@@ -580,18 +580,18 @@ fast path had skipped validation entirely.
 
 `anec` carries nothing unique — IO, MOTOR, NI, PAL, PSTAT (gamry), SAMPLE, SYNC
 and ORCH are all covered elsewhere — so its value is as a second station on PAL,
-which only `uvis4` confirmed before it.
+which only Deployment-C's UV-Vis station confirmed before it.
 
 Same caveat as every soak row: no golden diff against the pre-migration
 reference, no e-stop drill.
 
-`uvis4`, `note1`, `ecms3`, `eche10`, `hispec`, `ccsi2` and `anec` are signed off on
+Deployment-C's UV-Vis station, a private SYNC station, `ecms3`, `eche10`, `hispec`, `ccsi2` and `anec` are signed off on
 evidence. **Every B5-changed action-server family has at least one of them**,
 with one caveat: `PSTAT (biologic)` counts only through `hispec`, which ran the
 PR #213 replacement driver rather than the easy-biologic one B5 ported (see that
 row).
 
-### `adss3`, `clad`, `amts` — waived, 2026-09-28 (§)
+### `adss3`, `clad`, Deployment-B's station — waived, 2026-09-28 (§)
 
 **§ Not tested. Signed off by the station owner on a coverage argument, not on a
 run.** None of the three carries a B5-changed family that a signed station does
@@ -599,9 +599,9 @@ not already cover:
 
 | station | its B5-changed servers | covered by |
 |---|---|---|
-| `adss3` | CLEANSYRINGE, MOTOR, NI, ORCH, PAL, PSTAT (gamry), SAMPLE, SYNC, WORKSYRINGE | `ccsi2` (syringes), `uvis4`/`anec` (PAL), `eche10`/`ecms3` (gamry) |
+| `adss3` | CLEANSYRINGE, MOTOR, NI, ORCH, PAL, PSTAT (gamry), SAMPLE, SYNC, WORKSYRINGE | `ccsi2` (syringes), Deployment-C's UV-Vis station/`anec` (PAL), `eche10`/`ecms3` (gamry) |
 | `clad` | as `adss3`, plus WATERSYRINGE | the same, plus `ccsi2` |
-| `amts` | PSTAT (gamry), SYNC, ORCH | `ecms3`, `eche10` |
+| Deployment-B's station | PSTAT (gamry), SYNC, ORCH | `ecms3`, `eche10` |
 
 What the argument does not cover is anything station-specific: a config value, a
 wiring difference, or a hardware revision that only that station has. The
@@ -609,13 +609,13 @@ KMOTOR and `gamry_aux` defects were both of that kind, and both were caught only
 by a station's own first launch. So if one of these three misbehaves on first
 use, treat it as a B5 first-launch finding and not as an unrelated fault.
 
-### `electrode-demo` — waived, 2026-09-28 (¶)
+### Deployment-A's bench config — waived, 2026-09-28 (¶)
 
 **¶ Not tested. Signed off by the station owner because the station is blocked,
-not because it ran.** `electrode-demo` is waiting on its private deployment's
+not because it ran.** Deployment-A's bench config is waiting on its private deployment's
 repository migration and cannot launch until that lands.
 
-This is the one waiver that gives up coverage. `electrode-demo` is the only
+This is the one waiver that gives up coverage. Deployment-A's bench config is the only
 station that runs the B5 orchestrator, operator and visualizers with **no** hte
 action server underneath. Every other station validates those servers only
 incidentally, next to the action modules that the smoke sequence is actually

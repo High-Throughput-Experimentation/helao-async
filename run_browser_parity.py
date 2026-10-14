@@ -1,10 +1,8 @@
 """Run the rendered-parity lane end to end: one command, one exit code.
 
-Launches each config the lane needs, runs every browser check against it, tears
-the group down, and diffs the ``bokeh_legacy`` lane's matrix against the
-``bokeh_hexagon`` one. Exits non-zero if any check fails or the diff is non-empty,
-so the lane is a single line in a gate or a station runbook rather than a
-procedure.
+Launches each config the lane needs, runs every browser check against it,
+and tears the group down. Exits non-zero if any check fails, so the lane is a
+single line in a gate or a station runbook rather than a procedure.
 
 Usage::
 
@@ -58,20 +56,8 @@ MATRIX_DIR = os.path.join(REPO_ROOT, ".browser-parity")
 
 #: The lanes, in run order.
 #:
-#: ``pair`` names the other lane this one's matrix is diffed against. The two
-#: lanes serve the same documents from two configs, so their matrices must
-#: agree.
-#:
-#: The Reflex lane has no pair; its styles, pixels and both Q10 branches run
-#: on their own.
+#: No lane is paired: each runs its checks on its own.
 LANES = {
-    "bokeh_legacy": {
-        "config": "goldenvis",
-        "check": "helao/core/tests/browser_parity/check_bokeh_docs.py",
-        "args": ["goldenvis"],
-        "ports": [5001, 5002, 5003, 8001, 8002, 8010],
-        "pair": "bokeh_hexagon",
-    },
     "bokeh_hexagon": {
         "config": "goldenhexgraft",
         "check": "helao/core/tests/browser_parity/check_bokeh_docs.py",
@@ -277,7 +263,7 @@ def self_test() -> int:
         perturb,
     )
 
-    path = os.path.join(MATRIX_DIR, "bokeh_legacy.json")
+    path = os.path.join(MATRIX_DIR, "bokeh_hexagon.json")
     if not os.path.isfile(path):
         print(
             f"[parity] self-test needs a captured matrix at {path}; run the lane first"
@@ -337,28 +323,11 @@ def main() -> int:
         results[name] = (code, path)
         print(f"[parity] lane '{name}' exited {code}")
 
-    from helao.core.tests.browser_parity.matrix import (
-        diff_matrices,
-        format_diff,
-        load_matrix,
-    )
-
     failures = [n for n, (code, _) in results.items() if code != 0]
-    for name in names:
-        pair = LANES[name].get("pair")
-        if not pair or pair not in results:
-            continue
-        differences = diff_matrices(
-            load_matrix(results[name][1]), load_matrix(results[pair][1])
-        )
-        print(format_diff(name, pair, differences))
-        if differences:
-            failures.append(f"{name}-vs-{pair}")
-
     if failures:
         print(f"[parity] FAIL: {failures}")
         return 1
-    print(f"[parity] PASS: {len(names)} lane(s), matrices agree")
+    print(f"[parity] PASS: {len(names)} lane(s)")
     return 0
 
 

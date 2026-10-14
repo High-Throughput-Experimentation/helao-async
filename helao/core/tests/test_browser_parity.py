@@ -4,7 +4,7 @@ The checks themselves stay standalone ``__main__`` scripts -- they launch
 orchestration groups and drive browsers, the class of thing that hangs a
 collected pytest session. But the logic *underneath* them is pure: the contrast
 arithmetic, the ink classifier, the matrix diff and its volatile-key policy,
-and the config pair the diff depends on. None of that needs a browser, all of
+and the config shape the checks depend on. None of that needs a browser, all of
 it is load-bearing, and a lane whose diff silently stopped comparing anything
 would still print "PASS".
 
@@ -181,25 +181,6 @@ def test_volatile_matching_is_by_suffix_not_by_equality():
     document = {"label": "a", "routes": {"live": {"canvas7_ink_distinct": 10}}}
     mutated = matrix.perturb(document, "live.canvas7_ink_distinct", 999)
     assert matrix.diff_matrices(document, mutated) == []
-
-
-# ---------------------------------------------------------------------------
-# The config pair the Bokeh diff depends on
-# ---------------------------------------------------------------------------
-def test_the_bokeh_pair_declares_the_same_servers_on_the_same_ports():
-    """If the pair drifts, the diff compares two different groups.
-
-    A diff between a legacy config and a hexagon config that no longer describe
-    the same group would report the *config* difference and read as a hosting
-    regression -- or, worse, would be silenced by adding volatile keys until it
-    passed. Pinning the shape here means drift fails as drift.
-    """
-    legacy = _load("goldenvis.yml")["servers"]
-    hexagon = _load("goldenhexgraft.yml")["servers"]
-    assert set(legacy) == set(hexagon)
-    for key in legacy:
-        assert legacy[key]["port"] == hexagon[key]["port"], key
-        assert legacy[key]["group"] == hexagon[key]["group"], key
 
 
 def test_the_two_q10_configs_take_opposite_branches():

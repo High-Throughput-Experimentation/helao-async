@@ -11,7 +11,8 @@ Two things about the original are worth knowing before trusting either:
   ``data_dict_keys``, so that line raises ``KeyError`` on the first packet.
 
 This port follows the declared columns and the ``ws_data`` base class rather
-than reproducing either. Only ``power_supply_test.yml`` names this panel.
+than reproducing either. Mounted by the POWERSUPPLY server in htereflex.yml and
+htehexreflex.yml.
 """
 
 __all__ = ["WS_PATH", "STATE_BASE", "X_COLUMN", "build", "panel_id"]

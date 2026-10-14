@@ -58,12 +58,8 @@ HTE_CONFIG_GLOB = os.path.join(REPO_ROOT, "helao", "deploy", "hte", "configs", "
 #: deliberate update to this file instead of a silent narrowing of the sweep
 #: that the property tests below rest on.
 #:
-#: Was 29 until 13 hte configs were relocated to `configs/archive/`, which the
-#: glob above does not reach. The 12 scales that left were `adss` (4), `eche6`,
-#: `eche7`, `eche8` and `uvis` (2 each) -- 17 + 12 = 29 exactly, which is what
-#: makes lowering the pin safe here: no *live* config quietly lost an axis, and
-#: that is the regression this number exists to catch. Verify the arithmetic
-#: closes before ever lowering it again.
+#: Was 29 until 13 hte configs holding 12 of those scales were retired; the
+#: remaining 17 are the live configs.
 TRACKED_SCALE_COUNT = 17
 
 #: The largest N the round-trip property looks for a failure within. Measured

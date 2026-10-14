@@ -32,8 +32,8 @@ colour *and* the achieved contrast.
 
 Run it against a launched group::
 
-    python launch.py goldenvis
-    python helao/core/tests/browser_parity/check_bokeh_docs.py goldenvis
+    python launch.py goldenhexgraft
+    python helao/core/tests/browser_parity/check_bokeh_docs.py goldenhexgraft
 """
 
 import json
@@ -87,7 +87,7 @@ BOKEH_TOLERANCE = 1
 #: been introduced.
 DEFAULT_BUTTON_MIN_LUMA = 200
 
-#: Documents in the gate pair, by config, as ``{name: (port, expectations)}``.
+#: Documents in the gate, by config, as ``{name: (port, expectations)}``.
 #:
 #: ``min_divs`` is the content assertion that must pass before any colour on
 #: that document is recorded -- a document that failed to build still has a
@@ -326,7 +326,7 @@ def run(config: str) -> tuple:
 def main() -> int:
     """CLI: ``check_bokeh_docs.py [config] [--json out.json]``."""
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    config = args[0] if args else "goldenvis"
+    config = args[0] if args else "goldenhexgraft"
     out = None
     for index, arg in enumerate(sys.argv):
         if arg == "--json" and index + 1 < len(sys.argv):

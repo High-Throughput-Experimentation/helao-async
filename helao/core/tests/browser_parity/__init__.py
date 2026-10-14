@@ -39,7 +39,7 @@ either. The naming here is ``check_*`` rather than ``*_check`` only for
 sorting; both are equally invisible to the sweep, which is the intent.
 
 The pure logic underneath -- the matrix, the diff, the colour math, the ink
-bands, and the config pair the diff depends on -- *is* pytest-tested, in
+bands, and the config shape the checks depend on -- *is* pytest-tested, in
 ``helao/core/tests/test_browser_parity.py``, which the sweep does collect. So
 the half that can be checked without a browser rides the normal suite, and only
 the half that genuinely needs one is manual.
