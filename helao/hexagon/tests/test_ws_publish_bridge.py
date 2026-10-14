@@ -149,3 +149,75 @@ async def test_bridge_rejects_malformed_payload_loud():
         # DataPackageModel requires action_uuid/action_name/datamodel
         await bridge.publish_data({"nonsense": True})
     assert sub.empty()
+
+
+def _bridge_cfg(tmp_path):
+    return {
+        "root": str(tmp_path),
+        "dummy": True,
+        "simulation": True,
+        "run_type": "simulation",
+        "servers": {
+            "ORCH": {
+                "host": "127.0.0.1",
+                "port": 8901,
+                "group": "orchestrator",
+                "params": {},
+            },
+            "SIM": {"host": "127.0.0.1", "port": 8902, "group": "action", "params": {}},
+        },
+    }
+
+
+@pytest.fixture()
+def installed_bridge_cfg(tmp_path, monkeypatch):
+    from helao.helpers import config_loader
+
+    cfg = _bridge_cfg(tmp_path)
+    (tmp_path / "LOGS").mkdir()
+    monkeypatch.setattr(config_loader, "CONFIG", cfg)
+    return cfg
+
+
+def test_an_action_host_binds_the_bridge_to_its_own_queues(installed_bridge_cfg):
+    """D-B7c.1: every ActionHost binds the WS publish bridge in __init__, over its own
+    fan-out queues, into the status adapter build_wiring gave it."""
+    from helao.hexagon.app.action_host import ActionHost
+
+    host = ActionHost("SIM", "SIM", "bridge", 1.0, helao_cfg=installed_bridge_cfg)
+    bridge = host.hexagon_ws_bridge
+    assert isinstance(bridge, WsPublishBridge)
+    assert host.hexagon_wiring.status._publish_bridge is bridge
+    assert bridge._status_q is host.status_q
+    assert bridge._data_q is host.data_q
+    assert bridge._live_q is host.live_q
+
+
+def test_an_orch_host_has_no_bridge(installed_bridge_cfg):
+    """Q5 / P2b-2 D3: an OrchHost serves its own /ws_* relays and is never bound."""
+    from helao.hexagon.app.orch_host import OrchHost
+
+    host = OrchHost(
+        "ORCH", "ORCH", "bridge", version=3.0, helao_cfg=installed_bridge_cfg
+    )
+    assert host.hexagon_ws_bridge is None
+    assert host.hexagon_wiring.status._publish_bridge is None
+
+
+def test_an_injected_status_without_bind_publish_bridge_yields_no_bridge(
+    installed_bridge_cfg,
+):
+    """The isinstance guard: a status port that is not a DispatcherStatusAdapter (here the
+    FakeStatusPush, which has no bind_publish_bridge) gets no bridge, and nothing raises.
+    """
+    import dataclasses
+
+    from helao.hexagon.adapters.fakes import FakeStatusPush
+    from helao.hexagon.app.action_host import ActionHost
+    from helao.hexagon.app.factory import build_wiring
+
+    wiring = dataclasses.replace(build_wiring("SIM"), status=FakeStatusPush())
+    host = ActionHost(
+        "SIM", "SIM", "bridge", 1.0, wiring=wiring, helao_cfg=installed_bridge_cfg
+    )
+    assert host.hexagon_ws_bridge is None

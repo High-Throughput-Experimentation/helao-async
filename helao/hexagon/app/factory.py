@@ -20,7 +20,6 @@ import os
 from importlib import import_module
 
 from helao.helpers import helao_logging as logging
-from helao.hexagon.adapters.errors import UnwiredPortError
 from helao.hexagon.adapters.legacy.clock import LegacyClockAdapter
 from helao.hexagon.adapters.legacy.config import from_global_config
 from helao.hexagon.adapters.legacy.health import LegacyHealthAdapter
@@ -30,7 +29,6 @@ from helao.hexagon.adapters.legacy.status import DispatcherStatusAdapter
 from helao.hexagon.adapters.legacy.transport import LegacyTransportAdapter
 from helao.hexagon.adapters.native.artifact_store import NativeArtifactStoreAdapter
 from helao.hexagon.adapters.native.data_sink import NativeDataSinkAdapter
-from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
 from helao.hexagon.app.wiring import (
     ACTION_REQUIRED,
     VIS_REQUIRED,
@@ -94,24 +92,6 @@ def makeActionApp(server_key: str, legacy_module: str):
         raise TypeError(
             f"{legacy_module}.makeApp returned {type(app).__name__}, not an ActionHost"
         )
-    app.hexagon_wiring = wiring
-    app.hexagon_ws_bridge = None
-
-    # Registered AFTER ActionHost's own startup handler (Starlette preserves
-    # registration order), so the host's fan-out queues are live when the
-    # bridge is bound to them.
-    @app.on_event("startup")
-    async def _hexagon_ws_bridge_startup():
-        # P2b-2 (D3): the WS publish bridge publishes onto the host's fan-out
-        # queues. ACTION apps only: an OrchHost serves its own /ws_* relays.
-        if not isinstance(wiring.status, DispatcherStatusAdapter):
-            raise UnwiredPortError(
-                "WS publish bridge requires DispatcherStatusAdapter status wiring"
-            )
-        status_adapter = wiring.status
-        bridge = WsPublishBridge(app.base.status_q, app.base.data_q, app.base.live_q)
-        status_adapter.bind_publish_bridge(bridge)
-        app.hexagon_ws_bridge = bridge
 
     return app
 

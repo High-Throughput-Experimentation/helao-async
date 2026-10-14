@@ -83,6 +83,9 @@ def orch_ws_publishers(
 class OrchHost(ActionHost):
     """The native orchestrator server."""
 
+    # Q5 / P2b-2 D3: the orchestrator serves its own /ws_* relays, so no bridge.
+    _binds_ws_bridge = False
+
     def __init__(
         self,
         server_key: str,

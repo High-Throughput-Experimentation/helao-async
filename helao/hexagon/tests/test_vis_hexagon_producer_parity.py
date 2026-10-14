@@ -549,7 +549,7 @@ async def test_no_hexagon_orch_ws_producer_exists(tmp_path, monkeypatch):
     from helao.helpers import config_loader
     from helao.hexagon.adapters.errors import UnwiredPortError
     from helao.hexagon.adapters.legacy.status import DispatcherStatusAdapter
-    from helao.hexagon.app import factory, orch_host
+    from helao.hexagon.app import action_host, orch_host
 
     (tmp_path / "LOGS").mkdir()
     monkeypatch.setattr(
@@ -578,16 +578,17 @@ async def test_no_hexagon_orch_ws_producer_exists(tmp_path, monkeypatch):
         "a hexagon orch composition now binds a WS publish bridge -- the orch "
         "half of gate item 1 is no longer a known hole and must be tested"
     )
-    assert not hasattr(
-        app, "hexagon_ws_bridge"
-    ), "the orchestrator now carries a ws bridge attribute; see this test's docstring"
+    assert (
+        app.hexagon_ws_bridge is None
+    ), "the orchestrator now carries a ws bridge; see this test's docstring"
     with pytest.raises(UnwiredPortError):
         await status.publish_status(wf.build_status_payload().as_dict())
 
     # And the source-level twin, so the hole is visible without constructing an
-    # app: the ONLY bind_publish_bridge call site is in makeActionApp.
+    # app: the ONLY bind_publish_bridge call site is ActionHost.__init__.
     assert "bind_publish_bridge" not in inspect.getsource(orch_host)
-    assert "bind_publish_bridge" in inspect.getsource(factory.makeActionApp)
+    assert orch_host.OrchHost._binds_ws_bridge is False
+    assert "bind_publish_bridge" in inspect.getsource(action_host.ActionHost.__init__)
 
 
 @pytest.mark.asyncio

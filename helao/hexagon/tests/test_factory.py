@@ -344,7 +344,8 @@ def test_build_wiring_wires_native_write_adapters(installed_config):
     w.require(*ACTION_REQUIRED)  # fail-loud stays satisfiable
 
 
-def test_make_action_app_registers_the_ws_bridge_hook(installed_config):
+def test_make_action_app_adds_no_startup_hook_of_its_own(installed_config):
+    from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
     from helao.hexagon.app.factory import makeActionApp
 
     app = makeActionApp("SIM", "helao.deploy.test.servers.action.ws_simulator")
@@ -352,9 +353,9 @@ def test_make_action_app_registers_the_ws_bridge_hook(installed_config):
     assert not hasattr(app, "hexagon_active_graft")
     startup_names = [h.__name__ for h in app.router.on_startup]
     shutdown_names = [h.__name__ for h in app.router.on_shutdown]
-    # ours must be registered AFTER ActionHost's own startup handler
-    # (Starlette preserves registration order)
-    assert startup_names[-1] == "_hexagon_ws_bridge_startup"
+    # D-B7c.1: the bridge is bound by ActionHost.__init__, not by a hook here
+    assert "_hexagon_ws_bridge_startup" not in startup_names
+    assert isinstance(app.hexagon_ws_bridge, WsPublishBridge)
     assert not any("graft" in name for name in startup_names + shutdown_names)
 
 
@@ -381,33 +382,27 @@ def test_make_action_app_refuses_a_module_that_is_not_native(
     )
 
 
-@pytest.mark.asyncio
-async def test_action_app_startup_binds_ws_publish_bridge(installed_config):
-    """P2b-2 D3: the _hexagon_ws_bridge_startup hook constructs WsPublishBridge
-    over the host's own fan-out queues and binds it into the status adapter
-    (ACTION apps only; an OrchHost serves its own relays)."""
+def test_make_action_app_returns_a_host_bound_at_build(installed_config):
+    """D-B7c.1: ActionHost.__init__ constructs WsPublishBridge over the host's own
+    fan-out queues and binds it into the status adapter (ACTION apps only; an
+    OrchHost serves its own relays)."""
     from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
     from helao.hexagon.app.factory import makeActionApp
 
     app = makeActionApp("SIM", "helao.deploy.test.servers.action.ws_simulator")
-    assert app.hexagon_ws_bridge is None  # bound at startup, not at build
-    hook = [
-        h for h in app.router.on_startup if h.__name__ == "_hexagon_ws_bridge_startup"
-    ][0]
-    await hook()
     assert isinstance(app.hexagon_ws_bridge, WsPublishBridge)
     assert app.hexagon_wiring.status._publish_bridge is app.hexagon_ws_bridge
-    assert app.hexagon_ws_bridge._status_q is app.base.status_q
-    assert app.hexagon_ws_bridge._data_q is app.base.data_q
-    assert app.hexagon_ws_bridge._live_q is app.base.live_q
+    assert app.hexagon_ws_bridge._status_q is app.status_q
+    assert app.hexagon_ws_bridge._data_q is app.data_q
+    assert app.hexagon_ws_bridge._live_q is app.live_q
 
 
 @pytest.mark.asyncio
 async def test_status_adapter_unbound_is_fail_loud(installed_config):
     """Controller hardening 3 (Q1/D3 underpinning): a DispatcherStatusAdapter
     is unbound by default and stays fail-loud (UnwiredPortError on
-    publish_status). Only makeActionApp's startup hook binds the bridge (see
-    test_action_app_startup_binds_ws_publish_bridge); the composed orchestrator
+    publish_status). Only `ActionHost.__init__` binds the bridge (see
+    test_make_action_app_returns_a_host_bound_at_build); the composed orchestrator
     side is pinned by
     test_vis_hexagon_producer_parity::test_no_hexagon_orch_ws_producer_exists.
     (Bare-adapter check.)"""

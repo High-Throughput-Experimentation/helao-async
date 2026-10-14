@@ -60,6 +60,8 @@ from helao.helpers.premodels import Action
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.ws_utils import WsPublisher
 from helao.helpers.zdeque import zdeque
+from helao.hexagon.adapters.legacy.status import DispatcherStatusAdapter
+from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
 from helao.hexagon.app.wiring import ACTION_REQUIRED, PortWiring
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -112,6 +114,10 @@ class ActionHost(HelaoFastAPI):
         executors: Running executors by id (populated from Task 6).
         actionservermodel: This server's live status snapshot.
     """
+
+    #: D-B7c.1: whether __init__ binds the WS publish bridge. OrchHost turns it off: it
+    #: serves its own /ws_* relays (P2b-2 D3).
+    _binds_ws_bridge: bool = True
 
     def __init__(
         self,
@@ -263,6 +269,14 @@ class ActionHost(HelaoFastAPI):
         self.status_q = MultisubscriberQueue()
         self.data_q = MultisubscriberQueue()
         self.live_q = MultisubscriberQueue()
+        # D-B7c.1: the bridge only stores the three queue references, and the queues
+        # exist from here on, so it is bound now rather than in a startup hook.
+        self.hexagon_ws_bridge: Optional[WsPublishBridge] = None
+        if self._binds_ws_bridge and isinstance(wiring.status, DispatcherStatusAdapter):
+            self.hexagon_ws_bridge = WsPublishBridge(
+                self.status_q, self.data_q, self.live_q
+            )
+            wiring.status.bind_publish_bridge(self.hexagon_ws_bridge)
         self.status_publisher = WsPublisher(self.status_q)
         self.data_publisher = WsPublisher(self.data_q)
         self.live_publisher = WsPublisher(self.live_q)
