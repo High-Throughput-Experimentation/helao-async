@@ -38,6 +38,10 @@ class Recorder:
             raise AttributeError(attr)
 
         def call(*args):
+            # arg 1 is the gcACQUISITIONMODE enum (c_int): a VARIANT there is
+            # the station's "argument 1: ... cannot be interpreted as an integer"
+            if attr == "SetAcquisitionControl" and args[0] is EMPTY:
+                raise TypeError("argument 1: 'tagVARIANT' is not an integer")
             self._log.append((f"{self._name}.{attr}", args))
             return 1.0
 
@@ -102,7 +106,7 @@ def test_mode_set_on_signal_before_set_signal(log, mode):
     )
     assert acq < names.index("pstat.SetSignal")
     assert acq > names.index("GamrySignalRupdn.Init")
-    assert log[acq][1] == (EMPTY, EMPTY, EMPTY, f"GamryCOM.{mode}")
+    assert log[acq][1] == ("GamryCOM.AcqModeFast", EMPTY, EMPTY, f"GamryCOM.{mode}")
 
 
 def test_absent_mode_makes_no_call(log):

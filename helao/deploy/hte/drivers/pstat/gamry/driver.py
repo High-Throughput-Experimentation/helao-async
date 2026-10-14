@@ -373,13 +373,15 @@ class GamryDriver(HelaoDriver):
             # NIL, SamplingMode) before SetSignal; absent key keeps the default.
             # The method lives on IGamrySignal, which the coclass implements but
             # its default interface (e.g. IGamrySignalRupdn) does not inherit.
+            # Arg 1 is the gcACQUISITIONMODE enum, not a VARIANT: Explain's
+            # late-bound NIL coerces to 0 (AcqModeFast); comtypes needs the int.
             sampling_mode = action_params.get("SamplingMode")
             if sampling_mode is not None:
                 from comtypes.automation import VARIANT
 
                 acq = self.signal.QueryInterface(self.GamryCOM.IGamrySignal)
                 acq.SetAcquisitionControl(
-                    VARIANT.empty,
+                    self.GamryCOM.AcqModeFast,
                     VARIANT.empty,
                     VARIANT.empty,
                     getattr(self.GamryCOM, SamplingMode(sampling_mode).value),
