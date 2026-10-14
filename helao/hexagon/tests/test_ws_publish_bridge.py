@@ -25,6 +25,7 @@ from helao.core.models.data import DataModel, DataPackageModel
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.ws_utils import WsPublisher, WsSubscriber
 from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
+from helao.hexagon.adapters.shared.status import DispatcherStatusAdapter
 
 HOST = "127.0.0.1"
 
@@ -187,7 +188,10 @@ def test_an_action_host_binds_the_bridge_to_its_own_queues(installed_bridge_cfg)
     host = ActionHost("SIM", "SIM", "bridge", 1.0, helao_cfg=installed_bridge_cfg)
     bridge = host.hexagon_ws_bridge
     assert isinstance(bridge, WsPublishBridge)
-    assert host.hexagon_wiring.status._publish_bridge is bridge
+    assert host.hexagon_wiring is not None
+    status = host.hexagon_wiring.status
+    assert isinstance(status, DispatcherStatusAdapter)
+    assert status._publish_bridge is bridge
     assert bridge._status_q is host.status_q
     assert bridge._data_q is host.data_q
     assert bridge._live_q is host.live_q
@@ -201,7 +205,10 @@ def test_an_orch_host_has_no_bridge(installed_bridge_cfg):
         "ORCH", "ORCH", "bridge", version=3.0, helao_cfg=installed_bridge_cfg
     )
     assert host.hexagon_ws_bridge is None
-    assert host.hexagon_wiring.status._publish_bridge is None
+    assert host.hexagon_wiring is not None
+    status = host.hexagon_wiring.status
+    assert isinstance(status, DispatcherStatusAdapter)
+    assert status._publish_bridge is None
 
 
 def test_an_injected_status_without_bind_publish_bridge_yields_no_bridge(

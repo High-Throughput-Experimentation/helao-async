@@ -25,13 +25,14 @@ import reflex_bundle as rb
 
 def test_the_entry_file_re_exports_the_app(monkeypatch):
     stub = types.ModuleType("helao.ui.reflex.app")
-    stub.app = object()
+    setattr(stub, "app", object())
     monkeypatch.setitem(sys.modules, "helao.ui.reflex.app", stub)
     path = os.path.join(rb.APP_DIR, rb.APP_NAME, "helao_ui.py")
     spec = importlib.util.spec_from_file_location("_entry_under_test", path)
+    assert spec is not None and spec.loader is not None
     entry = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(entry)
-    assert entry.app is stub.app
+    assert entry.app is getattr(stub, "app")
 
 
 # --- Layout -----------------------------------------------------------------
