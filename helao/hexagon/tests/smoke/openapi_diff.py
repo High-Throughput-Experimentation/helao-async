@@ -1,15 +1,16 @@
-"""Structural diff of two FastAPI /openapi.json dumps for the gamryhex canary.
+"""Structural diff of two FastAPI /openapi.json dumps for a single-server canary.
 
 Compares the route surface (method + path) and the component schemas of a
-legacy vs hexagon server. Exit 0 == identical surface (parity), 1 == diffs,
+baseline vs candidate server. Exit 0 == identical surface (parity), 1 == diffs,
 2 == usage/load error. Volatile top-level fields (info, servers) are ignored;
 only the route table and schema definitions gate parity.
 
-Usage: python openapi_diff.py <legacy_openapi.json> <candidate_openapi.json>
+Usage: python openapi_diff.py <baseline_openapi.json> <candidate_openapi.json>
 """
 
 import json
 import sys
+from typing import Any
 
 
 def _load(path: str) -> dict:
@@ -36,8 +37,24 @@ def _routes(spec: dict) -> set[tuple[str, str]]:
     return out
 
 
+def _mask_volatile(node: Any) -> Any:
+    """Blank every `hlo_version` value.
+
+    Models default it to the running checkout's git hash, and FastAPI copies that
+    default into request-body schemas, so it differs between any two checkouts.
+    """
+    if isinstance(node, dict):
+        return {
+            k: "<hlo_version>" if k == "hlo_version" else _mask_volatile(v)
+            for k, v in node.items()
+        }
+    if isinstance(node, list):
+        return [_mask_volatile(v) for v in node]
+    return node
+
+
 def _schemas(spec: dict) -> dict[str, dict]:
-    return (spec.get("components") or {}).get("schemas") or {}
+    return _mask_volatile((spec.get("components") or {}).get("schemas") or {})
 
 
 def main(argv: list[str]) -> int:
@@ -54,6 +71,10 @@ def main(argv: list[str]) -> int:
     diffs = 0
 
     lr, cr = _routes(legacy), _routes(cand)
+    if not lr or not cr:
+        # An empty surface would make any pair "identical"; not an openapi dump.
+        print(f"no routes: baseline {len(lr)}, candidate {len(cr)}")
+        return 2
     removed = sorted(lr - cr)
     added = sorted(cr - lr)
     if removed:

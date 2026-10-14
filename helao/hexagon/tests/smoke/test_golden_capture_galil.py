@@ -7,7 +7,7 @@ Exercises only:
 
 The real-hardware POST to ``/MOTOR/query_positions`` (and ``verify_device_
 open``'s ``/get_status`` probe) is NOT exercised here -- that only runs
-at-station (see golden_capture_galil.py / galil_diff.bat docstrings).
+at-station (see golden_capture_galil.py docstrings).
 
 Written as plain assert-based ``test_*`` functions with no ``import pytest``
 (mirrors ``test_golden_capture.py`` -- this repo's conda ``helao`` env does

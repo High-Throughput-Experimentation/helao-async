@@ -26,7 +26,7 @@ import traceback
 from helao.core.models.machine import MachineModel
 from helao.core.tests._test_utils import TestReporter
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
-from helao.hexagon.adapters.legacy.clock import LegacyClockAdapter
+from helao.hexagon.adapters.shared.clock import LegacyClockAdapter
 from helao.hexagon.app.action_host import ActionHost
 from helao.hexagon.app.wiring import PortWiring
 

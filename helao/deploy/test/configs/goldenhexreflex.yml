@@ -1,16 +1,9 @@
-# P7f GATE config: goldenreflex.yml with its Reflex server hexagon-hosted.
+# P7f GATE config: goldenreflex.yml with its own `root:` (separate bundle).
 #
-# The diff against goldenreflex.yml is ONE key -- `deployment: hexagon` on UI
-# -- and that is the point: it is the whole flip, and deleting it is the whole
-# rollback (the launcher then sets no HELAO_REFLEX_APP_MODULE and the entry
-# module imports exactly what it always did). Everything else is deliberately
-# left legacy: the seam under test is the Reflex hosting route, and a config
-# that also flipped the action servers would prove which half worked only by
-# elimination. `root:` differs so this config's bundle and run tree do not
-# share goldenreflex's -- a bundle is per (config, server).
+# It differs from goldenreflex.yml only in `root:`, so this config's bundle and
+# run tree do not share goldenreflex's -- a bundle is per (config, server).
 #
-# Not a production config -- a mechanism proof, the public stand-in for a
-# private deployment's Reflex flip.
+# Not a production config -- a mechanism proof.
 dummy: true
 simulation: true
 show_debug: true
@@ -73,11 +66,8 @@ servers:
     host: 127.0.0.1
     port: 5010
     group: visualizer
-    # `reflex:` names the BUNDLE (resolve_bundle / build_reflex_bundle.py), so
-    # unlike `fast:`/`bokeh:` it cannot name a hexagon module. The line below
-    # is what routes it, via HELAO_REFLEX_APP_MODULE.
+    # `reflex:` names the BUNDLE (resolve_bundle / build_reflex_bundle.py).
     reflex: helao_ui
-    deployment: hexagon
     params:
       pages:
         - live

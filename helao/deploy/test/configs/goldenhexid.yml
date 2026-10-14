@@ -16,7 +16,6 @@ servers:
     port: 8001
     group: orchestrator
     fast: async_orch2
-    deployment: hexagon
     params: {}
     prefinish_experiment_hooks:
       append_params: ["*"]

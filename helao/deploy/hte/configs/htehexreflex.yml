@@ -1,23 +1,10 @@
-# P7k: `htereflex.yml` with its Reflex server hexagon-hosted.
+# P7k: `htereflex.yml` with its own `root:` so the two bundles do not collide.
 #
-# DIFF FROM THE LEGACY SIBLING (`htereflex.yml`), in full: `deployment:
-# hexagon` on UI, and a distinct `root:`. ROLLBACK: delete the `deployment:`
-# key -- the launcher then sets no HELAO_REFLEX_APP_MODULE and the entry module
-# imports exactly what it always did. `root:` differs because a bundle and a
-# run tree are per (config, server); sharing htereflex's would have each launch
-# invalidate the other's bundle stamp.
+# It differs from `htereflex.yml` only in a distinct `root:`, because a bundle
+# and a run tree are per (config, server); sharing htereflex's would have each
+# launch invalidate the other's bundle stamp.
 #
-# WHY NOTHING ELSE IS FLIPPED, measured rather than assumed:
-#   - There are no `bokeh:` or `operator:` servers in this config at all, so
-#     P7e's `bokeh: graft` + `legacy_module:` route has nothing here to apply
-#     to. (`htereflex.yml`'s eleven non-UI servers are all `fast:`.)
-#   - The action servers stay legacy deliberately, as in `goldenhexreflex.yml`:
-#     the seam under test is the Reflex hosting route, and a config that also
-#     flipped them would prove which half worked only by elimination. Two of
-#     them could not be flipped in any case -- `cpsim_server` has no shim under
-#     helao/deploy/hexagon/servers/action/ (only `ws_simulator` does).
-#
-# Like its legacy sibling this is a DEVELOPMENT config, not a station config:
+# Like `htereflex.yml` this is a DEVELOPMENT config, not a station config:
 # the action servers are the test deployment's websocket/replay simulators
 # pointed at the column names the real hte drivers publish, which is how the
 # hte panels are exercised on a machine with no hardware.
@@ -42,6 +29,7 @@ servers:
     port: 8102
     group: action
     fast: ws_simulator
+    deployment: test
     live_vis: co2_vis
     params:
       # The column the real SprintIR driver publishes; co2_vis means it.
@@ -52,6 +40,7 @@ servers:
     port: 8103
     group: action
     fast: ws_simulator
+    deployment: test
     live_vis: mfc_vis
     params:
       # `{device}__{field}`, as the mfc driver publishes. mfc_vis means the
@@ -65,6 +54,7 @@ servers:
     port: 8104
     group: action
     fast: ws_simulator
+    deployment: test
     live_vis: pressure_vis
     params:
       # Every analog input gets a mean, so both of these do.
@@ -76,6 +66,7 @@ servers:
     port: 8105
     group: action
     fast: ws_simulator
+    deployment: test
     live_vis: temp_vis
     params:
       # temp_vis plots its channels raw; no means are computed.
@@ -154,11 +145,8 @@ servers:
     host: 127.0.0.1
     port: 5110
     group: visualizer
-    # `reflex:` names the BUNDLE (resolve_bundle / build_reflex_bundle.py), so
-    # unlike `fast:`/`bokeh:` it cannot name a hexagon module. The line below
-    # is what routes it, via HELAO_REFLEX_APP_MODULE.
+    # `reflex:` names the BUNDLE (resolve_bundle / build_reflex_bundle.py).
     reflex: helao_ui
-    deployment: hexagon
     params:
       pages:
         - live

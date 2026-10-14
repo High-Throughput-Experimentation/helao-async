@@ -11,8 +11,7 @@ Exercises only:
 
 The (hardware-independent) POST to ``/WORKSYRINGE/get_present_volume`` (and
 ``check_device_open``'s ``/get_status`` probe) is NOT exercised here -- that
-only runs against a launched server (see golden_capture_syringe.py /
-syringe_diff.bat docstrings).
+only runs against a launched server (see golden_capture_syringe.py docstrings).
 
 Written as plain assert-based ``test_*`` functions with no ``import pytest``
 (mirrors ``test_golden_capture_galil.py`` -- this repo's conda ``helao`` env

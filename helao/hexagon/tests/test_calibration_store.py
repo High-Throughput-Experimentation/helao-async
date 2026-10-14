@@ -14,7 +14,7 @@ import os
 import numpy as np
 import pytest
 
-from helao.hexagon.adapters.legacy.calibration_store import JsonFileCalibrationStore
+from helao.hexagon.adapters.shared.calibration_store import JsonFileCalibrationStore
 from helao.hexagon.ports.calibration_store import CalibrationStorePort
 
 HOSTNAME = "teststation"

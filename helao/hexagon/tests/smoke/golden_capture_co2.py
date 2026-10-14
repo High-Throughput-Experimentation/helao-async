@@ -42,7 +42,7 @@ value derives from the same live measurement and is NOT covered by
 parity would report a diff on it between any two independent captures.
 
 Standalone counterpart to ``harness.capture.snapshot_capture`` for the
-orch-less, db-less co2/co2hex 2-server topology (CO2SENSOR@8012 + ACTVIS@5001
+orch-less, db-less co2 2-server topology (CO2SENSOR@8012 + ACTVIS@5001
 only -- no ORCH, no DB), mirroring spec/gamry's ``golden_capture[_spec].py``
 (see those modules' docstrings for the full topology-gap rationale). The
 hardware-agnostic settle / anti-vacuous-guard logic (``settle``,
@@ -60,9 +60,8 @@ Usage (AT-STATION, Windows, conda env ``helao``) -- ATTACH THE SENSOR FIRST:
         --out C:\\golden\\co2
 
 then terminate the launch, point ``--root``/``--config-prefix`` at a FRESH
-throwaway root and ``co2goldhex``, capture again, and diff the two capture
-directories with ``harness.parity``. ``co2_diff.bat`` automates exactly this
-sequence.
+throwaway root and ``co2gold``, capture again, and diff the two capture
+directories with ``harness.parity``.
 """
 
 from __future__ import annotations

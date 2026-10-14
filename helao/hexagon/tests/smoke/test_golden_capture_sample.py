@@ -7,9 +7,10 @@ Exercises only:
     a sample_server-shaped RUNS_DIAG tree
 
 The real POST to ``/SAMPLE/get_loaded_positions`` is NOT exercised here --
-that requires a running sample_server (see golden_capture_sample.py /
-sample_diff.sh docstrings). Unlike the galil/gamry canaries, this one needs
-NO hardware to run end-to-end (Archive is pure software), but this module
+that requires a running sample_server (see golden_capture_sample.py docstrings).
+Unlike the galil/gamry
+canaries, this one needs NO hardware to run end-to-end (Archive is pure
+software), but this module
 still deliberately stays server-free so it runs anywhere, including CI.
 
 Written as plain assert-based ``test_*`` functions with no ``import pytest``

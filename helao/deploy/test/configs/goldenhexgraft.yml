@@ -1,10 +1,7 @@
-# P7e GATE config: goldenhexvis.yml with its bokeh UI servers moved onto the
-# GENERIC config-driven grafts. OPERATOR and LIVE declare `bokeh: graft` +
-# a top-level `legacy_module:`; ACTVIS stays on its explicit hexagon shim, so
-# one launch proves the two routes coexist in a single group. This is the
-# public stand-in for a PRIVATE deployment's flip: swap the two
-# `legacy_module:` values for that deployment's own modules and nothing in this
-# repo has to name it. Not a production config — a mechanism proof.
+# P7e GATE config: goldenhexvis.yml's bokeh UI servers, one per standard
+# module (OPERATOR standalone_operator, LIVE live_visualizer, ACTVIS
+# action_visualizer), in a single group. Not a production config -- a mechanism
+# proof.
 dummy: true
 simulation: true
 show_debug: true
@@ -22,7 +19,6 @@ servers:
     port: 8001
     group: orchestrator
     fast: async_orch2
-    deployment: hexagon
     params: {}
     prefinish_experiment_hooks:
       append_params: ["*"]
@@ -32,9 +28,7 @@ servers:
     host: 127.0.0.1
     port: 5001
     group: operator
-    bokeh: graft
-    deployment: hexagon
-    legacy_module: helao.deploy.hte.servers.operator.standalone_operator
+    bokeh: standalone_operator
     params:
       orch_key: ORCH
       doc_name: "Operator (hexagon generic graft)"
@@ -52,9 +46,7 @@ servers:
     host: 127.0.0.1
     port: 5002
     group: visualizer
-    bokeh: graft
-    deployment: hexagon
-    legacy_module: helao.deploy.hte.servers.visualizer.live_visualizer
+    bokeh: live_visualizer
     params:
       doc_name: Websocket Live Visualizer
   ACTVIS:
@@ -62,7 +54,6 @@ servers:
     port: 5003
     group: visualizer
     bokeh: action_visualizer
-    deployment: hexagon
     params:
       doc_name: Action Visualizer
   SYNC:

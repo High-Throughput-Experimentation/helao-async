@@ -1,13 +1,11 @@
 """Which package an analysis server loads its ``analyze_*`` classes from, and
 what happens when one of them cannot be loaded.
 
-Both halves are regression tests for the same defect. ``fast_launcher`` sets
-``CONFIG["deployment"]`` from the server's OWN ``deployment:`` value, so a
-server grafted onto the hexagon composition (``deployment: hexagon`` plus a
-``legacy_module:``) used to look for its analyses under
-``helao.deploy.hexagon.drivers.data.analyses`` — a package that does not
-exist. Every import missed, every miss was logged and skipped, and the server
-started clean with all of its ``analyze_*`` routes missing.
+``fast_launcher`` sets ``CONFIG["deployment"]`` from the server's OWN
+``deployment:`` value; when that names a deployment with no analyses package,
+the loaded config's own location identifies the deployment instead. A miss on
+every import used to be logged and skipped, so a server started clean with all
+of its ``analyze_*`` routes missing.
 
 Everything here runs against the tracked ``hte`` deployment, so it passes on a
 checkout carrying no private deployments at all. No network, no hardware and no
@@ -29,22 +27,19 @@ HTE_ENDPOINTS = {"analyze_echeuvis_stability", "analyze_uvis_bkgsubnorm"}
 
 HTE_PKG = "helao.deploy.hte.drivers.data.analyses"
 
-#: What a hexagon-grafted hte analysis server carries in its config.
-HTE_LEGACY_MODULE = "helao.deploy.hte.servers.action.analysis_server"
-
 
 # ---------------------------------------------------------------------------
 # Package resolution
 # ---------------------------------------------------------------------------
 
 
-def test_ungrafted_server_resolves_to_its_own_deployment():
-    """The un-grafted path, pinned: deployment in, that deployment's package
-    out — no ``legacy_module``, no config path, nothing else consulted."""
+def test_server_resolves_to_its_own_deployment():
+    """Deployment in, that deployment's package out — no config path, nothing
+    else consulted."""
     assert m.resolve_analyses_package("hte") == HTE_PKG
 
 
-def test_ungrafted_resolution_is_not_stolen_by_the_config_path():
+def test_resolution_is_not_stolen_by_the_config_path():
     """A config living in another deployment must not redirect a server whose
     own deployment resolves fine (the launcher lets a config in deployment X
     host a server with an explicit ``deployment: Y``)."""
@@ -56,41 +51,21 @@ def test_ungrafted_resolution_is_not_stolen_by_the_config_path():
     )
 
 
-def test_graft_resolves_through_its_legacy_module():
-    """``fast: graft`` shape: the config names the wrapped legacy module, whose
-    package identifies the deployment owning the analyses."""
-    assert (
-        m.resolve_analyses_package("hexagon", legacy_module=HTE_LEGACY_MODULE)
-        == HTE_PKG
-    )
-
-
-def test_graft_without_legacy_module_resolves_through_the_config_path():
-    """Hardcoded-shim shape: ``fast: analysis_server`` + ``deployment:
-    hexagon`` puts no ``legacy_module:`` key in the config, so the config's own
-    location is the only thing left that identifies the deployment."""
+def test_deployment_without_analyses_resolves_through_the_config_path():
+    """A deployment with no analyses package falls through to the deployment
+    owning the loaded config file."""
     assert (
         m.resolve_analyses_package(
-            "hexagon", config_path="/repo/helao/deploy/hte/configs/somecfg.yml"
+            "no_such_deployment",
+            config_path="/repo/helao/deploy/hte/configs/somecfg.yml",
         )
         == HTE_PKG
     )
 
 
-def test_candidate_order_prefers_legacy_module_then_deployment_then_config(
-    monkeypatch,
-):
+def test_candidate_order_prefers_deployment_then_config(monkeypatch):
     """Order pinned independently of which packages happen to exist on disk."""
     monkeypatch.setattr(m, "_package_importable", lambda pkg: True)
-    resolved = m.resolve_analyses_package(
-        "second",
-        legacy_module="helao.deploy.first.servers.action.some_server",
-        config_path="/repo/helao/deploy/third/configs/somecfg.yml",
-    )
-    assert resolved == "helao.deploy.first.drivers.data.analyses"
-
-    # With no legacy_module the world deployment wins over the config path,
-    # which is what keeps every un-grafted server resolving as it did before.
     resolved = m.resolve_analyses_package(
         "second", config_path="/repo/helao/deploy/third/configs/somecfg.yml"
     )
@@ -125,34 +100,22 @@ def test_no_deployment_at_all_resolves_to_nothing():
 
 
 # ---------------------------------------------------------------------------
-# Class loading: grafted == un-grafted
+# Class loading
 # ---------------------------------------------------------------------------
 
 
-def test_ungrafted_load_returns_the_expected_class_set():
+def test_load_returns_the_expected_class_set():
     loaded = m.load_analysis_classes(HTE_ANALYSES, "hte")
     assert set(loaded) == HTE_ENDPOINTS
 
 
-def test_grafted_load_returns_the_same_classes_as_ungrafted():
-    """The gate: the same names must map to the same class objects whether the
-    server is composed directly or grafted. Under the old resolution the
-    grafted call returned ``{}``."""
-    ungrafted = m.load_analysis_classes(HTE_ANALYSES, "hte")
-    grafted = m.load_analysis_classes(
-        HTE_ANALYSES, "hexagon", legacy_module=HTE_LEGACY_MODULE
-    )
-    assert set(grafted) == HTE_ENDPOINTS
-    assert grafted == ungrafted
-
-
-def test_grafted_load_via_config_path_returns_the_same_classes():
-    grafted = m.load_analysis_classes(
+def test_load_via_config_path_returns_the_same_classes():
+    via_config = m.load_analysis_classes(
         HTE_ANALYSES,
-        "hexagon",
+        "no_such_deployment",
         config_path="/repo/helao/deploy/hte/configs/somecfg.yml",
     )
-    assert grafted == m.load_analysis_classes(HTE_ANALYSES, "hte")
+    assert via_config == m.load_analysis_classes(HTE_ANALYSES, "hte")
 
 
 # ---------------------------------------------------------------------------
@@ -233,21 +196,11 @@ def _world(tmp_path, **server_extras) -> dict:
     return world
 
 
-def test_app_registers_the_same_analyze_routes_grafted_and_ungrafted(
-    tmp_path, monkeypatch
-):
-    ungrafted = _world(tmp_path, fast="analysis_server")
-    ungrafted["deployment"] = "hte"
-    grafted = _world(
-        tmp_path, fast="graft", deployment="hexagon", legacy_module=HTE_LEGACY_MODULE
-    )
-    grafted["deployment"] = "hexagon"
-
-    ungrafted_routes = _analyze_routes(ungrafted, "ANA", monkeypatch)
-    grafted_routes = _analyze_routes(grafted, "ANA", monkeypatch)
-
-    assert ungrafted_routes == {f"/ANA/{name}" for name in HTE_ENDPOINTS}
-    assert grafted_routes == ungrafted_routes
+def test_app_registers_the_analyze_routes(tmp_path, monkeypatch):
+    world = _world(tmp_path, fast="analysis_server")
+    world["deployment"] = "hte"
+    routes = _analyze_routes(world, "ANA", monkeypatch)
+    assert routes == {f"/ANA/{name}" for name in HTE_ENDPOINTS}
 
 
 def test_app_build_fails_when_a_configured_analysis_is_missing(tmp_path, monkeypatch):

@@ -202,25 +202,6 @@ def test_the_bokeh_pair_declares_the_same_servers_on_the_same_ports():
         assert legacy[key]["group"] == hexagon[key]["group"], key
 
 
-def test_the_legacy_baseline_names_no_hexagon_hosting():
-    """The baseline is only a baseline if it is hosted the legacy way."""
-    legacy = _load("goldenvis.yml")["servers"]
-    for key, server in legacy.items():
-        assert server.get("deployment") != "hexagon", key
-        assert server.get("bokeh") != "graft", key
-        assert "legacy_module" not in server, key
-
-
-def test_the_hexagon_variant_actually_uses_the_graft():
-    """And the other half is only a test of the graft if it uses the graft."""
-    hexagon = _load("goldenhexgraft.yml")["servers"]
-    grafted = [k for k, s in hexagon.items() if s.get("bokeh") == "graft"]
-    assert grafted, "the hexagon variant grafts nothing"
-    for key in grafted:
-        assert hexagon[key]["deployment"] == "hexagon", key
-        assert hexagon[key]["legacy_module"], key
-
-
 def test_the_two_q10_configs_take_opposite_branches():
     """Q10 is only answered if one config declares a parser and one does not."""
     absent = _load("goldenreflex.yml")["servers"]["UI"]["params"]

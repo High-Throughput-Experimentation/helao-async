@@ -5,7 +5,7 @@ Wraps the SAME wire calls base_status's broadcaster makes: private
 /update_nonblocking (an actionmodel body + the reporting server's own
 host/port). Keeps its own client registry (attach/detach). The WS publish_*
 members are WIRED (P2b-2 — DD-7 discharged): they delegate to a
-WsPublishBridge bound at makeActionApp startup, which model-validates each
+WsPublishBridge bound in ``ActionHost.__init__``, which model-validates each
 payload back to its channel's wire type and puts it on the legacy fan-out
 queues (adapter-local drift fix D1, like the three drifts below). Before
 binding they raise UnwiredPortError loudly. ``OrchHost`` never binds the
@@ -67,8 +67,8 @@ class DispatcherStatusAdapter:
     def bind_publish_bridge(self, bridge: WsPublishBridge) -> None:
         """Late-bind the WS publish bridge (P2b-2 D3): the fan-out queues
         live on the ``ActionHost`` that ``makeApp`` returns, so
-        makeActionApp's startup hook constructs the bridge over them and
-        binds it here."""
+        ``ActionHost.__init__`` constructs the bridge over them and binds it
+        here."""
         self._publish_bridge = bridge
 
     async def attach_client(
@@ -144,7 +144,7 @@ class DispatcherStatusAdapter:
         if self._publish_bridge is None:
             raise UnwiredPortError(
                 "publish_status before bind_publish_bridge (bound at "
-                "makeActionApp startup; OrchHost publishes on its own WS)"
+                "ActionHost.__init__; OrchHost publishes on its own WS)"
             )
         await self._publish_bridge.publish_status(payload)
 
@@ -152,7 +152,7 @@ class DispatcherStatusAdapter:
         if self._publish_bridge is None:
             raise UnwiredPortError(
                 "publish_data before bind_publish_bridge (bound at "
-                "makeActionApp startup; OrchHost publishes on its own WS)"
+                "ActionHost.__init__; OrchHost publishes on its own WS)"
             )
         await self._publish_bridge.publish_data(payload)
 
@@ -160,6 +160,6 @@ class DispatcherStatusAdapter:
         if self._publish_bridge is None:
             raise UnwiredPortError(
                 "publish_live before bind_publish_bridge (bound at "
-                "makeActionApp startup; OrchHost publishes on its own WS)"
+                "ActionHost.__init__; OrchHost publishes on its own WS)"
             )
         await self._publish_bridge.publish_live(payload)

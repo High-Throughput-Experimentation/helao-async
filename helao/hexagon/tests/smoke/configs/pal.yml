@@ -16,7 +16,7 @@
 # (PAL_run_method / PAL_ANEC_* / PAL_injection_* / PAL_transfer_* / PAL_archive)
 # drives the physical autosampler/robot (SSH-dispatched cam methods + NI trigger
 # handshake) and must never be dispatched as a canary -- there is no safe,
-# non-perturbing read action. So the openapi-surface diff (see pal_canary.bat)
+# non-perturbing read action. So the openapi-surface diff
 # is the topology- and safety-appropriate parity check (mirrors ni/kmotor).
 # PAL is an SSH-connected Cytron/PAL autosampler -- WINDOWS-ONLY at station;
 # simulation:true is cosmetic (banner color). The openapi canary only needs the

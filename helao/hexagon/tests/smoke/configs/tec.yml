@@ -11,7 +11,7 @@
 #
 # `record_tec` (streams TEC telemetry via a TECMonExec) is NON-PERTURBING --
 # it does not change the setpoint or enable/disable the controller -- so it
-# is the safe read used for the runtime golden diff (see tec_diff.bat /
+# is the safe read used for the runtime golden diff (see
 # golden_capture_tec.py). `set_temperature`/`enable_tec`/`disable_tec`/
 # `wait_till_stable` all drive the controller and must never be dispatched by
 # a canary.

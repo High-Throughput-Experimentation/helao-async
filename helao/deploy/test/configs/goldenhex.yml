@@ -1,6 +1,5 @@
-# SMOKE config (hexagon-composed ORCH + SIM + SYNC; P2e sync cut-over).
-# Copy of golden.yml minus the bokeh servers (vis/operator hosting is P2),
-# with `deployment: hexagon` flipping ORCH and SIM onto the hexagon factory.
+# SMOKE config (ORCH + SIM + SYNC; P2e sync cut-over).
+# Copy of golden.yml minus the bokeh servers (vis/operator hosting is P2).
 # Ports match golden.yml so harness/capture.py works unmodified.
 dummy: true
 simulation: true
@@ -19,7 +18,6 @@ servers:
     port: 8001
     group: orchestrator
     fast: async_orch2
-    deployment: hexagon
     params: {}
     prefinish_experiment_hooks:
       append_params: ["*"]

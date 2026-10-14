@@ -351,7 +351,7 @@ def test_ingest_lifespan_is_an_async_context_manager_so_teardown_is_awaited():
     ) or inspect.isasyncgenfunction(getattr(task, "__wrapped__", task))
 
 
-def test_deployment_search_order_finds_every_deployment():
+def test_deployment_search_order_finds_every_deployment(tmp_path, monkeypatch):
     """The scan was silently finding none.
 
     discovery.py sits one directory deeper than the vis_subscriber it was lifted
@@ -360,7 +360,16 @@ def test_deployment_search_order_finds_every_deployment():
     and every Reflex panel resolved to "module not found" at runtime.
     """
     from helao.helpers import config_loader
+    from helao.ui.shared import discovery
     from helao.ui.shared.discovery import deployment_search_order
+
+    # A deployment is a dir under deploy/ shipping servers/visualizer (the
+    # scan's own definition). The repo's tracked set is just test + hte, so a
+    # third one is planted: only a working scan can return it.
+    present = {"test", "hte", "extra_dep"}
+    for name in present:
+        (tmp_path / name / "servers" / "visualizer").mkdir(parents=True)
+    monkeypatch.setattr(discovery, "_deploy_root", lambda: str(tmp_path))
 
     saved = config_loader.CONFIG
     try:
@@ -368,7 +377,7 @@ def test_deployment_search_order_finds_every_deployment():
         order = deployment_search_order()
         assert order[0] == "test"
         assert "hte" in order
-        assert len(order) > 2, f"fallback scan found nothing: {order}"
+        assert set(order) >= present, f"fallback scan found nothing: {order}"
     finally:
         config_loader.CONFIG = saved
 

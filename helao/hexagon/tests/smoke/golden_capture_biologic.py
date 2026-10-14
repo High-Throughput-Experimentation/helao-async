@@ -24,11 +24,10 @@ calibration resistor, but it still requires a live Biologic device to produce
 any data at all.
 
 Standalone counterpart to ``harness.capture.snapshot_capture`` for the
-orch-less, db-less biologic/biologichex 2-server topology (BIOLOGIC@8016 +
+orch-less, db-less biologic 2-server topology (BIOLOGIC@8016 +
 ACTVIS@5001 only -- no ORCH, no DB), mirroring gamry's
 ``helao.hexagon.tests.smoke.golden_capture`` (see that module's docstring for
-the full topology-gap rationale already recorded there and in
-``gamryhex_canary.bat``, which hit the same gap for the openapi-diff canary).
+the full topology-gap rationale already recorded there).
 The hardware-agnostic settle/anti-vacuous-guard logic (``settle``,
 ``_run_artifacts``, ``_act_status_map``) and the production action-dispatch
 path (``dispatch_action``) are IMPORTED from ``golden_capture.py`` rather than
@@ -49,9 +48,8 @@ instrument, and a dummy cell gives a stable open-circuit reading):
         --out C:\\golden\\biologic
 
 then terminate the launch, point ``--root``/``--config-prefix`` at a FRESH
-throwaway root and ``biologicgoldhex``, capture again, and diff the two capture
-directories with ``harness.parity``. ``biologic_diff.bat`` automates exactly
-this sequence.
+throwaway root and ``biologicgold``, capture again, and diff the two capture
+directories with ``harness.parity``.
 """
 
 from __future__ import annotations

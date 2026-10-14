@@ -17,10 +17,9 @@ data_q carries DataPackageModel, live_q is dict-native. Each put
 model_validates its payload back to the channel's wire type; a malformed
 payload fails loud with pydantic.ValidationError, never a silent bad frame.
 
-The queue refs live on the ``ActionHost``, whose queues are live only once the
-app has started — the bridge is therefore constructed and bound in
-makeActionApp's startup hook (D3: ACTION apps only; ``OrchHost`` publishes
-on its own WsPublishers, Q1).
+The queue refs live on the ``ActionHost``, which creates the three queues in
+``__init__`` — the bridge is therefore constructed and bound there too (D3:
+ACTION apps only; ``OrchHost`` publishes on its own WsPublishers, Q1).
 
 This module is HAND-WRITTEN (not a verbatim re-body copy) and is
 black-enforced (pyproject force-exclude narrowed in P2b-2, D2).

@@ -5,8 +5,8 @@ by the Task 12 smoke through the launched group)."""
 import pytest
 
 from helao.hexagon.adapters.errors import UnwiredPortError
-from helao.hexagon.adapters.legacy.artifact_store import LegacyArtifactStoreAdapter
-from helao.hexagon.adapters.legacy.data_sink import ActiveDataSinkAdapter
+from helao.hexagon.adapters.shared.artifact_store import LegacyArtifactStoreAdapter
+from helao.hexagon.adapters.shared.data_sink import ActiveDataSinkAdapter
 from helao.hexagon.ports.artifact_store import ArtifactStorePort
 from helao.hexagon.ports.data_sink import DataSinkPort
 

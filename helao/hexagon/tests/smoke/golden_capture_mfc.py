@@ -10,7 +10,7 @@ instantiates ``driver_classes=[AliCatMFC]`` unconditionally -- the config's
 ``dummy``/``simulation`` YAML keys are cosmetic (banner color) for this canary
 only. (One difference from gamry: ``AliCatMFC.__init__`` does NO device I/O and
 ``connect()`` exceptions are caught, so the server still BOOTS + serves
-/openapi.json with no MFC attached -- that is what the openapi mfc_canary.bat
+/openapi.json with no MFC attached -- that is all an openapi surface check
 relies on. This RUNTIME capture, however, needs the live device: with no Alicat
 on COM6 the poller buffers nothing and ``MfcExec._poll`` errors reading an empty
 live buffer.) So this capture rig is an AT-STATION, REAL-HARDWARE gate: the
@@ -59,7 +59,7 @@ manifest's ``masked_meta_keys`` so ``-act.yml`` parity is a clean PASS when only
 that integrated value differs, while a diff in any other key still surfaces.
 
 Standalone counterpart to ``harness.capture.snapshot_capture`` for the
-orch-less, db-less mfc/mfchex 2-server topology (MFC@8009 + ACTVIS@5001 only --
+orch-less, db-less mfc 2-server topology (MFC@8009 + ACTVIS@5001 only --
 no ORCH, no DB), mirroring gamry/galil/spec's ``golden_capture[_spec].py`` (see
 those modules' docstrings for the full topology-gap rationale). The
 hardware-agnostic settle / anti-vacuous-guard logic (``settle``,
@@ -77,9 +77,8 @@ Usage (AT-STATION, Windows, conda env ``helao``) -- ATTACH THE ALICAT MFC FIRST:
         --out C:\\golden\\mfc
 
 then terminate the launch, point ``--root``/``--config-prefix`` at a FRESH
-throwaway root and ``mfcgoldhex``, capture again, and diff the two capture
-directories with ``harness.parity``. ``mfc_diff.bat`` automates exactly this
-sequence.
+throwaway root and ``mfcgold``, capture again, and diff the two capture
+directories with ``harness.parity``.
 """
 
 from __future__ import annotations

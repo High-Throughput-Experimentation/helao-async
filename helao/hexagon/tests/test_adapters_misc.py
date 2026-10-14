@@ -7,11 +7,11 @@ import pytest
 
 from helao.core.drivers.helao_driver import DriverResponse, HelaoDriver
 from helao.hexagon.adapters.errors import UnwiredPortError
-from helao.hexagon.adapters.legacy.hardware import LegacyDriverHardwareAdapter
-from helao.hexagon.adapters.legacy.sample_state import SampleShimAdapter
-from helao.hexagon.adapters.legacy.state_persistence import QueuePckStore
-from helao.hexagon.adapters.legacy.status import DispatcherStatusAdapter
-from helao.hexagon.adapters.legacy.sync import LegacySyncAdapter
+from helao.hexagon.adapters.shared.hardware import LegacyDriverHardwareAdapter
+from helao.hexagon.adapters.shared.sample_state import SampleShimAdapter
+from helao.hexagon.adapters.shared.state_persistence import QueuePckStore
+from helao.hexagon.adapters.shared.status import DispatcherStatusAdapter
+from helao.hexagon.adapters.shared.sync import LegacySyncAdapter
 from helao.hexagon.ports.auxiliary import StatePersistencePort
 from helao.hexagon.ports.hardware import HardwarePort
 from helao.hexagon.ports.sample_state import SampleStatePort
@@ -151,7 +151,7 @@ async def test_status_attach_and_send_record_clients(monkeypatch):
         sent.append((server_key, host, port, private_action, params_dict, json_dict))
         return {}, ErrorCodes.none
 
-    import helao.hexagon.adapters.legacy.status as status_mod
+    import helao.hexagon.adapters.shared.status as status_mod
 
     monkeypatch.setattr(status_mod, "async_private_dispatcher", _fake_dispatch)
     a = DispatcherStatusAdapter(server_key="SIM")

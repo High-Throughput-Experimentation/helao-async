@@ -16,7 +16,7 @@ import pytest
 
 from helao.core.drivers.helao_driver import HelaoDriver
 from helao.core.error import ErrorCodes
-from helao.hexagon.adapters.legacy.galil_command_channel import GclibCommandChannel
+from helao.hexagon.adapters.shared.galil_command_channel import GclibCommandChannel
 from helao.hexagon.adapters.native.galil_motion_native import NativeGalilMotion
 from helao.hexagon.ports.galil_command_channel import (
     GalilChannelError,

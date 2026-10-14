@@ -32,7 +32,7 @@ values through the same ``normalize_name`` grammar, so it matches on both sides
 with NO masking (a real difference in any other -act.yml field still surfaces).
 
 Standalone counterpart to ``harness.capture.snapshot_capture`` for the
-orch-less, db-less cam/camhex 2-server topology (CAM@8013 + ACTVIS@5001 only),
+orch-less, db-less cam 2-server topology (CAM@8013 + ACTVIS@5001 only),
 mirroring spec/galil/gamry's golden_capture modules. The hardware-agnostic
 settle / anti-vacuous-guard logic (``settle``, ``_run_artifacts``,
 ``_act_status_map``) and the production dispatch path (``dispatch_action``) are
@@ -47,9 +47,8 @@ Usage (AT-STATION, Windows, conda env ``helao``) -- CAMERA REACHABLE AT axis_ip:
         --out C:\\golden\\cam
 
 then terminate the launch, point ``--root``/``--config-prefix`` at a FRESH
-throwaway root and ``camgoldhex``, capture again, and diff the two capture
-directories with ``harness.parity``. ``cam_diff.bat`` automates exactly this
-sequence.
+throwaway root and ``camgold``, capture again, and diff the two capture
+directories with ``harness.parity``.
 """
 
 from __future__ import annotations

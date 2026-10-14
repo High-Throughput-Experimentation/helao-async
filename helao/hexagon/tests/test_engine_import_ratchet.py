@@ -11,11 +11,11 @@ There is no allowlist: B7b deleted the graft machinery and re-pointed the
 harness encoder, the last three files B7a allowed.
 
 Runtime half. A fresh interpreter constructs an ``ActionHost``, an
-``OrchHost`` and a ``makeActionApp`` composition under the ``goldenhex``
+``OrchHost`` and a ``makeApp`` composition under the ``goldenhex``
 server entries and must end with no ``helao.core.servers`` module loaded. A
 subprocess, because this pytest process may already hold the engine through
 other imports. On 415c0bb2 the import-time count was 2 and the
-construction-time count 17; on e60d800a ``makeActionApp`` alone still loaded
+construction-time count 17; on e60d800a the action composition alone still loaded
 12, through its unconditional ``active_graft`` import. A helper that imports
 the engine lazily is an importer even when no static read of the hosts finds
 it.
@@ -136,18 +136,15 @@ cfg = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))
 cfg["root"] = tempfile.mkdtemp(prefix="b7a_ratchet_")
 config_loader.CONFIG = cfg
 from helao.hexagon.app.action_host import ActionHost
-from helao.hexagon.app.factory import makeActionApp
+from helao.deploy.test.servers.action.ws_simulator import makeApp
 from helao.hexagon.app.orch_host import OrchHost
 
 hosts = {
     "ActionHost": ActionHost("SIM", "SIM", "ratchet", 1.0, helao_cfg=cfg),
     "OrchHost": OrchHost("ORCH", "ORCH", "ratchet", version=3.0, helao_cfg=cfg),
-    # B7b: the composition every `deployment: hexagon` action server is
-    # built through. Until B7b it imported active_graft, and with it
-    # twelve engine modules, though no target needed the graft.
-    "makeActionApp": makeActionApp(
-        "SIM", "helao.deploy.test.servers.action.ws_simulator"
-    ),
+    # An action server module's own makeApp. Until B7b the composition it was
+    # built through imported active_graft, and with it twelve engine modules.
+    "ws_simulator makeApp": makeApp("SIM"),
 }
 report = {
     "engine_modules": sorted(

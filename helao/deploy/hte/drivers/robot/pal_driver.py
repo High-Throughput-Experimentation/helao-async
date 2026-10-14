@@ -58,12 +58,12 @@ from helao.core.drivers.helao_driver import (
 from helao.core.error import ErrorCodes
 from helao.core.models.data import DataModel
 from helao.helpers import config_loader
-from helao.hexagon.adapters.legacy.pal_transport import LegacyPalTransport
-from helao.hexagon.adapters.legacy.pal_trigger import (
+from helao.hexagon.adapters.shared.pal_transport import LegacyPalTransport
+from helao.hexagon.adapters.shared.pal_trigger import (
     NidaqmxPalTrigger,
     NullPalTrigger,
 )
-from helao.hexagon.adapters.legacy.sample_state import SampleShimAdapter
+from helao.hexagon.adapters.shared.sample_state import SampleShimAdapter
 from helao.hexagon.domain.models import (
     PalAction,
     PalCam,

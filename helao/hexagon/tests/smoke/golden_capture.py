@@ -18,11 +18,10 @@ non-perturbing) is safe against a dummy cell and never actively drives it,
 but it still requires a live GamryCOM device to produce any data at all.
 
 Standalone counterpart to ``harness.capture.snapshot_capture`` for the
-orch-less, db-less gamry/gamryhex 2-server topology (PSTAT@8001 + ACTVIS@5001
+orch-less, db-less gamry 2-server topology (PSTAT@8001 + ACTVIS@5001
 only -- no ORCH, no DB). ``harness.capture``'s ``quiesce``/``orch_stopped``/
-``db_drained`` assume an orchestrator + DB server and do not apply here (see
-the rationale already recorded in ``gamryhex_canary.bat``, which hit the same
-topology gap for the openapi-diff canary). Settling gates on the action's -act.yml reaching a
+``db_drained`` assume an orchestrator + DB server and do not apply here.
+Settling gates on the action's -act.yml reaching a
 TERMINAL ``action_status`` (finished/errored) -- NOT on the file existing,
 because a manual action writes its -act.yml at init with status "active"
 (base.py:1029) and only rewrites it terminal at finish; settling on existence
@@ -38,9 +37,8 @@ CAL RESISTOR FIRST:
         --out C:\\golden\\gamry
 
 then terminate the launch, point ``--root``/``--config-prefix`` at a FRESH
-throwaway root and ``gamrygoldhex``, capture again, and diff the two capture
-directories with ``harness.parity``. ``golden_diff.bat`` automates exactly
-this sequence.
+throwaway root and ``gamrygold``, capture again, and diff the two capture
+directories with ``harness.parity``.
 """
 
 from __future__ import annotations

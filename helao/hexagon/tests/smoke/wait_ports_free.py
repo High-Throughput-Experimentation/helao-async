@@ -1,8 +1,8 @@
 """Poll until the given TCP ports (and their RPC siblings, port+10000) are FREE.
 
-Pre-launch guard for the ``*_canary.bat`` / ``*_diff.bat`` station smoke
-scripts. Before launching a server group onto a fixed port, refuse to proceed
-while a stale binder -- a leftover server or ZMQ RPC listener from a previous
+Pre-launch guard for the station smoke scripts. Before launching a server
+group onto a fixed port, refuse to proceed while a stale binder -- a
+leftover server or ZMQ RPC listener from a previous
 leg or a prior canary/diff run -- still owns the HTTP port or its co-located
 RPC port (HTTP + 10000, see ``helao.core.rpc.derive_rpc_port``).
 

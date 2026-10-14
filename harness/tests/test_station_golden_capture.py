@@ -63,7 +63,7 @@ def unified_root(base, version="1e10"):
     return root
 
 
-def capture(root, out, seq=SEQ_NAME, prefix="eche10_hex"):
+def capture(root, out, seq=SEQ_NAME, prefix="eche10"):
     return subprocess.run(
         [
             sys.executable,
@@ -92,9 +92,9 @@ def test_legacy_pre_unified_post_passes_parity(tmp_path, zipped):
     assert capture(unified_root(tmp_path), post).returncode == 0
 
     m = ProvenanceManifest.load(pre)  # (i)
-    assert m.scenario == "eche10_hex-smoke"
-    assert m.config_path == "helao/deploy/hte/configs/eche10_hex.py"
-    assert m.launch_cmd == "python launch.py eche10_hex --no-hot-reload"
+    assert m.scenario == "eche10-smoke"
+    assert m.config_path == "helao/deploy/hte/configs/eche10.yml"
+    assert m.launch_cmd == "python launch.py eche10 --no-hot-reload"
     assert m.sequence_name == "GMTEST"
     assert m.sequence_params == {}
     assert m.harness_version == "station_golden_capture"

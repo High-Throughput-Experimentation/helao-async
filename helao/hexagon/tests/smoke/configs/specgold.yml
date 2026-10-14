@@ -1,5 +1,5 @@
 # CAPTURE-ONLY THROWAWAY ROOT, NEVER PRODUCTION. Copy of spec.yml used solely
-# by helao.hexagon.tests.smoke.golden_capture_spec / spec_diff.bat to capture
+# by helao.hexagon.tests.smoke.golden_capture_spec to capture
 # a runtime golden-master acquire_spec tree. The ONLY change from spec.yml is
 # `root:`, pointed at a dedicated throwaway path so the capture rig's
 # assert_fresh() has a clean tree to start from and production C:\INST_hlo

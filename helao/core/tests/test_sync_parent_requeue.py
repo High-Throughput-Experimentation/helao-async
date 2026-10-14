@@ -1,6 +1,6 @@
 """A child that finishes syncing must hand its parent a fresh re-queue budget.
 
-Station report (uvis4_hex, 2026-09-28): a full UVIS_GAIA_preset sequence
+Station report (a private station, 2026-09-28): a full UV-Vis sequence
 finished, but its auto-analysis never dispatched until the group restarted.
 
 A parent whose children are still unsynced re-queues itself one rank lower on

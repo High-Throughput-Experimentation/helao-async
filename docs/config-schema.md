@@ -36,25 +36,23 @@ to answer to the same prefix.
 A `.py` config must define a top-level `config` dict; it is executed, not
 parsed. `.yml` wins if both exist for one prefix.
 
-### Derived `<name>_hex.py` configs
+### Naming a server's module (rule D-B7c.2)
 
-A `<name>_hex.py` beside a station's `<name>.yml` is not a second copy. It
-calls `helao.hexagon.hexconfig.hexagon_variant(<absolute path of <name>.yml>)`
-(built from `__file__`), which loads the
-base and re-composes every server onto the hexagon app layer. Edit the base;
-the variant follows. Per server the variant adds:
+A server names its own module in `fast:` or `bokeh:` (`reflex:` for the Reflex
+stack), and the launcher imports `helao.deploy.<deployment>.servers.<group>.<module>`.
+There is no second config per station and no routing layer: a bare prefix
+launches the station, and the hexagon-native hosts (`ActionHost`, `OrchHost`)
+serve it. The one optional key is `deployment:`, which names the deployment
+that owns the module; it is required only when auto-detection is ambiguous
+(preflight says so). See [Deployment resolution](#deployment-resolution).
 
-- `deployment: hexagon` on every server;
-- for a non-orchestrator, non-Reflex server with no matching hexagon shim
-  (none of that name, or one pointing at a different module), also
-  `<code key>: graft` and a `legacy_module:` naming the real target.
-
-`root:`, ports and `params:` are unchanged, so both variants write to the same
-tree. Do not add these keys by hand. To see what a variant resolves to:
+To check a config before launch:
 
 ```
-python -m helao.hexagon.preflight helao/deploy/<deployment>/configs/<name>_hex.py
+python -m helao.hexagon.preflight helao/deploy/<deployment>/configs/<prefix>.yml
 ```
+
+It prints `PREFLIGHT OK` or lists every server whose module cannot be resolved.
 
 ## Top-level keys
 
@@ -74,8 +72,7 @@ raises at startup rather than running unlabelled.
 > `launch.py` reads `config["dummy"]` directly (no `.get`) while printing the
 > launch banner, so a config without it fails with a `KeyError` before any
 > server starts. `HelaoConfig` defaults it to `True`, but that default is never
-> used. Every tracked `.yml` config sets `dummy`. The derived `_hex.py` configs
-> inherit it from their base.
+> used. Every tracked `.yml` config sets `dummy`.
 
 ### Optional
 
@@ -227,7 +224,7 @@ externally managed server is declared.
 | Key | Type | Read by |
 |---|---|---|
 | `params` | dict | The server's own `makeApp`. Free-form except for the group-level conventions below. |
-| `deployment` | str | Overrides deployment auto-detection. See below. |
+| `deployment` | str | The deployment that owns the module; required only when auto-detection is ambiguous (preflight says so). See below. |
 | `log_level` | int | Every launcher. Falls back to the top-level `log_level`, then `20`. |
 | `regular_update` | bool | Action and orchestrator hosts: start a periodic status broadcast. |
 | `regular_update_delay` | float | Seconds between those broadcasts. Default `10`. |

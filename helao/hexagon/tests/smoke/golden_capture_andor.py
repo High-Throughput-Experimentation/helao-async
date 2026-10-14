@@ -55,7 +55,7 @@ analogue of masked_hlo_columns); the key stays present so a one-sided presence
 difference still surfaces.
 
 Standalone counterpart to ``harness.capture.snapshot_capture`` for the
-orch-less, db-less andor/andorhex 2-server topology (ANDOR@8011 + ACTVIS@5001
+orch-less, db-less andor 2-server topology (ANDOR@8011 + ACTVIS@5001
 only -- no ORCH, no DB), mirroring spec/co2/gamry's ``golden_capture[_*].py``
 (see those modules' docstrings for the full topology-gap rationale). The
 hardware-agnostic settle / anti-vacuous-guard logic (``settle``,
@@ -74,9 +74,8 @@ SPECTROGRAPH FIRST:
         --out C:\\golden\\andor
 
 then terminate the launch, point ``--root``/``--config-prefix`` at a FRESH
-throwaway root and ``andorgoldhex``, capture again, and diff the two capture
-directories with ``harness.parity``. ``andor_diff.bat`` automates exactly this
-sequence.
+throwaway root and ``andorgold``, capture again, and diff the two capture
+directories with ``harness.parity``.
 """
 
 from __future__ import annotations

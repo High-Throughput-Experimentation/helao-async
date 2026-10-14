@@ -9,7 +9,7 @@ Exercises only:
 
 The real-hardware POST to ``/CO2SENSOR/acquire_co2`` is NOT exercised here --
 that only runs at-station with the SprintIR sensor attached on COM12 (see
-golden_capture_co2.py / co2_diff.bat docstrings).
+golden_capture_co2.py docstrings).
 
 Written as plain assert-based ``test_*`` functions with no ``import pytest``
 (mirrors test_golden_capture_spec.py -- this repo's conda ``helao`` env does

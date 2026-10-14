@@ -9,8 +9,8 @@ import time
 import pytest
 
 from helao.core.error import ErrorCodes
-from helao.hexagon.adapters.legacy.config import LegacyConfigAdapter
-from helao.hexagon.adapters.legacy.transport import LegacyTransportAdapter
+from helao.hexagon.adapters.shared.config import LegacyConfigAdapter
+from helao.hexagon.adapters.shared.transport import LegacyTransportAdapter
 from helao.hexagon.ports.transport import TransportPort
 
 HOST, PORT = "127.0.0.1", 8123  # RPC mirror -> 18123

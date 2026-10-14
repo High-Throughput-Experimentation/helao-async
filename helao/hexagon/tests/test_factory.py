@@ -1,6 +1,6 @@
-"""Composition factory: fail-loud wiring, the native-only action-app wrap and
-its WS bridge hook, vis deferral, launcher shim delegation. Construction level
-only — full lifecycle is the Task 12 launched smoke."""
+"""Composition factory: fail-loud wiring, the status adapter's identity, the
+orchestrator's /loaded_modules route. Construction level only — full lifecycle
+is the Task 12 launched smoke."""
 
 import os
 
@@ -29,24 +29,6 @@ def _world(tmp_path):
                 "port": 8902,
                 "group": "action",
                 "fast": "ws_simulator",
-                "params": {},
-            },
-            # P7e: makeVisApp composes for real now, so its tests need a server
-            # entry build_wiring can resolve.
-            "OPERATOR": {
-                "host": "127.0.0.1",
-                "port": 5901,
-                "group": "operator",
-                "bokeh": "standalone_operator",
-                "deployment": "hexagon",
-                "params": {},
-            },
-            "LIVE": {
-                "host": "127.0.0.1",
-                "port": 5902,
-                "group": "visualizer",
-                "bokeh": "live_visualizer",
-                "deployment": "hexagon",
                 "params": {},
             },
         },
@@ -95,15 +77,13 @@ def test_orchestrator_exposes_loaded_modules(installed_config):
     `launch.py`'s `server_loaded_files` POSTs it for anything with a `fast:` key
     and treats a non-200 as "no known mapping" -- which fails closed, so the
     hot-reload watcher never restarted an orchestrator no matter what changed
-    under it. And it is the only external way to tell whether an orchestrator
-    process is running the hexagon shim or the legacy module, because neither
-    launcher logs the deployment when a config sets it explicitly.
+    under it.
 
-    Asserted on the app the orchestrator shim really builds (an ``OrchHost``),
+    Asserted on the app the orchestrator module really builds (an ``OrchHost``),
     not on the shared registrar: a registrar test would still pass if the host
     stopped calling it.
     """
-    from helao.deploy.hexagon.servers.orchestrator.async_orch2 import makeApp
+    from helao.deploy.hte.servers.orchestrator.async_orch2 import makeApp
 
     app = makeApp("ORCH")
     routes = {r.path for r in app.routes}  # type: ignore[attr-defined]
@@ -129,158 +109,11 @@ def test_orchestrator_exposes_loaded_modules(installed_config):
     assert all(len(h) == 40 for h in loaded.values())
 
 
-def test_make_action_app_wraps_legacy_module(installed_config):
-    from helao.helpers.server_api import HelaoFastAPI
-    from helao.hexagon.app.factory import makeActionApp
-
-    app = makeActionApp("SIM", "helao.deploy.test.servers.action.ws_simulator")
-    assert isinstance(app, HelaoFastAPI)
-    assert app.hexagon_wiring is not None  # type: ignore[attr-defined]
-    routes = {r.path for r in app.routes}  # type: ignore[attr-defined]
-    assert "/SIM/acquire_data" in routes  # real legacy action route survived
-
-
-def test_make_vis_app_delegates_to_legacy_module(installed_config, monkeypatch):
-    """Compat-facade: makeVisApp imports the named legacy module and calls its
-    makeBokehApp with the launcher-shaped args, leaving the RENDERING entirely
-    legacy (D1/D2)."""
-    from bokeh.document import Document
-
-    from helao.hexagon.app import factory
-
-    calls = {}
-
-    class FakeLegacy:
-        @staticmethod
-        def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):
-            calls["args"] = (doc, confPrefix, server_key, helao_repo_root)
-            return doc
-
-    def fake_import(name):
-        calls["module"] = name
-        return FakeLegacy
-
-    monkeypatch.setattr(factory, "import_module", fake_import)
-    doc = Document()
-    out = factory.makeVisApp(
-        "helao.deploy.hte.servers.operator.standalone_operator",
-        doc,
-        "goldenhexvis",
-        "OPERATOR",
-        "/repo",
-    )
-    assert out is doc
-    assert calls["module"] == "helao.deploy.hte.servers.operator.standalone_operator"
-    assert calls["args"] == (doc, "goldenhexvis", "OPERATOR", "/repo")
-
-
-def test_make_vis_app_wires_the_hosted_process(installed_config, monkeypatch):
-    """P7e: the hosted bokeh process is COMPOSED, not hexagon in name only.
-
-    Every VIS_REQUIRED port is wired, ui_host is the P7d BokehServerUiHost, and
-    the wiring rides the per-session Document the legacy module renders into.
-    """
-    from bokeh.document import Document
-
-    from helao.hexagon.app import factory
-    from helao.hexagon.app.ui_host import BokehServerUiHost
-    from helao.hexagon.app.wiring import VIS_REQUIRED
-
-    seen = {}
-
-    class FakeLegacy:
-        @staticmethod
-        def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):
-            # the legacy app must be able to see the wiring while it builds
-            seen["wiring_at_render"] = getattr(doc, "hexagon_wiring", None)
-            return doc
-
-    monkeypatch.setattr(factory, "import_module", lambda name: FakeLegacy)
-    doc = Document()
-    factory.makeVisApp("legacy.mod", doc, "goldenhexvis", "LIVE", "/repo")
-
-    wiring = doc.hexagon_wiring  # type: ignore[attr-defined]
-    assert wiring is not None
-    assert seen["wiring_at_render"] is wiring
-    assert isinstance(wiring.ui_host, BokehServerUiHost)
-    for name in VIS_REQUIRED:
-        assert getattr(wiring, name) is not None, name
-    # ui_host is NOT a blanket requirement of the other compositions (P7d)
-    from helao.hexagon.app.wiring import ACTION_REQUIRED, ORCH_REQUIRED
-
-    assert "ui_host" not in ACTION_REQUIRED and "ui_host" not in ORCH_REQUIRED
-
-
-def test_make_vis_app_raises_on_an_unwired_required_port(installed_config, monkeypatch):
-    """Fail-loud composition (spec §4.5): an unwired VIS_REQUIRED port aborts
-    the session BEFORE the legacy module is imported — a half-composed page is
-    never rendered."""
-    import pytest as _pytest
-    from bokeh.document import Document
-
-    from helao.hexagon.app import factory
-    from helao.hexagon.app.wiring import PortWiring, UnwiredPortError
-    from helao.hexagon.adapters.legacy.config import from_global_config
-
-    imported = []
-    monkeypatch.setattr(factory, "import_module", lambda name: imported.append(name))
-    # config wired, logging deliberately absent
-    monkeypatch.setattr(
-        factory, "build_wiring", lambda key: PortWiring(config=from_global_config())
-    )
-    doc = Document()
-    with _pytest.raises(UnwiredPortError) as ei:
-        factory.makeVisApp("legacy.mod", doc, "goldenhexvis", "LIVE", "/repo")
-    assert "logging" in str(ei.value)
-    assert imported == []
-
-
-def test_make_vis_app_raises_without_an_installed_config(monkeypatch):
-    """No CONFIG at all is the other fail-loud leg: build_wiring raises rather
-    than composing a vis process against nothing."""
-    import pytest as _pytest
-    from bokeh.document import Document
-
-    from helao.helpers import config_loader
-    from helao.hexagon.app import factory
-
-    monkeypatch.setattr(config_loader, "CONFIG", None)
-    with _pytest.raises(RuntimeError):
-        factory.makeVisApp("legacy.mod", Document(), "goldenhexvis", "LIVE", "/repo")
-
-
-def test_launcher_shims_delegate():
-    import inspect
-
-    import helao.deploy.hexagon.servers.action.ws_simulator as sim_shim
-    import helao.deploy.hexagon.servers.orchestrator.async_orch2 as orch_shim
-    from helao.hexagon.app import factory
-
-    assert (
-        orch_shim.makeApp.__module__
-        == "helao.deploy.hexagon.servers.orchestrator.async_orch2"
-    )
-    assert sim_shim.LEGACY_MODULE == "helao.deploy.test.servers.action.ws_simulator"
-
-    # B3b: the orchestrator shim no longer delegates to makeOrchApp. It
-    # builds an OrchHost directly, because the host owns the reducer and
-    # makeOrchApp's job was to graft it onto a legacy Orch that no longer
-    # gets constructed here. The assertion inverts rather than disappears:
-    # going back through the factory would wrap the engine again.
-    assert not hasattr(orch_shim, "FACTORY")
-    assert "OrchHost" in inspect.getsource(orch_shim.makeApp)
-    # scoped to makeApp, not the module: the docstring names makeOrchApp
-    # precisely to explain why it is no longer called.
-    assert "makeOrchApp" not in inspect.getsource(orch_shim.makeApp)
-    # B7b deleted makeOrchApp outright: no composition grafts a legacy Orch.
-    assert not hasattr(factory, "makeOrchApp")
-
-
 def test_build_wiring_status_port_carries_own_identity(installed_config):
     """P1b1 carry: the status adapter must be composed with the server's own
     host/port from config (orch_status_sync keys nonblocking bookkeeping on
     them) — never the ''/0 defaults."""
-    from helao.hexagon.adapters.legacy.status import DispatcherStatusAdapter
+    from helao.hexagon.adapters.shared.status import DispatcherStatusAdapter
     from helao.hexagon.app.factory import build_wiring
     from helao.hexagon.ports.status import StatusPort
 
@@ -299,7 +132,7 @@ async def test_status_wire_send_carries_composed_identity(
 ):
     """send_nonblocking_status must put the COMPOSED host/port on the wire
     (params_dict server_host/server_port), not ''/0."""
-    import helao.hexagon.adapters.legacy.status as status_mod
+    import helao.hexagon.adapters.shared.status as status_mod
     from helao.core.error import ErrorCodes
     from helao.hexagon.app.factory import build_wiring
 
@@ -344,120 +177,18 @@ def test_build_wiring_wires_native_write_adapters(installed_config):
     w.require(*ACTION_REQUIRED)  # fail-loud stays satisfiable
 
 
-def test_make_action_app_registers_the_ws_bridge_hook(installed_config):
-    from helao.hexagon.app.factory import makeActionApp
-
-    app = makeActionApp("SIM", "helao.deploy.test.servers.action.ws_simulator")
-    assert app.hexagon_wiring.artifact_store is not None
-    assert not hasattr(app, "hexagon_active_graft")
-    startup_names = [h.__name__ for h in app.router.on_startup]
-    shutdown_names = [h.__name__ for h in app.router.on_shutdown]
-    # ours must be registered AFTER ActionHost's own startup handler
-    # (Starlette preserves registration order)
-    assert startup_names[-1] == "_hexagon_ws_bridge_startup"
-    assert not any("graft" in name for name in startup_names + shutdown_names)
-
-
-def test_make_action_app_refuses_a_module_that_is_not_native(
-    installed_config, monkeypatch
-):
-    """D-B7b.2: a non-ActionHost is refused while the app is built, naming the
-    module, instead of failing inside the startup event as SystemExit(3)."""
-    from types import SimpleNamespace
-
-    from fastapi import FastAPI
-
-    from helao.hexagon.app import factory
-
-    monkeypatch.setattr(
-        factory,
-        "import_module",
-        lambda name: SimpleNamespace(makeApp=lambda server_key: FastAPI()),
-    )
-    with pytest.raises(TypeError) as ei:
-        factory.makeActionApp("SIM", "some.legacy.module")
-    assert str(ei.value) == (
-        "some.legacy.module.makeApp returned FastAPI, not an ActionHost"
-    )
-
-
-@pytest.mark.asyncio
-async def test_action_app_startup_binds_ws_publish_bridge(installed_config):
-    """P2b-2 D3: the _hexagon_ws_bridge_startup hook constructs WsPublishBridge
-    over the host's own fan-out queues and binds it into the status adapter
-    (ACTION apps only; an OrchHost serves its own relays)."""
-    from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
-    from helao.hexagon.app.factory import makeActionApp
-
-    app = makeActionApp("SIM", "helao.deploy.test.servers.action.ws_simulator")
-    assert app.hexagon_ws_bridge is None  # bound at startup, not at build
-    hook = [
-        h for h in app.router.on_startup if h.__name__ == "_hexagon_ws_bridge_startup"
-    ][0]
-    await hook()
-    assert isinstance(app.hexagon_ws_bridge, WsPublishBridge)
-    assert app.hexagon_wiring.status._publish_bridge is app.hexagon_ws_bridge
-    assert app.hexagon_ws_bridge._status_q is app.base.status_q
-    assert app.hexagon_ws_bridge._data_q is app.base.data_q
-    assert app.hexagon_ws_bridge._live_q is app.base.live_q
-
-
 @pytest.mark.asyncio
 async def test_status_adapter_unbound_is_fail_loud(installed_config):
     """Controller hardening 3 (Q1/D3 underpinning): a DispatcherStatusAdapter
     is unbound by default and stays fail-loud (UnwiredPortError on
-    publish_status). Only makeActionApp's startup hook binds the bridge (see
-    test_action_app_startup_binds_ws_publish_bridge); the composed orchestrator
-    side is pinned by
+    publish_status). Only `ActionHost.__init__` binds the bridge (see
+    test_ws_publish_bridge::test_an_action_host_binds_the_bridge_to_its_own_queues);
+    the composed orchestrator side is pinned by
     test_vis_hexagon_producer_parity::test_no_hexagon_orch_ws_producer_exists.
     (Bare-adapter check.)"""
     from helao.hexagon.adapters.errors import UnwiredPortError
-    from helao.hexagon.adapters.legacy.status import DispatcherStatusAdapter
+    from helao.hexagon.adapters.shared.status import DispatcherStatusAdapter
 
     a = DispatcherStatusAdapter("ORCH")
     with pytest.raises(UnwiredPortError):
         await a.publish_status({})
-
-
-def test_vis_shims_delegate(installed_config, monkeypatch):
-    """P2d: each vis/operator shim exports the 4-arg makeBokehApp shape
-    bokeh_launcher calls (doc positional; confPrefix/server_key/
-    helao_repo_root as kwargs) and routes through factory.makeVisApp to
-    the right legacy module."""
-    from bokeh.document import Document
-
-    import helao.deploy.hexagon.servers.operator.standalone_operator as op_shim
-    import helao.deploy.hexagon.servers.visualizer.action_visualizer as av_shim
-    import helao.deploy.hexagon.servers.visualizer.live_visualizer as lv_shim
-    from helao.hexagon.app import factory
-
-    expected = {
-        op_shim: "helao.deploy.hte.servers.operator.standalone_operator",
-        lv_shim: "helao.deploy.hte.servers.visualizer.live_visualizer",
-        av_shim: "helao.deploy.hte.servers.visualizer.action_visualizer",
-    }
-    calls = {}
-
-    class FakeLegacy:
-        @staticmethod
-        def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):
-            calls["args"] = (doc, confPrefix, server_key, helao_repo_root)
-            return doc
-
-    def fake_import(name):
-        calls["module"] = name
-        return FakeLegacy
-
-    monkeypatch.setattr(factory, "import_module", fake_import)
-    for shim, legacy_module in expected.items():
-        assert shim.LEGACY_MODULE == legacy_module
-        assert shim.FACTORY is factory.makeVisApp
-        doc = Document()
-        # the EXACT call shape bokeh_launcher.py:185-190 produces
-        out = shim.makeBokehApp(
-            doc, confPrefix="goldenhexvis", server_key="LIVE", helao_repo_root="/repo"
-        )
-        assert out is doc
-        assert calls["module"] == legacy_module
-        assert calls["args"] == (doc, "goldenhexvis", "LIVE", "/repo")
-        assert doc.hexagon_wiring is not None  # type: ignore[attr-defined]

@@ -1,4 +1,4 @@
-"""Unit tests for `helao.hexagon.adapters.legacy.pal_transport.
+"""Unit tests for `helao.hexagon.adapters.shared.pal_transport.
 LegacyPalTransport` (P3a-PAL slice 4).
 
 Covers construct-disconnected (no SSH/NI-DAQ opened at construction) and
@@ -6,7 +6,7 @@ the LOCAL (subprocess/aiofiles) path, which is genuinely Linux-runnable
 without any PAL hardware. The SSH/Cygwin path is station-gated (real
 paramiko connection to a real host) and is not exercised here -- see the
 module docstring's boundary note and the plan's slice-4 verification
-recipe (`pal_canary.bat` proves the SSH path at the station).
+recipe (the SSH path is proven at the station).
 
 `pytest-asyncio` is not installed in this env (see test_pal_reconciliation.
 py's docstring), so async bodies run via `asyncio.run(...)` from plain
@@ -17,7 +17,7 @@ import asyncio
 import sys
 
 from helao.core.error import ErrorCodes
-from helao.hexagon.adapters.legacy.pal_transport import LegacyPalTransport
+from helao.hexagon.adapters.shared.pal_transport import LegacyPalTransport
 from helao.hexagon.ports.pal_transport import PalTransportPort
 
 

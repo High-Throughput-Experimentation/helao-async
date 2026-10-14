@@ -5,7 +5,7 @@ copy this file anywhere and run it while a checkout that lacks the rest of this
 branch (e.g. freeze/pre-legacy-removal_2608) is active. Run it by file path:
 
     python station_golden_capture.py --root C:\\INST_hlo\\DATA --seq <sequence dir name>
-        --out <set dir> --config-prefix eche10_hex [--launch-cmd "<cmd>"]
+        --out <set dir> --config-prefix eche10 [--launch-cmd "<cmd>"]
 
 Reads <root>, writes only <out> (which must not exist). Handles the unified
 layout (RUNS, DIAG) and the legacy one (RUNS_FINISHED/SYNCED/NOSYNC/DIAG plus
@@ -115,11 +115,10 @@ def main():
                 n_prc += 1
 
     prefix = a.config_prefix
-    ext = "py" if prefix.endswith("_hex") else "yml"
     fields = {
         "scenario": f"{prefix}-smoke",
         "config_prefix": prefix,
-        "config_path": f"helao/deploy/hte/configs/{prefix}.{ext}",
+        "config_path": f"helao/deploy/hte/configs/{prefix}.yml",
         "legacy_git_sha": scalar(text, "hlo_version") or "unknown",
         "launch_cmd": a.launch_cmd or f"python launch.py {prefix} --no-hot-reload",
         "sequence_name": scalar(text, "sequence_name") or "unknown",

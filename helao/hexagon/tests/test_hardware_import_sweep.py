@@ -2,7 +2,7 @@ import importlib
 
 import pytest
 
-from helao.hexagon.adapters.legacy.hardware import LegacyDriverHardwareAdapter
+from helao.hexagon.adapters.shared.hardware import LegacyDriverHardwareAdapter
 from helao.hexagon.ports.hardware import HardwarePort
 
 BASE = "helao.deploy.hte.drivers."

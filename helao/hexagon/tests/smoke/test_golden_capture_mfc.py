@@ -10,7 +10,7 @@ Exercises only:
 
 The real-hardware POST to ``/MFC/acquire_flowrate`` is NOT exercised here --
 that only runs at-station with the Alicat MFC attached on COM9 (see
-golden_capture_mfc.py / mfc_diff.bat docstrings).
+golden_capture_mfc.py docstrings).
 
 Written as plain assert-based ``test_*`` functions with no ``import pytest``
 (mirrors test_golden_capture_spec.py -- this repo's conda ``helao`` env does not

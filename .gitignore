@@ -24,7 +24,6 @@ helao/deploy/*
 !helao/deploy/__init__.py
 !helao/deploy/hte/
 !helao/deploy/test/
-!helao/deploy/hexagon/
 
 # superpowers brainstorm/companion artifacts
 .superpowers

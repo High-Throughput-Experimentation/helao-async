@@ -26,8 +26,8 @@
 # `query_positions` (the poller samples position internally via
 # `get_lbuf`/live_dict, but that is not exposed as a callable action route).
 # So there is no SAFE, non-perturbing read action to dispatch for a runtime
-# golden diff -- the openapi-surface diff (see kmotor_canary.bat) is the
-# safety-appropriate parity check (mirrors ni_canary.bat's rationale exactly).
+# golden diff -- the openapi-surface diff is the
+# safety-appropriate parity check (mirrors ni.yml's rationale exactly).
 # KinesisMotor.connect() opens a real pylablib Thorlabs.KinesisMotor handle
 # per axis -- WINDOWS-ONLY hardware; simulation:true is cosmetic (banner
 # color only), there is no Kinesis sim/dummy data path.

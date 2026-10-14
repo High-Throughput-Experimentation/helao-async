@@ -5,8 +5,8 @@
 # `params.analyses`. Those endpoints, when actually invoked, need a seeded
 # process/sequence-zip record to run against (AnalysisExecutor.start_executor
 # reads a real process); a runtime golden diff therefore needs seeded input
-# data and is DEFERRED, not N/A -- the openapi surface diff (this config +
-# analysis_canary.sh) is the deliverable for now.
+# data and is DEFERRED, not N/A -- the openapi surface diff (this config) is the
+# deliverable for now.
 #
 # Step-0 finding: AnalysisSyncer.__init__ (analysis_driver.py:173) builds a
 # pgs3.EcheUvisLoader (helao/core/drivers/data/loaders/pgs3.py) whose
@@ -21,7 +21,7 @@
 # helao/deploy/hte/drivers/data/analyses/ (only echeuvis_stability.py and
 # uvis_bkgsubnorm.py) -- load_analysis_classes() would only log-and-skip a
 # missing module (not crash), but an empty list keeps the launched surface
-# deterministic and identical between legacy/hexagon.
+# deterministic and identical from run to run.
 #
 # This config is action-only: none of the live ANA configs (icpm1, xrfs1,
 # adss, adss3, ccsi1/2, clad) declare action_vis/live_vis for ANA, so a
