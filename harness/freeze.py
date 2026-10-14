@@ -65,7 +65,12 @@ from pathlib import Path
 from collections.abc import Iterable
 from typing import Optional
 
-from harness.endpoints import diff_route_sets, extract_routes, normalize_annotation
+from harness.endpoints import (
+    diff_route_sets,
+    extract_routes,
+    matches_pin,
+    normalize_annotation,
+)
 from helao.hexagon.preflight import _checklist_dir
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -111,6 +116,34 @@ DYNAMIC_KEY = "dynamic_registration"
 
 def _route_key(route: dict) -> tuple[str, str]:
     return (route["path"], route["method"])
+
+
+def strip_listed_additions(
+    current: list[dict], frozen: list[dict], entries: list[dict]
+) -> list[dict]:
+    """``current`` minus each ``_param_additions.json`` parameter the frozen
+    route does not have and that matches its pin.
+
+    The merge then never sees those parameters, so ``--accept-drift`` cannot
+    fold them into the frozen record. One that drifted from its pin still shows
+    as drift, and a (mistakenly) listed *frozen* parameter is never stripped,
+    so a merge can never delete it from the record.
+    """
+    pinned = {_route_key(a): a["params"] for a in entries}
+    frozen_names = {_route_key(r): {p["name"] for p in r["params"]} for r in frozen}
+
+    def listed_addition(route: dict, param: dict) -> bool:
+        pin = pinned.get(_route_key(route), {}).get(param["name"])
+        return (
+            pin is not None
+            and param["name"] not in frozen_names.get(_route_key(route), set())
+            and matches_pin(param, pin)
+        )
+
+    return [
+        {**r, "params": [p for p in r["params"] if not listed_addition(r, p)]}
+        for r in current
+    ]
 
 
 def synthesized_key(frozen: list[dict]) -> Optional[str]:
@@ -436,6 +469,15 @@ def freeze_deployment(
         if additions.is_file()
         else set()
     )
+    # Optional parameters deliberately added to frozen routes. Like the routes
+    # above they stay out of the frozen record; the gate allows them by name,
+    # pinned annotation and default (see endpoints.filter_allowed_param_additions).
+    param_additions_file = checklist_dir / "_param_additions.json"
+    param_additions = (
+        json.loads(param_additions_file.read_text(encoding="utf-8"))
+        if param_additions_file.is_file()
+        else []
+    )
 
     for entry in load_manifest(checklist_dir):
         module = entry["module"]
@@ -460,11 +502,15 @@ def freeze_deployment(
                     + (f" ({note})" if note else "")
                 )
                 continue
-        current = [
-            r
-            for r in extract_routes(src, server_key=key)
-            if (module, *_route_key(r)) not in listed
-        ]
+        current = strip_listed_additions(
+            [
+                r
+                for r in extract_routes(src, server_key=key)
+                if (module, *_route_key(r)) not in listed
+            ],
+            frozen,
+            [a for a in param_additions if a["module"] == module],
+        )
         merged, drift = merge_routes(
             frozen,
             current,

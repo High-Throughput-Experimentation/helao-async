@@ -174,6 +174,27 @@ def normalize_annotation(text: str) -> str:
     return _PEP585_RE.sub(lambda m: m.group(1).lower(), text)
 
 
+def _norm_params(value):
+    """``params`` with PEP 585 alias spelling normalized away, for comparison."""
+    if not isinstance(value, list):
+        return value
+    return [
+        (
+            {
+                k: (
+                    normalize_annotation(v)
+                    if k == "annotation" and isinstance(v, str)
+                    else v
+                )
+                for k, v in p.items()
+            }
+            if isinstance(p, dict)
+            else p
+        )
+        for p in value
+    ]
+
+
 def diff_route_sets(frozen: list[dict], current: list[dict]) -> list[dict]:
     """Checklist diff: every frozen route present with equal schema, no extras."""
 
@@ -181,24 +202,7 @@ def diff_route_sets(frozen: list[dict], current: list[dict]) -> list[dict]:
         return (r["path"], r["method"])
 
     def norm(field: str, value):
-        """Compare ``params`` with PEP 585 alias spelling normalized away."""
-        if field != "params" or not isinstance(value, list):
-            return value
-        return [
-            (
-                {
-                    k: (
-                        normalize_annotation(v)
-                        if k == "annotation" and isinstance(v, str)
-                        else v
-                    )
-                    for k, v in p.items()
-                }
-                if isinstance(p, dict)
-                else p
-            )
-            for p in value
-        ]
+        return _norm_params(value) if field == "params" else value
 
     fmap = {key(r): r for r in frozen}
     cmap = {key(r): r for r in current}
@@ -244,6 +248,154 @@ def filter_allowed_additions(
     allowed: list[dict] = []
     for d in diffs:
         if d["kind"] == "extra" and (d["path"], d["method"]) in listed:
+            allowed.append(d)
+        else:
+            failing.append(d)
+    return failing, allowed
+
+
+_QUERY_LIKE = {"Query", "Header", "Cookie"}
+#: Names that make a parameter a container, an ``Annotated`` marker, or a body
+#: field. Any of them anywhere in a new parameter's annotation refuses it.
+_NON_SCALAR = {
+    "list",
+    "dict",
+    "set",
+    "frozenset",
+    "tuple",
+    "List",
+    "Dict",
+    "Set",
+    "FrozenSet",
+    "Tuple",
+    "Sequence",
+    "Mapping",
+    "Iterable",
+    "Annotated",
+    "Body",
+    "Form",
+    "File",
+    "UploadFile",
+    "Depends",
+    "Security",
+}
+
+
+def _is_literal(node: ast.expr) -> bool:
+    try:
+        value = ast.literal_eval(node)
+    except (ValueError, TypeError, SyntaxError):
+        return False
+    return value is not Ellipsis
+
+
+def is_optional_query_default(default: Optional[str]) -> bool:
+    """True when ``default`` (the extractor's unparsed text) is one the gate
+    knows leaves a new parameter optional and outside the request body.
+
+    An allowlist: a literal constant other than ``...``, or a literal default
+    given positionally or as ``default=`` to a call spelled exactly ``Query``,
+    ``Header`` or ``Cookie``. Everything else is refused -- no default, ``...``,
+    ``Query()``/``Query(...)``, ``Body``/``Form``/``File`` (a second body field
+    makes FastAPI embed the old one, changing its wire format), ``Depends``,
+    aliases such as ``Q(...)``, attribute calls, and named constants, none of
+    which can be judged from source text.
+    """
+    if default is None:
+        return False
+    node = ast.parse(default, mode="eval").body
+    if not isinstance(node, ast.Call):
+        return _is_literal(node)
+    if not (isinstance(node.func, ast.Name) and node.func.id in _QUERY_LIKE):
+        return False
+    value = node.args[0] if node.args else None
+    for k in node.keywords:
+        if k.arg == "default":
+            value = k.value
+    return value is not None and _is_literal(value)
+
+
+def is_scalar_annotation(annotation: Optional[str]) -> bool:
+    """True when ``annotation`` names no container, ``Annotated`` or body marker.
+
+    # ponytail: a bare class name could be a pydantic model (a body field) or an
+    # Enum (a query value); source text cannot tell them apart, so the entry
+    # pins the annotation and its ``why`` is what a reviewer judges. Resolve
+    # the name by import if a model ever slips through.
+    """
+    if annotation is None:
+        return False
+    names = set()
+    for n in ast.walk(ast.parse(annotation, mode="eval")):
+        if isinstance(n, ast.Name):
+            names.add(n.id)
+        elif isinstance(n, ast.Attribute):
+            names.add(n.attr)
+    return not names & _NON_SCALAR
+
+
+def matches_pin(param: dict, pin: dict) -> bool:
+    """``param`` carries exactly the entry's pinned annotation and default."""
+    return param["default"] == pin["default"] and normalize_annotation(
+        param["annotation"] or ""
+    ) == normalize_annotation(pin["annotation"])
+
+
+def _only_adds_optional(
+    frozen: list[dict], current: list[dict], pinned: dict[str, dict]
+) -> bool:
+    """True when ``current`` is ``frozen`` plus exactly ``pinned``'s params, each
+    matching its pin and each an optional, scalar, non-body parameter."""
+    frozen_names = {p["name"] for p in frozen}
+    kept = [p for p in current if p["name"] in frozen_names]
+    added = [p for p in current if p["name"] not in frozen_names]
+    return (
+        _norm_params(kept) == _norm_params(frozen)
+        and len(added) == len(pinned)
+        and all(
+            p["name"] in pinned
+            and matches_pin(p, pinned[p["name"]])
+            and is_optional_query_default(p["default"])
+            and is_scalar_annotation(p["annotation"])
+            for p in added
+        )
+    )
+
+
+def filter_allowed_param_additions(
+    diffs: list[dict],
+    param_additions: list[dict],
+) -> tuple[list[dict], list[dict]]:
+    """Split checklist diffs into ``(failing, allowed)`` for new optional params.
+
+    A ``changed`` ``params`` diff is allowed only when its ``(path, method)`` is
+    listed and the route is its frozen self plus exactly the entry's ``params``:
+    every frozen parameter is still there, in the same order, with the same
+    annotation and default, and each listed one carries exactly the annotation
+    and default the entry pins and is an optional, scalar, non-body parameter
+    (:func:`is_optional_query_default`, :func:`is_scalar_annotation`). A
+    caller that never sends the new parameters therefore sees the frozen route.
+    Anything else -- a removed, retyped or re-defaulted parameter, a new
+    *required* or body one, an annotation or default other than the pinned
+    one, a name the entry does not list, a ``tags`` change -- still fails.
+
+    ``params`` maps each new parameter's name to ``{"annotation", "default"}``
+    as the extractor unparses them (``"bool"``/``"False"``). Pinning the
+    default matters: a new ``bool = True`` is schema-compatible yet changes
+    what every existing caller gets. Pinning the annotation stops a later
+    retype -- to a body model, say -- from riding on an approved entry.
+    """
+    listed = {(a["path"], a["method"]): a["params"] for a in param_additions}
+    failing: list[dict] = []
+    allowed: list[dict] = []
+    for d in diffs:
+        names = listed.get((d["path"], d["method"]))
+        if (
+            d["kind"] == "changed"
+            and d.get("field") == "params"
+            and names is not None
+            and _only_adds_optional(d["frozen"], d["current"], names)
+        ):
             allowed.append(d)
         else:
             failing.append(d)

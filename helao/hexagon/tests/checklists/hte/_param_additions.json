@@ -1,0 +1,94 @@
+[
+  {
+    "module": "gamry_server2.py",
+    "path": "/PSTAT/run_CV",
+    "method": "post",
+    "params": {
+      "SamplingMode": {
+        "annotation": "Optional[GamrySamplingMode]",
+        "default": "None"
+      },
+      "versus_OCV": {
+        "annotation": "bool",
+        "default": "False"
+      },
+      "OCV_duration__s": {
+        "annotation": "float",
+        "default": "2.0"
+      },
+      "OCV_acquisition_period__s": {
+        "annotation": "float",
+        "default": "0.1"
+      }
+    },
+    "date": "2026-10-14",
+    "why": "SamplingMode selects Gamry Fast/NoiseReject/Surface per-step sampling (Surface for Cdl/ECSA); versus_OCV applies potentials relative to a pre-measured OCV, as run_PEIS does. All default to the previous behaviour."
+  },
+  {
+    "module": "gamry_server2.py",
+    "path": "/PSTAT/run_LSV",
+    "method": "post",
+    "params": {
+      "SamplingMode": {
+        "annotation": "Optional[GamrySamplingMode]",
+        "default": "None"
+      },
+      "versus_OCV": {
+        "annotation": "bool",
+        "default": "False"
+      },
+      "OCV_duration__s": {
+        "annotation": "float",
+        "default": "2.0"
+      },
+      "OCV_acquisition_period__s": {
+        "annotation": "float",
+        "default": "0.1"
+      }
+    },
+    "date": "2026-10-14",
+    "why": "SamplingMode selects Gamry Fast/NoiseReject/Surface per-step sampling; versus_OCV applies potentials relative to a pre-measured OCV, as run_PEIS does. All default to the previous behaviour."
+  },
+  {
+    "module": "gamry_server2.py",
+    "path": "/PSTAT/run_CA",
+    "method": "post",
+    "params": {
+      "versus_OCV": {
+        "annotation": "bool",
+        "default": "False"
+      },
+      "OCV_duration__s": {
+        "annotation": "float",
+        "default": "2.0"
+      },
+      "OCV_acquisition_period__s": {
+        "annotation": "float",
+        "default": "0.1"
+      }
+    },
+    "date": "2026-10-14",
+    "why": "versus_OCV applies the hold potential relative to a pre-measured OCV, as run_PEIS does. Defaults to the previous behaviour."
+  },
+  {
+    "module": "gamry_server2.py",
+    "path": "/PSTAT/run_RCA",
+    "method": "post",
+    "params": {
+      "versus_OCV": {
+        "annotation": "bool",
+        "default": "False"
+      },
+      "OCV_duration__s": {
+        "annotation": "float",
+        "default": "2.0"
+      },
+      "OCV_acquisition_period__s": {
+        "annotation": "float",
+        "default": "0.1"
+      }
+    },
+    "date": "2026-10-14",
+    "why": "versus_OCV applies the RCA signal array relative to a pre-measured OCV, as run_PEIS does. Defaults to the previous behaviour."
+  }
+]

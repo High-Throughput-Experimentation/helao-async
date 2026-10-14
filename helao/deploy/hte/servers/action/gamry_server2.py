@@ -61,6 +61,58 @@ from ...drivers.pstat.gamry.technique import (
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
+async def measure_init_ocv(active, driver, action_params: dict) -> float:
+    """Measure OCV before a technique, save it as ``init_ocv.hlo``, return its mean.
+
+    Runs :func:`measure_ocv` for ``OCV_duration__s`` seconds at
+    ``OCV_acquisition_period__s`` and averages the final five samples.
+
+    Raises if E-STOP fired during the window. The executor is not registered
+    with the server until ``_pre_exec`` returns, so neither E-STOP nor stop can
+    reach it here, and setup would otherwise go on to energize the cell.
+    """
+    ocv_duration = action_params.get("OCV_duration__s", 2.0)
+    ocv_acq_period = action_params.get("OCV_acquisition_period__s", 0.1)
+    LOGGER.info(f"measuring OCV for {ocv_duration:.1f} seconds")
+    ts, vs = await measure_ocv(
+        driver.pstat, driver.GamryCOM, ocv_duration, ocv_acq_period
+    )
+    mean_ocv = float(np.mean(vs[-5:]))
+    ocv_data = {"t_s": ts, "Ewe_V": vs}
+    await active.write_file(
+        output_str=json.dumps(ocv_data),
+        file_type="pstat_helao__file",
+        filename="init_ocv.hlo",
+        file_group=HloFileGroup.helao_files,
+        header=yml_dumps({"mean_ocv": mean_ocv}),
+        json_data_keys=list(ocv_data.keys()),
+    )
+    LOGGER.info(f"OCV result: {mean_ocv:.3f} V")
+    # last await before setup energizes the cell: check E-STOP after the write
+    if (
+        active.base.actionservermodel.estop
+        or HloStatus.estopped in active.action.action_status
+    ):
+        raise RuntimeError("E-STOP during OCV measurement; not energizing the cell")
+    return mean_ocv
+
+
+def offset_potentials(signal_params: dict, offset: float) -> dict:
+    """Return ``signal_params`` with every potential (``*__V`` key) shifted by ``offset``.
+
+    Scan rates (``*__V_s``) and non-potential keys are left untouched; a list
+    value (the RCA ``SignalArray__V``) is shifted element-wise into a new list.
+    """
+    return {
+        k: (
+            ([x + offset for x in v] if isinstance(v, list) else v + offset)
+            if k.endswith("__V")
+            else v
+        )
+        for k, v in signal_params.items()
+    }
+
+
 class GamryExec(Executor):
     """Executor that runs a single Gamry dtaq-based technique.
 
@@ -144,13 +196,15 @@ class GamryExec(Executor):
     async def _pre_exec(self) -> dict:
         """Wait for the cell to be free and configure the technique.
 
-        Polls ``get_gamry_state`` until the cell is idle (up to 30 s) and
-        then calls ``driver.setup`` with the technique, signal, dtaq, and
-        IE-range parameters.
+        Polls ``get_gamry_state`` until the cell is idle (up to 30 s). If
+        ``versus_OCV`` is set, measures OCV (see :func:`measure_init_ocv`) and
+        shifts every signal potential by its mean, so the requested potentials
+        are vs OCV. Then calls ``driver.setup`` with the technique, signal,
+        dtaq, and IE-range parameters.
 
         Returns:
             Dict with ``error`` set to :attr:`ErrorCodes.none` on success or
-            :attr:`ErrorCodes.setup` on timeout or driver failure.
+            :attr:`ErrorCodes.setup` on timeout, OCV, or driver failure.
         """
         max_wait = 30
         init_time = time.time()
@@ -160,6 +214,15 @@ class GamryExec(Executor):
                 return {"error": ErrorCodes.setup}
             LOGGER.warning("Gamry cell is busy. Waiting 1 second.")
             await asyncio.sleep(1)
+        if self.action_params.get("versus_OCV", False):
+            try:
+                self.mean_ocv = await measure_init_ocv(
+                    self.active, self.driver, self.action_params
+                )
+            except Exception:
+                LOGGER.error("GamryExec OCV measurement failed", exc_info=True)
+                return {"error": ErrorCodes.setup}
+            self.signal_params = offset_potentials(self.signal_params, self.mean_ocv)
         resp = self.driver.setup(
             self.technique,
             self.signal_params,
@@ -434,29 +497,10 @@ class GamryEisExec(Executor):
             await asyncio.sleep(1)
         try:
             if self.action_params.get("versus_OCV", False):
-                ocv_duration = self.action_params.get("OCV_duration__s", 2.0)
-                ocv_acq_period = self.action_params.get(
-                    "OCV_acquisition_period__s", 0.1
+                self.mean_ocv = await measure_init_ocv(
+                    self.active, self.driver, self.action_params
                 )
-                LOGGER.info(f"measuring OCV for {ocv_duration:.1f} seconds")
-                ts, vs = await measure_ocv(
-                    self.driver.pstat,
-                    self.driver.GamryCOM,
-                    ocv_duration,
-                    ocv_acq_period,
-                )
-                self.mean_ocv = np.mean(vs[-5:])
                 self.offset += self.mean_ocv
-                ocv_data = {"t_s": ts, "Ewe_V": vs}
-                await self.active.write_file(
-                    output_str=json.dumps(ocv_data),
-                    file_type="pstat_helao__file",
-                    filename="init_ocv.hlo",
-                    file_group=HloFileGroup.helao_files,
-                    header=yml_dumps({"mean_ocv": float(self.mean_ocv)}),
-                    json_data_keys=list(ocv_data.keys()),
-                )
-                LOGGER.info(f"OCV result: {self.mean_ocv:.3f} V")
 
             # create ReadZ instance and attach to driver (self.driver.readz)
             resp = self.driver.setup_eis(
@@ -638,6 +682,9 @@ async def gamry_dyn_endpoints(app: ActionHost):
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         IErange: model_ierange = "auto",
+        versus_OCV: bool = False,  # potentials vs a pre-measured OCV if True
+        OCV_duration__s: float = 2.0,  # OCV measurement time for versus_OCV
+        OCV_acquisition_period__s: float = 0.1,
         SamplingMode: Optional[GamrySamplingMode] = None,  # None keeps pstat default
         SetStopIMin: Optional[float] = None,
         SetStopIMax: Optional[float] = None,
@@ -675,6 +722,11 @@ async def gamry_dyn_endpoints(app: ActionHost):
             TTLwait: TTL channel to wait on (``-1`` disables).
             TTLsend: TTL channel to assert on start (``-1`` disables).
             IErange: Current range setting; ``"auto"`` for autoranging.
+            versus_OCV: If true, measure OCV first and apply every potential
+                relative to its mean (saved as ``init_ocv.hlo``). OCV is taken
+                before any ``TTLwait`` trigger, so a long trigger wait leaves it stale.
+            OCV_duration__s: OCV measurement duration when ``versus_OCV`` is true.
+            OCV_acquisition_period__s: OCV sampling period in seconds.
             SamplingMode: Per-step current sampling (``Surface`` for
                 Cdl/ECSA); ``None`` leaves the instrument default.
             SetStopIMin: Lower current threshold for early stop.
@@ -717,6 +769,9 @@ async def gamry_dyn_endpoints(app: ActionHost):
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         IErange: model_ierange = "auto",
+        versus_OCV: bool = False,  # potentials vs a pre-measured OCV if True
+        OCV_duration__s: float = 2.0,  # OCV measurement time for versus_OCV
+        OCV_acquisition_period__s: float = 0.1,
         SetStopXMin: Optional[
             float
         ] = None,  # lower current threshold to trigger early stopping
@@ -751,6 +806,11 @@ async def gamry_dyn_endpoints(app: ActionHost):
             TTLwait: TTL channel to wait on (``-1`` disables).
             TTLsend: TTL channel to assert on start (``-1`` disables).
             IErange: Current range setting; ``"auto"`` for autoranging.
+            versus_OCV: If true, measure OCV first and apply every potential
+                relative to its mean (saved as ``init_ocv.hlo``). OCV is taken
+                before any ``TTLwait`` trigger, so a long trigger wait leaves it stale.
+            OCV_duration__s: OCV measurement duration when ``versus_OCV`` is true.
+            OCV_acquisition_period__s: OCV sampling period in seconds.
             SetStopXMin: Lower current threshold for early stop.
             SetStopXMax: Upper current threshold for early stop.
             SetStopAtDelayXMin: Consecutive-point delay for ``SetStopXMin``.
@@ -853,6 +913,9 @@ async def gamry_dyn_endpoints(app: ActionHost):
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         IErange: model_ierange = "auto",
+        versus_OCV: bool = False,  # potentials vs a pre-measured OCV if True
+        OCV_duration__s: float = 2.0,  # OCV measurement time for versus_OCV
+        OCV_acquisition_period__s: float = 0.1,
         SamplingMode: Optional[GamrySamplingMode] = None,  # None keeps pstat default
         SetStopIMin: Optional[
             float
@@ -893,6 +956,11 @@ async def gamry_dyn_endpoints(app: ActionHost):
             TTLwait: TTL channel to wait on (``-1`` disables).
             TTLsend: TTL channel to assert on start (``-1`` disables).
             IErange: Current range setting; ``"auto"`` for autoranging.
+            versus_OCV: If true, measure OCV first and apply every potential
+                relative to its mean (saved as ``init_ocv.hlo``). OCV is taken
+                before any ``TTLwait`` trigger, so a long trigger wait leaves it stale.
+            OCV_duration__s: OCV measurement duration when ``versus_OCV`` is true.
+            OCV_acquisition_period__s: OCV sampling period in seconds.
             SamplingMode: Per-step current sampling (``Surface`` for
                 Cdl/ECSA); ``None`` leaves the instrument default.
             SetStopIMin: Lower current threshold for early stop.
@@ -990,6 +1058,9 @@ async def gamry_dyn_endpoints(app: ActionHost):
         TTLwait: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         TTLsend: int = Query(-1, ge=-1, le=3),  # -1 disables, else select TTL 0-3
         IErange: model_ierange = "auto",
+        versus_OCV: bool = False,  # potentials vs a pre-measured OCV if True
+        OCV_duration__s: float = 2.0,  # OCV measurement time for versus_OCV
+        OCV_acquisition_period__s: float = 0.1,
         alert_duration__s: float = -1,
         alert_above: bool = True,
         alert_sleep__s: float = -1,
@@ -1015,6 +1086,11 @@ async def gamry_dyn_endpoints(app: ActionHost):
             TTLwait: TTL channel to wait on (``-1`` disables).
             TTLsend: TTL channel to assert on start (``-1`` disables).
             IErange: Current range setting; ``"auto"`` for autoranging.
+            versus_OCV: If true, measure OCV first and apply every potential
+                relative to its mean (saved as ``init_ocv.hlo``). OCV is taken
+                before any ``TTLwait`` trigger, so a long trigger wait leaves it stale.
+            OCV_duration__s: OCV measurement duration when ``versus_OCV`` is true.
+            OCV_acquisition_period__s: OCV sampling period in seconds.
             alert_duration__s: Minimum duration for runtime alerts (seconds).
             alert_above: Whether to alert on above- or below-threshold.
             alert_sleep__s: Suppression window between alerts.
