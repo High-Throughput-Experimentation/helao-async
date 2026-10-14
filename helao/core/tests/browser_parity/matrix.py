@@ -24,7 +24,6 @@ can never fail, which is the failure mode this file exists to avoid.
 __all__ = [
     "VOLATILE_KEYS",
     "diff_matrices",
-    "format_diff",
     "load_matrix",
     "save_matrix",
 ]
@@ -40,9 +39,9 @@ import os
 #: Kept deliberately short. Every entry is a hole in the gate, so a new one
 #: needs a reason that is about the *value*, not about a diff that failed.
 VOLATILE_KEYS = {
-    # The two configs name their documents differently on purpose -- that is
-    # how a launch log says which host is serving. Comparing them would report
-    # the one difference the pair is designed to have.
+    # Configs name their documents differently on purpose -- that is how a
+    # launch log says which host is serving. Comparing two matrices would report
+    # the one difference they are designed to have.
     "doc_title": "the config names the host in the title, by design",
     # Simulators are free-running, so how much a chart has drawn at capture
     # time is a function of when the browser connected. The *bucket* this
@@ -116,7 +115,7 @@ def diff_matrices(left: dict, right: dict) -> list:
     """Compare two matrices, ignoring the declared volatile keys.
 
     A route present in one run and absent in the other is a difference, and an
-    important one: it is what a config pair drifting apart looks like. It is
+    important one: it is what two configs drifting apart looks like. It is
     reported as a missing key rather than skipped.
 
     Returns:
@@ -133,19 +132,6 @@ def diff_matrices(left: dict, right: dict) -> list:
         if a != b:
             differences.append((key, a, b))
     return differences
-
-
-def format_diff(left_label: str, right_label: str, differences: list) -> str:
-    """Render a diff for a terminal."""
-    if not differences:
-        return f"matrix diff {left_label} vs {right_label}: empty (identical)"
-    lines = [
-        f"matrix diff {left_label} vs {right_label}: "
-        f"{len(differences)} difference(s)"
-    ]
-    for key, a, b in differences:
-        lines.append(f"  {key}: {left_label}={a!r} {right_label}={b!r}")
-    return "\n".join(lines)
 
 
 def perturb(document: dict, key: str, value) -> dict:
