@@ -1323,6 +1323,45 @@ def wait_key():
     return keypress
 
 
+def watch_until(stop: threading.Event, poll_seconds: float, poll_once) -> None:
+    """Call ``poll_once`` every ``poll_seconds`` until ``stop`` is set.
+
+    Waits on the event instead of sleeping, so a group teardown stops the
+    hot-reload watcher within one wait rather than after its next poll.
+    """
+    if poll_seconds <= 0:
+        # Event.wait(<=0) returns at once, so this would spin on git forever;
+        # time.sleep used to raise instead.
+        raise ValueError(f"poll_seconds must be positive, got {poll_seconds}")
+    while not stop.wait(poll_seconds):
+        poll_once()
+
+
+def guarded_restart(teardown_started, servername, stop_old, start_new) -> bool:
+    """Restart one server unless a group teardown has begun.
+
+    Checked twice: before the server is touched, and again once the old process
+    is gone, so a teardown that starts mid-restart never gets a fresh server
+    relaunched underneath it. On hte-ecms-03 (2026-10-14) the hot-reload watcher
+    relaunched PSTAT four seconds into a CTRL-x, re-initializing the Gamry, and
+    the teardown then had to kill the new process again.
+
+    Returns:
+        bool: True when the server was relaunched.
+    """
+    if teardown_started.is_set():
+        LAUNCH_LOGGER.info(f"Not restarting {servername}: group teardown in progress.")
+        return False
+    stop_old()
+    if teardown_started.is_set():
+        LAUNCH_LOGGER.info(
+            f"Stopped {servername} but not relaunching it: group teardown in progress."
+        )
+        return False
+    start_new()
+    return True
+
+
 def launcher(
     confArg,
     confDict,
@@ -2166,13 +2205,17 @@ def main():
             return False
         teardown_started.set()
         deliberate_stop.set()
-        # Orchestrators first (they detach subscribers and export non-empty
-        # queues), then action servers. Visualizer/operator bokeh apps have no
-        # /shutdown route, so pidd.close() signals those.
-        graceful_shutdown_all()
-        # hold pidd_lock so a concurrent hot-reload restart can't interleave its
-        # pidd mutation with the teardown's kill loop.
+        # The whole teardown holds pidd_lock, /shutdown sweep included, so it and
+        # a restart (CTRL-r, hot-reload, relaunch_all) are mutually exclusive. A
+        # restart already holding the lock either sees teardown_started and does
+        # not relaunch, or finishes first -- and then its fresh server gets the
+        # sweep's /shutdown like every other. Setting the event before taking the
+        # lock is what lets the in-flight restart see it.
         with pidd_lock:
+            # Orchestrators first (they detach subscribers and export non-empty
+            # queues), then action servers. Visualizer/operator bokeh apps have
+            # no /shutdown route, so pidd.close() signals those.
+            graceful_shutdown_all()
             pidd.close()
         return True
 
@@ -2184,7 +2227,8 @@ def main():
         exactly one restart code path. Reuses ``pidd.kill_server`` (graceful ->
         SIGKILL + reap) and records the new ``Popen`` handle in ``pidd.procs``
         for later reaping. Holds ``pidd_lock`` for the whole sequence so it
-        cannot race the keypress thread's pidd mutations.
+        cannot race the keypress thread's pidd mutations, and refuses through
+        :func:`guarded_restart` once a group teardown has started.
 
         Args:
             groupname (str): Server group (action/orchestrator/visualizer/operator).
@@ -2193,7 +2237,7 @@ def main():
                 ``--restore`` so it imports its saved queues on startup.
 
         Returns:
-            bool: True if the relaunch sequence completed without error.
+            bool: True if the server was relaunched without error.
         """
         # From here on a child exiting is intended, so the launch supervisor
         # must stop calling it a failed start.
@@ -2205,57 +2249,71 @@ def main():
                     for k in pidd.servers[groupname][servername].keys()
                     if k in pidd.codeKeys
                 ][0]
-                S = stop_server(groupname, servername)
-                LAUNCH_LOGGER.info(f"{servername} successful shutdown() event.")
-                pidd.kill_server(servername)
-                LAUNCH_LOGGER.info(f"Successfully closed {servername} process.")
-                cmd = ["python", "-u", f"{codeKey}_launcher.py", confArg, servername]
-                if restore and groupname == "orchestrator":
-                    cmd.append("--restore")
-                CONSOLE.unregister(servername)
-                p = subprocess.Popen(
-                    cmd,
-                    cwd=helao_repo_root,
-                    env=CONSOLE.child_env(),
-                    **CONSOLE.spawn_kwargs(),
+                S: dict = {}
+
+                def stop_old():
+                    S.update(stop_server(groupname, servername))
+                    LAUNCH_LOGGER.info(f"{servername} successful shutdown() event.")
+                    pidd.kill_server(servername)
+                    LAUNCH_LOGGER.info(f"Successfully closed {servername} process.")
+
+                def start_new():
+                    cmd = [
+                        "python",
+                        "-u",
+                        f"{codeKey}_launcher.py",
+                        confArg,
+                        servername,
+                    ]
+                    if restore and groupname == "orchestrator":
+                        cmd.append("--restore")
+                    CONSOLE.unregister(servername)
+                    p = subprocess.Popen(
+                        cmd,
+                        cwd=helao_repo_root,
+                        env=CONSOLE.child_env(),
+                        **CONSOLE.spawn_kwargs(),
+                    )
+                    CONSOLE.register(servername, p)
+                    pidd.store_pid(servername, S["host"], S["port"], p.pid)
+                    pidd.procs[servername] = p
+                    if groupname == "action":
+                        # The restarted server was just Popen'd; wait for it to
+                        # bind its port before re-subscribing, otherwise the
+                        # /attach_client POST below hits a dead socket
+                        # (ConnectionError) and re-subscription silently fails.
+                        if not wait_for_server_ready(S["host"], S["port"]):
+                            LAUNCH_LOGGER.warning(
+                                f"Restarted {servername} not responding after wait; "
+                                f"attempting re-subscription anyway."
+                            )
+                        for orchserv in pidd.orchServs:
+                            OS = pidd.servers["orchestrator"][orchserv]
+                            LAUNCH_LOGGER.info(
+                                f"Re-subscribing {orchserv} to restarted {servername}."
+                            )
+                            # A restarted action server comes up with an empty
+                            # subscriber list, so the orchestrator must re-subscribe
+                            # to it. Mirror Orch.subscribe_all: call the ACTION
+                            # server's /attach_client with the orchestrator as the
+                            # client, so the action server pushes its status to the
+                            # orch's /update_status. (Calling the ORCH's
+                            # /attach_client with the action server as the client is
+                            # backwards -- it makes the orch POST to
+                            # <action>/update_status, which 404s and spams the log.)
+                            requests.post(
+                                f"http://{S['host']}:{S['port']}/attach_client",
+                                params={
+                                    "client_servkey": orchserv,
+                                    "client_host": OS["host"],
+                                    "client_port": OS["port"],
+                                },
+                                timeout=10,
+                            )
+
+                return guarded_restart(
+                    teardown_started, servername, stop_old, start_new
                 )
-                CONSOLE.register(servername, p)
-                pidd.store_pid(servername, S["host"], S["port"], p.pid)
-                pidd.procs[servername] = p
-                if groupname == "action":
-                    # The restarted server was just Popen'd; wait for it to
-                    # bind its port before re-subscribing, otherwise the
-                    # /attach_client POST below hits a dead socket
-                    # (ConnectionError) and re-subscription silently fails.
-                    if not wait_for_server_ready(S["host"], S["port"]):
-                        LAUNCH_LOGGER.warning(
-                            f"Restarted {servername} not responding after wait; "
-                            f"attempting re-subscription anyway."
-                        )
-                    for orchserv in pidd.orchServs:
-                        OS = pidd.servers["orchestrator"][orchserv]
-                        LAUNCH_LOGGER.info(
-                            f"Re-subscribing {orchserv} to restarted {servername}."
-                        )
-                        # A restarted action server comes up with an empty
-                        # subscriber list, so the orchestrator must re-subscribe
-                        # to it. Mirror Orch.subscribe_all: call the ACTION
-                        # server's /attach_client with the orchestrator as the
-                        # client, so the action server pushes its status to the
-                        # orch's /update_status. (Calling the ORCH's
-                        # /attach_client with the action server as the client is
-                        # backwards -- it makes the orch POST to
-                        # <action>/update_status, which 404s and spams the log.)
-                        requests.post(
-                            f"http://{S['host']}:{S['port']}/attach_client",
-                            params={
-                                "client_servkey": orchserv,
-                                "client_host": OS["host"],
-                                "client_port": OS["port"],
-                            },
-                            timeout=10,
-                        )
-                return True
             except Exception:
                 LAUNCH_LOGGER.error(
                     f" ... got error restarting {groupname}/{servername}: ",
@@ -2326,6 +2384,13 @@ def main():
                 )
                 return False
 
+            if teardown_started.is_set():
+                # A signal arrived during the relaunch; teardown_group is waiting
+                # on pidd_lock. Bringing the group back up only for it to be
+                # killed would re-initialize every driver for nothing.
+                LAUNCH_LOGGER.info("Full relaunch skipped: group teardown in progress.")
+                return False
+
             LAUNCH_LOGGER.info(
                 f"All servers down. Relaunching in cold-start order: "
                 f"{'/'.join(LAUNCH_ORDER)}."
@@ -2383,12 +2448,13 @@ def main():
             f"Hot-reload watching {len(repos)} repo(s) every {poll_seconds}s: {repos}"
         )
         pending = set()  # (group, name) affected but not yet restarted
-        while True:
-            time.sleep(poll_seconds)
+
+        def poll_once():
+            nonlocal pending
             if not hotreload_enabled.is_set():
                 # Paused via CTRL-t: do not poll git or advance HEADs, so any
                 # commits during the pause are picked up once re-enabled.
-                continue
+                return
             changed = set()
             for r in repos:
                 cur = git_head(r)
@@ -2434,6 +2500,8 @@ def main():
             if pending:
                 still_pending = set()
                 for group, name in pending:
+                    if teardown_started.is_set():
+                        return  # the group is going down; restart nothing
                     entry = pidd.servers.get(group, {}).get(name)
                     if entry is None:
                         continue  # server no longer known; drop
@@ -2444,6 +2512,8 @@ def main():
                         if not restart_server(
                             group, name, restore=(group == "orchestrator")
                         ):
+                            if teardown_started.is_set():
+                                return  # refused by guarded_restart, not failed
                             # relaunch failed (server may now be down); keep it
                             # queued so a later poll retries rather than leaving
                             # it dead silently.
@@ -2458,6 +2528,12 @@ def main():
                         )
                         still_pending.add((group, name))
                 pending = still_pending
+
+        # Stops as soon as a group teardown begins (CTRL-x, a signal, or the
+        # non-interactive interrupt), instead of polling, and possibly
+        # restarting servers, while the group is being shut down.
+        watch_until(teardown_started, poll_seconds, poll_once)
+        LAUNCH_LOGGER.info("Hot-reload: group teardown started; watcher stopped.")
 
     def thread_waitforkey():
         """
@@ -2620,6 +2696,11 @@ def main():
     # the hotreload_enabled Event, which the CTRL-t hotkey toggles at runtime.
     # The resolved on/off state above only sets the initial position.
     poll_seconds = int(hot_reload_cfg.get("poll_seconds", 30))
+    if poll_seconds < 1:
+        LAUNCH_LOGGER.warning(
+            f"hot_reload.poll_seconds={poll_seconds} is not positive; using 1."
+        )
+        poll_seconds = 1
     if hot_reload_on:
         hotreload_enabled.set()
         LAUNCH_LOGGER.info(
