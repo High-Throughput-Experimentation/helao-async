@@ -370,12 +370,15 @@ class GamryDriver(HelaoDriver):
             self.signal = client.CreateObject(technique.signal.name)
             self.signal.Init(*signal_paramlist)
             # Framework sequencerCV.exp: Signal.SetAcquisitionControl(NIL, NIL,
-            # NIL, SamplingMode) before SetSignal; absent key keeps the default
+            # NIL, SamplingMode) before SetSignal; absent key keeps the default.
+            # The method lives on IGamrySignal, which the coclass implements but
+            # its default interface (e.g. IGamrySignalRupdn) does not inherit.
             sampling_mode = action_params.get("SamplingMode")
             if sampling_mode is not None:
                 from comtypes.automation import VARIANT
 
-                self.signal.SetAcquisitionControl(
+                acq = self.signal.QueryInterface(self.GamryCOM.IGamrySignal)
+                acq.SetAcquisitionControl(
                     VARIANT.empty,
                     VARIANT.empty,
                     VARIANT.empty,

@@ -27,7 +27,16 @@ class Recorder:
         self._name = name
         self._log = log
 
+    def QueryInterface(self, iface):
+        self._log.append((f"{self._name}.QueryInterface", (iface,)))
+        return Recorder(iface, self._log)
+
     def __getattr__(self, attr):
+        # comtypes binds the coclass's default interface, which (like the real
+        # IGamrySignalRupdn) lacks the IGamrySignal method: station AttributeError
+        if attr == "SetAcquisitionControl" and self._name != "GamryCOM.IGamrySignal":
+            raise AttributeError(attr)
+
         def call(*args):
             self._log.append((f"{self._name}.{attr}", args))
             return 1.0
@@ -86,7 +95,11 @@ def _setup(log, **extra):
 )
 def test_mode_set_on_signal_before_set_signal(log, mode):
     names, log = _setup(log, SamplingMode=mode)
-    acq = names.index("GamrySignalRupdn.SetAcquisitionControl")
+    acq = names.index("GamryCOM.IGamrySignal.SetAcquisitionControl")
+    assert log[acq - 1] == (
+        "GamrySignalRupdn.QueryInterface",
+        ("GamryCOM.IGamrySignal",),
+    )
     assert acq < names.index("pstat.SetSignal")
     assert acq > names.index("GamrySignalRupdn.Init")
     assert log[acq][1] == (EMPTY, EMPTY, EMPTY, f"GamryCOM.{mode}")
@@ -94,5 +107,6 @@ def test_mode_set_on_signal_before_set_signal(log, mode):
 
 def test_absent_mode_makes_no_call(log):
     names, _ = _setup(log)
-    assert "GamrySignalRupdn.SetAcquisitionControl" not in names
+    assert "GamryCOM.IGamrySignal.SetAcquisitionControl" not in names
+    assert "GamrySignalRupdn.QueryInterface" not in names
     assert "pstat.SetSignal" in names
