@@ -1,5 +1,5 @@
 # CAPTURE-ONLY THROWAWAY ROOT, NEVER PRODUCTION. Copy of galilio.yml used
-# solely by helao.hexagon.tests.smoke.golden_capture_galil_io / galilio_diff.bat
+# solely by helao.hexagon.tests.smoke.golden_capture_galil_io
 # to capture a runtime golden-master get_digital_in tree. The ONLY change
 # from galilio.yml is `root:`, pointed at a dedicated throwaway path so the
 # capture rig's assert_fresh() has a clean tree to start from and production

@@ -5,7 +5,7 @@ Exercises only:
   - the RUNS_ACTIVE-based settle helper (``settle``), with no orch/DB
 
 The real-hardware POST to ``/PSTAT/run_OCV`` is NOT exercised here -- that
-only runs at-station (see golden_capture.py / golden_diff.bat docstrings).
+only runs at-station (see golden_capture.py docstrings).
 
 Written as plain assert-based ``test_*`` functions with no ``import pytest``
 (this repo's conda ``helao`` env does not currently have the pytest package

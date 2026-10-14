@@ -8,8 +8,7 @@ Exercises only:
     spec-shaped RUNS_DIAG tree
 
 The real-hardware POST to ``/SPEC/acquire_spec`` is NOT exercised here -- that
-only runs at-station with the SM303 attached (see golden_capture_spec.py /
-spec_diff.bat docstrings).
+only runs at-station with the SM303 attached (see golden_capture_spec.py docstrings).
 
 Written as plain assert-based ``test_*`` functions with no ``import pytest``
 (mirrors test_golden_capture_galil.py -- this repo's conda ``helao`` env does

@@ -30,6 +30,7 @@ servers:
     port: 8102
     group: action
     fast: ws_simulator
+    deployment: test
     live_vis: co2_vis
     params:
       # The column the real SprintIR driver publishes; co2_vis means it.
@@ -40,6 +41,7 @@ servers:
     port: 8103
     group: action
     fast: ws_simulator
+    deployment: test
     live_vis: mfc_vis
     params:
       # `{device}__{field}`, as the mfc driver publishes. mfc_vis means the
@@ -53,6 +55,7 @@ servers:
     port: 8104
     group: action
     fast: ws_simulator
+    deployment: test
     live_vis: pressure_vis
     params:
       # Every analog input gets a mean, so both of these do.
@@ -64,6 +67,7 @@ servers:
     port: 8105
     group: action
     fast: ws_simulator
+    deployment: test
     live_vis: temp_vis
     params:
       # temp_vis plots its channels raw; no means are computed.

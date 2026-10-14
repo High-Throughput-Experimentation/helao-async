@@ -4,8 +4,8 @@
 # endpoints (/finish_yml, /list_pending, /n_queue, /current_progress, ...) --
 # there is no `/{server_key}/{action}` action endpoint and no data-producing
 # action, so a runtime RUNS-tree golden diff is N/A for this server (unlike
-# galil/sample/gamry). The openapi surface diff (legacy vs hexagon route +
-# schema parity) is the appropriate check here -- see sync_canary.sh.
+# galil/sample/gamry). The openapi surface (route table + schemas) is the
+# appropriate check here.
 #
 # Step-0 finding: HelaoSyncer.__init__ (sync_driver.py:690) only opens a real
 # AWS session when the `AWS_CONFIG_PATH` env var is set (it is not, on this

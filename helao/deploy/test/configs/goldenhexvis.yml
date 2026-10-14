@@ -1,8 +1,7 @@
-# P2d GATE config: hexagon-hosted bokeh operator/visualizers over the
-# hexagon ORCH+SIM (goldenhex.yml servers verbatim + golden.yml's bokeh
-# entries, each flipped to `deployment: hexagon` so bokeh_launcher resolves
-# the helao/deploy/hexagon shim modules). goldenhex.yml itself stays a pure
-# action/orch parity config. SYNC stays legacy (cut-over is P2e).
+# P2d GATE config: bokeh operator/visualizers over ORCH+SIM
+# (goldenhex.yml servers verbatim + golden.yml's bokeh entries).
+# goldenhex.yml itself stays a pure action/orch parity config. SYNC stays
+# legacy (cut-over is P2e).
 dummy: true
 simulation: true
 show_debug: true
@@ -20,7 +19,6 @@ servers:
     port: 8001
     group: orchestrator
     fast: async_orch2
-    deployment: hexagon
     params: {}
     prefinish_experiment_hooks:
       append_params: ["*"]
@@ -31,7 +29,6 @@ servers:
     port: 5001
     group: operator
     bokeh: standalone_operator
-    deployment: hexagon
     params:
       orch_key: ORCH
       doc_name: "Operator (hexagon compat-facade)"
@@ -50,7 +47,6 @@ servers:
     port: 5002
     group: visualizer
     bokeh: live_visualizer
-    deployment: hexagon
     params:
       doc_name: Websocket Live Visualizer
   ACTVIS:
@@ -58,7 +54,6 @@ servers:
     port: 5003
     group: visualizer
     bokeh: action_visualizer
-    deployment: hexagon
     params:
       doc_name: Action Visualizer
   SYNC:

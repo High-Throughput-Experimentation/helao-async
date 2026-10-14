@@ -1,7 +1,7 @@
-"""Structural diff of two FastAPI /openapi.json dumps for the gamryhex canary.
+"""Structural diff of two FastAPI /openapi.json dumps for a single-server canary.
 
 Compares the route surface (method + path) and the component schemas of a
-legacy vs hexagon server. Exit 0 == identical surface (parity), 1 == diffs,
+baseline vs candidate server. Exit 0 == identical surface (parity), 1 == diffs,
 2 == usage/load error. Volatile top-level fields (info, servers) are ignored;
 only the route table and schema definitions gate parity.
 

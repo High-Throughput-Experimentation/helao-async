@@ -1,5 +1,5 @@
 # CAPTURE-ONLY THROWAWAY ROOT, NEVER PRODUCTION. Copy of co2.yml used solely
-# by helao.hexagon.tests.smoke.golden_capture_co2 / co2_diff.bat to capture a
+# by helao.hexagon.tests.smoke.golden_capture_co2 to capture a
 # runtime golden-master acquire_co2 tree. The ONLY change from co2.yml is
 # `root:`, pointed at a dedicated throwaway path so the capture rig's
 # assert_fresh() has a clean tree to start from and production C:\INST_hlo

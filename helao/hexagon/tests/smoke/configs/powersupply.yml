@@ -18,9 +18,9 @@
 # / `get_current_async` are driver-level polling helpers used internally by
 # these executors (see power_supply_driver.py) -- they are NOT exposed as
 # standalone action endpoints, so there is no safe, non-perturbing read
-# action to dispatch for a runtime diff (mirrors ni_canary.bat /
-# kmotor_canary.bat's rationale exactly). The openapi diff (see
-# powersupply_canary.bat) is therefore the safety-appropriate parity check.
+# action to dispatch for a runtime diff (mirrors ni.yml /
+# kmotor.yml's rationale exactly). The openapi diff is therefore the
+# safety-appropriate parity check.
 dummy: true
 simulation: true
 run_type: power_supply

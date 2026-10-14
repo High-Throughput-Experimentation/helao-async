@@ -8,7 +8,7 @@ Exercises only:
 
 The real-hardware POST to ``/IO/get_digital_in`` (and ``verify_device_open``'s
 ``/get_status`` probe) is NOT exercised here -- that only runs at-station
-(see golden_capture_galil_io.py / galilio_diff.bat docstrings).
+(see golden_capture_galil_io.py docstrings).
 
 Written as plain assert-based ``test_*`` functions with no ``import pytest``
 (mirrors ``test_golden_capture_galil.py`` -- this repo's conda ``helao`` env

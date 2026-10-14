@@ -6,9 +6,8 @@
 # CAM param (axis_ip) is copied verbatim from eche10.yml's CAM block. This is
 # the Axis IP webcam (AxisCam, HTTP JPEG fetch -- NO vendor DLL, NO COM/gclib).
 #
-# TWO TIERS (as of the RE_CAM_IMG harness rule): cam_canary.bat does the
-# /openapi.json surface diff (this config + camhex.yml); cam_diff.bat does the
-# runtime acquire_image golden diff (camgold.yml/camgoldhex.yml).
+# TWO TIERS (as of the RE_CAM_IMG harness rule): the /openapi.json surface diff
+# uses this config; the runtime acquire_image golden diff uses camgold.yml.
 # AxisCam.connect() opens no network connection (returns success
 # unconditionally), so the openapi canary boots and serves /openapi.json even
 # without the camera reachable; the runtime diff DOES need the camera reachable

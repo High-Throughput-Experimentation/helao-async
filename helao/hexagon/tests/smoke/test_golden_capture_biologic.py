@@ -8,7 +8,7 @@ Exercises only:
 
 The real-hardware POST to ``/BIOLOGIC/run_OCV`` (and ``verify_device_open``'s
 ``/get_status`` probe) is NOT exercised here -- that only runs at-station (see
-golden_capture_biologic.py / biologic_diff.bat docstrings). ``easy_biologic``
+golden_capture_biologic.py docstrings). ``easy_biologic``
 imports only on Windows, but this module never imports the driver -- only the
 pure capture logic -- so it runs on Linux.
 

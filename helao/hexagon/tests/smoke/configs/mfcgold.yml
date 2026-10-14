@@ -1,5 +1,5 @@
 # CAPTURE-ONLY THROWAWAY ROOT, NEVER PRODUCTION. Copy of mfc.yml used solely
-# by helao.hexagon.tests.smoke.golden_capture_mfc / mfc_diff.bat to capture a
+# by helao.hexagon.tests.smoke.golden_capture_mfc to capture a
 # runtime golden-master acquire_flowrate tree. The ONLY change from mfc.yml is
 # `root:`, pointed at a dedicated throwaway path so the capture rig's
 # assert_fresh() has a clean tree to start from and production C:\INST_hlo

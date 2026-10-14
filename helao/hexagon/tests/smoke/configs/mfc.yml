@@ -19,7 +19,7 @@
 # (the openapi canary passes regardless); a data-producing action
 # (acquire_flowrate) additionally requires the real MFC on COM6 -- a wrong COM
 # now fails the action fast (MfcExec fail-fast guard) instead of hanging (see
-# mfc_diff.bat / golden_capture_mfc.py).
+# golden_capture_mfc.py).
 dummy: true
 simulation: true
 run_type: mfc_server

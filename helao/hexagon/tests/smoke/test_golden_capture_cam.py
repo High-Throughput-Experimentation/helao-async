@@ -11,8 +11,7 @@ Exercises only:
     what makes the cam runtime golden diff possible)
 
 The real-hardware POST to ``/CAM/acquire_image`` is NOT exercised here -- that
-only runs at-station with the camera reachable (see golden_capture_cam.py /
-cam_diff.bat docstrings).
+only runs at-station with the camera reachable (see golden_capture_cam.py docstrings).
 
 Runnable two ways (no ``import pytest`` -- mirrors the other capture tests):
 

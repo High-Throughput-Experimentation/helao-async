@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 REM ---------------------------------------------------------------------------
-REM Station golden diff for eche10_hex: the legacy-layout run on the freeze
+REM Station golden diff for eche10: the legacy-layout run on the freeze
 REM branch against the same sequence on the unified-layout branch under test.
 REM Steps 1 and 6 of docs\superpowers\notes\2026-08-15-B5-station-gate-runbook.md.
 REM
@@ -14,7 +14,7 @@ REM                   (no .zip, no path; found under RUNS, DIAG, RUNS_FINISHED,
 REM                   RUNS_SYNCED, RUNS_NOSYNC, RUNS_DIAG)
 REM     goldens       default C:\INST_hlo_goldens\eche10 -- holds pre, post,
 REM                   parity-report.json and golden_result.txt
-REM   Production root is C:\INST_hlo\DATA and config prefix is eche10_hex; edit
+REM   Production root is C:\INST_hlo\DATA and config prefix is eche10; edit
 REM   the two set lines below to change either.
 REM
 REM Workflow, in this order:
@@ -22,7 +22,7 @@ REM  (a) Copy this file and station_golden_capture.py out of the repo, to the
 REM      same folder anywhere, so capture still works on a checkout that lacks
 REM      them; or switch back to feat/parity-legacy-layout-remap to run capture.
 REM      capture uses only the python standard library.
-REM  (b) PRE: check out freeze/pre-legacy-removal_2608, launch eche10_hex, run
+REM  (b) PRE: check out freeze/pre-legacy-removal_2608, launch eche10, run
 REM      the station smoke sequence, and let it fully drain and sync with SYNC
 REM      idle. Then: eche10_golden_diff.bat capture pre SEQNAME
 REM      capture refuses a sequence still under RUNS_ACTIVE.
@@ -33,6 +33,8 @@ REM  (d) DIFF: check out feat/parity-legacy-layout-remap, and run
 REM      eche10_golden_diff.bat diff
 REM      from that checkout's copy of this script. The legacy-layout flag is
 REM      added automatically when pre holds a legacy RUNS_* tree.
+REM  Rollback after B7c: check out freeze/pre-b7c-rename_2610 in every repo and
+REM  launch the variant config there (see the B5 runbook).
 REM
 REM capture only READS the production root; every write goes under goldens.
 REM Results are also saved to goldens\capture_pre.txt, capture_post.txt and
@@ -40,7 +42,7 @@ REM golden_result.txt.
 REM ---------------------------------------------------------------------------
 
 set "ROOT=C:\INST_hlo\DATA"
-set "PREFIX=eche10_hex"
+set "PREFIX=eche10"
 set "DEFAULT_GOLDENS=C:\INST_hlo_goldens\eche10"
 
 if /I "%~1"=="capture" goto :do_capture
@@ -145,7 +147,7 @@ if exist "%GOLDENS%\parity-report.json" type "%GOLDENS%\parity-report.json"
 echo.
 if "%PARITY_RC%"=="0" (
   (
-    echo [golden] PASS -- post matches pre for eche10_hex
+    echo [golden] PASS -- post matches pre for eche10
     echo [golden] artifacts: %GOLDENS%\pre, %GOLDENS%\post, %GOLDENS%\parity-report.json
   ) > "%GOLDENS%\golden_result.txt"
 ) else if not exist "%GOLDENS%\parity-report.json" (

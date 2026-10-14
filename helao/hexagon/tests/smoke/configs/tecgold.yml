@@ -1,5 +1,5 @@
 # CAPTURE-ONLY THROWAWAY ROOT, NEVER PRODUCTION. Copy of tec.yml used solely
-# by helao.hexagon.tests.smoke.golden_capture_tec / tec_diff.bat to capture a
+# by helao.hexagon.tests.smoke.golden_capture_tec to capture a
 # runtime golden-master record_tec tree. The ONLY change from tec.yml is
 # `root:`, pointed at a dedicated throwaway path so the capture rig's
 # assert_fresh() has a clean tree to start from and production C:\INST_hlo

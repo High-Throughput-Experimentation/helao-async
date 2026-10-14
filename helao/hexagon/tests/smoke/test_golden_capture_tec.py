@@ -7,7 +7,7 @@ Exercises only:
 
 The real-hardware POST to ``/TEC/record_tec`` (and ``verify_device_open``'s
 ``/get_status`` probe) is NOT exercised here -- that only runs at-station
-(see golden_capture_tec.py / tec_diff.bat docstrings).
+(see golden_capture_tec.py docstrings).
 
 Written as plain assert-based ``test_*`` functions with no ``import pytest``
 (mirrors ``test_golden_capture.py`` / ``test_golden_capture_galil.py`` --

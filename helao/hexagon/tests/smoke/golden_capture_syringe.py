@@ -44,7 +44,7 @@ withdraw/run command and does not move the plunger or fluid (contrast infuse/
 withdraw, which drive the pump -- deliberately NOT chosen for this canary).
 
 Standalone counterpart to ``harness.capture.snapshot_capture`` for the
-orch-less, db-less syringe/syringehex 2-server topology (WORKSYRINGE@8013 +
+orch-less, db-less syringe 2-server topology (WORKSYRINGE@8013 +
 ACTVIS@5001 only -- no ORCH, no DB), mirroring galil's
 ``helao.hexagon.tests.smoke.golden_capture_galil`` and gamry's
 ``golden_capture`` (see those modules for the full topology-gap rationale). The
@@ -64,9 +64,8 @@ capture, and THE PLUNGER DOES NOT MOVE for this scenario:
         --out C:\\golden\\syringe
 
 then terminate the launch, point ``--root``/``--config-prefix`` at a FRESH
-throwaway root and ``syringegoldhex``, capture again, and diff the two capture
-directories with ``harness.parity``. ``syringe_diff.bat`` automates exactly
-this sequence.
+throwaway root and ``syringegold``, capture again, and diff the two capture
+directories with ``harness.parity``.
 """
 
 from __future__ import annotations

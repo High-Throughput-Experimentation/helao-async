@@ -18,7 +18,6 @@ servers:
     port: 8001
     group: orchestrator
     fast: async_orch2
-    deployment: hexagon
     params:
       heartbeat_interval: 3
     prefinish_experiment_hooks:

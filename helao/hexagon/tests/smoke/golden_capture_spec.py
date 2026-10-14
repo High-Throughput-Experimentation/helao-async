@@ -32,7 +32,7 @@ fully deterministic (params = ``int_time_ms``/``duration_sec``) and NO
 ``masked_meta_keys`` are needed. The only masking is the .hlo body columns.
 
 Standalone counterpart to ``harness.capture.snapshot_capture`` for the
-orch-less, db-less spec/spechex 2-server topology (SPEC@8011 + ACTVIS@5001 only
+orch-less, db-less spec 2-server topology (SPEC@8011 + ACTVIS@5001 only
 -- no ORCH, no DB), mirroring galil/gamry's ``golden_capture[_galil].py`` (see
 those modules' docstrings for the full topology-gap rationale). The
 hardware-agnostic settle / anti-vacuous-guard logic (``settle``,
@@ -51,9 +51,8 @@ FIRST:
         --out C:\\golden\\spec
 
 then terminate the launch, point ``--root``/``--config-prefix`` at a FRESH
-throwaway root and ``specgoldhex``, capture again, and diff the two capture
-directories with ``harness.parity``. ``spec_diff.bat`` automates exactly this
-sequence.
+throwaway root and ``specgold``, capture again, and diff the two capture
+directories with ``harness.parity``.
 """
 
 from __future__ import annotations

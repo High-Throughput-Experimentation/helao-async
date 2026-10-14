@@ -10,9 +10,8 @@
 # spectrograph attached (see golden_capture_andor.py's docstring). The openapi
 # canary only needs the server to boot and serve /openapi.json.
 #
-# TWO TIERS: andor_canary.bat does the /openapi.json surface diff (this config +
-# andorhex.yml); andor_diff.bat does the runtime `acquire` golden diff
-# (andorgold.yml/andorgoldhex.yml). `acquire` streams a .hlo of live per-pixel
+# TWO TIERS: the /openapi.json surface diff uses this config; the runtime
+# `acquire` golden diff uses andorgold.yml. `acquire` streams a .hlo of live per-pixel
 # intensities (ch_0000..ch_NNNN) + tick timestamps with a config-deterministic
 # `wl` (pixel->wavelength) header -- like spec_server's acquire_spec, NOT cam's
 # timestamped JPEG sidecars: the driver writes NO image files, so no new

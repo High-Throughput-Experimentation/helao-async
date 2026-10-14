@@ -32,13 +32,12 @@ gating above, for the endpoint to exist). The pinned scenario reads
 line, never a ``dev_do`` output.
 
 Standalone counterpart to ``harness.capture.snapshot_capture`` for the
-orch-less, db-less galilio/galiliohex 2-server topology (IO@8005 +
+orch-less, db-less galilio 2-server topology (IO@8005 +
 ACTVIS@5001 only -- no ORCH, no DB), mirroring gamry's
 ``helao.hexagon.tests.smoke.golden_capture`` and galil_motion's
 ``golden_capture_galil`` (see those modules' docstrings for the full
-topology-gap rationale already recorded there and in ``galil_canary.bat`` /
-``gamryhex_canary.bat``, which hit the same gap for their openapi-diff
-canaries). The hardware-agnostic settle/anti-vacuous-guard logic (``settle``,
+topology-gap rationale already recorded there). The hardware-agnostic
+settle/anti-vacuous-guard logic (``settle``,
 ``_run_artifacts``, ``_act_status_map``) is IMPORTED from
 ``golden_capture.py`` rather than re-implemented here -- it is pure
 -act.yml/RUNS_ACTIVE polling logic with no gamry-specific assumptions (does
@@ -58,9 +57,8 @@ read):
         --out C:\\golden\\galilio
 
 then terminate the launch, point ``--root``/``--config-prefix`` at a FRESH
-throwaway root and ``galiliogoldhex``, capture again, and diff the two
-capture directories with ``harness.parity``. ``galilio_diff.bat`` automates
-exactly this sequence.
+throwaway root and ``galiliogold``, capture again, and diff the two
+capture directories with ``harness.parity``.
 """
 
 from __future__ import annotations

@@ -20,12 +20,11 @@ config's ``dummy``/``simulation`` YAML keys are therefore cosmetic (banner
 color) for this canary, exactly as already documented for galil/gamry.
 
 Standalone counterpart to ``harness.capture.snapshot_capture`` for the
-orch-less, db-less tec/techex 2-server topology (TEC@8008 + ACTVIS@5001 only
+orch-less, db-less tec 2-server topology (TEC@8008 + ACTVIS@5001 only
 -- no ORCH, no DB), mirroring gamry's
 ``helao.hexagon.tests.smoke.golden_capture`` / galil's
 ``golden_capture_galil`` (see those modules' docstrings for the full
-topology-gap rationale already recorded there and in ``gamryhex_canary.bat``,
-which hit the same gap for the openapi-diff canary). The hardware-agnostic
+topology-gap rationale already recorded there). The hardware-agnostic
 settle/anti-vacuous-guard logic (``settle``, ``_run_artifacts``,
 ``_act_status_map``, ``dispatch_action``) is IMPORTED from
 ``golden_capture.py`` rather than re-implemented here. Only the
@@ -43,9 +42,8 @@ controller must be powered on and reachable at the configured serial ``port``
         --out C:\\golden\\tec
 
 then terminate the launch, point ``--root``/``--config-prefix`` at a FRESH
-throwaway root and ``tecgoldhex``, capture again, and diff the two capture
-directories with ``harness.parity``. ``tec_diff.bat`` automates exactly this
-sequence.
+throwaway root and ``tecgold``, capture again, and diff the two capture
+directories with ``harness.parity``.
 """
 
 from __future__ import annotations

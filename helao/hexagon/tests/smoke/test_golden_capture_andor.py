@@ -10,7 +10,7 @@ Exercises only:
 
 The real-hardware POST to ``/ANDOR/acquire`` is NOT exercised here -- that only
 runs at-station with the Andor camera + spectrograph attached (see
-golden_capture_andor.py / andor_diff.bat docstrings).
+golden_capture_andor.py docstrings).
 
 Written as plain assert-based ``test_*`` functions with no ``import pytest``
 (mirrors test_golden_capture_spec.py -- this repo's conda ``helao`` env does not

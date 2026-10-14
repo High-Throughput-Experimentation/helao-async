@@ -50,7 +50,7 @@ empty below); a real hexagon-vs-legacy diff on ANY key is a genuine
 regression.
 
 Standalone counterpart to ``harness.capture.snapshot_capture`` for the
-orch-less, db-less sample/samplehex 2-server topology (SAMPLE@8008 +
+orch-less, db-less sample 2-server topology (SAMPLE@8008 +
 ACTVIS@5001 only -- no ORCH, no DB, no S3), mirroring galil's
 ``helao.hexagon.tests.smoke.golden_capture_galil`` (see that module's and
 gamry's ``golden_capture.py``'s docstrings for the full topology-gap
@@ -70,9 +70,8 @@ Usage (Linux, conda env ``helao``) -- no hardware, no pre-check needed:
         --out /tmp/golden/sample
 
 then terminate the launch, point ``--root``/``--config-prefix`` at a FRESH
-throwaway root and ``samplegoldhex``, capture again, and diff the two capture
-directories with ``harness.parity``. ``sample_diff.sh`` automates exactly this
-sequence.
+throwaway root and ``samplegold``, capture again, and diff the two capture
+directories with ``harness.parity``.
 """
 
 from __future__ import annotations

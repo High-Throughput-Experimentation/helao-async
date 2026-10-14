@@ -23,12 +23,11 @@ controller must still be powered on and reachable at ``galil_ip_str`` to
 produce any position data at all.
 
 Standalone counterpart to ``harness.capture.snapshot_capture`` for the
-orch-less, db-less galil/galilhex 2-server topology (MOTOR@8003 +
+orch-less, db-less galil 2-server topology (MOTOR@8003 +
 ACTVIS@5001 only -- no ORCH, no DB), mirroring gamry's
 ``helao.hexagon.tests.smoke.golden_capture`` (see that module's docstring for
-the full topology-gap rationale already recorded there and in
-``gamryhex_canary.bat``, which hit the same gap for the openapi-diff
-canary). The hardware-agnostic settle/anti-vacuous-guard logic (``settle``,
+the full topology-gap rationale already recorded there). The hardware-agnostic
+settle/anti-vacuous-guard logic (``settle``,
 ``_run_artifacts``, ``_act_status_map``) is IMPORTED from
 ``golden_capture.py`` rather than re-implemented here -- it is pure
 -act.yml/RUNS_ACTIVE polling logic with no gamry-specific assumptions (does
@@ -48,9 +47,8 @@ not a potentiostat), and THE STAGE DOES NOT MOVE for this scenario:
         --out C:\\golden\\galil
 
 then terminate the launch, point ``--root``/``--config-prefix`` at a FRESH
-throwaway root and ``galilgoldhex``, capture again, and diff the two capture
-directories with ``harness.parity``. ``galil_diff.bat`` automates exactly
-this sequence.
+throwaway root and ``galilgold``, capture again, and diff the two capture
+directories with ``harness.parity``.
 """
 
 from __future__ import annotations

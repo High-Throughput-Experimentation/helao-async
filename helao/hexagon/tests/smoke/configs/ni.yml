@@ -16,7 +16,7 @@
 # route this config DOES expose (pump / gasvalve / liquidvalve / multivalve /
 # stop) drives real hardware and must never be dispatched as a canary. So there
 # is no runtime data-capture scenario for NI under the verbatim ccsi1 params;
-# the openapi-surface diff (see ni_canary.bat) is the topology- and
+# the openapi-surface diff is the topology- and
 # safety-appropriate parity check. cNIMAX.connect() opens NI-DAQmx tasks against
 # the cDAQ chassis -- WINDOWS-ONLY hardware; simulation:true is cosmetic (banner
 # color), there is no NI sim/dummy data path. The openapi canary only needs the
