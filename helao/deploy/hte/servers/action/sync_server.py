@@ -210,7 +210,7 @@ def makeApp(server_key) -> ActionHost:
 
     @app.post("/finish_yml", tags=["private"])
     async def finish_yml(yml_path: str) -> str:
-        """Enqueue a finished YAML for upload and move to ``RUNS_SYNCED``.
+        """Enqueue a finished YAML for upload, releasing it from sync quarantine.
 
         Determines the rank from the file suffix (``-seq.yml``, ``-exp.yml``,
         ``-act.yml``) and forwards to :meth:`HelaoSyncer.enqueue_yml`.
@@ -224,6 +224,9 @@ def makeApp(server_key) -> ActionHost:
             rank = 0
         else:
             rank = -1
+        # Sync quarantine: a hand-POSTed path is the operator's re-queue, so it
+        # releases the record first; enqueue_yml would otherwise skip it.
+        await asyncio.to_thread(app.driver.release_quarantine, clean_path)
         await app.driver.enqueue_yml(clean_path, rank)
         return yml_path
 
@@ -260,11 +263,14 @@ def makeApp(server_key) -> ActionHost:
         operator polls, and the frozen endpoint checklist for this module
         (``helao/hexagon/tests/checklists/hte/sync_server.json``) pins the route
         set, so a new route would break that gate.
+
+        ``quarantined`` lists records the syncer has stopped retrying (sync quarantine spec); POST ``/finish_yml`` with a listed ``yml`` to release one.
         """
         return {
             "running": list(app.driver.running_tasks.keys()),
             "num_queued": (app.driver.task_queue.qsize()),
             "last_startup_sweep": app.last_startup_sweep,  # type: ignore[attr-defined]
+            "quarantined": app.driver.quarantined(),
         }
 
     @app.post("/list_exceptions", tags=["private"])

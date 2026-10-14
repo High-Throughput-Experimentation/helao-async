@@ -27,6 +27,7 @@ __all__ = [
     "COMPACT_MIN_LINES",
     "COMPACT_RATIO",
     "DONE",
+    "QUARANTINED",
     "UNSYNCED",
     "RunStateJournal",
     "identify_record",
@@ -49,6 +50,10 @@ LOGGER = logging.LOGGER if logging.LOGGER is not None else logging.make_logger(_
 ACTIVE = "active"
 UNSYNCED = "unsynced"
 DONE = "done"
+#: A SYNC-journal state for a record the syncer has stopped retrying (sync
+#: quarantine spec). Not ``done``, so it stays in the working set and survives
+#: compaction; ``/tasks`` lists it from there.
+QUARANTINED = "quarantined"
 
 #: Compaction fires only when the file is both absolutely large and mostly
 #: dead weight. The floor stops a quiet station from compacting constantly;
@@ -274,6 +279,30 @@ def _prg_is_complete(prg_path: Path) -> bool:
     return "s3: true" in lines and "api: true" in lines
 
 
+def _prg_is_quarantined(prg_path: Path) -> bool:
+    """Whether a ``.prg`` sidecar records its record as quarantined.
+
+    True when the sidecar holds a ``quarantined_at`` line with a value other
+    than ``null``. Read as flat text, like :func:`_prg_is_complete`, for the
+    same reasons: no helao imports here, only the block's own two-space
+    indented key counts, and a malformed or unreadable sidecar
+    degrades to "not quarantined" -- the safe direction, since a wrongly
+    unquarantined record is merely retried.
+    """
+    try:
+        lines = prg_path.read_text(encoding="utf-8").splitlines()
+    except (OSError, ValueError):
+        return False
+    for line in lines:
+        # Only the block's own key, indented two spaces under `quarantine:`.
+        # A folded continuation of a long `last_error` is indented further
+        # and may contain the same text.
+        if line.startswith("  quarantined_at:"):
+            value = line.split(":", 1)[1].strip()
+            return value not in ("", "null", "~")
+    return False
+
+
 def _scan_top_level(path: Path, keys: set) -> dict:
     """``key: value`` pairs for ``keys``, from a bounded window of ``path``.
 
@@ -421,7 +450,11 @@ def rebuild_from_tree(runs_root, states_root, server_key: str) -> "RunStateJourn
                     "ts": datetime.now().isoformat(),
                     "uuid": uuid,
                     "kind": kind,
-                    "state": UNSYNCED,
+                    "state": (
+                        QUARANTINED
+                        if _prg_is_quarantined(yml.with_suffix(".prg"))
+                        else UNSYNCED
+                    ),
                     "path": f"{root_name}/{rel}" if rel != "." else root_name,
                     "parent": parent,
                 }

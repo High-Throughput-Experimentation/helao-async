@@ -30,7 +30,7 @@ from collections import defaultdict
 from configparser import ConfigParser
 from contextlib import AsyncExitStack, asynccontextmanager
 from copy import copy
-from datetime import datetime
+from datetime import datetime, timedelta
 from glob import glob
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Optional, Union
@@ -61,9 +61,11 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 from helao.helpers import helao_logging as logging
 from helao.helpers.run_state import (
     DONE,
+    QUARANTINED,
     UNSYNCED,
     RunStateJournal,
     _prg_is_complete,
+    _prg_is_quarantined,
     identify_record,
     rebuild_from_tree,
     root_relative,
@@ -745,6 +747,31 @@ class HelaoYml:
         )
 
 
+#: ``last_error`` is cut to this many characters so a traceback-sized message
+#: cannot bloat the ``.prg`` (sync quarantine spec §3).
+QUARANTINE_ERROR_CHARS = 500
+
+#: Failures closer together than this count as one strike: a parent's re-walk
+#: retries a failing child several times in one burst, and without a gap that
+#: burst alone would spend the whole strike budget (sync quarantine spec Q7).
+QUARANTINE_STRIKE_GAP = timedelta(hours=1)
+
+
+def quarantine_due(block: dict, n: int, hours: float, now: datetime) -> bool:
+    """Whether a ``quarantine`` block has earned quarantine (spec Q3).
+
+    Both thresholds must hold: at least ``n`` strikes, and the first failure
+    at least ``hours`` old. The age floor is what keeps an S3 or API outage
+    from quarantining every record that happened to sync during it. ``n <= 0``
+    disables quarantine. ``now`` is a parameter so the rule is testable
+    without patching the clock.
+    """
+    if n <= 0 or block.get("strikes", 0) < n:
+        return False
+    first = datetime.fromisoformat(block["first_failed"])
+    return now - first >= timedelta(hours=hours)
+
+
 class Progress:
     """Sidecar ``.prg`` file tracking sync state for one ``HelaoYml``.
 
@@ -1120,6 +1147,57 @@ class Progress:
         # with self.prglock:
         self.prg.unlink()
 
+    @property
+    def quarantine(self) -> Optional[dict]:
+        """The ``quarantine`` block, or ``None`` if no failure is recorded."""
+        return self.dict.get("quarantine")
+
+    @property
+    def is_quarantined(self) -> bool:
+        """Whether this record is quarantined (``quarantined_at`` is set)."""
+        return bool((self.quarantine or {}).get("quarantined_at"))
+
+    def add_strike(self, error: str, n: int, hours: float, now: datetime) -> bool:
+        """Record one failed sync pass; return True only on entering quarantine.
+
+        A block that does not parse (a hand edit, a foreign writer) is replaced
+        by a fresh one rather than raised on: a strike is bookkeeping, and
+        failing here would turn a failed pass into a crashed worker. A failure
+        less than ``QUARANTINE_STRIKE_GAP`` after the last counted one updates
+        ``last_error`` but is not a new strike.
+        """
+        stamp = now.isoformat(timespec="seconds")
+        block = self.quarantine or {}
+        try:
+            strikes = int(block["strikes"])
+            datetime.fromisoformat(block["first_failed"])
+            first = block["first_failed"]
+            last = datetime.fromisoformat(block["last_failed"])
+            already = bool(block.get("quarantined_at"))
+        except (TypeError, KeyError, ValueError, AttributeError):
+            strikes, first, last, already = 0, stamp, None, False
+        counted = last is None or now - last >= QUARANTINE_STRIKE_GAP
+        if counted:
+            strikes += 1
+        new_block = {
+            "strikes": strikes,
+            "first_failed": first,
+            "last_failed": stamp if counted else block["last_failed"],
+            "quarantined_at": block.get("quarantined_at") if already else None,
+            "last_error": str(error)[:QUARANTINE_ERROR_CHARS],
+        }
+        entered = counted and not already and quarantine_due(new_block, n, hours, now)
+        if entered:
+            new_block["quarantined_at"] = stamp
+        self.dict["quarantine"] = new_block
+        self.write_dict()
+        return entered
+
+    def clear_quarantine(self) -> None:
+        """Drop the ``quarantine`` block, so the next failure starts afresh."""
+        if self.dict.pop("quarantine", None) is not None:
+            self.write_dict()
+
 
 class SyncDriver:
     """Async worker pool that pushes ``RUNS_FINISHED`` ymls to S3 and the API.
@@ -1183,6 +1261,11 @@ class SyncDriver:
                 )
 
         self.max_tasks = self._sync_cfg.get("max_tasks", 1)
+        #: Sync quarantine thresholds (spec Q3/Q4): a record is parked after
+        #: this many failed passes once its first failure is this old.
+        #: ``quarantine_strikes: 0`` disables parking; strikes still record.
+        self.quarantine_strikes = int(self._sync_cfg.get("quarantine_strikes", 5))
+        self.quarantine_hours = float(self._sync_cfg.get("quarantine_hours", 24))
         LOGGER.info("checking for aws_config_path")
         if "aws_config_path" in self._sync_cfg:
             os.environ["AWS_CONFIG_PATH"] = self._sync_cfg["aws_config_path"]
@@ -1301,6 +1384,79 @@ class SyncDriver:
         ``--restore``, so a restart would drop the in-memory ``task_queue``.
         """
         return self.task_queue.qsize() > 0 or bool(self.running_tasks)
+
+    def _add_strike(self, yml_path: Path, error: str) -> tuple:
+        """Blocking half of :meth:`_strike`: parse the yml, add the strike."""
+        if _prg_is_complete(Path(yml_path).with_suffix(".prg")):
+            return False, {}
+        prog = Progress(yml_path)
+        entered = prog.add_strike(
+            error, self.quarantine_strikes, self.quarantine_hours, datetime.now()
+        )
+        return entered, prog.quarantine or {}
+
+    async def _strike(self, yml_path: Path, error: str) -> None:
+        """Record one failed pass for ``yml_path``; park it if it has earned it.
+
+        The yml parse runs in a thread: a multi-MB sequence yml would otherwise
+        starve the event loop on every failed pass. Raises one ``LOGGER.alert`` on the strike that enters quarantine and
+        journals the record as ``quarantined``. Never raises: a failure to
+        record a strike is logged and dropped, so bookkeeping can never turn a
+        failed pass into a dead worker.
+        """
+        try:
+            entered, block = await asyncio.to_thread(self._add_strike, yml_path, error)
+            if not entered:
+                return
+            LOGGER.alert(  # type: ignore[attr-defined]
+                f"SYNC quarantined {yml_path} after {block.get('strikes')} failed "
+                f"passes ({block.get('first_failed')} .. {block.get('last_failed')}); "
+                f"last error: {block.get('last_error')}. It will not be retried "
+                "automatically. Fix the cause, then POST /finish_yml with this path."
+            )
+            self._journal(yml_path, QUARANTINED)
+        except Exception:
+            LOGGER.error(f"Could not record a sync strike for {yml_path}", exc_info=True)
+
+    def release_quarantine(self, yml_path: Union[Path, str]) -> bool:
+        """Clear ``yml_path``'s quarantine; True if there was one to clear."""
+        yml_path = Path(yml_path)
+        if not _prg_is_quarantined(yml_path.with_suffix(".prg")):
+            return False
+        Progress(yml_path).clear_quarantine()
+        LOGGER.info(f"Operator released {yml_path} from sync quarantine.")
+        return True
+
+    def quarantined(self) -> list:
+        """Quarantined records from the SYNC journal, with their ``.prg`` block.
+
+        Empty when this server keeps no journal. The yml is found by kind
+        suffix inside the journalled record directory; ``yml`` is ``None`` if
+        it is gone.
+        """
+        if self.run_journal is None:
+            return []
+        suffix = {"action": "-act.yml", "experiment": "-exp.yml", "sequence": "-seq.yml"}
+        out = []
+        for rec in self.run_journal.working_set().values():
+            if rec.get("state") != QUARANTINED:
+                continue
+            rec_dir = Path(str(self.helaodirs.root)) / rec["path"]
+            ymls = sorted(rec_dir.glob(f"*{suffix.get(rec['kind'], '.yml')}"))
+            entry = {
+                "uuid": rec["uuid"],
+                "kind": rec["kind"],
+                "path": rec["path"],
+                "yml": str(ymls[0]) if ymls else None,
+            }
+            if ymls:
+                try:
+                    prg = yml_load(ymls[0].with_suffix(".prg"), fast=True)
+                    entry.update((prg or {}).get("quarantine") or {})
+                except Exception:
+                    LOGGER.warning(f"Could not read the .prg beside {ymls[0]}")
+            out.append(entry)
+        return out
 
     def try_remove_empty(self, remove_target) -> bool:
         """Recursively ``rmdir`` ``remove_target`` if it (and its subtree) are empty.
@@ -1490,8 +1646,9 @@ class SyncDriver:
                 async with AsyncExitStack() as locks:
                     await self._acquire_hierarchy_locks(locks, yml_path)
                     await self.sync_yml(yml_path=yml_path, rank=rank)
-            except Exception:
+            except Exception as exc:
                 LOGGER.error(f"Error in syncer worker for {yml_path}", exc_info=True)
+                await self._strike(yml_path, f"{type(exc).__name__}: {exc}")
             finally:
                 self.running_tasks.pop(yml_path.name, None)
 
@@ -1549,6 +1706,14 @@ class SyncDriver:
             LOGGER.info(
                 f"{str(yml_path)} is a process artifact, not a syncable record; "
                 "skipping enqueue request."
+            )
+        elif _prg_is_quarantined(yml_path.with_suffix(".prg")):
+            # Sync quarantine: every automatic re-queue (startup sweep,
+            # finish_pending, parent re-walks) routes through here, so this one
+            # check is the whole gate. /finish_yml releases it first.
+            LOGGER.info(
+                f"{str(yml_path)} is in sync quarantine; skipping enqueue request. "
+                "POST /finish_yml with this path once the cause is fixed."
             )
         elif rank < rank_limit:
             LOGGER.debug(
@@ -1786,6 +1951,17 @@ class SyncDriver:
             LOGGER.info(
                 f"{str(prog.yml.target)} is not synced after this pass; it stays "
                 "in place for the next scan."
+            )
+            chain = self.postfinish[prog.yml.type].hooks
+            failed = [
+                f"{name}: {entry.get('error')}"
+                for name, entry in (prog.dict.get("hooks") or {}).items()
+                if entry.get("state") == "failed"
+                and getattr(chain.get(name), "blocking", False)
+            ]
+            await self._strike(
+                prog.yml.target,
+                failed[0] if failed else "post-finish chain did not complete",
             )
             return False
 
