@@ -47,6 +47,7 @@ import threading
 import time
 import zipfile
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from glob import glob
 from logging import Logger
@@ -582,6 +583,11 @@ class Pidd:
         self.reqKeys = ("host", "port", "group")
         self.codeKeys = ("fast", "bokeh", "reflex")
         self.d = {}
+        # Serializes pid-pickle access: every load_global/write_global takes it,
+        # so no reader sees a half-written file, and kill_server/_forget hold it
+        # across their read-modify-write. close() kills one group's servers
+        # concurrently and each of them rewrites the pickle.
+        self._state_lock = threading.RLock()
         try:
             self.load_global()
         except IOError:
@@ -606,7 +612,7 @@ class Pidd:
             FileNotFoundError: If the file specified by `self.pidFilePath` does not exist.
             pickle.UnpicklingError: If there is an error unpickling the file.
         """
-        with open(self.pidFilePath, "rb") as f:
+        with self._state_lock, open(self.pidFilePath, "rb") as f:
             self.d = pickle.load(f)
             # print_message(LAUNCH_LOGGER, "launcher", f"Succesfully loaded '{self.pidFilePath}'.")
 
@@ -620,7 +626,7 @@ class Pidd:
         Raises:
             Exception: If there is an error during the file writing process.
         """
-        with open(self.pidFilePath, "wb") as f:
+        with self._state_lock, open(self.pidFilePath, "wb") as f:
             pickle.dump(self.d, f)
 
     def list_pids(self):
@@ -793,6 +799,27 @@ class Pidd:
             # is alive, which keeps the escalation path conservative.
             return False
 
+    def _forget(self, k):
+        """Drop ``k`` from the pid pickle.
+
+        Reloads under the state lock first, so a removal another thread just
+        wrote is never overwritten with this thread's stale copy of ``self.d``.
+        """
+        with self._state_lock:
+            self.load_global()
+            self.d.pop(k, None)
+            self.write_global()
+
+    def _kill_contained(self, k):
+        """``kill_server`` for a teardown sweep: one server's failure is logged
+        and must not stop the rest of the group, the later groups, or the
+        "kill whats left" pass."""
+        try:
+            return self.kill_server(k)
+        except Exception:
+            LAUNCH_LOGGER.error(f"Error killing server '{k}'", exc_info=True)
+            return False
+
     def kill_server(self, k):
         """
         Terminates a server process identified by the key `k`.
@@ -811,29 +838,28 @@ class Pidd:
             bool: True if the server was successfully terminated or not found, False if the process
                 survived even SIGKILL (in which case the pid entry is retained for recovery).
         """
-        self.load_global()  # reload in case any servers were appended
-        if k not in self.d:
-            LAUNCH_LOGGER.info(f"Server '{k}' not found in pid dict.")
-            return True
+        with self._state_lock:
+            self.load_global()  # reload in case any servers were appended
+            if k not in self.d:
+                LAUNCH_LOGGER.info(f"Server '{k}' not found in pid dict.")
+                return True
 
-        active = self.list_active()
-        if k not in [key for key, _, _, _ in active]:
-            LAUNCH_LOGGER.info(
-                f"Server '{k}' is not running, removing from global dict."
-            )
-            self._reap_child(k)  # in case the child exited but was never waited on
-            del self.d[k]
-            self.write_global()
-            return True
+            active = self.list_active()
+            if k not in [key for key, _, _, _ in active]:
+                LAUNCH_LOGGER.info(
+                    f"Server '{k}' is not running, removing from global dict."
+                )
+                self._reap_child(k)  # in case the child exited but was never waited on
+                self._forget(k)
+                return True
 
-        pid = self.d[k]["pid"]
+            pid = self.d[k]["pid"]
         try:
             p = psutil.Process(pid)
         except psutil.NoSuchProcess:
             LAUNCH_LOGGER.info(f"Server '{k}' (pid {pid}) already gone.")
             self._reap_child(k)
-            del self.d[k]
-            self.write_global()
+            self._forget(k)
             return True
 
         # Windows gets a cooperative step first, because it otherwise has none:
@@ -847,8 +873,7 @@ class Pidd:
                 LAUNCH_LOGGER.info(
                     f"Successfully terminated server '{k}' (graceful, CTRL_BREAK)."
                 )
-                del self.d[k]
-                self.write_global()
+                self._forget(k)
                 return True
             LAUNCH_LOGGER.warning(
                 f"Server '{k}' still alive {self.GRACEFUL_WAIT}s after CTRL_BREAK; "
@@ -862,8 +887,7 @@ class Pidd:
             p.terminate()
         except psutil.NoSuchProcess:
             self._reap_child(k)
-            del self.d[k]
-            self.write_global()
+            self._forget(k)
             return True
         except Exception:
             LAUNCH_LOGGER.error(f"Error signaling server '{k}'", exc_info=True)
@@ -871,8 +895,7 @@ class Pidd:
 
         if self._wait_gone(p, self.GRACEFUL_WAIT, k):
             LAUNCH_LOGGER.info(f"Successfully terminated server '{k}' (graceful).")
-            del self.d[k]
-            self.write_global()
+            self._forget(k)
             return True
 
         LAUNCH_LOGGER.warning(
@@ -888,8 +911,7 @@ class Pidd:
 
         if self._wait_gone(p, self.FORCE_WAIT, k):
             LAUNCH_LOGGER.info(f"Successfully killed server '{k}' (SIGKILL).")
-            del self.d[k]
-            self.write_global()
+            self._forget(k)
             return True
 
         LAUNCH_LOGGER.error(f"Failed to terminate server '{k}' even after SIGKILL.")
@@ -902,7 +924,7 @@ class Pidd:
         1. Lists all active servers.
         2. Prints the list of active servers.
         3. Iterates through a predefined kill order (`KILL_ORDER`) and terminates servers in each group.
-        4. Waits for a short duration before killing each server.
+        4. Kills the servers of one group concurrently, then moves to the next.
         5. Kills any remaining active servers.
         6. Prints a message if any servers failed to terminate.
         7. Removes the PID file if all servers are successfully terminated.
@@ -917,24 +939,22 @@ class Pidd:
         LAUNCH_LOGGER.info(f"active pidds: {active}")
 
         activeserver = [k for k, _, _, _ in active]
+        # Groups go in order; the servers inside one go concurrently. They are
+        # independent processes, each with its own CTRL_BREAK grace window, so
+        # serially those windows (often uvicorn's whole 5 s graceful timeout)
+        # added up across a group instead of overlapping.
         KILL_ORDER = ["operator", "visualizer", "action", "orchestrator"]
         for group in KILL_ORDER:
-            LAUNCH_LOGGER.info(f"Killing {group} group.")
-            if group in self.servers.keys():
-                G = self.servers[group]
-                for server in G:
-                    twait = 0.1
-                    LAUNCH_LOGGER.info(
-                        f"waiting {twait} seconds before killing server {server}"
-                    )
-                    time.sleep(twait)
-                    LAUNCH_LOGGER.info(f"Killing {server}.")
-                    if server in activeserver:
-                        self.kill_server(server)
+            targets = [s for s in self.servers.get(group, {}) if s in activeserver]
+            if not targets:
+                continue
+            LAUNCH_LOGGER.info(f"Killing {group} group: {targets}")
+            with ThreadPoolExecutor(max_workers=len(targets)) as pool:
+                list(pool.map(self._kill_contained, targets))
 
         # kill whats left
         for k, _, _, _ in self.list_active():
-            self.kill_server(k)
+            self._kill_contained(k)
         active = self.list_active()
         if active:
             LAUNCH_LOGGER.warning(
@@ -2105,7 +2125,8 @@ def main():
                 servers = list(pidd.orchServs)
             else:
                 servers = list(pidd.servers[group])
-            for server in servers:
+
+            def post_one(server, group=group):
                 try:
                     LAUNCH_LOGGER.info(f"Shutting down {server}.")
                     stop_server(group, server)
@@ -2114,6 +2135,12 @@ def main():
                         f" ... got error shutting down {group}/{server}: ",
                         exc_info=True,
                     )
+
+            # Concurrently within the group: each /shutdown blocks on that
+            # server's own driver hooks, which no other server waits on.
+            if servers:
+                with ThreadPoolExecutor(max_workers=len(servers)) as pool:
+                    list(pool.map(post_one, servers))
 
     # Serializes all pidd mutation across the keypress thread (CTRL-r/CTRL-x) and
     # the hot-reload daemon so their read-modify-write on pidd.d / the pickle /
