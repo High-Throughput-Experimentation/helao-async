@@ -23,6 +23,7 @@ import sys
 
 __all__ = [
     "LAUNCHER_SCRIPTS",
+    "foreign_launcher_pids",
     "listening_ports",
     "orphan_report",
     "surviving_launchers",
@@ -69,12 +70,37 @@ def surviving_launchers(tasklist_csv: str, config_prefix: str = "") -> list[tupl
     return found
 
 
-def listening_ports(netstat_txt: str, ports) -> list[int]:
+def foreign_launcher_pids(tasklist_csv: str, config_prefix: str) -> set[int]:
+    """PIDs of HELAO launcher processes that belong to a *different* config.
+
+    A station's production group can legitimately hold the same port numbers on
+    its own addresses while the smoke test runs (hte-eche-10, 2026-10-14: eche10's
+    VIS, OPERATOR and MOTOR on 5001-5003 failed a golden run whose servers had
+    all gone). Only these processes are excused: a listener owned by anything
+    else -- an unknown or vanished pid, or a non-launcher process such as a
+    grandchild holding the socket -- still counts against the tested group.
+    A config whose name contains the prefix is treated as the same config, so
+    the excuse can only ever under-apply.
+    """
+    if not config_prefix:
+        return set()
+    return {
+        pid
+        for pid, line in surviving_launchers(tasklist_csv)
+        if config_prefix not in line
+    }
+
+
+def listening_ports(
+    netstat_txt: str, ports, ignore_pids: "set[int] | frozenset[int]" = frozenset()
+) -> list[int]:
     """Return which of ``ports`` are still in LISTENING state.
 
     Args:
         netstat_txt: Contents of ``netstat -ano``.
         ports: Ports the launched group should have released.
+        ignore_pids: Owning pids (``netstat``'s last column) whose listeners do
+            not count -- see :func:`foreign_launcher_pids`.
 
     Returns:
         list[int]: Still-listening ports, in the order given.
@@ -83,6 +109,9 @@ def listening_ports(netstat_txt: str, ports) -> list[int]:
     held: list[int] = []
     for line in netstat_txt.splitlines():
         if "LISTENING" not in line.upper():
+            continue
+        fields = line.split()
+        if fields and fields[-1].isdigit() and int(fields[-1]) in ignore_pids:
             continue
         # Match ":<port>" followed by whitespace so :5001 does not also match
         # :50010, and an ephemeral remote address is never read as a local port.
@@ -154,7 +183,9 @@ def orphan_report(tasklist_csv: str, netstat_txt: str, ports, config_prefix="") 
             f"Note this says nothing about containment either way."
         )
     procs = surviving_launchers(tasklist_csv, config_prefix)
-    held = listening_ports(netstat_txt, ports)
+    held = listening_ports(
+        netstat_txt, ports, foreign_launcher_pids(tasklist_csv, config_prefix)
+    )
     if not procs and not held:
         return ""
     lines = ["ORPHANS SURVIVED the launcher being force-killed:"]

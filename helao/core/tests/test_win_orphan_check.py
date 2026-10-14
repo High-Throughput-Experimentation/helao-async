@@ -13,6 +13,7 @@ from typing import Final
 from helao.core.tests.win_orphan_check import (
     MIN_PROCESS_LINES,
     evidence_is_usable,
+    foreign_launcher_pids,
     listening_ports,
     orphan_report,
     surviving_launchers,
@@ -187,3 +188,57 @@ def test_usable_evidence_with_orphans_still_reports_them() -> None:
     report = orphan_report(WMIC_WITH_ORPHANS, NETSTAT_HOLDING, [5001], "golden")
     assert "CANNOT JUDGE" not in report
     assert "7412" in report
+
+
+# hte-eche-10, 2026-10-14: the station's own eche10 group was running while the
+# golden smoke test ran. It holds 5001-5003 on the station's addresses; golden's
+# servers (127.0.0.1) had all gone, yet the old checker reported three orphans.
+WMIC_OTHER_GROUP: Final[str] = (
+    "CommandLine                                          ProcessId\n"
+    "python -u bokeh_launcher.py eche10 VIS               18524\n"
+    "python -u bokeh_launcher.py eche10 OPERATOR          1932\n"
+    "python -u fast_launcher.py eche10 MOTOR              4568\n" + _FILLER + "\n"
+)
+NETSTAT_OTHER_GROUP: Final[str] = """Active Connections
+
+  Proto  Local Address          Foreign Address        State           PID
+  TCP    10.231.100.130:5001    0.0.0.0:0              LISTENING       18524
+  TCP    10.231.100.130:5002    0.0.0.0:0              LISTENING       1932
+  TCP    [::1]:5003             [::]:0                 LISTENING       4568
+"""
+
+
+def test_another_configs_running_group_is_not_an_orphan() -> None:
+    assert foreign_launcher_pids(WMIC_OTHER_GROUP, "golden") == {18524, 1932, 4568}
+    assert (
+        orphan_report(
+            WMIC_OTHER_GROUP, NETSTAT_OTHER_GROUP, [5001, 5002, 5003], "golden"
+        )
+        == ""
+    )
+
+
+def test_a_real_orphan_still_fails_beside_another_group() -> None:
+    procs = WMIC_OTHER_GROUP + "python -u bokeh_launcher.py golden LIVE  7700\n"
+    netstat = NETSTAT_OTHER_GROUP + (
+        "  TCP    127.0.0.1:5002         0.0.0.0:0              LISTENING       7700\n"
+    )
+    report = orphan_report(procs, netstat, [5001, 5002, 5003], "golden")
+    assert "pid 7700" in report and "port 5002 still LISTENING" in report
+    assert "port 5001" not in report and "port 5003" not in report
+
+
+def test_a_listener_with_an_unknown_owner_still_counts() -> None:
+    """A vanished pid, or a non-launcher process holding the socket, is never excused."""
+    netstat = NETSTAT_OTHER_GROUP + (
+        "  TCP    127.0.0.1:5003         0.0.0.0:0              LISTENING       31337\n"
+    )
+    report = orphan_report(WMIC_OTHER_GROUP, netstat, [5001, 5002, 5003], "golden")
+    assert "port 5003 still LISTENING" in report
+
+
+def test_without_a_prefix_nothing_is_excused() -> None:
+    assert foreign_launcher_pids(WMIC_OTHER_GROUP, "") == set()
+    assert "port 5001 still LISTENING" in orphan_report(
+        WMIC_OTHER_GROUP, NETSTAT_OTHER_GROUP, [5001]
+    )
