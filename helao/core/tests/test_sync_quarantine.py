@@ -291,7 +291,7 @@ async def test_zero_strikes_disables_quarantine_but_records(tmp_path, mod, monke
     try:
         act_yml = make_action(make_exp_tree(tmp_path, "RUNS", mk_uuid(1)), 0)
         for _ in range(3):
-            drv._strike(act_yml, "boom")
+            await drv._strike(act_yml, "boom")
         prog = mod.Progress(act_yml)
         assert prog.quarantine["strikes"] == 3 and not prog.is_quarantined
         assert alerts == []
@@ -305,7 +305,7 @@ async def test_strike_on_a_vanished_record_does_not_kill_the_worker(tmp_path, mo
     drv = make_sync_driver(tmp_path, mod.SyncDriver, QUICK)
     try:
         ghost = tmp_path / "RUNS" / "gone" / "260610.000001000000-act.yml"
-        drv._strike(ghost, "boom")  # Progress raises loading the missing yml
+        await drv._strike(ghost, "boom")  # Progress raises loading the missing yml
         assert not ghost.with_suffix(".prg").exists()
         act_yml = make_action(make_exp_tree(tmp_path, "RUNS", mk_uuid(1)), 0)
         seen = []
@@ -331,7 +331,7 @@ async def test_no_journal_still_quarantines_and_lists_nothing(
     try:
         assert drv.run_journal is None
         act_yml = make_action(make_exp_tree(tmp_path, "RUNS", mk_uuid(1)), 0)
-        drv._strike(act_yml, "boom")
+        await drv._strike(act_yml, "boom")
         assert mod.Progress(act_yml).is_quarantined
         assert len(alerts) == 1
         assert drv.quarantined() == []

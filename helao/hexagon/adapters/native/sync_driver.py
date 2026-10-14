@@ -1372,22 +1372,27 @@ class SyncDriver:
         """
         return self.task_queue.qsize() > 0 or bool(self.running_tasks)
 
-    def _strike(self, yml_path: Path, error: str) -> None:
+    def _add_strike(self, yml_path: Path, error: str) -> tuple:
+        """Blocking half of :meth:`_strike`: parse the yml, add the strike."""
+        prog = Progress(yml_path)
+        entered = prog.add_strike(
+            error, self.quarantine_strikes, self.quarantine_hours, datetime.now()
+        )
+        return entered, prog.quarantine or {}
+
+    async def _strike(self, yml_path: Path, error: str) -> None:
         """Record one failed pass for ``yml_path``; park it if it has earned it.
 
-        Raises one ``LOGGER.alert`` on the strike that enters quarantine and
+        The yml parse runs in a thread: a multi-MB sequence yml would otherwise
+        starve the event loop on every failed pass. Raises one ``LOGGER.alert`` on the strike that enters quarantine and
         journals the record as ``quarantined``. Never raises: a failure to
         record a strike is logged and dropped, so bookkeeping can never turn a
         failed pass into a dead worker.
         """
         try:
-            prog = Progress(yml_path)
-            entered = prog.add_strike(
-                error, self.quarantine_strikes, self.quarantine_hours, datetime.now()
-            )
+            entered, block = await asyncio.to_thread(self._add_strike, yml_path, error)
             if not entered:
                 return
-            block = prog.quarantine or {}
             LOGGER.alert(
                 f"SYNC quarantined {yml_path} after {block.get('strikes')} failed "
                 f"passes ({block.get('first_failed')} .. {block.get('last_failed')}); "
@@ -1628,7 +1633,7 @@ class SyncDriver:
                     await self.sync_yml(yml_path=yml_path, rank=rank)
             except Exception as exc:
                 LOGGER.error(f"Error in syncer worker for {yml_path}", exc_info=True)
-                self._strike(yml_path, f"{type(exc).__name__}: {exc}")
+                await self._strike(yml_path, f"{type(exc).__name__}: {exc}")
             finally:
                 self.running_tasks.pop(yml_path.name, None)
 
@@ -1939,7 +1944,7 @@ class SyncDriver:
                 if entry.get("state") == "failed"
                 and getattr(chain.get(name), "blocking", False)
             ]
-            self._strike(
+            await self._strike(
                 prog.yml.target,
                 failed[0] if failed else "post-finish chain did not complete",
             )
