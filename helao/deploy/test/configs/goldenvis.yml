@@ -1,10 +1,9 @@
 # P7j BASELINE config: the legacy half of the rendered-parity pair.
 #
 # Byte-for-byte the same server shape, ports and params as
-# `goldenhexgraft.yml`, with every hexagon key removed: no `deployment:
-# hexagon`, no `bokeh: graft`, no `legacy_module:`. Each Bokeh server names its
-# legacy module directly, so this group is served entirely through the legacy
-# launcher path.
+# `goldenhexgraft.yml`. Each Bokeh server names its own module directly in
+# `bokeh:`, with no `deployment:` key, so this group is served entirely through
+# the plain launcher path.
 #
 # It exists because the parity lane needs something to compare against. P7's
 # claim is that the graft moves the *hosting* and changes nothing rendered; a

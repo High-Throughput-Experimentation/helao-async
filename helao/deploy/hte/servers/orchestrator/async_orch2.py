@@ -8,10 +8,7 @@ sequences, and dispatches actions over HTTP.
 
 B5: this used to build a legacy ``OrchAPI``, which constructed an ``Orch`` and
 let ``makeOrchApp`` graft the hexagon reducer over it. B3b gave the reducer a
-native owner, so the composition is the host itself. The change is the same one
-``helao/deploy/hexagon/servers/orchestrator/async_orch2.py`` already made; the
-two entrypoints now differ only in which package they live in, which is what
-lets B7 delete one of them.
+native owner, so the composition is the host itself.
 """
 
 __all__ = ["makeApp"]

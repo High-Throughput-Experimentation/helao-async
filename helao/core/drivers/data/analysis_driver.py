@@ -13,8 +13,9 @@ This module replaces the previously duplicated per-deployment drivers
 dynamically from ``helao.deploy.<deployment>.drivers.data.analyses`` and must
 follow the local-loader batch contract ``__init__(process_uuid, local_loader,
 analysis_params)``. Which ``<deployment>`` that is comes from
-:func:`resolve_analyses_package`, (see its docstring); a configured analysis that cannot be loaded raises
-:class:`AnalysisLoadError` rather than leaving the server short a route.
+:func:`resolve_analyses_package` (see its docstring); a configured analysis that
+cannot be loaded raises :class:`AnalysisLoadError` rather than leaving the server
+short a route.
 
 **A queued analysis outlives the process that queued it.** The queue itself
 cannot: it is an ``asyncio.Queue`` of tuples holding a live

@@ -282,7 +282,7 @@ class ActionHost(HelaoFastAPI):
         self.live_publisher = WsPublisher(self.live_q)
         #: Remote status subscribers, as (server_key, host, port) tuples.
         #: ONE registry, on the host. The status *port* adapter keeps its own
-        #: client list for the makeActionApp compositions; routing the host's
+        #: client list, which no host routes through; routing the host's
         #: attach_client through that adapter while log_status_task fans out
         #: over this set would mean a server that accepts every subscription
         #: and broadcasts to nobody, with both halves logging success.

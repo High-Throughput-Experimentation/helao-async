@@ -28,6 +28,31 @@ table rather than leaving the row ambiguous.
 
 ---
 
+## After B7c (2026-10)
+
+B7c retired the `<x>_hex` configs, the `graft` code key, `legacy_module:` and
+`deployment: hexagon`. A bare prefix `<x>` now launches the station on the native hosts.
+The sections below this block are dated provenance and still name the retired launch forms.
+
+1. **Before pulling any repo, stop every running group on the station (`CTRL-x`)**, `_hex` or
+   not. If a group was detached (`CTRL-d`), reconnect with `./helao.sh <prefix> --reconnect`
+   first. The hot-reload watcher would otherwise restart idle servers into a deleted module,
+   and a running `<x>_hex` group is invisible to a `<x>` launch.
+2. Pull the parent and every nested repo the station uses.
+3. Remove the leftover untracked `__pycache__` directories: `rm -rf helao/deploy/hexagon
+   helao/hexagon/adapters/legacy`, or on Windows `cmd` `rmdir /s /q helao\deploy\hexagon` and
+   `rmdir /s /q helao\hexagon\adapters\legacy`.
+4. Run `python -m helao.hexagon.preflight <full config path>` on the exact config the station
+   will launch. It must print `PREFLIGHT OK`.
+5. Launch with `./helao.sh <x> --restore` (Windows: `helao.bat <x> --restore`). Queues
+   exported under `<x>_hex` are imported. Expect one Reflex bundle rebuild.
+6. **Bookmarks:** Bokeh servers that served at `/graft` now serve at `/<module>` (for example
+   `/control_visualizer`). Update any bookmark or wall display.
+7. **Rollback:** stop the group, check out `freeze/pre-b7c-rename_2610` in every repo, and
+   launch `<x>_hex`.
+
+---
+
 ## Read this first
 
 **Launching the non-`_hex` config is not a rollback.** `adss3.yml` and
@@ -216,10 +241,10 @@ fields are required, the values are provenance only and are not compared:
 ```yaml
 # <goldens>/<station>/pre/provenance.yml
 scenario: <station>-smoke
-config_prefix: <station>_hex
-config_path: helao/deploy/hte/configs/<station>_hex.py
+config_prefix: <station>
+config_path: helao/deploy/hte/configs/<station>.yml
 legacy_git_sha: <the rev recorded above>
-launch_cmd: python launch.py <station>_hex --no-hot-reload
+launch_cmd: python launch.py <station> --no-hot-reload
 sequence_name: <smoke sequence name>
 sequence_params: {}
 capture_timestamp: <ISO timestamp>
@@ -244,7 +269,7 @@ affected by B5 and does not move.
 ### 3. Preflight
 
 ```
-python -m helao.hexagon.preflight helao/deploy/hte/configs/<station>_hex.py
+python -m helao.hexagon.preflight helao/deploy/hte/configs/<station>.yml
 ```
 
 Expect no findings. This resolves the config without launching anything.
@@ -252,7 +277,7 @@ Expect no findings. This resolves the config without launching anything.
 ### 4. Launch and watch for a server that exits on its own
 
 ```
-python launch.py <station>_hex --no-hot-reload
+python launch.py <station> --no-hot-reload
 ```
 
 Every server must bind, and `supervise_early_exits` must report nothing exiting
@@ -449,7 +474,7 @@ exercise the abort path. As with `uvis4`, a regression visible only as a
 renamed in `e02a7ff6` — it has always run on `hte-ecms-03`, and every `host:`
 line and every record it writes said so while the prefix did not. The station
 and its server list are unchanged; only the name in this table is corrected.
-Launch it as `python launch.py ecms3` (or `ecms3_hex`).
+Launch it as `python launch.py ecms3`.
 
 `ecms3` ran its ECMS sequences on `unstable` at `e02a7ff6` with no issues
 reported by the station owner. That rev carries the September orchestrator and

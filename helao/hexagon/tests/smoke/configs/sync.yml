@@ -19,7 +19,7 @@
 # This config is action-only: sync_server exposes only private/bare
 # endpoints, and no visualizer is declared anywhere DB is used, so a
 # visualizer panel here would only ever be blank. It exists so an openapi
-# diff can compare legacy vs hexagon like-for-like. Port 8010 copied from
+# diff can compare the surface before and after a change. Port 8010 copied from
 # eche10.yml's DB block.
 dummy: true
 simulation: true

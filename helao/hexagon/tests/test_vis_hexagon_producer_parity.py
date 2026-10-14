@@ -10,7 +10,7 @@ thirds of that and left the join open:
   ``add_points`` conform -- but fed them frames from the *legacy* encoder only.
 
 Nothing yet drove a hexagon-produced frame into a panel, and nothing drove any
-frame into a panel living inside a hexagon-composed document. Both are here:
+frame into a panel living inside a document served by a native host. Both are here:
 
 1. :func:`test_panels_agree_on_hexagon_and_legacy_produced_frames` runs each
    panel's real ``add_points`` twice -- once over a legacy-produced frame, once

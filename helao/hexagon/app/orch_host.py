@@ -1402,11 +1402,11 @@ class OrchHost(ActionHost):
         the same change rather than left beside it.
 
         Keeping both would be two code paths for one behaviour, and B1 has
-        already shown the cost: ``makeActionApp`` went on grafting the write
-        path onto native hosts after B1 landed, and the resulting
-        AttributeError fired inside the FastAPI startup event where uvicorn
-        reports it only as SystemExit(3) -- the server never bound and
-        nothing named the cause.
+        already shown the cost: the old graft kept rebinding the write path
+        onto native hosts after B1 landed, and the resulting AttributeError
+        fired inside the FastAPI startup event where uvicorn reports it only
+        as SystemExit(3) -- the server never bound and nothing named the
+        cause.
         """
         from helao.hexagon.app.dispatch_loop import HexDispatchLoop, HexRuntime
         from helao.hexagon.app.ingestion import HexHealthMonitor, HexStatusIngestion

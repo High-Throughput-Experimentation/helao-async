@@ -9,6 +9,31 @@ named only by alias here.
 
 ---
 
+## After B7c (2026-10)
+
+B7c retired the `<x>_hex` configs, the `graft` code key, `legacy_module:` and
+`deployment: hexagon`. A bare prefix `<x>` now launches the station on the native hosts.
+The sections below this block are dated provenance and still name the retired launch forms.
+
+1. **Before pulling any repo, stop every running group on the station (`CTRL-x`)**, `_hex` or
+   not. If a group was detached (`CTRL-d`), reconnect with `./helao.sh <prefix> --reconnect`
+   first. The hot-reload watcher would otherwise restart idle servers into a deleted module,
+   and a running `<x>_hex` group is invisible to a `<x>` launch.
+2. Pull the parent and every nested repo the station uses.
+3. Remove the leftover untracked `__pycache__` directories: `rm -rf helao/deploy/hexagon
+   helao/hexagon/adapters/legacy`, or on Windows `cmd` `rmdir /s /q helao\deploy\hexagon` and
+   `rmdir /s /q helao\hexagon\adapters\legacy`.
+4. Run `python -m helao.hexagon.preflight <full config path>` on the exact config the station
+   will launch. It must print `PREFLIGHT OK`.
+5. Launch with `./helao.sh <x> --restore` (Windows: `helao.bat <x> --restore`). Queues
+   exported under `<x>_hex` are imported. Expect one Reflex bundle rebuild.
+6. **Bookmarks:** Bokeh servers that served at `/graft` now serve at `/<module>` (for example
+   `/control_visualizer`). Update any bookmark or wall display.
+7. **Rollback:** stop the group, check out `freeze/pre-b7c-rename_2610` in every repo, and
+   launch `<x>_hex`.
+
+---
+
 ## 0. Correction to the P7 plan, read this first
 
 The P7-UI plan (`docs/superpowers/plans/2026-08-05-P7-UI-both-stacks.md`, P7k item 3) says

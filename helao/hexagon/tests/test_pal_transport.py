@@ -6,7 +6,7 @@ the LOCAL (subprocess/aiofiles) path, which is genuinely Linux-runnable
 without any PAL hardware. The SSH/Cygwin path is station-gated (real
 paramiko connection to a real host) and is not exercised here -- see the
 module docstring's boundary note and the plan's slice-4 verification
-recipe (`pal_canary.bat` proves the SSH path at the station).
+recipe (the SSH path is proven at the station).
 
 `pytest-asyncio` is not installed in this env (see test_pal_reconciliation.
 py's docstring), so async bodies run via `asyncio.run(...)` from plain

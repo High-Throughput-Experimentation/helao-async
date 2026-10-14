@@ -1,9 +1,10 @@
 """Run the rendered-parity lane end to end: one command, one exit code.
 
 Launches each config the lane needs, runs every browser check against it, tears
-the group down, and diffs the legacy-hosted matrix against the hexagon-hosted
-one. Exits non-zero if any check fails or the diff is non-empty, so the lane is
-a single line in a gate or a station runbook rather than a procedure.
+the group down, and diffs the ``bokeh_legacy`` lane's matrix against the
+``bokeh_hexagon`` one. Exits non-zero if any check fails or the diff is non-empty,
+so the lane is a single line in a gate or a station runbook rather than a
+procedure.
 
 Usage::
 
@@ -57,9 +58,9 @@ MATRIX_DIR = os.path.join(REPO_ROOT, ".browser-parity")
 
 #: The lanes, in run order.
 #:
-#: ``pair`` names the other lane this one's matrix is diffed against. P7's claim
-#: is that the graft moves the hosting and changes nothing rendered, so the
-#: legacy-hosted and hexagon-hosted runs of the same documents must agree.
+#: ``pair`` names the other lane this one's matrix is diffed against. The two
+#: lanes serve the same documents from two configs, so their matrices must
+#: agree.
 #:
 #: The Reflex lane has no pair; its styles, pixels and both Q10 branches run
 #: on their own.

@@ -36,7 +36,7 @@ def test_gate_config_validates(path):
 
 @pytest.mark.parametrize("path", [_HEX, _HTE_HEX])
 def test_gate_config_preflights_clean(path):
-    """The D9 rejection these configs would have tripped before P7f."""
+    """Each gate config preflights with no findings."""
     from helao.hexagon import preflight
 
     assert preflight.preflight_config(path) == []

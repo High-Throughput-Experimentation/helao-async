@@ -1,7 +1,7 @@
 # STANDALONE power_supply_server canary config (P3a special-split,
 # POWER_SUPPLY). Mirrors galil.yml / kmotor.yml's 2-server shape (one action
 # server + one action_visualizer) so an at-station openapi golden diff can
-# compare legacy vs hexagon like-for-like without pulling in a full station.
+# compare the surface before and after a change without pulling in a full station.
 # `resource_name`/`timeout_ms` are copied verbatim from power_supply_test.yml
 # (the only reference for this server) so PowerSupplyDriver.connect() can
 # open the real pyvisa VISA resource -- a wrong/absent resource_name makes

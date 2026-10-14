@@ -5,7 +5,7 @@ baseline vs candidate server. Exit 0 == identical surface (parity), 1 == diffs,
 2 == usage/load error. Volatile top-level fields (info, servers) are ignored;
 only the route table and schema definitions gate parity.
 
-Usage: python openapi_diff.py <legacy_openapi.json> <candidate_openapi.json>
+Usage: python openapi_diff.py <baseline_openapi.json> <candidate_openapi.json>
 """
 
 import json

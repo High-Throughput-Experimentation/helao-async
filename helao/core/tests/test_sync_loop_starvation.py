@@ -1,6 +1,6 @@
 """``sync_yml`` must not hold the event loop while it parses records.
 
-Station report (note1_hex, 2026-10-01): after a restart SYNC refused
+Station report (a private station, 2026-10-01): after a restart SYNC refused
 connections on its own port for ~4.5 minutes. A 296-experiment XRFS
 ``-seq.yml`` (9.7 MB, ~4 s per parse) re-entered ``sync_yml`` every ~15 s while
 its experiments were still uploading, and each pass parsed it and loaded

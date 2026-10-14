@@ -2,6 +2,6 @@
 
 Three subpackages sit here: ``native/`` (the hosts' own implementations,
 several of them source-parity-pinned re-bodies of a ``helao/core/`` twin),
-``shared/`` (adapters onto the legacy engine, used while it is still
-reachable), and ``vis/`` (the visualizer-facing faces).
+``shared/`` (adapters shared by the hosts and the hte drivers), and
+``vis/`` (the visualizer-facing faces).
 """

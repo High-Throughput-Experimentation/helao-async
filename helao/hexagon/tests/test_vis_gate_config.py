@@ -45,14 +45,13 @@ def test_gate_configs_validate(path):
 
 @pytest.mark.parametrize("path", [_CFG, _GRAFT_CFG])
 def test_gate_bokeh_entries_name_hte_modules_with_no_routing_key(path):
-    """Every bokeh server names its hte module directly: no `deployment` /
-    `legacy_module` routing key, no `bokeh_port`, and the module resolves under
-    helao.deploy.hte and exposes makeBokehApp."""
+    """Every bokeh server names its hte module directly: no `deployment` key, no
+    `bokeh_port`, and the module resolves under helao.deploy.hte and exposes
+    makeBokehApp. (The retired routing keys are the ratchet's business.)"""
     bokeh_entries = _bokeh_entries(_load(path))
     assert set(bokeh_entries) == {"OPERATOR", "LIVE", "ACTVIS"}
     for scfg in bokeh_entries.values():
         assert "deployment" not in scfg
-        assert "legacy_module" not in scfg
         assert "bokeh_port" not in scfg  # bokeh servers use host/port
         mod = import_module(f"helao.deploy.hte.servers.{scfg['group']}.{scfg['bokeh']}")
         assert callable(mod.makeBokehApp)

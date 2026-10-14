@@ -294,8 +294,8 @@ async def encode_orch_api(channel: str, payload: Any = None) -> bytes:
 async def encode_hexagon(channel: str, payload: Any = None) -> bytes:
     """Encode one frame through the HEXAGON composition's producer stack.
 
-    The chain exercised here is the one ``makeActionApp`` builds at startup
-    (``helao/hexagon/app/factory.py``): a real
+    The chain exercised here is the one ``ActionHost.__init__`` builds
+    (``helao/hexagon/app/action_host.py``): a real
     :class:`~helao.hexagon.adapters.shared.status.DispatcherStatusAdapter`
     with a real :class:`~helao.hexagon.adapters.native.ws_publish.WsPublishBridge`
     bound into it, publishing onto the legacy fan-out queue that the untouched
