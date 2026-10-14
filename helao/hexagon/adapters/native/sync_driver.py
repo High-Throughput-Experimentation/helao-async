@@ -1168,6 +1168,9 @@ class SyncDriver:
                 "SYNC",
             ).items()
         }
+        # config_dict is the live world config that /get_config serves, so the
+        # AWS credentials merge into a private copy, never into config_dict.
+        self._sync_cfg = dict(self.config_dict)
         cparser = ConfigParser()
         if "AWS_CONFIG_PATH" in os.environ:
             with open(os.environ["AWS_CONFIG_PATH"], encoding="utf-8") as f:
@@ -1175,19 +1178,21 @@ class SyncDriver:
             aws_profile = self.config_dict.get("aws_profile", "default")
             if aws_profile in cparser:
                 aws_config = dict(cparser[aws_profile])
-                self.config_dict.update(aws_config)
-                self.config_dict["aws_config_path"] = os.environ["AWS_CONFIG_PATH"]
-                self.config_dict["aws_profile"] = aws_profile
-                LOGGER.debug(self.config_dict)
+                self._sync_cfg.update(aws_config)
+                self._sync_cfg["aws_config_path"] = os.environ["AWS_CONFIG_PATH"]
+                self._sync_cfg["aws_profile"] = aws_profile
+                LOGGER.debug(
+                    f"aws profile {aws_profile!r} from {os.environ['AWS_CONFIG_PATH']}"
+                )
 
-        self.max_tasks = self.config_dict.get("max_tasks", 1)
+        self.max_tasks = self._sync_cfg.get("max_tasks", 1)
         LOGGER.info("checking for aws_config_path")
-        if "aws_config_path" in self.config_dict:
-            os.environ["AWS_CONFIG_PATH"] = self.config_dict["aws_config_path"]
+        if "aws_config_path" in self._sync_cfg:
+            os.environ["AWS_CONFIG_PATH"] = self._sync_cfg["aws_config_path"]
             self.aws_session = boto3.Session(
-                aws_access_key_id=self.config_dict["aws_access_key_id"],
-                aws_secret_access_key=self.config_dict["aws_secret_access_key"],
-                region_name=self.config_dict["region"],
+                aws_access_key_id=self._sync_cfg["aws_access_key_id"],
+                aws_secret_access_key=self._sync_cfg["aws_secret_access_key"],
+                region_name=self._sync_cfg["region"],
             )
             self.s3 = self.aws_session.client("s3")
             self.s3r = boto3.resource("s3")
@@ -1195,7 +1200,7 @@ class SyncDriver:
             self.aws_session = None
             self.s3 = None
             self.s3r = None
-        self.bucket = self.config_dict["aws_bucket"]
+        self.bucket = self._sync_cfg["aws_bucket"]
 
         #: The unsynced working set (spec §4.1). SYNC is the only writer of
         #: this file; producing servers own their own.
