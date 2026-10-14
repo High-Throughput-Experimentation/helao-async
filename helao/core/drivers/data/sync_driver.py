@@ -751,6 +751,11 @@ class HelaoYml:
 #: cannot bloat the ``.prg`` (sync quarantine spec §3).
 QUARANTINE_ERROR_CHARS = 500
 
+#: Failures closer together than this count as one strike: a parent's re-walk
+#: retries a failing child several times in one burst, and without a gap that
+#: burst alone would spend the whole strike budget (sync quarantine spec Q7).
+QUARANTINE_STRIKE_GAP = timedelta(hours=1)
+
 
 def quarantine_due(block: dict, n: int, hours: float, now: datetime) -> bool:
     """Whether a ``quarantine`` block has earned quarantine (spec Q3).
@@ -1157,28 +1162,34 @@ class Progress:
 
         A block that does not parse (a hand edit, a foreign writer) is replaced
         by a fresh one rather than raised on: a strike is bookkeeping, and
-        failing here would turn a failed pass into a crashed worker.
+        failing here would turn a failed pass into a crashed worker. A failure
+        less than ``QUARANTINE_STRIKE_GAP`` after the last counted one updates
+        ``last_error`` but is not a new strike.
         """
         stamp = now.isoformat(timespec="seconds")
-        block = self.quarantine
+        block = self.quarantine or {}
         try:
-            strikes = int(block["strikes"]) + 1
+            strikes = int(block["strikes"])
             datetime.fromisoformat(block["first_failed"])
             first = block["first_failed"]
+            last = datetime.fromisoformat(block["last_failed"])
             already = bool(block.get("quarantined_at"))
-        except (TypeError, KeyError, ValueError):
-            strikes, first, already = 1, stamp, False
-        block = {
+        except (TypeError, KeyError, ValueError, AttributeError):
+            strikes, first, last, already = 0, stamp, None, False
+        counted = last is None or now - last >= QUARANTINE_STRIKE_GAP
+        if counted:
+            strikes += 1
+        new_block = {
             "strikes": strikes,
             "first_failed": first,
-            "last_failed": stamp,
-            "last_error": str(error)[:QUARANTINE_ERROR_CHARS],
+            "last_failed": stamp if counted else block["last_failed"],
             "quarantined_at": block.get("quarantined_at") if already else None,
+            "last_error": str(error)[:QUARANTINE_ERROR_CHARS],
         }
-        entered = not already and quarantine_due(block, n, hours, now)
+        entered = counted and not already and quarantine_due(new_block, n, hours, now)
         if entered:
-            block["quarantined_at"] = stamp
-        self.dict["quarantine"] = block
+            new_block["quarantined_at"] = stamp
+        self.dict["quarantine"] = new_block
         self.write_dict()
         return entered
 
@@ -1371,6 +1382,8 @@ class SyncDriver:
 
     def _add_strike(self, yml_path: Path, error: str) -> tuple:
         """Blocking half of :meth:`_strike`: parse the yml, add the strike."""
+        if _prg_is_complete(Path(yml_path).with_suffix(".prg")):
+            return False, {}
         prog = Progress(yml_path)
         entered = prog.add_strike(
             error, self.quarantine_strikes, self.quarantine_hours, datetime.now()
@@ -1390,7 +1403,7 @@ class SyncDriver:
             entered, block = await asyncio.to_thread(self._add_strike, yml_path, error)
             if not entered:
                 return
-            LOGGER.alert(
+            LOGGER.alert(  # type: ignore[attr-defined]
                 f"SYNC quarantined {yml_path} after {block.get('strikes')} failed "
                 f"passes ({block.get('first_failed')} .. {block.get('last_failed')}); "
                 f"last error: {block.get('last_error')}. It will not be retried "

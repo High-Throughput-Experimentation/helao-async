@@ -4,7 +4,6 @@ import asyncio
 import textwrap
 from datetime import datetime, timedelta
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
@@ -113,6 +112,61 @@ def test_the_crossing_strike_returns_true_exactly_once(tmp_path, mod):
     assert reread.is_quarantined is True
     assert reread.quarantine["first_failed"] == T0.isoformat(timespec="seconds")
     assert reread.quarantine["last_error"] == "boom"
+
+
+@pytest.mark.parametrize("mod", MODS)
+def test_a_burst_inside_the_gap_counts_once(tmp_path, mod):
+    act_yml = make_action(make_exp_tree(tmp_path, "RUNS", mk_uuid(1)), 0)
+    prog = mod.Progress(act_yml)
+    for minutes, err in ((0, "e1"), (10, "e2"), (50, "e3")):
+        prog.add_strike(err, 5, 24, T0 + timedelta(minutes=minutes))
+    block = mod.Progress(act_yml).quarantine
+    assert block["strikes"] == 1
+    assert block["last_failed"] == T0.isoformat(timespec="seconds")
+    assert block["last_error"] == "e3"
+    prog.add_strike("e4", 5, 24, T0 + timedelta(minutes=61))
+    assert mod.Progress(act_yml).quarantine["strikes"] == 2
+
+
+def test_a_folded_last_error_cannot_fake_quarantine(tmp_path):
+    from helao.helpers.run_state import _prg_is_quarantined
+
+    for mod in MODS:
+        act_yml = make_action(
+            make_exp_tree(tmp_path / mod.__name__, "RUNS", mk_uuid(1)), 0
+        )
+        mod.Progress(act_yml).add_strike(
+            "E" * 66 + " quarantined_at: 2026-01-01 " + "y " * 40, 5, 24, T0
+        )
+        # Field order now puts quarantined_at first, which alone defeats the
+        # fake; put last_error first, as pre-fix sidecars had it, so the
+        # indent anchor is what this test exercises.
+        prog = mod.Progress(act_yml)
+        blk = prog.quarantine
+        prog.dict["quarantine"] = {
+            "last_error": blk["last_error"],
+            **{k: v for k, v in blk.items() if k != "last_error"},
+        }
+        prog.write_dict()
+        prg = act_yml.with_suffix(".prg")
+        lines = [ln.strip() for ln in prg.read_text(encoding="utf-8").splitlines()]
+        assert any(ln.startswith("quarantined_at: 2026-01-01") for ln in lines)
+        assert _prg_is_quarantined(prg) is False
+
+
+@pytest.mark.parametrize("mod", MODS)
+@pytest.mark.asyncio
+async def test_a_shipped_record_is_never_struck(tmp_path, mod):
+    drv = make_sync_driver(tmp_path, mod.SyncDriver, QUICK)
+    try:
+        act_yml = make_action(make_exp_tree(tmp_path, "RUNS", mk_uuid(1)), 0)
+        prog = mod.Progress(act_yml)
+        prog.dict["synced"] = True
+        prog.write_dict()
+        await drv._strike(act_yml, "boom")
+        assert mod.Progress(act_yml).quarantine is None
+    finally:
+        await teardown_driver(drv)
 
 
 @pytest.mark.parametrize("mod", MODS)
@@ -293,7 +347,8 @@ async def test_zero_strikes_disables_quarantine_but_records(tmp_path, mod, monke
         for _ in range(3):
             await drv._strike(act_yml, "boom")
         prog = mod.Progress(act_yml)
-        assert prog.quarantine["strikes"] == 3 and not prog.is_quarantined
+        # Three back-to-back failures fall inside QUARANTINE_STRIKE_GAP: one strike.
+        assert prog.quarantine["strikes"] == 1 and not prog.is_quarantined
         assert alerts == []
     finally:
         await teardown_driver(drv)

@@ -284,18 +284,22 @@ def _prg_is_quarantined(prg_path: Path) -> bool:
 
     True when the sidecar holds a ``quarantined_at`` line with a value other
     than ``null``. Read as flat text, like :func:`_prg_is_complete`, for the
-    same reasons: no helao imports here, and a malformed or unreadable sidecar
+    same reasons: no helao imports here, only the block's own two-space
+    indented key counts, and a malformed or unreadable sidecar
     degrades to "not quarantined" -- the safe direction, since a wrongly
     unquarantined record is merely retried.
     """
     try:
         lines = prg_path.read_text(encoding="utf-8").splitlines()
-    except OSError:
+    except (OSError, ValueError):
         return False
     for line in lines:
-        key, _, value = line.strip().partition(":")
-        if key == "quarantined_at":
-            return value.strip() not in ("", "null", "~")
+        # Only the block's own key, indented two spaces under `quarantine:`.
+        # A folded continuation of a long `last_error` is indented further
+        # and may contain the same text.
+        if line.startswith("  quarantined_at:"):
+            value = line.split(":", 1)[1].strip()
+            return value not in ("", "null", "~")
     return False
 
 

@@ -31,7 +31,7 @@ interrupted"**, so quarantine must not strand work that a later pass would compl
 | Q4 | Defaults `N = 5`, `window = 24 h`, as SYNC server params `quarantine_strikes` and `quarantine_hours`. `quarantine_strikes: 0` disables quarantine (strikes are still recorded). |
 | Q5 | State lives in the record's `.prg` (source of truth). The SYNC journal gets a `quarantined` line as an index for listing. |
 | Q6 | Surface: one `LOGGER.alert` (email) when a record enters quarantine; `/tasks` gains a `quarantined` list; `POST /finish_yml` on a quarantined record clears it and re-queues it. No new routes and no route-signature changes, so the frozen `hte` `sync_server` checklist is untouched. |
-| Q7 | Strikes need not be consecutive and are never reset by a partial success. The age floor carries "has been failing for a while"; a record that syncs is complete and its block is moot. |
+| Q7 | Strikes need not be consecutive and are never reset by a partial success. The age floor carries "has been failing for a while"; a record that syncs is complete and its block is moot. **Amended 2026-10-14 (final review):** failures less than `QUARANTINE_STRIKE_GAP` (1 h) after the last counted strike do not add a strike, though they still update `last_error`. A parent's re-walk retries a failing child several times in one burst; without the gap that burst alone spent the whole budget, so "N strikes" would not mean N separate failures. |
 
 Rejected alternatives:
 - A `RUNS_FAILED` tree (§6's first idea). Records no longer move between trees under the
@@ -46,12 +46,16 @@ Rejected alternatives:
 
 ```yaml
 quarantine:
-  strikes: 5                 # int, incremented once per failed pass
+  strikes: 5                 # int, incremented once per failed pass >= 1 h after the last strike
   first_failed: 2026-10-14T09:12:03   # set on the first strike, never moved
-  last_failed: 2026-10-15T10:40:51
-  last_error: "RuntimeError: Failed to upload ..."   # truncated to 500 chars
+  last_failed: 2026-10-15T10:40:51    # time of the last *counted* strike
   quarantined_at: 2026-10-15T10:40:51  # null until the rule in Q3 fires
+  last_error: "RuntimeError: Failed to upload ..."   # every failure; truncated to 500 chars
 ```
+
+`quarantined_at` is written before `last_error`, and the flat-text reader
+(`run_state._prg_is_quarantined`) matches only the two-space-indented key. A long `last_error`
+folds onto continuation lines indented further, and its text may contain the same key.
 
 Absent block = no failures recorded. Timestamps use the same `isoformat(timespec="seconds")`
 form as the hook states in `helao/core/hooks/postfinish.py`. `last_error` is truncated so a
@@ -76,8 +80,10 @@ patching. This is the only place the rule in Q3 is written.
 
 - `quarantine` property: the block or `None`.
 - `is_quarantined` property: `quarantine` is not `None` and `quarantined_at` is set.
-- `add_strike(error: str, n: int, hours: float, now: datetime) -> bool`: increments the block,
-  sets `first_failed` on the first strike, updates `last_failed` and `last_error`, sets
+- `add_strike(error: str, n: int, hours: float, now: datetime) -> bool`: increments the block
+  when at least `QUARANTINE_STRIKE_GAP` has passed since `last_failed` (Q7 amendment), sets
+  `first_failed` on the first strike, updates `last_failed` on a counted strike and `last_error`
+  always, sets
   `quarantined_at` when `quarantine_due` first becomes true, writes the `.prg`, and returns True
   **only on the strike that enters quarantine**. That return value is what makes the alert fire
   once.

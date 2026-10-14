@@ -379,6 +379,20 @@ The syncer is found by server key: `SYNC`. A config that still carries the
 retired `DB` key and no `SYNC` key raises at startup instead of silently not
 syncing.
 
+### Sync quarantine
+
+A record whose sync keeps failing is parked rather than retried at every start.
+Two `SYNC` server `params` set when:
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `quarantine_strikes` | int | `5` | Failed passes before a record is parked. Failures less than an hour after the last counted one do not count. `0` disables parking (strikes are still recorded). |
+| `quarantine_hours` | float | `24` | The first failure must be at least this old before a record is parked, so a short S3/API outage never parks anything. |
+
+A parked record raises one alert and is listed under `quarantined` in `/tasks`;
+POST `/finish_yml` with its path to release and re-queue it. Spec:
+`docs/superpowers/specs/2026-10-14-sync-quarantine-design.md`.
+
 ### Deprecated aliases
 
 | Alias | Replacement |
