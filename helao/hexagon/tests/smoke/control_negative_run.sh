@@ -21,6 +21,7 @@ print(read_config('$PREFIX')['root'])" | tail -1)}"
 LAUNCHLOG="/tmp/p7g_${PREFIX}.launch.log"
 
 echo "[control_negative] wiping fresh root $ROOT"
+$PY helao/hexagon/tests/smoke/safe_root.py check-temp "$ROOT" || exit 2
 rm -rf "$ROOT"
 
 echo "[control_negative] launching $PREFIX (log: $LAUNCHLOG)"

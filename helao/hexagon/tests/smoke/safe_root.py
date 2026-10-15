@@ -25,6 +25,7 @@ The generated-directory names are the source of truth from
 import argparse
 import shutil
 import sys
+import tempfile
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Optional
@@ -105,6 +106,19 @@ def validate_root(root: Optional[str]) -> Path:
     return rp
 
 
+def validate_temp_root(root: Optional[str]) -> Path:
+    """``validate_root`` plus: the root must live under the system temp dir.
+
+    Smoke scripts wipe their root, so they may only ever run against a scratch
+    tree, never a station's real root.
+    """
+    rp = validate_root(root)
+    tmp = Path(tempfile.gettempdir()).resolve()
+    if rp == tmp or not rp.is_relative_to(tmp):
+        raise ValueError(f"root {rp!r} is not under the system temp dir {tmp!r}")
+    return rp
+
+
 def reset_generated(
     root: Optional[str],
     names: Optional[Iterable[str]] = None,
@@ -161,6 +175,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     p_check = sub.add_parser("check", help="validate that root is safe to touch")
     p_check.add_argument("root")
 
+    p_temp = sub.add_parser(
+        "check-temp", help="check, and require root under the system temp dir"
+    )
+    p_temp.add_argument("root")
+
     p_reset = sub.add_parser(
         "reset", help="delete ephemeral (or named) generated subdirs under root"
     )
@@ -180,6 +199,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         if args.cmd == "check":
             rp = validate_root(args.root)
             print(f"[safe_root] OK: {rp} is safe (repo not underneath, not a root)")
+            return 0
+        if args.cmd == "check-temp":
+            rp = validate_temp_root(args.root)
+            print(f"[safe_root] OK: {rp} is a safe temp-dir root")
             return 0
         if args.cmd == "reset":
             reset_generated(args.root, names=args.include, dry_run=args.dry_run)

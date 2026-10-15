@@ -11,6 +11,8 @@ cd "$REPO" || exit 2
 LAUNCHLOG="/tmp/p1b2a_${PREFIX}_${SCEN}.launch.log"
 
 echo "[parity_run] wiping fresh root $ROOT"
+conda run -n helao python helao/hexagon/tests/smoke/safe_root.py check-temp "$ROOT" || exit 2
+conda run -n helao python helao/hexagon/tests/smoke/safe_root.py check-temp "$CAND" || exit 2
 rm -rf "$ROOT"
 rm -rf "$CAND"
 

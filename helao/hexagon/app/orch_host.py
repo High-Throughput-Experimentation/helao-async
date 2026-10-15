@@ -1505,9 +1505,8 @@ class OrchHost(ActionHost):
         ):
             if task is not None:
                 task.cancel()
-        stop = getattr(self._hex_health, "stop", None)
-        if callable(stop):
-            stop()
+        if getattr(self, "_hex_health", None) is not None:
+            await self._hex_health.close()
         if self.parked_head_action is not None or any(
             len(x) > 0 for x in (self.sequence_dq, self.experiment_dq, self.action_dq)
         ):

@@ -11,6 +11,7 @@ cd "$REPO" || exit 2
 LAUNCHLOG="/tmp/p1b2b_${PREFIX}_${ITEM}.launch.log"
 
 echo "[conc_run] wiping fresh root $ROOT"
+conda run -n helao python helao/hexagon/tests/smoke/safe_root.py check-temp "$ROOT" || exit 2
 rm -rf "$ROOT"
 
 echo "[conc_run] launching $PREFIX (log: $LAUNCHLOG)"

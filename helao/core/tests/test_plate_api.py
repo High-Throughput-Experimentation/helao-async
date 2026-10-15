@@ -120,6 +120,17 @@ def test_printrecord_and_elements_on_404(api, monkeypatch):
     assert api.get_elements_plateid(99999) is None
 
 
+def test_elements_survive_failed_print_lookup(api, monkeypatch):
+    # get_print returns None on an HTTP/network error: no AttributeError
+    monkeypatch.setattr(api, "get_info", lambda plateid: {"screening_print_id": 7})
+    monkeypatch.setattr(api, "get_print", lambda print_id: None)
+    monkeypatch.setattr(api, "get_print_plateid", lambda plateid: None)
+    assert api.get_elements_plateid(PLATE) is None
+    # a print without sources, string plateid (no alternate retrieval): no KeyError
+    monkeypatch.setattr(api, "get_print", lambda print_id: {})
+    assert api.get_elements_plateid(str(PLATE)) is None
+
+
 def test_legacy_printrecord_false_not_none(api, monkeypatch):
     monkeypatch.setattr(api.legacy_api, "importinfo", lambda plateid: None)
     assert api.legacy_api.check_printrecord_plateid(5) is False

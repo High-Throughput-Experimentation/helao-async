@@ -65,7 +65,7 @@ def test_retired_tuple_shape():
     print("test_retired_tuple_shape PASS")
 
 
-def run_all():
+def run_all() -> bool:
     test_resolves_sync_key()
     test_retired_db_key_raises()
     test_sync_present_ignores_stale_db_block()
@@ -73,6 +73,7 @@ def run_all():
     test_preferred_key_wins()
     test_retired_tuple_shape()
     print("ALL SERVER_KEYS TESTS PASS")
+    return True
 
 
 if __name__ == "__main__":

@@ -76,7 +76,6 @@ class EndpointModel(BaseModel, HelaoDict):
                         if hlostatus not in self.nonactive_dict:
                             # is_sub_status = True
                             self.nonactive_dict[hlostatus] = {}
-                            break
                         self.nonactive_dict[hlostatus].update({uuid: status})
 
                 # # no main substatus, add it under finished key

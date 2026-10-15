@@ -21,6 +21,7 @@ import asyncio
 import pytest
 
 from helao.hexagon.app.action_host import ActionHost
+from helao.hexagon.app.ingestion import HexHealthMonitor
 from helao.hexagon.app.orch_host import OrchHost
 
 
@@ -29,17 +30,13 @@ class _Probe(OrchHost):
 
     def __init__(self):  # noqa: D107  (deliberately not building a server)
         self.exports = 0
-        self.stopped_health = 0
         self.sequence_dq = ["one queued sequence"]
         self.experiment_dq = []
         self.action_dq = []
-        self._hex_health = self
+        self._hex_health = HexHealthMonitor(None, None, None)
         self.status_subscriber = None
         self.driver_monitor = None
         self.heartbeat_monitor = None
-
-    def stop(self):
-        self.stopped_health += 1
 
     def export_queues(self, timestamp_pck=False):
         self.exports += 1
@@ -63,6 +60,7 @@ async def test_shutdown_cancels_the_monitors_before_the_host_shuts_down(monkeypa
     probe = _Probe()
     probe.heartbeat_monitor = asyncio.create_task(_never())
     probe.driver_monitor = asyncio.create_task(_never())
+    probe._hex_health._task = asyncio.create_task(_never())
 
     await probe.shutdown()
     await asyncio.sleep(0)
@@ -71,6 +69,8 @@ async def test_shutdown_cancels_the_monitors_before_the_host_shuts_down(monkeypa
     # the action servers start disconnecting their drivers.
     assert probe.heartbeat_monitor.cancelled()
     assert probe.driver_monitor.cancelled()
+    # the health monitor's own probe loop must stop too (it has close(), not stop())
+    assert probe._hex_health._task.cancelled()
     assert order == ["host"], "the host's own shutdown must still run"
 
 
