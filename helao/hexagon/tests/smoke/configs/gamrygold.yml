@@ -10,7 +10,6 @@ dummy: true
 simulation: true
 run_type: gamry
 root: C:\INST_hlo_golden
-alert_config_path: C:\INST_hlo_golden\USER_CONFIG\alert_gamry.yml
 servers:
   PSTAT:
     host: 127.0.0.1

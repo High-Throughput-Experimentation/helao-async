@@ -61,6 +61,10 @@ from ...drivers.motion.enum import MoveModes, TransformationModes
 # (helao) c:\Program Files (x86)\Galil\gclib\source\wrappers\python>python setup.py install
 
 
+#: Hard limit on how long a move is waited on (the UI follow-up ceiling must be at least this).
+MOVE_WAIT_CAP_S = 30 * 60
+
+
 class cmd_exception(ValueError):
     """Raised when an invalid motion mode reaches the Galil command builder."""
 
@@ -834,8 +838,7 @@ class Galil(HelaoDriver):
         LOGGER.info(f"timeofmove: {timeofmove}")
         if len(timeofmove) > 0:
             tmax = max(timeofmove)
-            if tmax > 30 * 60:
-                tmax = 30 * 60  # 30min hard limit
+            tmax = min(tmax, MOVE_WAIT_CAP_S)
         else:
             tmax = 0
 

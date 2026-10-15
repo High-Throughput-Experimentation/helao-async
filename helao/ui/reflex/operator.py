@@ -1,9 +1,9 @@
 """Reflex rendering of the standalone operator.
 
 A second UI over the same orchestrator seam the Bokeh operator uses:
-``orch_backend.OrchBackend`` is an async ABC of 25 methods, and this page is a
-consumer of it, not a second implementation. That module is not changed to suit
-this one -- ``bokeh_operator.py`` is still live beside it, named by 32 configs.
+``orch_backend.OrchBackend`` is an async ABC, and this page is a consumer of
+it, not a second implementation. That module is not changed to suit this one --
+the Bokeh operator (``helao/ui/bokeh/operator.py``) is still live beside it.
 
 Two structural choices worth knowing before editing:
 

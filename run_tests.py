@@ -58,7 +58,7 @@ COUNTS = re.compile(r"(\d+) (passed|failed|error|errors|skipped|xfailed|xpassed)
 
 
 def _skipped(path: Path) -> bool:
-    return any(part in SKIP_PARTS for part in path.parts)
+    return any(part in SKIP_PARTS for part in path.relative_to(REPO_ROOT).parts)
 
 
 def has_pytest_tests(path: Path) -> bool:

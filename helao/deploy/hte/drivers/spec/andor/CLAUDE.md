@@ -25,10 +25,12 @@ selected by the action server's `wl_source` param (`spectrograph` | `calibration
   config keeps working unedited. An *unrecognized* value raises: a typo would
   otherwise hand a lamp-calibrated station the spectrograph driver and fail much
   later at `connect()` with a vendor import error.
-- **`connect()` succeeds on an uncalibrated station; `acquire` is what refuses.** The
-  calibration action runs on the same server, so a refusing `connect()` would leave
-  the station uncalibratable forever. `acquire` cannot fall back to a pixel index —
-  both the channel names and `optional.wl` come from `wl_arr`.
+- **`connect()` succeeds on an uncalibrated station, and `acquire` runs on the channel
+  index.** The calibration action runs on the same server, so a refusing `connect()`
+  would leave the station uncalibratable forever. `connect()` substitutes
+  `np.arange(width)` and sets `wl_calibrated=False`; every action then records
+  `calibrated=False`. `acquire` refuses only when `wl_arr` is `None`, i.e. `connect()`
+  never succeeded.
 - **`run_wl_calibration()` is on the base, so a spectrograph station can measure a
   lamp too** and compare the fit against `GetCalibration` without changing its live
   axis. The response's `applied` field says which happened. On the lamp-calibrated

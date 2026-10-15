@@ -66,8 +66,10 @@ class AndorDriver(HelaoDriver):
     pixel_width: float
     # Optional, and not an oversight to "fix" back: __init__ sets this to None
     # and the lamp-calibrated variant has no axis at all until its first
-    # calibration, so _wavelengths() legitimately returns None there. acquire
-    # refuses on None rather than measuring against a fabricated axis.
+    # calibration, so _wavelengths() legitimately returns None there.
+    # connect() then substitutes the channel index and records
+    # calibrated=False (_fall_back_to_channel_index); acquire refuses only if
+    # wl_arr is still None, i.e. connect() never succeeded.
     wl_arr: Optional[np.ndarray]
     #: False when `wl_arr` is the bare channel index rather than a measured
     #: axis. `acquire` copies it into the action params as `calibrated`, which

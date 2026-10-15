@@ -12,8 +12,17 @@ duplicate-append and replace-when-missing cases.
 
 Also asserts the combined ``model_json_schema()`` of the three models is
 byte-identical to the pre-3a baseline captured at
-``.omc/artifacts/p3a/schema_baseline.json`` — proving the new methods add
+``helao/core/tests/fixtures/schema_baseline.json`` (tracked; the check FAILS if it
+is missing) — proving the new methods add
 nothing to the pydantic schema and the fields stay ``list[HloStatus]``.
+
+Regenerate the baseline after an intentional model-schema change::
+
+    python -c "import json; from helao.core.models.action import ActionModel as A; \\
+from helao.core.models.experiment import ExperimentModel as E; \\
+from helao.core.models.sequence import SequenceModel as S; \\
+print(json.dumps([m.model_json_schema() for m in (A, E, S)], indent=1, sort_keys=True, default=str), end='')" \\
+        > helao/core/tests/fixtures/schema_baseline.json
 
 Not a pytest test: this is a standalone script (matching the convention of
 the other ``helao.core.tests.unit_test_*`` modules) invoked directly or via
@@ -36,7 +45,7 @@ from helao.core.tests._test_utils import TestReporter
 from helao.helpers.yml_tools import yml_dumps
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-SCHEMA_BASELINE_PATH = REPO_ROOT / ".omc" / "artifacts" / "p3a" / "schema_baseline.json"
+SCHEMA_BASELINE_PATH = Path(__file__).parent / "fixtures" / "schema_baseline.json"
 
 START_STATES = [
     [],

@@ -1887,7 +1887,7 @@ def main():
         from run_unit_tests import main as run_all_unit_tests
 
         if run_all_unit_tests() != 0:
-            quit()
+            sys.exit(1)
 
     # save ntp time offset
     helaodirs = helao_dirs(config, "launcher")

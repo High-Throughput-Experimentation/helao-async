@@ -372,9 +372,18 @@ class cNIMAX(HelaoDriver):
         )
 
         # each card need its own physical trigger input
+        if self.ttlwait != -1 and not (
+            self.config_dict.get("dev_cellvoltage_trigger", "") != ""
+            and self.config_dict.get("dev_cellcurrent_trigger", "") != ""
+        ):
+            LOGGER.warning(
+                "TTLwait requested but dev_cellvoltage_trigger/"
+                "dev_cellcurrent_trigger are not both configured; "
+                "cell IV starts without a trigger wait"
+            )
         if (
-            self.config_dict["dev_cellvoltage_trigger"] != ""
-            and self.config_dict["dev_cellcurrent_trigger"] != ""
+            self.config_dict.get("dev_cellvoltage_trigger", "") != ""
+            and self.config_dict.get("dev_cellcurrent_trigger", "") != ""
             and self.ttlwait != -1
         ):
             self.task_6284cellvoltage.triggers.start_trigger.trig_type = (

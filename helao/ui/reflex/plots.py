@@ -56,7 +56,7 @@ try:
 except Exception as exc:  # pragma: no cover - import-time environment failure
     raise PlotBackendError(
         "the xy charting backend is unavailable; the Reflex UI stack cannot "
-        f"start. Install it with `pip install xy==0.0.5`. Underlying error: {exc}"
+        f"start. Install it with `pip install xy==0.0.7`. Underlying error: {exc}"
     ) from exc
 
 #: Process-wide store the buffer route serves from. Task 6 hands the router

@@ -573,7 +573,7 @@ simulation: true
 show_debug: true
 run_unit_tests: true
 run_type: simulation
-root: /home/dan/INST_hlo_golden
+root: /tmp/helao-golden
 
 experiment_libraries:
   - simulatews_exp

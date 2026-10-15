@@ -71,8 +71,8 @@ def ECHE_move(
     Calls ``ECHE_sub_rel_move`` then ``ECHE_sub_shutdown``.
 
     Args:
-        move_x_mm: Target x position to move to (mm).
-        move_y_mm: Target y position to move to (mm).
+        move_x_mm: Relative x offset to move by (mm).
+        move_y_mm: Relative y offset to move by (mm).
 
     Returns:
         List of planned experiments to dispatch.
@@ -643,7 +643,7 @@ def ECHE_CV(
 ) -> list:
     """Standalone CV scan for ECHE without illumination.
 
-    Loads the sample, runs OCV, performs a CV scan, and shuts down.
+    Loads the sample, performs a CV scan, and shuts down.
 
     Args:
         plate_id: Plate ID of the solid sample library.
@@ -984,7 +984,7 @@ def ECHE_CV_led(
 ) -> list:
     """Photo-CV for ECHE with LED toggling.
 
-    Loads the sample, runs OCV, performs a CV-LED sweep, and shuts down.
+    Loads the sample, performs a CV-LED sweep, and shuts down.
 
     Args:
         plate_id: Plate ID of the solid sample library.
@@ -1113,7 +1113,7 @@ def ECHE_CP(
 ) -> list:
     """Standalone CP hold for ECHE without illumination.
 
-    Loads the sample, runs OCV, performs a CP hold, and shuts down.
+    Loads the sample, performs a CP hold, and shuts down.
 
     Args:
         plate_id: Plate ID of the solid sample library.
@@ -1208,7 +1208,7 @@ def ECHE_CP_led(
 ) -> list:
     """Photo-CP hold for ECHE with LED toggling.
 
-    Loads the sample, runs OCV, performs a CP-LED hold, and shuts down.
+    Loads the sample, performs a CP-LED hold, and shuts down.
 
     Args:
         plate_id: Plate ID of the solid sample library.
