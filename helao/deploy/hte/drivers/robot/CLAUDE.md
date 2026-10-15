@@ -1,0 +1,3 @@
+# PAL driver
+
+The SSH tuple for a remote PAL controller (`user`, `key`, `host`) is read by `pal_driver._env_param`. Configs name environment variables instead of holding the values (`user_env`, `key_env`, `host_env`, as in `password_env` of the synaccess driver), so the public repo and `/get_config` carry only the variable names. Set them per station: `conda env config vars set HELAO_PAL_SSH_USER=... HELAO_PAL_SSH_KEY=... HELAO_PAL_SSH_HOST=... -n helao`, then re-activate the env. A literal `user`/`key`/`host` param still wins. An unset `host_env` variable logs an ERROR at startup and `sshhost` stays `None`: `connect()` fails and every PAL action returns `not_available` (fails closed; local mode is only `host: localhost`).

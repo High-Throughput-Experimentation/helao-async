@@ -1,5 +1,4 @@
 import asyncio
-import json
 from datetime import datetime
 from functools import partial
 
@@ -25,6 +24,7 @@ from helao.ui.bokeh.theme import SECTION_MARGIN, stretch_section
 from helao.ui.bokeh.vis import Vis
 from helao.ui.bokeh.vis_subscriber import ActionVisualizer
 from helao.helpers.dispatcher import async_private_dispatcher
+from helao.helpers.ws_utils import WireDecodeError, wire_loads
 
 valid_data_status = (
     None,
@@ -331,14 +331,19 @@ class C_vis(ActionVisualizer):
                     self.IOloop_data_run = True
                     while self.IOloop_data_run:
                         try:
-                            datapackage = DataPackageModel(
-                                **json.loads(await ws.recv())
+                            msg = wire_loads(await ws.recv())
+                            datapackage = (
+                                msg
+                                if isinstance(msg, DataPackageModel)
+                                else DataPackageModel(**msg)
                             )
                             datastatus = datapackage.datamodel.status
                             if datastatus in valid_data_status:
                                 self.vis.doc.add_next_tick_callback(
                                     async_partial(self.add_points)
                                 )
+                        except WireDecodeError:
+                            continue  # skip the bad frame, keep the subscription
                         except Exception:
                             self.IOloop_data_run = False
                     await ws.close()
