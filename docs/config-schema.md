@@ -436,6 +436,7 @@ route, whatever its config says:
 | `/composition` | plate composition map | credentials (below), and some server declares `params.plate_api: HTEPlateAPI` |
 | `/uvvis`, `/xafs`, `/xrds` | plate spectra | credentials (below); the wafer-photo underlay also needs the plate API |
 | `/retire` | retire mis-identified sequences | credentials (below), `params.retire: true` on this Reflex server, and a `root` |
+| `/quarantine` | release or write off parked sync records | `params.sync_quarantine: true` on this Reflex server, and a `SYNC` server in the config |
 
 **Credential-gated pages.** `/composition`, `/uvvis`, `/xafs`, `/xrds` and
 `/retire` read the metadata API or S3. If the Reflex process has no
@@ -461,6 +462,7 @@ Params on the Reflex server entry:
 | `plate_api` | — | `HTEPlateAPI` is the only accepted value. `/operator` reads this server's own value. `/composition` and the spectra pages use the first server in the config that declares one. |
 | `retire` | `False` | Literal `true` enables `/retire`. The page deletes metadata-API rows and moves run directories, so turn it on only where intended. |
 | `retire_sources_root` | — | Folder of converter sources. `/retire` refuses a sequence that has a converter job still in progress under this folder. |
+| `sync_quarantine` | `False` | Literal `true` enables `/quarantine`. Release re-queues a parked record; write-off closes an incomplete process group with the actions that exist and records the missing ones, so turn it on only where operators may do that. |
 | `seqspec_parser_path` / `seqspec_folder_path` / `parser_kwargs` | — | Spec-sequence tab of `/operator`. The two paths resolve relative to the repo root when not absolute. See [`group: operator`](#group-operator). |
 
 ## Ports
@@ -644,6 +646,7 @@ backend, and, implicitly, `18001`/`18002` for RPC.
       should upload
 - [ ] the syncer server is keyed `SYNC`
 - [ ] Reflex `pages` is a list; `retire: true` only where retiring is intended
+- [ ] `sync_quarantine: true` only where operators may release or write off parked sync records
 - [ ] if the file lives outside `helao/deploy/*/configs/`, every server carries
       an explicit `deployment:`
 - [ ] `python launch.py <prefix>` reaches the banner — that proves validation

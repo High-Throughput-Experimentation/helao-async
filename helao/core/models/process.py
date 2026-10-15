@@ -60,6 +60,7 @@ class ProcessModel(ShortProcessModel):
         campaign_name (Optional[str]): Campaign label.
         campaign_uuid (Optional[UUID]): Campaign UUID.
         run_id (Optional[UUID]): Run identifier.
+        missing_action_orders (Optional[list[int]]): Action orders written off by an operator; absent on a normal process.
     """
 
     sequence_uuid: Optional[UUID] = None
@@ -82,3 +83,4 @@ class ProcessModel(ShortProcessModel):
     campaign_name: Optional[str] = None
     campaign_uuid: Optional[UUID] = None
     run_id: Optional[UUID] = None
+    missing_action_orders: Optional[list[int]] = None

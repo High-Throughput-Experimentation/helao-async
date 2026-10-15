@@ -187,3 +187,13 @@ can never complete, and `s3_upload` would raise "did not sync after N tries" on 
 - A group whose actions are ALL absent is still dropped as a phantom by `sync_process`
   (unchanged behaviour), so a fully lost group is not parked.
 - With `quarantine_strikes: 0` the incomplete-group message is logged at ERROR each pass.
+
+## 8. Addendum 2026-10-15: write-off shipped; Q6/§2/§6 premise corrected
+
+- The "explicit operator write-off route" named in §7 is built: `POST /write_off`, a `write_off:`
+  `.prg` block, a ledger and an opt-in `/quarantine` page. See
+  `2026-10-15-sync-write-off-design.md`.
+- Correction: Q6 and §2 said new routes need a checklist re-freeze, so none were added, and §6
+  deferred dedicated routes for that reason. That premise is wrong. New routes need only an entry
+  in `helao/hexagon/tests/checklists/hte/_additions.json`; the frozen record is untouched.
+

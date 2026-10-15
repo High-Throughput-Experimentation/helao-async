@@ -69,6 +69,7 @@ PROGRESS = [
     "s3_done",
     "api_done",
     "remove_prg",
+    "written_off",
 ]
 
 
@@ -115,6 +116,9 @@ SYNC_DRIVER_CORE = [
     "syncer",
     "get_progress",
     "enqueue_yml",
+    "write_off",
+    "_write_off",
+    "_append_write_off_ledger",
 ]
 
 
