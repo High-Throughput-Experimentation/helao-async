@@ -534,7 +534,6 @@ def make_logger(
         x is not None
         for x in [mailhost, mailport, fromaddr, username, password, recipients]
     ]
-    # print(email_conditions)
     if all(email_conditions):
         email_queue = Queue(-1)
         queue_handler = QueueHandler(email_queue)
@@ -560,7 +559,23 @@ def make_logger(
             f"(throttled to 1 email per {email_interval}s)"
         )
     else:
-        logger_instance.info(f"Email alerts not enabled using config: {email_config}")
+        # Key names only: the config dict carries the SMTP password.
+        missing = [
+            k
+            for k, v in zip(
+                [
+                    "mailhost",
+                    "mailport",
+                    "fromaddr",
+                    "username",
+                    "password",
+                    "recipients",
+                ],
+                [mailhost, mailport, fromaddr, username, password, recipients],
+            )
+            if v is None
+        ]
+        logger_instance.info(f"Email alerts not enabled, missing keys: {missing}")
 
     webhook = email_config.get("webhook", None)
     payload = email_config.get("payload", None)
@@ -578,7 +593,10 @@ def make_logger(
         webhook_queue_listener.start()
         logger_instance.info(f"Webhook alerts enabled at log level: {ALERT_LEVEL}")
     else:
-        logger_instance.info(f"Webhook alerts not enabled using config: {email_config}")
+        missing = [
+            k for k, v in zip(["webhook", "payload"], [webhook, payload]) if v is None
+        ]
+        logger_instance.info(f"Webhook alerts not enabled, missing keys: {missing}")
 
     logger_instance.info(f"writing log events to {log_path}")
     logger_instance.propagate = False

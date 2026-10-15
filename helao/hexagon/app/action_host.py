@@ -946,7 +946,8 @@ class ActionHost(HelaoFastAPI):
             if not is_action_post:
                 return await call_next(request)
 
-            body_dict = json.loads(await request.body())
+            # Bodyless POSTs (``/estop`` takes only a query param) are valid.
+            body_dict = json.loads(await request.body() or b"{}")
             action_dict = body_dict.get("action", {})
             start_cond = action_dict.get("start_condition", ASC.wait_for_all)
             ep_model = self.actionservermodel.endpoints.get(endpoint)
