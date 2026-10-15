@@ -1160,8 +1160,14 @@ class Progress:
         """Whether this record is quarantined (``quarantined_at`` is set)."""
         return bool((self.quarantine or {}).get("quarantined_at"))
 
-    def add_strike(self, error: str, n: int, hours: float, now: datetime) -> bool:
+    def add_strike(
+        self, error: str, n: int, hours: float, now: datetime, immediate: bool = False
+    ) -> bool:
         """Record one failed sync pass; return True only on entering quarantine.
+
+        ``immediate`` parks the record now, whatever the strike count and age:
+        for a failure no retry can cure (a permanently incomplete process
+        group). ``quarantined_at`` is the detection time.
 
         A block that does not parse (a hand edit, a foreign writer) is replaced
         by a fresh one rather than raised on: a strike is bookkeeping, and
@@ -1189,7 +1195,11 @@ class Progress:
             "quarantined_at": block.get("quarantined_at") if already else None,
             "last_error": str(error)[:QUARANTINE_ERROR_CHARS],
         }
-        entered = counted and not already and quarantine_due(new_block, n, hours, now)
+        entered = (
+            n > 0
+            and not already
+            and (immediate or (counted and quarantine_due(new_block, n, hours, now)))
+        )
         if entered:
             new_block["quarantined_at"] = stamp
         self.dict["quarantine"] = new_block
@@ -1388,17 +1398,25 @@ class SyncDriver:
         """
         return self.task_queue.qsize() > 0 or bool(self.running_tasks)
 
-    def _add_strike(self, yml_path: Path, error: str) -> tuple:
+    def _add_strike(
+        self, yml_path: Path, error: str, immediate: bool = False
+    ) -> tuple:
         """Blocking half of :meth:`_strike`: parse the yml, add the strike."""
         if _prg_is_complete(Path(yml_path).with_suffix(".prg")):
             return False, {}
         prog = Progress(yml_path)
         entered = prog.add_strike(
-            error, self.quarantine_strikes, self.quarantine_hours, datetime.now()
+            error,
+            self.quarantine_strikes,
+            self.quarantine_hours,
+            datetime.now(),
+            immediate,
         )
         return entered, prog.quarantine or {}
 
-    async def _strike(self, yml_path: Path, error: str) -> None:
+    async def _strike(
+        self, yml_path: Path, error: str, immediate: bool = False
+    ) -> None:
         """Record one failed pass for ``yml_path``; park it if it has earned it.
 
         The yml parse runs in a thread: a multi-MB sequence yml would otherwise
@@ -1408,18 +1426,68 @@ class SyncDriver:
         failed pass into a dead worker.
         """
         try:
-            entered, block = await asyncio.to_thread(self._add_strike, yml_path, error)
+            entered, block = await asyncio.to_thread(
+                self._add_strike, yml_path, error, immediate
+            )
             if not entered:
                 return
-            LOGGER.alert(  # type: ignore[attr-defined]
-                f"SYNC quarantined {yml_path} after {block.get('strikes')} failed "
-                f"passes ({block.get('first_failed')} .. {block.get('last_failed')}); "
-                f"last error: {block.get('last_error')}. It will not be retried "
-                "automatically. Fix the cause, then POST /finish_yml with this path."
-            )
+            if immediate:
+                msg = (
+                    f"SYNC quarantined {yml_path} immediately: "
+                    f"{block.get('last_error')}. It cannot complete as recorded. "
+                    "It will not be retried automatically. POST /finish_yml "
+                    "releases it, but it is parked again while the record is "
+                    "still absent (a write-off route is planned)."
+                )
+            else:
+                msg = (
+                    f"SYNC quarantined {yml_path} after {block.get('strikes')} "
+                    f"failed passes ({block.get('first_failed')} .. "
+                    f"{block.get('last_failed')}); last error: "
+                    f"{block.get('last_error')}. It will not be retried "
+                    "automatically. Fix the cause, then POST /finish_yml with "
+                    "this path."
+                )
+            LOGGER.alert(msg)  # type: ignore[attr-defined]
             self._journal(yml_path, QUARANTINED)
         except Exception:
             LOGGER.error(f"Could not record a sync strike for {yml_path}", exc_info=True)
+
+    def _incomplete_process_groups(self, prog: Progress) -> dict:
+        """Process groups of a finished experiment that can never complete.
+
+        ``{group index: [missing action_orders]}``. A group qualifies only when
+        it is unfinished, at least one of its actions has synced (an all-absent
+        group is a phantom, dropped by :meth:`sync_process`), and one of its
+        ``action_order`` values is neither synced nor has *any* action record
+        (``-act.yml``, whatever its state) under the experiment dir. A record
+        that exists but has not synced is ordinary retry, never listed here.
+        Call only once the experiment has no unfinished child (see
+        :meth:`sync_yml`). Legacy experiments build their groups from the
+        actions they saw, so they never qualify.
+        """
+        d = prog.dict
+        if d["legacy_experiment"]:
+            return {}
+        done = d["process_actions_done"]
+        s3_unf, api_unf = prog.list_unfinished_procs()
+        lacking = {
+            p: [i for i in d["process_groups"][p] if i not in done]
+            for p in set(s3_unf) | set(api_unf)
+        }
+        # all-absent groups are phantoms; only partly-synced ones are listed
+        lacking = {
+            p: m
+            for p, m in lacking.items()
+            if m and len(m) < len(d["process_groups"][p])
+        }
+        if not lacking:
+            return {}
+        on_disk = {
+            c.meta.get("action_order") for c in prog.yml.children if c.type == "action"
+        }
+        gone = {p: [i for i in m if i not in on_disk] for p, m in lacking.items()}
+        return {p: m for p, m in gone.items() if m}
 
     def release_quarantine(self, yml_path: Union[Path, str]) -> bool:
         """Clear ``yml_path``'s quarantine; True if there was one to clear."""
@@ -1899,6 +1967,20 @@ class SyncDriver:
                 LOGGER.debug(
                     f"Cannot sync {str(prog.yml.target)}, children are not 'synced'."
                 )
+                if all(
+                    _prg_is_quarantined(c.target.with_suffix(".prg"))
+                    for c in finished_children
+                ):
+                    # Every unshipped child is parked: nothing this parent does
+                    # can change that. Re-queueing it (and, via the gate, the
+                    # children) only burns rank on a quarantined subtree; the
+                    # operator's /finish_yml on a child re-queues the parent
+                    # once that child ships.
+                    LOGGER.info(
+                        f"{str(prog.yml.target)}: every unsynced child is in sync "
+                        "quarantine; not re-queuing."
+                    )
+                    return False
                 # Re-queue this parent *below* its children, and decrement the
                 # rank on every pass so the rank_limit floor in enqueue_yml
                 # eventually bounds the retries. Re-queuing at a higher rank
@@ -1935,6 +2017,28 @@ class SyncDriver:
             # Rebuild process metas from the on-disk action ymls before the
             # chain flushes them (see reconcile_processes).
             prog = self.reconcile_processes(prog)
+            # Every child is shipped here, so an action_order with no record
+            # at all is lost for good: no retry can complete its group. Park the
+            # experiment now (not after the strike/age threshold) and alert;
+            # nothing is force-closed. /finish_yml releases it.
+            incomplete = self._incomplete_process_groups(prog)
+            if incomplete:
+                metas = prog.dict["process_metas"]
+                why = (
+                    "; ".join(
+                        f"process group {p} ({metas.get(p, {}).get('process_uuid')}) "
+                        f"has no action record for action_order {m}"
+                        for p, m in sorted(incomplete.items())
+                    )
+                    + " (likely an operator skip or E-STOP mid-group, or an "
+                    "action lost at a crash)"
+                )
+                if self.quarantine_strikes <= 0:
+                    # Parking is disabled, so _strike stays silent; say why
+                    # this pass failed.
+                    LOGGER.error(f"{str(prog.yml.target)}: {why}")
+                await self._strike(prog.yml.target, why, immediate=True)
+                return False
 
         # The S3 leg and the analysis dispatch are post-finish hooks now
         # (finish-hooks spec §6): s3_upload (blocking) and dispatch_analysis
