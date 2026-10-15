@@ -69,6 +69,7 @@ PROGRESS = [
     "s3_done",
     "api_done",
     "remove_prg",
+    "written_off",
 ]
 
 

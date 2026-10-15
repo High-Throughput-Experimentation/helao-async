@@ -1199,9 +1199,16 @@ class Progress:
         )
         if entered:
             new_block["quarantined_at"] = stamp
+        if (entered and immediate) or (already and block.get("immediate")):
+            new_block["immediate"] = True  # display hint; carried across strikes
         self.dict["quarantine"] = new_block
         self.write_dict()
         return entered
+
+    def written_off(self, pidx) -> list:
+        """Orders of group ``pidx`` written off and still absent from the record."""
+        orders = ((self.dict.get("write_off") or {}).get("groups") or {}).get(pidx, [])
+        return [i for i in orders if i not in self.dict["process_actions_done"]]
 
     def clear_quarantine(self) -> None:
         """Drop the ``quarantine`` block, so the next failure starts afresh."""
@@ -1469,7 +1476,11 @@ class SyncDriver:
         done = d["process_actions_done"]
         s3_unf, api_unf = prog.list_unfinished_procs()
         lacking = {
-            p: [i for i in d["process_groups"][p] if i not in done]
+            p: [
+                i
+                for i in d["process_groups"][p]
+                if i not in done and i not in prog.written_off(p)
+            ]
             for p in set(s3_unf) | set(api_unf)
         }
         # all-absent groups are phantoms; only partly-synced ones are listed
@@ -2464,7 +2475,9 @@ class SyncDriver:
                     continue
                 meta = exp_prog.dict["process_metas"][pidx]
                 uuid_key = meta["process_uuid"]
-                model = ProcessModel.model_validate(meta).clean_dict(strip_private=True)
+                model = ProcessModel.model_validate(
+                    {**meta, "missing_action_orders": exp_prog.written_off(pidx) or None}
+                ).clean_dict(strip_private=True)
                 # write to local yml
                 # Beside the -exp.yml, inside the RUNS_* tree, so the sequence
                 # zip carries its own process identity. It used to go to
@@ -2491,7 +2504,11 @@ class SyncDriver:
             # process_groups; skip it here too (its pidx was already flagged done)
             if gids is None or pidx not in exp_prog.dict["process_metas"]:
                 continue
-            if all(i in exp_prog.dict["process_actions_done"] for i in gids):
+            if all(
+                i in exp_prog.dict["process_actions_done"]
+                or i in exp_prog.written_off(pidx)
+                for i in gids
+            ):
                 meta = exp_prog.dict["process_metas"][pidx]
                 # The API push is retired (see sync_yml), but the meta is still
                 # validated here so a malformed process fails loudly instead of
