@@ -975,7 +975,7 @@ def ECMS_sub_CV(
         potential_apex1_vsRef = WE_potential_apex1__V - 1.0 * ref_offset__V
         potential_apex2_vsRef = WE_potential_apex2__V - 1.0 * ref_offset__V
         potential_final_vsRef = WE_potential_final__V - 1.0 * ref_offset__V
-    elif WE_versus == "OCV":
+    elif WE_versus == "ocv":
         potential_init_vsRef = WE_potential_init__V
         potential_apex1_vsRef = WE_potential_apex1__V
         potential_apex2_vsRef = WE_potential_apex2__V 
