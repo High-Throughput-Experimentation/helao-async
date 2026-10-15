@@ -589,3 +589,26 @@ async def test_tasks_lists_quarantined_records(installed_config):
     body = await _route(app, "/tasks")()
     assert body["quarantined"] == [{"yml": "/x/a-act.yml", "strikes": 5}]
     assert set(body) == {"running", "num_queued", "last_startup_sweep", "quarantined"}
+
+
+def test_write_off_route_forwards_the_stripped_path(installed_config):
+    from fastapi.testclient import TestClient
+
+    class _WriteOffDriver:
+        def __init__(self):
+            self.calls = []
+
+        async def write_off(self, yml_path, reason, operator):
+            self.calls.append((yml_path, reason, operator))
+            return {"ok": True, "status": "written off", "groups": {"1": [2]}}
+
+    app = _make_app(installed_config)
+    drv = _WriteOffDriver()
+    app.driver = drv  # _prime needs a running loop; TestClient brings its own
+    resp = TestClient(app).post(
+        "/write_off",
+        params={"yml_path": '"/x/a-exp.yml"', "reason": "estop", "operator": "op"},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": True, "status": "written off", "groups": {"1": [2]}}
+    assert drv.calls == [("/x/a-exp.yml", "estop", "op")]

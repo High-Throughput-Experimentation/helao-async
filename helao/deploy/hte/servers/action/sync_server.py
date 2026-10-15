@@ -251,6 +251,19 @@ def makeApp(server_key) -> ActionHost:
         app.driver.reset_sync(sync_path.strip('"').strip("'"))
         return sync_path
 
+    @app.post("/write_off", tags=["private"])
+    async def write_off(yml_path: str, reason: str, operator: str) -> dict:
+        """Write off the missing actions of a parked experiment and re-queue it.
+
+        Only for an incomplete-process-group quarantine; anything else is a
+        refusal in the returned dict (``ok: false``), never an HTTP error, so a
+        dispatcher fallback cannot replay it. Idempotent: see
+        ``SyncDriver.write_off``.
+        """
+        return await app.driver.write_off(
+            yml_path.strip('"').strip("'"), reason, operator
+        )
+
     @app.post("/tasks", tags=["private"])
     async def running() -> dict:
         """Return running sync tasks, the queued count, and the startup sweep.
@@ -262,7 +275,7 @@ def makeApp(server_key) -> ActionHost:
         rather than given a route of its own: ``/tasks`` is already what an
         operator polls, and the frozen endpoint checklist for this module
         (``helao/hexagon/tests/checklists/hte/sync_server.json``) pins the route
-        set, so a new route would break that gate.
+        set, so a new route needs an entry in ``checklists/hte/_additions.json``.
 
         ``quarantined`` lists records the syncer has stopped retrying (sync quarantine spec); POST ``/finish_yml`` with a listed ``yml`` to release one.
         """
@@ -270,7 +283,7 @@ def makeApp(server_key) -> ActionHost:
             "running": list(app.driver.running_tasks.keys()),
             "num_queued": (app.driver.task_queue.qsize()),
             "last_startup_sweep": app.last_startup_sweep,  # type: ignore[attr-defined]
-            "quarantined": app.driver.quarantined(),
+            "quarantined": await asyncio.to_thread(app.driver.quarantined),
         }
 
     @app.post("/list_exceptions", tags=["private"])

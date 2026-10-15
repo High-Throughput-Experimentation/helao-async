@@ -35,6 +35,7 @@ import io
 import json
 import os
 import shutil
+import threading
 import traceback
 from collections import defaultdict
 from configparser import ConfigParser
@@ -759,6 +760,16 @@ QUARANTINE_ERROR_CHARS = 500
 #: burst alone would spend the whole strike budget (sync quarantine spec Q7).
 QUARANTINE_STRIKE_GAP = timedelta(hours=1)
 
+#: Write-off ``reason`` / ``operator`` caps, after whitespace collapsing. Longer
+#: is refused, not cut, so a pasted log cannot bloat the ``.prg``, the ledger
+#: or the alert email (sync write-off spec 3.1).
+WRITE_OFF_REASON_CHARS = 500
+WRITE_OFF_OPERATOR_CHARS = 80
+
+#: Write-offs of different experiments run in threads against one ledger file,
+#: and appends are not atomic on Windows or CIFS (sync write-off spec 3.3).
+_WRITE_OFF_LEDGER_LOCK = threading.Lock()
+
 
 def quarantine_due(block: dict, n: int, hours: float, now: datetime) -> bool:
     """Whether a ``quarantine`` block has earned quarantine (spec Q3).
@@ -1444,7 +1455,8 @@ class SyncDriver:
                     f"{block.get('last_error')}. It cannot complete as recorded. "
                     "It will not be retried automatically. POST /finish_yml "
                     "releases it, but it is parked again while the record is "
-                    "still absent (a write-off route is planned)."
+                    "still absent. POST /write_off records a write-off of the "
+                    "missing actions."
                 )
             else:
                 msg = (
@@ -1508,6 +1520,140 @@ class SyncDriver:
         Progress(yml_path).clear_quarantine()
         LOGGER.info(f"Operator released {yml_path} from sync quarantine.")
         return True
+
+    def _append_write_off_ledger(self, entry: dict) -> None:
+        """Append to ``STATES/sync_write_off.jsonl`` (skipped without states_root)."""
+        if not self.helaodirs.states_root:
+            return
+        path = Path(self.helaodirs.states_root) / "sync_write_off.jsonl"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with _WRITE_OFF_LEDGER_LOCK:
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry) + "\n")
+
+    def _write_off(self, yml_path: Path, reason: str, operator: str) -> dict:
+        """Blocking half of :meth:`write_off` (sync write-off spec 4.4, steps 1-7).
+
+        Refusals return ``{"ok": False, "error": ...}`` and never create or
+        write a ``.prg``: ``Progress`` is built only once the record is known
+        to be a quarantined experiment with a ``.prg`` on disk.
+        """
+        reason = " ".join(str(reason).split())
+        operator = " ".join(str(operator).split())
+        if not reason or len(reason) > WRITE_OFF_REASON_CHARS:
+            err = f"reason must be 1-{WRITE_OFF_REASON_CHARS} characters"
+            return {"ok": False, "error": err}
+        if not operator or len(operator) > WRITE_OFF_OPERATOR_CHARS:
+            err = f"operator must be 1-{WRITE_OFF_OPERATOR_CHARS} characters"
+            return {"ok": False, "error": err}
+        yml_path = Path(yml_path)
+        prg = yml_path.with_suffix(".prg")
+        root = Path(str(self.helaodirs.root)).resolve()
+        if (
+            not yml_path.name.endswith("-exp.yml")
+            or not yml_path.is_file()
+            or not yml_path.resolve().is_relative_to(root)
+            or not prg.exists()
+        ):
+            err = f"{yml_path} is not an experiment yml with a .prg under root"
+            return {"ok": False, "error": err}
+        if _prg_is_complete(prg):
+            return {"ok": True, "status": "already synced"}
+        block = (yml_load(prg, fast=True) or {}).get("write_off")
+        if block:
+            if _prg_is_quarantined(prg):
+                return {
+                    "ok": False,
+                    "error": "parked again after a write-off, so a strike caused "
+                    "it; fix the cause, then POST /finish_yml",
+                }
+            self._append_write_off_ledger(
+                {
+                    "ts": datetime.now().isoformat(timespec="seconds"),
+                    "yml": str(yml_path),
+                    "action": "requeue",
+                    "operator": operator,
+                    "reason": reason,
+                    "groups": block.get("groups"),
+                }
+            )
+            return {
+                "ok": True,
+                "status": "requeued",
+                "at": str(block.get("at")),
+                "operator": str(block.get("operator")),
+            }
+        if not _prg_is_quarantined(prg):
+            return {"ok": False, "error": f"{yml_path} is not in sync quarantine"}
+        prog = self.reconcile_processes(Progress(yml_path))
+        found = self._incomplete_process_groups(prog)
+        groups = {int(p): list(m) for p, m in found.items()}
+        if not groups:
+            return {
+                "ok": False,
+                "error": "not an incomplete-process-group quarantine; "
+                "fix the cause and POST /finish_yml",
+            }
+        at = datetime.now().isoformat(timespec="seconds")
+        self._append_write_off_ledger(
+            {
+                "ts": at,
+                "yml": str(yml_path),
+                "action": "write_off",
+                "operator": operator,
+                "reason": reason,
+                "groups": groups,
+            }
+        )
+        # int pidx keys: Progress.written_off matches only ints
+        prog.dict["write_off"] = {
+            "at": at,
+            "operator": operator,
+            "reason": reason,
+            "groups": groups,
+        }
+        prog.dict.pop("quarantine", None)
+        for key in ("process_s3", "process_api"):  # re-push the backlog, marked
+            prog.dict[key] = [p for p in prog.dict[key] if p not in groups]
+        prog.write_dict()
+        return {"ok": True, "status": "written off", "groups": groups}
+
+    async def write_off(
+        self, yml_path: Union[Path, str], reason: str, operator: str
+    ) -> dict:
+        """Close an incomplete-group quarantine with the actions that exist.
+
+        Returns a dict and never raises: a raise would reach the dispatcher as
+        an ``RPCError`` and the call would replay (sync write-off spec 4.4).
+        The alert and the re-queue run after the locks are released, because
+        ``enqueue_yml`` must not hold the sequence lock.
+        """
+        yml_path = Path(yml_path)
+        try:
+            async with AsyncExitStack() as stack:
+                await self._acquire_hierarchy_locks(stack, yml_path)
+                result = await asyncio.to_thread(
+                    self._write_off, yml_path, reason, operator
+                )
+        except Exception as err:
+            LOGGER.error(f"Write-off of {yml_path} failed", exc_info=True)
+            return {"ok": False, "error": f"{type(err).__name__}: {err}"}
+        if not result.get("ok"):
+            LOGGER.info(f"Write-off of {yml_path} refused: {result.get('error')}")
+            return result
+        try:  # the block is durable; a tail failure must not become an HTTP 500
+            if result.get("status") == "written off":
+                LOGGER.alert(  # type: ignore[attr-defined]
+                    f"SYNC write-off of {yml_path} by "
+                    f"{' '.join(str(operator).split())}: groups {result['groups']}; "
+                    f"reason: {' '.join(str(reason).split())}. It syncs with the "
+                    "actions that exist."
+                )
+            await self.enqueue_yml(yml_path, 1)
+        except Exception as err:
+            LOGGER.error(f"Write-off tail of {yml_path} failed", exc_info=True)
+            return {**result, "warning": f"not re-queued: {type(err).__name__}: {err}"}
+        return result
 
     def quarantined(self) -> list:
         """Quarantined records from the SYNC journal, with their ``.prg`` block.

@@ -116,6 +116,9 @@ SYNC_DRIVER_CORE = [
     "syncer",
     "get_progress",
     "enqueue_yml",
+    "write_off",
+    "_write_off",
+    "_append_write_off_ledger",
 ]
 
 
