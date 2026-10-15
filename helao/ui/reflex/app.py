@@ -72,6 +72,11 @@ from helao.ui.reflex.control import (
     control_page,
 )
 from helao.ui.reflex.retire import RetireState, configure_retire, retire_page
+from helao.ui.reflex.sync_quarantine import (
+    QuarantineState,
+    configure_quarantine,
+    sync_quarantine_page,
+)
 from helao.ui.reflex.state import make_panel_state
 from helao.ui.reflex.xy_component import make_buffer_router
 from helao.helpers import config_loader
@@ -93,6 +98,7 @@ SHELL_ROUTES = (
     "/xafs",
     "/xrds",
     "/retire",
+    "/quarantine",
 )
 
 #: Page name -> the config key whose panels belong on it.
@@ -352,6 +358,7 @@ def _nav():
                 spacing="4",
             ),
         ),
+        rx.link("Quarantine", href="/quarantine"),
         width="100%",
         padding="0.75em 1em",
         align="center",
@@ -522,6 +529,7 @@ def build_app(world_cfg: dict, server_key: str):
     assert XafsState is not None
     assert XrdsState is not None
     assert RetireState is not None
+    assert QuarantineState is not None
     # The operator's backend is built per session from this config; without
     # this the page renders but can never reach an orchestrator.
     configure_operator(world_cfg, server_key)
@@ -532,6 +540,8 @@ def build_app(world_cfg: dict, server_key: str):
     configure_composition(world_cfg, server_key)
     # And the retire page, which is off unless this server opts in.
     configure_retire(world_cfg, server_key)
+    # And the sync-quarantine page, off unless this server opts in.
+    configure_quarantine(world_cfg, server_key)
 
     # The buffer route carries bulk column data out-of-band, so megabyte float
     # arrays never traverse Reflex's JSON state channel. `api_transformer` is
@@ -633,6 +643,11 @@ def build_app(world_cfg: dict, server_key: str):
         lambda: _page("Retire sequence", retire_page(), "/retire"),
         route="/retire",
         title="HELAO retire",
+    )
+    application.add_page(
+        lambda: _page("Sync quarantine", sync_quarantine_page(), "/quarantine"),
+        route="/quarantine",
+        title="HELAO quarantine",
     )
 
     @contextlib.asynccontextmanager

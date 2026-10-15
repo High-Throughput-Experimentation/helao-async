@@ -426,3 +426,39 @@ def test_retire_route_is_the_real_page_and_its_handlers_register(reflex_cfg):
     handlers = page.RetireState.event_handlers
     for name in ("set_uuid", "set_confirm", "gather", "do_retire"):
         assert name in handlers, f"{name} not registered; have {sorted(handlers)}"
+
+
+def test_quarantine_route_is_the_real_page_and_its_handlers_register(reflex_cfg):
+    from helao.ui.reflex import sync_quarantine as page
+
+    from helao.ui.reflex.app import SHELL_ROUTES, build_app
+
+    build_app(reflex_cfg, "UI")
+    assert "/quarantine" in SHELL_ROUTES
+    handlers = page.QuarantineState.event_handlers
+    for name in (
+        "set_confirm",
+        "set_reason",
+        "set_operator",
+        "select",
+        "refresh",
+        "release_row",
+        "write_off",
+    ):
+        assert name in handlers, f"{name} not registered; have {sorted(handlers)}"
+
+
+def test_build_app_configures_the_quarantine_page(reflex_cfg, monkeypatch):
+    """Mutation: delete configure_quarantine from build_app."""
+    import copy
+
+    from helao.ui.reflex import sync_quarantine as page
+    from helao.ui.reflex.app import build_app
+
+    monkeypatch.setitem(page._CONFIG, "enabled", False)
+    monkeypatch.setitem(page._CONFIG, "target", None)
+    cfg = copy.deepcopy(dict(reflex_cfg))
+    cfg["servers"]["SYNC"] = {"host": "localhost", "port": 8010, "group": "action"}
+    cfg["servers"]["UI"].setdefault("params", {})["sync_quarantine"] = True
+    build_app(cfg, "UI")
+    assert page.quarantine_enabled() is True

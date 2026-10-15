@@ -44,6 +44,7 @@ TW: Final[Mapping[str, str]] = {
     "slate-800": "#1e293b",
     "slate-900": "#0f172a",
     "slate-950": "#020617",
+    "red-50": "#fef2f2",
     "red-400": "#f87171",
     "red-500": "#ef4444",
     "red-600": "#dc2626",
@@ -199,6 +200,7 @@ REFLEX_PAGE_TINTS: Final[Mapping[str, str]] = {
     "/xafs": "teal-50",
     "/xrds": "yellow-50",
     "/retire": "orange-50",
+    "/quarantine": "red-50",
 }
 """One page canvas per Reflex route — the functional-section signal.
 
