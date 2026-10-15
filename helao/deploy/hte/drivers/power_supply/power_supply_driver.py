@@ -52,6 +52,7 @@ class PowerSupplyDriver(HelaoDriver):
             None  # this gives access to the list resources method
         )
         self.ready = False
+        self._estopped = False  # E-STOP latch: refuse to energize while set
 
     def connect(self) -> DriverResponse:
         """Open the VISA resource, query `*IDN?`, and mark the driver ready."""
@@ -81,6 +82,12 @@ class PowerSupplyDriver(HelaoDriver):
         Note: `voltage_v` is currently logged but not used in the `VSET1:`
         command (which writes the literal `0`).
         """
+        if output_on and self._estopped:
+            return DriverResponse(
+                response=DriverResponseType.failed,
+                status=DriverStatus.error,
+                message="E-STOP latched: output not enabled",
+            )
         if self.instrument is None:
             return DriverResponse(
                 response=DriverResponseType.failed,
@@ -127,6 +134,12 @@ class PowerSupplyDriver(HelaoDriver):
 
     def set_output(self, output_on: bool = True) -> DriverResponse:
         """Send `OUT1` or `OUT0` to enable or disable the supply output."""
+        if output_on and self._estopped:
+            return DriverResponse(
+                response=DriverResponseType.failed,
+                status=DriverStatus.error,
+                message="E-STOP latched: output not enabled",
+            )
         if self.instrument is None:
             return DriverResponse(
                 response=DriverResponseType.failed,
@@ -382,24 +395,19 @@ class PowerSupplyDriver(HelaoDriver):
             )
 
     def stop(self) -> DriverResponse:
-        """Stub stop method satisfying the `HelaoDriver` interface; performs no action."""
-        if self.instrument is None:
-            return DriverResponse(
-                response=DriverResponseType.failed,
-                status=DriverStatus.uninitialized,
-                message="not connected",
-            )
-        try:
-            return DriverResponse(
-                response=DriverResponseType.success, status=DriverStatus.ok
-            )
-        except Exception:
-            LOGGER.error("stop failed:", exc_info=True)
-            return DriverResponse(
-                response=DriverResponseType.failed,
-                status=DriverStatus.error,
-                message=f"stop failed:",
-            )
+        """De-energize the supply output (`OUT0`)."""
+        resp = self.set_output(False)
+        if resp.response != DriverResponseType.success:
+            LOGGER.error(f"stop failed: {resp.message}")
+        return resp
+
+    async def estop(self, switch: bool, *args, **kwargs) -> bool:
+        """Latch E-STOP and de-energize the output; release clears the latch."""
+        self._estopped = switch
+        if switch:
+            LOGGER.info("power supply estop: output off")
+            self.stop()
+        return switch
 
     def disconnect(self) -> DriverResponse:
         """Close the VISA instrument and resource manager, clearing `self.instrument`."""

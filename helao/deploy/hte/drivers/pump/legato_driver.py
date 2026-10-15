@@ -280,8 +280,8 @@ class KDS100(HelaoDriver):
 
         ``DriverPoller.get_data`` is called synchronously (see
         ``helao_driver.py``), so the poller cannot ``await`` :meth:`send`.
-        The wire protocol is identical; only the lock-wait sleep is blocking
-        instead of cooperative.
+        The wire protocol is identical; if the lock is held it returns
+        ``[]`` (skip this poll cycle) rather than waiting.
 
         Args:
             pump_name: Key in the config ``pumps`` dict identifying the target pump.
@@ -307,8 +307,11 @@ class KDS100(HelaoDriver):
             cmd = cmd + "\r"
         addr = self.config_dict["pumps"][pump_name]["address"]
         command_str = f"{addr:02}@{cmd}"
-        while self.com_lock:
-            time.sleep(0.1)
+        if self.com_lock:
+            # An async send() holds the lock across awaits on this same thread;
+            # spinning here would block the loop it needs to finish. Skip the
+            # cycle instead (the poller just samples again next time).
+            return []
         self.com_lock = True
         try:
             self.sio.write(command_str)

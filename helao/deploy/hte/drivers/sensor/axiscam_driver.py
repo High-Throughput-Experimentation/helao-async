@@ -28,6 +28,9 @@ from helao.core.models.hlostatus import HloStatus
 from helao.core.models.run_dir import redirect_manual_dir
 from helao.helpers.executor import Executor
 
+# seconds; an unreachable camera must fail the frame, not hang the server
+ACQUIRE_TIMEOUT_S = 10
+
 
 class AxisCam(HelaoDriver):
     """Driver that pulls still JPEGs from an Axis M1103 IP camera over HTTP."""
@@ -83,7 +86,10 @@ class AxisCam(HelaoDriver):
         LOGGER.info("creating http session")
         with requests.Session() as session:
             LOGGER.info(f"making get request to {self.config_dict['axis_ip']}")
-            resp = session.get(f"http://{self.config_dict['axis_ip']}/jpg/1/image.jpg")
+            resp = session.get(
+                f"http://{self.config_dict['axis_ip']}/jpg/1/image.jpg",
+                timeout=ACQUIRE_TIMEOUT_S,
+            )
             img = resp.content
             LOGGER.info(f"acquired image {len(img)} at: {time.time()}")
         return img
@@ -150,7 +156,7 @@ class AxisCamExec(Executor):
         # self.active.base.print_message(
         #     f"Image acquisition started at {self.start_time}"
         # )
-        img = self.active.driver.acquire_image()
+        img = await asyncio.to_thread(self.active.driver.acquire_image)
         # LOGGER.info("image acquired")
         live_dict = await self.write_image(img, self.start_time)
         return {"error": ErrorCodes.none, "data": live_dict}
@@ -164,7 +170,15 @@ class AxisCamExec(Executor):
             durations run indefinitely).
         """
         iter_time = time.time()
-        img = self.active.driver.acquire_image()
+        try:
+            img = await asyncio.to_thread(self.active.driver.acquire_image)
+        except requests.RequestException as exc:
+            LOGGER.error(f"axis camera image fetch failed: {exc!r}")
+            return {
+                "error": ErrorCodes.critical_error,
+                "status": HloStatus.errored,
+                "message": f"axis camera image fetch failed: {exc!r}",
+            }
         live_dict = await self.write_image(img, iter_time)
         elapsed_time = iter_time - self.start_time
         if (self.duration < 0) or (elapsed_time < self.duration):

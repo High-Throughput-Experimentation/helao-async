@@ -218,7 +218,8 @@ class NativeGalilMotion(HelaoDriver):
                 f"miscalibrated (place the plate_calib file and reconnect)"
             )
             plate = self.dflt_matrix
-        store.save_plate_calibration(plate)
+        else:
+            store.save_plate_calibration(plate)
         self.plate_transfermatrix = plate
         LOGGER.info(f"plate_transfermatrix is: \n{self.plate_transfermatrix}")
 
@@ -477,6 +478,28 @@ class NativeGalilMotion(HelaoDriver):
     async def _motor_move(
         self, d_mm, axis, speed, mode, transformation, units="mm"
     ) -> dict:
+        """Busy-guarded wrapper: ``motor_busy`` is always cleared, even on error."""
+        if self.motor_busy or not self.galil_enabled:
+            return {
+                "moved_axis": None,
+                "speed": None,
+                "accepted_rel_dist": None,
+                "supplied_rel_dist": None,
+                "err_dist": None,
+                "err_code": ErrorCodes.in_progress,
+                "counts": None,
+            }
+        self.motor_busy = True
+        try:
+            return await self._motor_move_unguarded(
+                d_mm, axis, speed, mode, transformation, units
+            )
+        finally:
+            self.motor_busy = False
+
+    async def _motor_move_unguarded(
+        self, d_mm, axis, speed, mode, transformation, units="mm"
+    ) -> dict:
         """Transform coordinates, issue the per-axis move sequence, settle-poll.
 
         Faithful port of the legacy ``Galil._motor_move``: converts ``d_mm`` from
@@ -502,17 +525,6 @@ class NativeGalilMotion(HelaoDriver):
         silently garble the target. That combination is refused outright rather
         than converted.
         """
-        if self.motor_busy or not self.galil_enabled:
-            return {
-                "moved_axis": None,
-                "speed": None,
-                "accepted_rel_dist": None,
-                "supplied_rel_dist": None,
-                "err_dist": None,
-                "err_code": ErrorCodes.in_progress,
-                "counts": None,
-            }
-        self.motor_busy = True
         # galil_enabled is True past the guard -> connect() ran -> transform set.
         assert self.transform is not None
         tf = self.transform
@@ -848,15 +860,16 @@ class NativeGalilMotion(HelaoDriver):
         )
         if not self.blocked and self.galil_enabled:
             self.blocked = True
-            retval = await self._motor_move(
-                d_mm=d_mm,
-                axis=axis,
-                speed=speed,
-                mode=mode,
-                transformation=transformation,
-            )
-            self.blocked = False
-            return retval
+            try:
+                return await self._motor_move(
+                    d_mm=d_mm,
+                    axis=axis,
+                    speed=speed,
+                    mode=mode,
+                    transformation=transformation,
+                )
+            finally:
+                self.blocked = False
         return {
             "moved_axis": None,
             "speed": None,

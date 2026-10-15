@@ -98,7 +98,8 @@ class WsSyncClient:
         """Connect, receive one message, and return the decoded payload.
 
         Retries up to five times on connection failure, sleeping two seconds
-        between attempts.
+        between attempts. Returns ``{}`` at once if no message arrives within
+        5 s of connecting.
 
         Returns:
             Decoded message dict, or ``{}`` if all retries fail.
@@ -107,9 +108,12 @@ class WsSyncClient:
         for retry_idx in range(retry_limit):
             try:
                 with connect(self.data_url) as conn:
-                    recv_bytes = conn.recv()
+                    recv_bytes = conn.recv(timeout=5)
                 if recv_bytes:
                     return pickle.loads(pyzstd.decompress(recv_bytes))
+            except TimeoutError:
+                # connected but the publisher is silent: no packet, not a retry
+                return {}
             except Exception:
                 print(f"Could not connect, retrying {retry_idx+1}/{retry_limit}")
                 time.sleep(2)
