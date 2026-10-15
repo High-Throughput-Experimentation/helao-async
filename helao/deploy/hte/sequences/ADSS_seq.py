@@ -22,7 +22,7 @@ from helao.helpers.lib_decorators import sequence
 from helao.helpers.premodels import ExperimentPlanMaker
 
 
-@sequence(version=8)
+@sequence(version=9)
 def ADSS_CA_cell_1potential(
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
@@ -189,7 +189,7 @@ def ADSS_CA_cell_1potential(
             "ADSS_sub_OCV_photo",
             {
                 "Tval__s": OCV_duration,
-                "SampleRate": samplerate_sec,
+                "samplerate_sec": samplerate_sec,
                 "ph": ph,
                 "ref_type": ref_type,
                 "ref_offset__V": ref_offset__V,
@@ -230,7 +230,7 @@ def ADSS_CA_cell_1potential(
             "ADSS_sub_OCV_photo",
             {
                 "Tval__s": OCV_duration,
-                "SampleRate": samplerate_sec,
+                "samplerate_sec": samplerate_sec,
                 "ph": ph,
                 "ref_type": ref_type,
                 "ref_offset__V": ref_offset__V,
@@ -258,7 +258,7 @@ def ADSS_CA_cell_1potential(
             "ADSS_sub_OCV",
             {
                 "Tval__s": OCV_duration,
-                "SampleRate": samplerate_sec,
+                "samplerate_sec": samplerate_sec,
                 "ph": ph,
                 "ref_type": ref_type,
                 "ref_offset__V": ref_offset__V,
@@ -295,7 +295,7 @@ def ADSS_CA_cell_1potential(
             "ADSS_sub_OCV",
             {
                 "Tval__s": OCV_duration,
-                "SampleRate": samplerate_sec,
+                "samplerate_sec": samplerate_sec,
                 "ph": ph,
                 "ref_type": ref_type,
                 "ref_offset__V": ref_offset__V,
@@ -382,7 +382,7 @@ def ADSS_CA_cell_1potential(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=5)
+@sequence(version=6)
 def ADSS_PA_CVs_CAs_cell(
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
@@ -569,7 +569,7 @@ def ADSS_PA_CVs_CAs_cell(
                 "Vapex2_vsRHE": Vapex2_vsRHE[i],
                 "Vfinal_vsRHE": Vfinal_vsRHE[i],
                 "scanrate_voltsec": scanrate_voltsec[i],
-                "SampleRate": CV_samplerate_sec,
+                "samplerate_sec": CV_samplerate_sec,
                 "cycles": CV_cycle,
                 "gamry_i_range": gamry_i_range,
                 "ph": ph,
@@ -702,7 +702,7 @@ def ADSS_PA_CVs_CAs_cell(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=8)
+@sequence(version=9)
 def ADSS_PA_CVs_CAs_CVs_cell_simple(
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
@@ -947,7 +947,7 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
                     "Vapex2_vsRHE": Vapex2_vsRHE[i],
                     "Vfinal_vsRHE": Vfinal_vsRHE[i],
                     "scanrate_voltsec": scanrate_voltsec[i],
-                    "SampleRate": CV_samplerate_sec,
+                    "samplerate_sec": CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -1033,7 +1033,7 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
                     "Vapex2_vsRHE": CV2_Vapex2_vsRHE[i],
                     "Vfinal_vsRHE": CV2_Vfinal_vsRHE[i],
                     "scanrate_voltsec": CV2_scanrate_voltsec[i],
-                    "SampleRate": CV2_samplerate_sec,
+                    "samplerate_sec": CV2_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -1093,7 +1093,7 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ADSS_CA_cell_multipotential(
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
@@ -1245,7 +1245,7 @@ def ADSS_CA_cell_multipotential(
                 "ADSS_sub_OCV_photo",
                 {
                     "Tval__s": OCV_duration,
-                    "SampleRate": samplerate_sec,
+                    "samplerate_sec": samplerate_sec,
                     "ph": ph,
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
@@ -1282,7 +1282,7 @@ def ADSS_CA_cell_multipotential(
                 "ADSS_sub_OCV_photo",
                 {
                     "Tval__s": OCV_duration,
-                    "SampleRate": samplerate_sec,
+                    "samplerate_sec": samplerate_sec,
                     "ph": ph,
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
@@ -1310,7 +1310,7 @@ def ADSS_CA_cell_multipotential(
                 "ADSS_sub_OCV",
                 {
                     "Tval__s": OCV_duration,
-                    "SampleRate": samplerate_sec,
+                    "samplerate_sec": samplerate_sec,
                     "ph": ph,
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
@@ -1343,7 +1343,7 @@ def ADSS_CA_cell_multipotential(
                 "ADSS_sub_OCV",
                 {
                     "Tval__s": OCV_duration,
-                    "SampleRate": samplerate_sec,
+                    "samplerate_sec": samplerate_sec,
                     "ph": ph,
                     "ref_type": ref_type,
                     "ref_offset__V": ref_offset__V,
@@ -1418,7 +1418,7 @@ def ADSS_CA_cell_multipotential(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ADSS_PA_CVs_testing(
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 6307,
@@ -1599,7 +1599,7 @@ def ADSS_PA_CVs_testing(
                 "Vapex2_vsRHE": Vapex2_vsRHE[i],
                 "Vfinal_vsRHE": Vfinal_vsRHE[i],
                 "scanrate_voltsec": scanrate_voltsec[i],
-                "SampleRate": CV_samplerate_sec,
+                "samplerate_sec": CV_samplerate_sec,
                 "cycles": CV_cycle,
                 "gamry_i_range": gamry_i_range,
                 "ph": ph,
@@ -1691,7 +1691,7 @@ def ADSS_PA_CVs_testing(
                 "Vapex2_vsRHE": CV2_Vapex2_vsRHE[i],
                 "Vfinal_vsRHE": CV2_Vfinal_vsRHE[i],
                 "scanrate_voltsec": CV2_scanrate_voltsec[i],
-                "SampleRate": CV2_samplerate_sec,
+                "samplerate_sec": CV2_samplerate_sec,
                 "cycles": CV_cycle,
                 "gamry_i_range": gamry_i_range,
                 "ph": ph,
@@ -1739,7 +1739,7 @@ def ADSS_PA_CVs_testing(
         epm.add(
             "ADSS_sub_clean_cell",
             {
-                "Clean_volume": Clean_volume_ul,
+                "Clean_volume_ul": Clean_volume_ul,
                 "DrainWait_s": CleanDrainWait_s,
                 #    "ResidualWait_s": ResidualWait_s,
             },
@@ -1765,7 +1765,7 @@ def ADSS_PA_CVs_testing(
             {
                 "solid_custom_position": "cell1_we",
                 "solid_plate_id": plate_id,
-                "solid_sample_no": plate_sample_no,
+                "solid_sample_no": second_sample_no,
                 "previous_liquid": use_electrolyte,
                 "liquid_custom_position": "cell1_we",
                 "liquid_sample_no": liquid_sample_no,
@@ -1799,7 +1799,7 @@ def ADSS_PA_CVs_testing(
                     "Vapex2_vsRHE": Vapex2_vsRHE[i],
                     "Vfinal_vsRHE": Vfinal_vsRHE[i],
                     "scanrate_voltsec": scanrate_voltsec[i],
-                    "SampleRate": CV_samplerate_sec,
+                    "samplerate_sec": CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -1834,7 +1834,7 @@ def ADSS_PA_CVs_testing(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ADSS_PA_CVs_CAs_CVs_autogasswitching(
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 6307,
@@ -2079,7 +2079,7 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
             "Vapex2_vsRHE": CleaningCV_Vapex2_vsRHE,
             "Vfinal_vsRHE": CleaningCV_Vinit_vsRHE,
             "scanrate_voltsec": CleaningCV_scanrate_voltsec,
-            "SampleRate": CV_samplerate_sec,
+            "samplerate_sec": CV_samplerate_sec,
             "cycles": CleaningCV_cycles,
             "gamry_i_range": gamry_i_range,
             "ph": ph,
@@ -2114,7 +2114,7 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
                 "Vapex2_vsRHE": Vapex2_vsRHE[i],
                 "Vfinal_vsRHE": Vfinal_vsRHE[i],
                 "scanrate_voltsec": scanrate_voltsec[i],
-                "SampleRate": CV_samplerate_sec,
+                "samplerate_sec": CV_samplerate_sec,
                 "cycles": CV_cycle,
                 "gamry_i_range": gamry_i_range,
                 "ph": ph,
@@ -2188,7 +2188,7 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
     #     )
 
     epm.add(
-        "ADSS_sub_tranfer_liquid_in",
+        "ADSS_sub_transfer_liquid_in",
         {
             "destination": "cell1_we",
             "source_tray": phosphoric_location[0],
@@ -2222,7 +2222,7 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
                 "Vapex2_vsRHE": CV2_Vapex2_vsRHE[i],
                 "Vfinal_vsRHE": CV2_Vfinal_vsRHE[i],
                 "scanrate_voltsec": CV2_scanrate_voltsec[i],
-                "SampleRate": CV2_samplerate_sec,
+                "samplerate_sec": CV2_samplerate_sec,
                 "cycles": CV_cycle,
                 "gamry_i_range": gamry_i_range,
                 "ph": ph,
@@ -2271,7 +2271,7 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
             epm.add(
                 "ADSS_sub_clean_cell",
                 {
-                    "Clean_volume": Clean_volume_ul,
+                    "Clean_volume_ul": Clean_volume_ul,
                     "DrainWait_s": CleanDrainWait_s,
                     #    "ResidualWait_s": ResidualWait_s,
                 },
@@ -2280,7 +2280,7 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=4)
+@sequence(version=5)
 def ADSS_PA_CV_TRI(
     # note: str = "need as many samples as you expect combinations of UPL and LPL",
     # sample info
@@ -2682,7 +2682,7 @@ def ADSS_PA_CV_TRI(
                     "Vapex2_vsRHE": cleaning_Vapex2_vsRHE[i],
                     "Vfinal_vsRHE": cleaning_Vfinal_vsRHE[i],
                     "scanrate_voltsec": cleaning_scanrate_voltsec[i],
-                    "SampleRate": cleaning_CV_samplerate_sec,
+                    "samplerate_sec": cleaning_CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -2698,12 +2698,12 @@ def ADSS_PA_CV_TRI(
             epm.add(
                 "ADSS_sub_CV",
                 {
-                    "Vinit_vsRHE": ref_Vinit_vsRHE,
-                    "Vapex1_vsRHE": ref_Vapex1_vsRHE,
-                    "Vapex2_vsRHE": ref_Vapex2_vsRHE,
-                    "Vfinal_vsRHE": ref_Vfinal_vsRHE,
-                    "scanrate_voltsec": ref_CV_scanrate_voltsec,
-                    "SampleRate": ref_CV_samplerate_sec,
+                    "Vinit_vsRHE": ref_Vinit_vsRHE[i],
+                    "Vapex1_vsRHE": ref_Vapex1_vsRHE[i],
+                    "Vapex2_vsRHE": ref_Vapex2_vsRHE[i],
+                    "Vfinal_vsRHE": ref_Vfinal_vsRHE[i],
+                    "scanrate_voltsec": ref_CV_scanrate_voltsec[i],
+                    "samplerate_sec": ref_CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -2746,12 +2746,12 @@ def ADSS_PA_CV_TRI(
             epm.add(
                 "ADSS_sub_CV",
                 {
-                    "Vinit_vsRHE": ref_Vinit_vsRHE,
-                    "Vapex1_vsRHE": ref_Vapex1_vsRHE,
-                    "Vapex2_vsRHE": ref_Vapex2_vsRHE,
-                    "Vfinal_vsRHE": ref_Vfinal_vsRHE,
-                    "scanrate_voltsec": ref_CV_scanrate_voltsec,
-                    "SampleRate": ref_CV_samplerate_sec,
+                    "Vinit_vsRHE": ref_Vinit_vsRHE[i],
+                    "Vapex1_vsRHE": ref_Vapex1_vsRHE[i],
+                    "Vapex2_vsRHE": ref_Vapex2_vsRHE[i],
+                    "Vfinal_vsRHE": ref_Vfinal_vsRHE[i],
+                    "scanrate_voltsec": ref_CV_scanrate_voltsec[i],
+                    "samplerate_sec": ref_CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -3018,7 +3018,7 @@ def ADSS_PA_CV_TRI(
                     "Vapex2_vsRHE": cleaning_Vapex2_vsRHE[i],
                     "Vfinal_vsRHE": cleaning_Vfinal_vsRHE[i],
                     "scanrate_voltsec": cleaning_scanrate_voltsec[i],
-                    "SampleRate": cleaning_CV_samplerate_sec,
+                    "samplerate_sec": cleaning_CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -3059,7 +3059,7 @@ def ADSS_PA_CV_TRI(
                     "Vapex2_vsRHE": lpl,
                     "Vfinal_vsRHE": lpl,
                     "scanrate_voltsec": testing_CV_scanrate_voltsec,
-                    "SampleRate": testing_CV_samplerate_sec,
+                    "samplerate_sec": testing_CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -3128,7 +3128,7 @@ def ADSS_PA_CV_TRI(
                     "Vapex2_vsRHE": lpl,
                     "Vfinal_vsRHE": lpl,
                     "scanrate_voltsec": testing_CV_scanrate_voltsec,
-                    "SampleRate": testing_CV_samplerate_sec,
+                    "samplerate_sec": testing_CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -3205,7 +3205,7 @@ def ADSS_PA_CV_TRI(
                     "Vapex2_vsRHE": lpl,
                     "Vfinal_vsRHE": lpl,
                     "scanrate_voltsec": testing_CV_scanrate_voltsec,
-                    "SampleRate": testing_CV_samplerate_sec,
+                    "samplerate_sec": testing_CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -3275,7 +3275,7 @@ def ADSS_PA_CV_TRI(
                     "Vapex2_vsRHE": lpl,
                     "Vfinal_vsRHE": lpl,
                     "scanrate_voltsec": testing_CV_scanrate_voltsec,
-                    "SampleRate": testing_CV_scanrate_voltsec,
+                    "samplerate_sec": testing_CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -3518,7 +3518,7 @@ def ADSS_PA_CV_TRI(
                     "Vapex2_vsRHE": cleaning_Vapex2_vsRHE[i],
                     "Vfinal_vsRHE": cleaning_Vfinal_vsRHE[i],
                     "scanrate_voltsec": cleaning_scanrate_voltsec[i],
-                    "SampleRate": cleaning_CV_samplerate_sec,
+                    "samplerate_sec": cleaning_CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -3534,12 +3534,12 @@ def ADSS_PA_CV_TRI(
             epm.add(
                 "ADSS_sub_CV",
                 {
-                    "Vinit_vsRHE": ref_Vinit_vsRHE,
-                    "Vapex1_vsRHE": ref_Vapex1_vsRHE,
-                    "Vapex2_vsRHE": ref_Vapex2_vsRHE,
-                    "Vfinal_vsRHE": ref_Vfinal_vsRHE,
-                    "scanrate_voltsec": ref_CV_scanrate_voltsec,
-                    "SampleRate": ref_CV_samplerate_sec,
+                    "Vinit_vsRHE": ref_Vinit_vsRHE[i],
+                    "Vapex1_vsRHE": ref_Vapex1_vsRHE[i],
+                    "Vapex2_vsRHE": ref_Vapex2_vsRHE[i],
+                    "Vfinal_vsRHE": ref_Vfinal_vsRHE[i],
+                    "scanrate_voltsec": ref_CV_scanrate_voltsec[i],
+                    "samplerate_sec": ref_CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -3582,12 +3582,12 @@ def ADSS_PA_CV_TRI(
             epm.add(
                 "ADSS_sub_CV",
                 {
-                    "Vinit_vsRHE": ref_Vinit_vsRHE,
-                    "Vapex1_vsRHE": ref_Vapex1_vsRHE,
-                    "Vapex2_vsRHE": ref_Vapex2_vsRHE,
-                    "Vfinal_vsRHE": ref_Vfinal_vsRHE,
-                    "scanrate_voltsec": ref_CV_scanrate_voltsec,
-                    "SampleRate": ref_CV_samplerate_sec,
+                    "Vinit_vsRHE": ref_Vinit_vsRHE[i],
+                    "Vapex1_vsRHE": ref_Vapex1_vsRHE[i],
+                    "Vapex2_vsRHE": ref_Vapex2_vsRHE[i],
+                    "Vfinal_vsRHE": ref_Vfinal_vsRHE[i],
+                    "scanrate_voltsec": ref_CV_scanrate_voltsec[i],
+                    "samplerate_sec": ref_CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -3649,7 +3649,7 @@ def ADSS_PA_CV_TRI(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=8)
+@sequence(version=9)
 def ADSS_PA_CV_TRI_new(
     # note: str = "need as many samples as you expect combinations of UPL and LPL",
     # sample info
@@ -4064,7 +4064,7 @@ def ADSS_PA_CV_TRI_new(
                     "Vapex2_vsRHE": cleaning_Vapex2_vsRHE[i],
                     "Vfinal_vsRHE": cleaning_Vfinal_vsRHE[i],
                     "scanrate_voltsec": cleaning_scanrate_voltsec[i],
-                    "SampleRate": cleaning_CV_samplerate_sec,
+                    "samplerate_sec": cleaning_CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -4081,12 +4081,12 @@ def ADSS_PA_CV_TRI_new(
             epm.add(
                 "ADSS_sub_CV",
                 {
-                    "Vinit_vsRHE": ref_Vinit_vsRHE,
-                    "Vapex1_vsRHE": ref_Vapex1_vsRHE,
-                    "Vapex2_vsRHE": ref_Vapex2_vsRHE,
-                    "Vfinal_vsRHE": ref_Vfinal_vsRHE,
-                    "scanrate_voltsec": ref_CV_scanrate_voltsec,
-                    "SampleRate": ref_CV_samplerate_sec,
+                    "Vinit_vsRHE": ref_Vinit_vsRHE[i],
+                    "Vapex1_vsRHE": ref_Vapex1_vsRHE[i],
+                    "Vapex2_vsRHE": ref_Vapex2_vsRHE[i],
+                    "Vfinal_vsRHE": ref_Vfinal_vsRHE[i],
+                    "scanrate_voltsec": ref_CV_scanrate_voltsec[i],
+                    "samplerate_sec": ref_CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -4141,12 +4141,12 @@ def ADSS_PA_CV_TRI_new(
             epm.add(
                 "ADSS_sub_CV",
                 {
-                    "Vinit_vsRHE": ref_Vinit_vsRHE,
-                    "Vapex1_vsRHE": ref_Vapex1_vsRHE,
-                    "Vapex2_vsRHE": ref_Vapex2_vsRHE,
-                    "Vfinal_vsRHE": ref_Vfinal_vsRHE,
-                    "scanrate_voltsec": ref_CV_scanrate_voltsec,
-                    "SampleRate": ref_CV_samplerate_sec,
+                    "Vinit_vsRHE": ref_Vinit_vsRHE[i],
+                    "Vapex1_vsRHE": ref_Vapex1_vsRHE[i],
+                    "Vapex2_vsRHE": ref_Vapex2_vsRHE[i],
+                    "Vfinal_vsRHE": ref_Vfinal_vsRHE[i],
+                    "scanrate_voltsec": ref_CV_scanrate_voltsec[i],
+                    "samplerate_sec": ref_CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -4434,7 +4434,7 @@ def ADSS_PA_CV_TRI_new(
                     "Vapex2_vsRHE": cleaning_Vapex2_vsRHE[i],
                     "Vfinal_vsRHE": cleaning_Vfinal_vsRHE[i],
                     "scanrate_voltsec": cleaning_scanrate_voltsec[i],
-                    "SampleRate": cleaning_CV_samplerate_sec,
+                    "samplerate_sec": cleaning_CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -4467,7 +4467,7 @@ def ADSS_PA_CV_TRI_new(
                     "Vapex2_vsRHE": lpl,
                     "Vfinal_vsRHE": lpl,
                     "scanrate_voltsec": testing_CV_scanrate_voltsec,
-                    "SampleRate": testing_CV_samplerate_sec,
+                    "samplerate_sec": testing_CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -4539,7 +4539,7 @@ def ADSS_PA_CV_TRI_new(
                     "Vapex2_vsRHE": lpl,
                     "Vfinal_vsRHE": lpl,
                     "scanrate_voltsec": testing_CV_scanrate_voltsec,
-                    "SampleRate": testing_CV_samplerate_sec,
+                    "samplerate_sec": testing_CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -4634,7 +4634,7 @@ def ADSS_PA_CV_TRI_new(
                     "Vapex2_vsRHE": lpl,
                     "Vfinal_vsRHE": lpl,
                     "scanrate_voltsec": testing_CV_scanrate_voltsec,
-                    "SampleRate": testing_CV_samplerate_sec,
+                    "samplerate_sec": testing_CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -4710,7 +4710,7 @@ def ADSS_PA_CV_TRI_new(
                     "Vapex2_vsRHE": lpl,
                     "Vfinal_vsRHE": lpl,
                     "scanrate_voltsec": testing_CV_scanrate_voltsec,
-                    "SampleRate": testing_CV_scanrate_voltsec,
+                    "samplerate_sec": testing_CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -5017,7 +5017,7 @@ def ADSS_PA_CV_TRI_new(
                     "Vapex2_vsRHE": cleaning_Vapex2_vsRHE[i],
                     "Vfinal_vsRHE": cleaning_Vfinal_vsRHE[i],
                     "scanrate_voltsec": cleaning_scanrate_voltsec[i],
-                    "SampleRate": cleaning_CV_samplerate_sec,
+                    "samplerate_sec": cleaning_CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -5034,12 +5034,12 @@ def ADSS_PA_CV_TRI_new(
             epm.add(
                 "ADSS_sub_CV",
                 {
-                    "Vinit_vsRHE": ref_Vinit_vsRHE,
-                    "Vapex1_vsRHE": ref_Vapex1_vsRHE,
-                    "Vapex2_vsRHE": ref_Vapex2_vsRHE,
-                    "Vfinal_vsRHE": ref_Vfinal_vsRHE,
-                    "scanrate_voltsec": ref_CV_scanrate_voltsec,
-                    "SampleRate": ref_CV_samplerate_sec,
+                    "Vinit_vsRHE": ref_Vinit_vsRHE[i],
+                    "Vapex1_vsRHE": ref_Vapex1_vsRHE[i],
+                    "Vapex2_vsRHE": ref_Vapex2_vsRHE[i],
+                    "Vfinal_vsRHE": ref_Vfinal_vsRHE[i],
+                    "scanrate_voltsec": ref_CV_scanrate_voltsec[i],
+                    "samplerate_sec": ref_CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -5095,12 +5095,12 @@ def ADSS_PA_CV_TRI_new(
             epm.add(
                 "ADSS_sub_CV",
                 {
-                    "Vinit_vsRHE": ref_Vinit_vsRHE,
-                    "Vapex1_vsRHE": ref_Vapex1_vsRHE,
-                    "Vapex2_vsRHE": ref_Vapex2_vsRHE,
-                    "Vfinal_vsRHE": ref_Vfinal_vsRHE,
-                    "scanrate_voltsec": ref_CV_scanrate_voltsec,
-                    "SampleRate": ref_CV_samplerate_sec,
+                    "Vinit_vsRHE": ref_Vinit_vsRHE[i],
+                    "Vapex1_vsRHE": ref_Vapex1_vsRHE[i],
+                    "Vapex2_vsRHE": ref_Vapex2_vsRHE[i],
+                    "Vfinal_vsRHE": ref_Vfinal_vsRHE[i],
+                    "scanrate_voltsec": ref_CV_scanrate_voltsec[i],
+                    "samplerate_sec": ref_CV_samplerate_sec,
                     "cycles": CV_cycle,
                     "gamry_i_range": gamry_i_range,
                     "ph": ph,
@@ -5202,7 +5202,7 @@ def ADSS_PA_CV_TRI_new(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ADSS_PA_CV_single(
     # sample info
     plate_id: int = 6307,
@@ -5533,7 +5533,7 @@ def ADSS_PA_CV_single(
             "Vapex2_vsRHE": Vapex2_vsRHE,
             "Vfinal_vsRHE": Vfinal_vsRHE,
             "scanrate_voltsec": CV_scanrate_voltsec,
-            "SampleRate": CV_samplerate_sec,
+            "samplerate_sec": CV_samplerate_sec,
             "cycles": CV_cycles,
             "gamry_i_range": gamry_i_range,
             "ph": ph,

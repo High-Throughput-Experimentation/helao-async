@@ -761,7 +761,7 @@ def ANEC_photo_CAgasonly(
     return epm.planned_experiments
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ANEC_photo_CV(
     WE_versus: str = "ref",
     ref_type: str = "leakless",
@@ -864,6 +864,7 @@ def ANEC_photo_CV(
             {
                 "WE_versus": WE_versus,
                 "ref_type": ref_type,
+                "ref_offset__V": ref_offset,
                 "pH": pH,
                 "WE_potential_init__V": WE_potential_init__V,
                 "WE_potential_apex1__V": WE_potential_apex1__V,
@@ -1812,7 +1813,7 @@ def ANEC_gasonly_CA(
     return epm.planned_experiments
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ANEC_repeat_CV(
     WE_versus: str = "ref",
     ref_type: str = "leakless",
@@ -1891,6 +1892,7 @@ def ANEC_repeat_CV(
             {
                 "WE_versus": WE_versus,
                 "ref_type": ref_type,
+                "ref_offset__V": ref_offset,
                 "pH": pH,
                 "WE_potential_init__V": WE_potential_init__V,
                 "WE_potential_apex1__V": WE_potential_apex1__V,

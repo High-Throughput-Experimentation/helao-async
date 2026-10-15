@@ -1053,7 +1053,7 @@ def ANEC_sub_HeatCA(
     return apm.planned_actions
 
 
-@experiment(version=1)
+@experiment(version=2)
 def ANEC_sub_OCV(
     Tval__s: float = 900.0,
     IErange: str = "auto",
@@ -1088,7 +1088,7 @@ def ANEC_sub_OCV(
         "run_OCV",
         {
             "Tval__s": Tval__s,
-            "SampleRate": 0.05,
+            "AcqInterval__s": 0.05,
             "IErange": IErange,
         },
         from_global_act_params={"_fast_samples_in": "fast_samples_in"},

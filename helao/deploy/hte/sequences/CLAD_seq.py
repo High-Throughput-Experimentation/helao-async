@@ -10,7 +10,7 @@ from helao.helpers.premodels import ExperimentPlanMaker
 SEQUENCES = ["CLAD_seq"]
 
 
-@sequence(version=1)
+@sequence(version=2)
 def CLAD_seq(
     solid_plate_id: int = 6307,
     plate_sample_no_list: list = [],
@@ -198,7 +198,7 @@ def CLAD_seq(
             "ADSS_sub_recirculate",
             {
                 "direction_forward_or_reverse": "forward",
-                "wait_duration_s": fill_recirc_fwd_duration_s,
+                "wait_time_s": fill_recirc_fwd_duration_s,
             },
         )
         epm.add(

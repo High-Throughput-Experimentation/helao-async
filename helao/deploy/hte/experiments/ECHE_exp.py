@@ -398,7 +398,7 @@ def ECHE_sub_CA_led(
     return apm.planned_actions  # returns complete action list to orch
 
 
-@experiment(version=1)
+@experiment(version=2)
 def ECHE_sub_OCV(
     Tval__s: float = 1,
     SampleRate: float = 0.05,
@@ -429,7 +429,7 @@ def ECHE_sub_OCV(
         "run_OCV",
         {
             "Tval__s": Tval__s,
-            "SampleRate": SampleRate,
+            "AcqInterval__s": SampleRate,
             "TTLwait": -1,  # -1 disables, else select TTL 0-3
             "TTLsend": -1,  # -1 disables, else select TTL 0-3
             # "IErange": "auto",
