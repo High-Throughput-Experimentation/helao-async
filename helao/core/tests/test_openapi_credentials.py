@@ -80,3 +80,16 @@ def test_lookup_key_sends_header(env_file, monkeypatch):
     )
     assert asyncio.run(api._lookup_key("u", "f.hlo")) == "raw_data/u/f.hlo"
     assert seen == {"url": "https://base.test/api/file/metadata", "key": "k123"}
+
+
+def test_api_dsn_pins_the_psycopg2_driver(tmp_path):
+    """A bare postgresql:// resolves to psycopg (v3) on SQLAlchemy 2.1."""
+    from sqlalchemy.engine import make_url
+
+    path = tmp_path / "db.env"
+    path.write_text(
+        "API_USER=u\nAPI_PASSWORD=p\nAPI_PORT=5432\nAPI_DB=d\nAPI_SCHEMA=s\n",
+        encoding="utf-8",
+    )
+    url = make_url(HelaoCredentials(_env_file=path).api_dsn)
+    assert url.drivername == "postgresql+psycopg2"

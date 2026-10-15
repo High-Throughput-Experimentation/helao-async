@@ -106,7 +106,9 @@ class HelaoCredentials(BaseSettings):
     def api_dsn(self) -> str:
         """Return a Postgres DSN string for the API DB with the schema set on search_path."""
         pgdsn = PostgresDsn.build(
-            scheme="postgresql",
+            # Pin the driver: SQLAlchemy 2.1 maps a bare postgresql:// to
+            # psycopg (v3), which the helao env does not ship.
+            scheme="postgresql+psycopg2",
             username=self.API_USER,
             password=(
                 urllib.parse.quote(self.API_PASSWORD.get_secret_value())
