@@ -9,6 +9,11 @@ from socket import gethostname
 
 __all__ = ["hlo_version", "get_hlo_version"]
 
+# helao/core/version.py -> repo root
+_REPO_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
+
 
 @lru_cache(maxsize=None)
 def get_branch_commithash(work_tree_path: str = ".") -> tuple:
@@ -25,13 +30,17 @@ def get_branch_commithash(work_tree_path: str = ".") -> tuple:
     try:
         command = ["git", "rev-parse", "--abbrev-ref", "HEAD"]
         branch = (
-        subprocess.check_output(command, cwd=work_tree_path, stderr=subprocess.STDOUT)
+            subprocess.check_output(
+                command, cwd=work_tree_path, stderr=subprocess.STDOUT
+            )
             .decode("utf8")
             .strip()
         )
         command = ["git", "rev-parse", "--short", "HEAD"]
         commit_hash = (
-            subprocess.check_output(command, cwd=work_tree_path, stderr=subprocess.STDOUT)
+            subprocess.check_output(
+                command, cwd=work_tree_path, stderr=subprocess.STDOUT
+            )
             .decode("utf8")
             .strip()
         )
@@ -66,16 +75,17 @@ def get_filehash(filename: str) -> str:
         return ""
 
 
-def get_hlo_version(work_tree_path: str = ".") -> str:
+def get_hlo_version(work_tree_path: str = _REPO_ROOT) -> str:
     """Return the HELAO version string.
 
-    Uses the current short git commit hash when available, falling back to
-    ``{hostname}_{YYMMDD}``.
+    Uses the short git commit hash of the repo this module lives in (not the
+    process cwd) when available, falling back to ``{hostname}_{YYMMDD}`` when
+    there is no git checkout.
     """
-    try:
-        return get_branch_commithash(work_tree_path)[1]
-    except Exception:
-        return f"{gethostname()}_{datetime.now().strftime('%y%m%d')}"
+    return (
+        get_branch_commithash(work_tree_path)[1]
+        or f"{gethostname()}_{datetime.now().strftime('%y%m%d')}"
+    )
 
 
 def get_caller_filehash() -> tuple:

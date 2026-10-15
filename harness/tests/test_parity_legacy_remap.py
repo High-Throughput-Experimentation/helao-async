@@ -1,5 +1,6 @@
 """--remap-legacy-layout: a legacy-layout golden diffed against a unified capture."""
 
+from pathlib import Path
 import json
 import shutil
 import zipfile
@@ -435,3 +436,23 @@ def test_two_zipped_sequences_across_the_year_boundary(tmp_path):
         _write_run(cand, "RUNS", year, seed=100 + 10 * i, mmdd=mmdd, seq_name=name)
     report = run_parity(gdir, cand, remap_legacy_layout=True)
     assert report["status"] == "pass", report
+
+
+def test_s3_analysis_payload_violation_is_reported_by_run_parity(tmp_path, monkeypatch):
+    # Wiring test: the S3 analysis check's findings must reach the report.
+    # (Its own rules are covered in test_s3_analysis_pass.py.)
+    import harness.parity as parity
+
+    finding = {"key": "S3 analysis output x.json", "golden": "g", "candidate": "c"}
+    monkeypatch.setattr(
+        parity,
+        "internal_s3_analysis_checks",
+        lambda root: [finding],
+    )
+    report = run_parity(
+        make_legacy_golden(tmp_path),
+        make_unified_candidate(tmp_path),
+        remap_legacy_layout=True,
+    )
+    assert report["status"] == "fail"
+    assert report["consistency_diffs"].count(finding) == 2  # golden + candidate

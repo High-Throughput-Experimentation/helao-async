@@ -9,7 +9,7 @@ experiment_libraries:
   - helao/hexagon/tests/smoke/hexid_exp.py
 sequence_libraries: []
 run_type: simulation
-root: /home/dan/INST_hlo_hexid
+root: /tmp/helao-hexid
 servers:
   HEXORC:
     host: 127.0.0.1

@@ -69,8 +69,9 @@ class AndorCalibratedDriver(AndorDriver):
         path = self.calibration_file()
         if not path.exists():
             LOGGER.warning(
-                "no wavelength calibration at %s; acquire will refuse until "
-                "/ANDOR/calibrate_wl has been run on this station",
+                "no wavelength calibration at %s; acquire will record the "
+                "channel index (calibrated=False) until /ANDOR/calibrate_wl "
+                "has been run on this station",
                 path,
             )
             return None

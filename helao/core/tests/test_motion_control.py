@@ -1085,15 +1085,11 @@ def test_the_ceiling_outlasts_any_move_the_hardware_can_actually_perform():
 
     assert slowest_mm_per_s is not None, "no configured axis speed found"
 
-    # The driver waits for its own moves up to 30 minutes; the follow-up must
-    # not give up before the driver does, or it abandons live motion.
-    driver_cap_s = 30.0 * 60.0
-    assert motion_control.FOLLOWUP_CEILING_S >= driver_cap_s
+    # The driver waits for its own moves up to its cap; the follow-up must not be
+    # shorter than that cap (equal is fine), or it abandons live motion.
+    from helao.deploy.hte.drivers.motion.galil_motion_driver import MOVE_WAIT_CAP_S
 
-    # And concretely: the travel reachable within the driver's cap on the
-    # slowest axis must still be inside the follow-up's window.
-    reachable_mm = slowest_mm_per_s * driver_cap_s
-    assert reachable_mm / slowest_mm_per_s <= motion_control.FOLLOWUP_CEILING_S
+    assert motion_control.FOLLOWUP_CEILING_S >= MOVE_WAIT_CAP_S
     print(
         "test_the_ceiling_outlasts_any_move_the_hardware_can_actually_perform "
         f"PASS (slowest {slowest_mm_per_s:.3f} mm/s, "

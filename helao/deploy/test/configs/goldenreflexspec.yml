@@ -31,7 +31,7 @@ experiment_libraries:
 sequence_libraries:
   - helao/deploy/test/sequences/TEST_seq.py
 run_type: simulation
-root: /home/dan/INST_hlo_reflexspec
+root: /tmp/helao-reflexspec
 servers:
   ORCH:
     host: 127.0.0.1

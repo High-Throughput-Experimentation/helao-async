@@ -293,15 +293,16 @@ def test_t6_skip_clears_only_actions():
     assert kinds(cmds) == [fsm.ClearActionQueue]
 
 
-def test_t7_estop_intent_clears_actions_and_estops_loop_state():
+def test_t7_estop_intent_on_started_loop_steps_to_stop_intent_without_commands():
     s, cmds = fsm.step(
         st(loop_state=LoopStatus.started, n_acts=3, loop_intent=LoopIntent.estop),
         fsm.LoopIterate(),
     )
     # ladder StopLoop wins first (estop intent) -> intend_stop; the
     # EstopClearActions path is reached when intent survives to LaunchAction.
-    # Encode exactly what the reducer does; see implementation note below.
-    assert s.loop_state in (LoopStatus.started, LoopStatus.estopped)
+    assert s.loop_state == LoopStatus.started
+    assert s.loop_intent == LoopIntent.stop
+    assert kinds(cmds) == []
 
 
 # --- T4: exit + finalization (plain stop with empty queues closes out) ---

@@ -25,7 +25,11 @@ from harness import HARNESS_VERSION
 from harness.classify import ArtifactRow, fold_legacy_week_token
 from harness.hlo_pass import diff_hlo
 from harness.manifest import ManifestMissingError, ProvenanceManifest, content_mask_mode
-from harness.s3_pass import diff_s3_record, internal_s3_checks
+from harness.s3_pass import (
+    diff_s3_record,
+    internal_s3_analysis_checks,
+    internal_s3_checks,
+)
 from harness.treepass import (
     diff_member_sets,
     explode_zips,
@@ -185,7 +189,12 @@ def run_parity(
             fdiffs = compare_file(row, norm, gpath, cpath, mg, mc, manifest)
             if fdiffs:
                 file_diffs[norm] = fdiffs
-        consistency = internal_s3_checks(g_ex) + internal_s3_checks(c_ex)
+        consistency = (
+            internal_s3_checks(g_ex)
+            + internal_s3_checks(c_ex)
+            + internal_s3_analysis_checks(g_ex)
+            + internal_s3_analysis_checks(c_ex)
+        )
         # F1 guard: an empty golden set has nothing to compare and would PASS
         # with 0 diffs vacuously (e.g. a capture that snapshotted before the run
         # wrote any output). A golden master with no comparable files is never

@@ -3,13 +3,13 @@
 The rig NEVER launches or kills servers. Launch the group first, in another
 terminal, from the repo root:
 
-    rm -rf /home/dan/INST_hlo_golden          # captures start from a FRESH root
+    rm -rf /tmp/helao-golden          # captures start from a FRESH root
     conda run -n helao python launch.py golden --no-hot-reload
 
 then run one scenario:
 
     conda run -n helao python -m harness.capture --scenario GM-1 \
-        --root /home/dan/INST_hlo_golden \
+        --root /tmp/helao-golden \
         --out /home/dan/helao_goldens/GM-1/run1
 
 and CTRL-x the launch terminal afterwards. One scenario per launch: the rig
@@ -747,7 +747,11 @@ def snapshot_capture(
         if src.is_dir():
             shutil.copytree(src, out_root / top)
     sha = subprocess.run(
-        ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        ["git", "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=Path(__file__).resolve().parents[1],
     ).stdout.strip()
     config_path = resolve_config_path(config_prefix)
     ProvenanceManifest(

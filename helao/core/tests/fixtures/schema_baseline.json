@@ -1,0 +1,5580 @@
+[
+ {
+  "$defs": {
+   "ActionStartCondition": {
+    "description": "Pre-dispatch wait condition for an action.\n\nMembers:\n    no_wait: Dispatch immediately without waiting on anything.\n    wait_for_endpoint: Wait until the target endpoint is free.\n    wait_for_server: Wait until the target action server is free.\n    wait_for_all: Wait until all queued actions have finished.\n    wait_for_orch: Wait until any pending \"wait\" action on the orch finishes.\n    wait_for_previous: Wait only for the most recently dispatched action.",
+    "enum": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "title": "ActionStartCondition",
+    "type": "integer"
+   },
+   "AssemblySample": {
+    "description": "Composite sample built from constituent samples.\n\nAttributes:\n    sample_type (Literal[SampleType.assembly]): Discriminator pinned to ``assembly``.\n    parts (list): Constituent samples (any sample subtype).\n    sample_position (Optional[str]): Position label; default ``\"cell1_we\"``.\n    parent_assembly_label (Optional[str]): Label of a parent assembly, if any.",
+    "properties": {
+     "action_uuid": {
+      "default": [],
+      "items": {
+       "format": "uuid",
+       "type": "string"
+      },
+      "title": "Action Uuid",
+      "type": "array"
+     },
+     "chemical": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Chemical",
+      "type": "array"
+     },
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Comment"
+     },
+     "etc": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Etc",
+      "type": "object"
+     },
+     "global_label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Global Label"
+     },
+     "hlo_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hlo Version"
+     },
+     "inheritance": {
+      "anyOf": [
+       {
+        "$ref": "#/$defs/SampleInheritance"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null
+     },
+     "last_update": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Last Update"
+     },
+     "lot_number": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Lot Number",
+      "type": "array"
+     },
+     "machine_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Machine Name"
+     },
+     "parent_assembly_label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Parent Assembly Label"
+     },
+     "partial_molarity": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Partial Molarity",
+      "type": "array"
+     },
+     "parts": {
+      "default": [],
+      "items": {
+       "anyOf": [
+        {
+         "discriminator": {
+          "mapping": {
+           "assembly": "#/$defs/AssemblySample",
+           "gas": "#/$defs/GasSample",
+           "liquid": "#/$defs/LiquidSample",
+           "solid": "#/$defs/SolidSample"
+          },
+          "propertyName": "sample_type"
+         },
+         "oneOf": [
+          {
+           "$ref": "#/$defs/AssemblySample"
+          },
+          {
+           "$ref": "#/$defs/LiquidSample"
+          },
+          {
+           "$ref": "#/$defs/GasSample"
+          },
+          {
+           "$ref": "#/$defs/SolidSample"
+          }
+         ]
+        },
+        {
+         "$ref": "#/$defs/NoneSample"
+        },
+        {
+         "$ref": "#/$defs/SampleModel"
+        }
+       ]
+      },
+      "title": "Parts",
+      "type": "array"
+     },
+     "prep_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Prep Date"
+     },
+     "sample_creation_action_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Action Uuid"
+     },
+     "sample_creation_experiment_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Experiment Uuid"
+     },
+     "sample_creation_timecode": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Timecode"
+     },
+     "sample_hash": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Hash"
+     },
+     "sample_no": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample No"
+     },
+     "sample_position": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": "cell1_we",
+      "title": "Sample Position"
+     },
+     "sample_type": {
+      "const": "assembly",
+      "default": "assembly",
+      "title": "Sample Type",
+      "type": "string"
+     },
+     "server_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Server Name"
+     },
+     "source": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Source",
+      "type": "array"
+     },
+     "status": {
+      "default": [],
+      "items": {
+       "$ref": "#/$defs/SampleStatus"
+      },
+      "title": "Status",
+      "type": "array"
+     },
+     "supplier": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Supplier",
+      "type": "array"
+     }
+    },
+    "title": "AssemblySample",
+    "type": "object"
+   },
+   "ErrorCodes": {
+    "description": "Error codes recorded on actions and driver responses.\n\nMembers:\n    none: No error.\n    critical: Generic critical error.\n    critical_error: Critical error variant kept for backward compatibility.\n    start_timeout: Action failed to start within the configured time.\n    continue_timeout: Action failed to make progress within the timeout.\n    done_timeout: Action failed to complete within the timeout.\n    in_progress: Operation is still running (reported as a status hint).\n    not_available: Requested resource is unavailable.\n    ssh_error: SSH transport failure.\n    not_initialized: Driver/resource not yet initialized.\n    bug: Internal logic bug.\n    cmd_error: Underlying command/driver returned an error.\n    no_sample: Operation required a sample that was not provided.\n    unspecified: Unspecified failure.\n    estop: Emergency stop triggered.\n    stop: Normal stop requested.\n    timeout: Generic timeout.\n    setup: Setup/configuration failure.\n    numerical: Numerical/math failure.\n    motor: Motor/motion failure.\n    http: HTTP transport failure.\n    not_allowed: Operation is not allowed in the current state.",
+    "enum": [
+     "none",
+     "critical",
+     "critical_error",
+     "start_timeout",
+     "continue_timeout",
+     "done_timeout",
+     "in_progress",
+     "not_available",
+     "ssh_error",
+     "not_initialized",
+     "bug",
+     "cmd_error",
+     "no_sample",
+     "unspecified",
+     "estop",
+     "stop",
+     "timeout",
+     "setup",
+     "numerical",
+     "motor",
+     "http",
+     "not_allowed"
+    ],
+    "title": "ErrorCodes",
+    "type": "string"
+   },
+   "FileInfo": {
+    "description": "Metadata record describing one file produced by an action.\n\nAttributes:\n    file_type (Optional[str]): File type tag.\n    file_name (Optional[str]): Path to the file relative to the record's own\n        directory, forward-slash separated on every platform. A bare file\n        name is the common case; a file written into a subdirectory of the\n        action directory keeps its subdirectory segments, so that the\n        syncer's ``files``-driven upload set can address it.\n    data_keys (list[str]): Data keys present in the file.\n    sample (list[str]): Sample labels associated with the file.\n    action_uuid (Optional[UUID]): UUID of the producing action.\n    run_use (Optional[RunUse]): Intended use of the file's data.\n    nosync (bool): True to exclude the file from data sync.",
+    "properties": {
+     "action_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Action Uuid"
+     },
+     "data_keys": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Data Keys",
+      "type": "array"
+     },
+     "file_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "File Name"
+     },
+     "file_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "File Type"
+     },
+     "nosync": {
+      "default": false,
+      "title": "Nosync",
+      "type": "boolean"
+     },
+     "run_use": {
+      "anyOf": [
+       {
+        "$ref": "#/$defs/RunUse"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null
+     },
+     "sample": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Sample",
+      "type": "array"
+     }
+    },
+    "title": "FileInfo",
+    "type": "object"
+   },
+   "GasSample": {
+    "description": "Gas sample with volume and dilution-factor fields.\n\nAttributes:\n    sample_type (Literal[SampleType.gas]): Discriminator pinned to ``gas``.\n    volume_ml (Optional[float]): Volume in millilitres.\n    dilution_factor (Optional[float]): Dilution factor relative to a stock.",
+    "properties": {
+     "action_uuid": {
+      "default": [],
+      "items": {
+       "format": "uuid",
+       "type": "string"
+      },
+      "title": "Action Uuid",
+      "type": "array"
+     },
+     "chemical": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Chemical",
+      "type": "array"
+     },
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Comment"
+     },
+     "dilution_factor": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": 1.0,
+      "title": "Dilution Factor"
+     },
+     "etc": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Etc",
+      "type": "object"
+     },
+     "global_label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Global Label"
+     },
+     "hlo_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hlo Version"
+     },
+     "inheritance": {
+      "anyOf": [
+       {
+        "$ref": "#/$defs/SampleInheritance"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null
+     },
+     "last_update": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Last Update"
+     },
+     "lot_number": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Lot Number",
+      "type": "array"
+     },
+     "machine_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Machine Name"
+     },
+     "partial_molarity": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Partial Molarity",
+      "type": "array"
+     },
+     "prep_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Prep Date"
+     },
+     "sample_creation_action_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Action Uuid"
+     },
+     "sample_creation_experiment_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Experiment Uuid"
+     },
+     "sample_creation_timecode": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Timecode"
+     },
+     "sample_hash": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Hash"
+     },
+     "sample_no": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample No"
+     },
+     "sample_position": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Position"
+     },
+     "sample_type": {
+      "const": "gas",
+      "default": "gas",
+      "title": "Sample Type",
+      "type": "string"
+     },
+     "server_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Server Name"
+     },
+     "source": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Source",
+      "type": "array"
+     },
+     "status": {
+      "default": [],
+      "items": {
+       "$ref": "#/$defs/SampleStatus"
+      },
+      "title": "Status",
+      "type": "array"
+     },
+     "supplier": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Supplier",
+      "type": "array"
+     },
+     "volume_ml": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": 0.0,
+      "title": "Volume Ml"
+     }
+    },
+    "title": "GasSample",
+    "type": "object"
+   },
+   "HloStatus": {
+    "description": "Lifecycle status flags applied to actions, experiments, and sequences.\n\nMembers:\n    active: Currently running.\n    finished: Completed normally.\n    errored: Terminated due to an error.\n    aborted: Terminated by user/operator request.\n    skipped: Skipped without running.\n    estopped: Halted by an emergency stop.\n    split: Split into sub-actions.\n    busy: Server/endpoint busy but action not yet started.\n    retired: Archived/no longer active.",
+    "enum": [
+     "active",
+     "finished",
+     "errored",
+     "aborted",
+     "skipped",
+     "estopped",
+     "split",
+     "busy",
+     "retired"
+    ],
+    "title": "HloStatus",
+    "type": "string"
+   },
+   "LiquidSample": {
+    "description": "Liquid sample with volume, pH, dilution, and electrolyte fields.\n\nAttributes:\n    sample_type (Literal[SampleType.liquid]): Discriminator pinned to ``liquid``.\n    volume_ml (Optional[float]): Sample volume in millilitres.\n    ph (Optional[float]): pH of the sample.\n    dilution_factor (Optional[float]): Dilution factor relative to a stock.\n    electrolyte (Optional[str]): Electrolyte identifier (see `Electrolyte`).",
+    "properties": {
+     "action_uuid": {
+      "default": [],
+      "items": {
+       "format": "uuid",
+       "type": "string"
+      },
+      "title": "Action Uuid",
+      "type": "array"
+     },
+     "chemical": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Chemical",
+      "type": "array"
+     },
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Comment"
+     },
+     "dilution_factor": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": 1.0,
+      "title": "Dilution Factor"
+     },
+     "electrolyte": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Electrolyte"
+     },
+     "etc": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Etc",
+      "type": "object"
+     },
+     "global_label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Global Label"
+     },
+     "hlo_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hlo Version"
+     },
+     "inheritance": {
+      "anyOf": [
+       {
+        "$ref": "#/$defs/SampleInheritance"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null
+     },
+     "last_update": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Last Update"
+     },
+     "lot_number": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Lot Number",
+      "type": "array"
+     },
+     "machine_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Machine Name"
+     },
+     "partial_molarity": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Partial Molarity",
+      "type": "array"
+     },
+     "ph": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Ph"
+     },
+     "prep_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Prep Date"
+     },
+     "sample_creation_action_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Action Uuid"
+     },
+     "sample_creation_experiment_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Experiment Uuid"
+     },
+     "sample_creation_timecode": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Timecode"
+     },
+     "sample_hash": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Hash"
+     },
+     "sample_no": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample No"
+     },
+     "sample_position": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Position"
+     },
+     "sample_type": {
+      "const": "liquid",
+      "default": "liquid",
+      "title": "Sample Type",
+      "type": "string"
+     },
+     "server_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Server Name"
+     },
+     "source": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Source",
+      "type": "array"
+     },
+     "status": {
+      "default": [],
+      "items": {
+       "$ref": "#/$defs/SampleStatus"
+      },
+      "title": "Status",
+      "type": "array"
+     },
+     "supplier": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Supplier",
+      "type": "array"
+     },
+     "volume_ml": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": 0.0,
+      "title": "Volume Ml"
+     }
+    },
+    "title": "LiquidSample",
+    "type": "object"
+   },
+   "MachineModel": {
+    "description": "Network identity of a HELAO server.\n\nAttributes:\n    server_name (Optional[str]): Logical server key from the config.\n    machine_name (Optional[str]): Host machine name.\n    hostname (Optional[str]): Network hostname or IP.\n    port (Optional[int]): TCP port.",
+    "properties": {
+     "hostname": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Hostname"
+     },
+     "machine_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Machine Name"
+     },
+     "port": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Port"
+     },
+     "server_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Server Name"
+     }
+    },
+    "title": "MachineModel",
+    "type": "object"
+   },
+   "NoneSample": {
+    "description": "Sentinel sample representing the absence of a sample.\n\nAttributes:\n    sample_type (Literal[None]): Always `None`.\n    global_label (Literal[None]): Always `None`.\n    inheritance (Optional[SampleInheritance]): Internal inheritance state.\n    status (list[SampleStatus]): Internal lifecycle status flags.",
+    "properties": {
+     "action_uuid": {
+      "default": [],
+      "items": {
+       "format": "uuid",
+       "type": "string"
+      },
+      "title": "Action Uuid",
+      "type": "array"
+     },
+     "chemical": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Chemical",
+      "type": "array"
+     },
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Comment"
+     },
+     "etc": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Etc",
+      "type": "object"
+     },
+     "global_label": {
+      "const": null,
+      "default": null,
+      "title": "Global Label",
+      "type": "null"
+     },
+     "hlo_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hlo Version"
+     },
+     "inheritance": {
+      "anyOf": [
+       {
+        "$ref": "#/$defs/SampleInheritance"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null
+     },
+     "last_update": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Last Update"
+     },
+     "lot_number": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Lot Number",
+      "type": "array"
+     },
+     "machine_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Machine Name"
+     },
+     "partial_molarity": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Partial Molarity",
+      "type": "array"
+     },
+     "prep_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Prep Date"
+     },
+     "sample_creation_action_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Action Uuid"
+     },
+     "sample_creation_experiment_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Experiment Uuid"
+     },
+     "sample_creation_timecode": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Timecode"
+     },
+     "sample_hash": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Hash"
+     },
+     "sample_no": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample No"
+     },
+     "sample_position": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Position"
+     },
+     "sample_type": {
+      "const": null,
+      "default": null,
+      "title": "Sample Type",
+      "type": "null"
+     },
+     "server_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Server Name"
+     },
+     "source": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Source",
+      "type": "array"
+     },
+     "status": {
+      "default": [],
+      "items": {
+       "$ref": "#/$defs/SampleStatus"
+      },
+      "title": "Status",
+      "type": "array"
+     },
+     "supplier": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Supplier",
+      "type": "array"
+     }
+    },
+    "title": "NoneSample",
+    "type": "object"
+   },
+   "ProcessContrib": {
+    "description": "Fields an action can contribute to its enclosing process.\n\nMembers:\n    action_params: Action parameter dict.\n    files: Files produced by the action.\n    samples_in: Input samples.\n    samples_out: Output samples.\n    run_use: `RunUse` tag.\n    technique_name: Technique name.",
+    "enum": [
+     "action_params",
+     "files",
+     "samples_in",
+     "samples_out",
+     "run_use",
+     "technique_name"
+    ],
+    "title": "ProcessContrib",
+    "type": "string"
+   },
+   "RunUse": {
+    "description": "Intended use of the data produced by a run.\n\nMembers:\n    data: Standard experiment data.\n    ref: Generic reference measurement.\n    ref_light: Light reference (spectroscopy).\n    ref_dark: Dark reference (spectroscopy).\n    ref_bkg: Background reference.\n    baseline: Baseline measurement.\n    standard: Calibration standard.\n    blank: Blank measurement.\n    preca_baseline: Pre-calibration baseline.\n    pre_anneal: Measurement taken before annealing.\n    post_anneal: Measurement taken after annealing.\n    shutter_closed: Measurement with the shutter closed.\n    izero: I-zero (incident intensity) reference.\n    energy_calib: Energy calibration scan.",
+    "enum": [
+     "data",
+     "ref",
+     "ref_light",
+     "ref_dark",
+     "ref_bkg",
+     "baseline",
+     "standard",
+     "blank",
+     "preca_baseline",
+     "pre_anneal",
+     "post_anneal",
+     "shutter_closed",
+     "izero",
+     "energy_calib"
+    ],
+    "title": "RunUse",
+    "type": "string"
+   },
+   "SampleInheritance": {
+    "description": "How a sample's identity propagates across actions.\n\nMembers:\n    none: No inheritance rule.\n    give_only: The sample only provides material to descendants.\n    receive_only: The sample only receives material.\n    allow_both: Both giving and receiving are allowed.\n    block_both: Neither giving nor receiving is allowed.",
+    "enum": [
+     "none",
+     "give_only",
+     "receive_only",
+     "allow_both",
+     "block_both"
+    ],
+    "title": "SampleInheritance",
+    "type": "string"
+   },
+   "SampleModel": {
+    "description": "Generic sample record with shared identifying and provenance fields.\n\nSubclassed by `LiquidSample`, `GasSample`, `SolidSample`, `AssemblySample`,\nand `NoneSample` to narrow `sample_type` and add type-specific fields.\n\nAttributes:\n    hlo_version (Optional[str]): HELAO version stamped at construction.\n    global_label (Optional[str]): Global identifier; `None` denotes a reference sample.\n    sample_type (Optional[str]): Discriminator naming the sample form.\n    sample_creation_timecode (Optional[int]): Creation time in nanoseconds since epoch.\n    last_update (Optional[int]): Last-update time in nanoseconds since epoch.\n    sample_no (Optional[int | str]): Local sample number or label.\n    machine_name (Optional[str]): Source machine name.\n    sample_hash (Optional[str]): Optional content hash.\n    server_name (Optional[str]): Server that created the sample.\n    action_uuid (list[UUID]): Actions that referenced this sample.\n    sample_creation_action_uuid (Optional[UUID]): Action that created the sample.\n    sample_creation_experiment_uuid (Optional[UUID]): Experiment that created the sample.\n    sample_position (Optional[str]): Position label on the station.\n    inheritance (Optional[SampleInheritance]): Inheritance rule (internal use).\n    status (list[SampleStatus]): Lifecycle status flags (internal use).\n    chemical (list[str]): Chemicals composing the sample.\n    partial_molarity (list[str]): Per-chemical molarity entries.\n    supplier (list[str]): Suppliers per chemical.\n    lot_number (list[str]): Lot numbers per chemical.\n    source (list[str]): Source labels.\n    prep_date (Optional[datetime.date]): Preparation date.\n    comment (Optional[str]): Free-form comment.\n    etc (dict): Catch-all for additional fields not in the standard schema.",
+    "properties": {
+     "action_uuid": {
+      "default": [],
+      "items": {
+       "format": "uuid",
+       "type": "string"
+      },
+      "title": "Action Uuid",
+      "type": "array"
+     },
+     "chemical": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Chemical",
+      "type": "array"
+     },
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Comment"
+     },
+     "etc": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Etc",
+      "type": "object"
+     },
+     "global_label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Global Label"
+     },
+     "hlo_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hlo Version"
+     },
+     "inheritance": {
+      "anyOf": [
+       {
+        "$ref": "#/$defs/SampleInheritance"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null
+     },
+     "last_update": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Last Update"
+     },
+     "lot_number": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Lot Number",
+      "type": "array"
+     },
+     "machine_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Machine Name"
+     },
+     "partial_molarity": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Partial Molarity",
+      "type": "array"
+     },
+     "prep_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Prep Date"
+     },
+     "sample_creation_action_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Action Uuid"
+     },
+     "sample_creation_experiment_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Experiment Uuid"
+     },
+     "sample_creation_timecode": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Timecode"
+     },
+     "sample_hash": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Hash"
+     },
+     "sample_no": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample No"
+     },
+     "sample_position": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Position"
+     },
+     "sample_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Type"
+     },
+     "server_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Server Name"
+     },
+     "source": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Source",
+      "type": "array"
+     },
+     "status": {
+      "default": [],
+      "items": {
+       "$ref": "#/$defs/SampleStatus"
+      },
+      "title": "Status",
+      "type": "array"
+     },
+     "supplier": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Supplier",
+      "type": "array"
+     }
+    },
+    "title": "SampleModel",
+    "type": "object"
+   },
+   "SampleStatus": {
+    "description": "Lifecycle state of a sample relative to the current action.\n\nMembers:\n    none: No status set.\n    created: Sample was created during the action.\n    destroyed: Sample was destroyed during the action.\n    merged: Sample was merged with another sample.\n    preserved: Sample exists before and after the action unchanged in identity.\n    incorporated: Sample was combined into an assembly.\n    recovered: Sample was extracted from an assembly.\n    loaded: Sample was loaded into a station.\n    unloaded: Sample was unloaded from a station.",
+    "enum": [
+     "none",
+     "created",
+     "destroyed",
+     "merged",
+     "preserved",
+     "incorporated",
+     "recovered",
+     "loaded",
+     "unloaded"
+    ],
+    "title": "SampleStatus",
+    "type": "string"
+   },
+   "SolidSample": {
+    "description": "Solid sample tied to a plate id and sample number.\n\nAttributes:\n    sample_type (Literal[SampleType.solid]): Discriminator pinned to ``solid``.\n    machine_name (Optional[str]): Machine context for label formatting; defaults to ``\"legacy\"``.\n    plate_id (Optional[int | str]): Plate identifier hosting the sample.",
+    "properties": {
+     "action_uuid": {
+      "default": [],
+      "items": {
+       "format": "uuid",
+       "type": "string"
+      },
+      "title": "Action Uuid",
+      "type": "array"
+     },
+     "chemical": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Chemical",
+      "type": "array"
+     },
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Comment"
+     },
+     "etc": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Etc",
+      "type": "object"
+     },
+     "global_label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Global Label"
+     },
+     "hlo_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hlo Version"
+     },
+     "inheritance": {
+      "anyOf": [
+       {
+        "$ref": "#/$defs/SampleInheritance"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null
+     },
+     "last_update": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Last Update"
+     },
+     "lot_number": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Lot Number",
+      "type": "array"
+     },
+     "machine_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": "legacy",
+      "title": "Machine Name"
+     },
+     "partial_molarity": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Partial Molarity",
+      "type": "array"
+     },
+     "plate_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Plate Id"
+     },
+     "prep_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Prep Date"
+     },
+     "sample_creation_action_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Action Uuid"
+     },
+     "sample_creation_experiment_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Experiment Uuid"
+     },
+     "sample_creation_timecode": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Timecode"
+     },
+     "sample_hash": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Hash"
+     },
+     "sample_no": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample No"
+     },
+     "sample_position": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Position"
+     },
+     "sample_type": {
+      "const": "solid",
+      "default": "solid",
+      "title": "Sample Type",
+      "type": "string"
+     },
+     "server_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Server Name"
+     },
+     "source": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Source",
+      "type": "array"
+     },
+     "status": {
+      "default": [],
+      "items": {
+       "$ref": "#/$defs/SampleStatus"
+      },
+      "title": "Status",
+      "type": "array"
+     },
+     "supplier": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Supplier",
+      "type": "array"
+     }
+    },
+    "title": "SolidSample",
+    "type": "object"
+   }
+  },
+  "description": "Full record of a HELAO action.\n\nExtends `ShortActionModel` with the parameters, samples, files, status,\nprocess linkage, and bookkeeping fields persisted for each action run.\n\nAttributes:\n    orchestrator (MachineModel): Orchestrator that dispatched the action.\n    access (str): Access tier identifier (e.g. ``\"hte\"``).\n    dummy (bool): True if this is a dummy/test action.\n    simulation (bool): True if the action ran against a simulated driver.\n    run_type (Optional[str]): Instrument/run-type label from the world config.\n    run_use (Optional[RunUse]): How the resulting data is to be used.\n    experiment_uuid (Optional[UUID]): UUID of the parent experiment.\n    experiment_timestamp (Optional[datetime]): Timestamp of the parent experiment.\n    action_timestamp (Optional[datetime]): Timestamp when the action was created.\n    action_status (list[HloStatus]): Accumulated status flags for the action.\n    action_order (Optional[int]): Intended dispatch order.\n    action_retry (Optional[int]): Retry counter.\n    action_split (Optional[int]): Split index for parallelized/split actions.\n    action_name (Optional[str]): Action endpoint name.\n    action_sub_name (Optional[str]): Sub-name or variant.\n    action_abbr (Optional[str]): Short label used in file names.\n    action_params (dict): Parameters supplied to the action endpoint.\n    action_output (dict): Data produced by the action (non-file output).\n    action_etc (Optional[float]): Expected time-to-completion in seconds.\n    action_codehash (Optional[str]): Git hash of the action's source file.\n    action_codepath (Optional[str]): Source file path of the action.\n    action_funcname (Optional[str]): Name of the Python function implementing it.\n    action_finished_timestamp (Optional[datetime]): When the action completed.\n    parent_action_uuid (Optional[UUID]): UUID of the parent action, if any.\n    child_action_uuid (Optional[UUID]): UUID of the child action, if any.\n    samples_in (list): Input samples (union of sample model types).\n    samples_out (list): Output samples (union of sample model types).\n    files (list[FileInfo]): Files produced by the action.\n    manual_action (bool): True if performed manually rather than dispatched.\n    nonblocking (bool): True if the orchestrator does not wait for completion.\n    exec_id (Optional[str]): Execution identifier used by the runner.\n    technique_name (Optional[Union[str, list]]): Technique(s) associated with the action.\n    process_finish (bool): True marks the action as the terminator of a process group.\n    process_contrib (list[ProcessContrib]): Fields this action contributes to its process.\n    error_code (Optional[ErrorCodes]): Final error code.\n    process_uuid (Optional[UUID]): UUID of the enclosing process.\n    data_request_id (Optional[UUID]): Optional data-request linkage.\n    sync_data (bool): True to ship the action's data via the syncer.\n    campaign_name (Optional[str]): Campaign name label.\n    campaign_uuid (Optional[UUID]): Campaign UUID.\n    run_id (Optional[UUID]): Run identifier.\n    start_condition (ActionStartCondition): Gate that must clear before dispatch.\n    save_act (bool): True to persist the action YAML record.\n    save_data (bool): True to persist data files.\n    from_global_act_params (dict): Parameters injected from the global context.\n    to_global_params (Union[list, dict]): Parameters to publish to the global context.",
+  "properties": {
+   "access": {
+    "default": "hte",
+    "title": "Access",
+    "type": "string"
+   },
+   "action_abbr": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Action Abbr"
+   },
+   "action_actual_order": {
+    "anyOf": [
+     {
+      "type": "integer"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": 0,
+    "title": "Action Actual Order"
+   },
+   "action_codehash": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Action Codehash"
+   },
+   "action_codepath": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Action Codepath"
+   },
+   "action_comment": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Action Comment"
+   },
+   "action_etc": {
+    "anyOf": [
+     {
+      "type": "number"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Action Etc"
+   },
+   "action_finished_timestamp": {
+    "anyOf": [
+     {
+      "format": "date-time",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Action Finished Timestamp"
+   },
+   "action_funcname": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Action Funcname"
+   },
+   "action_name": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Action Name"
+   },
+   "action_order": {
+    "anyOf": [
+     {
+      "type": "integer"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": 0,
+    "title": "Action Order"
+   },
+   "action_output": {
+    "additionalProperties": true,
+    "default": {},
+    "title": "Action Output",
+    "type": "object"
+   },
+   "action_output_dir": {
+    "anyOf": [
+     {
+      "format": "path",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Action Output Dir"
+   },
+   "action_params": {
+    "additionalProperties": true,
+    "default": {},
+    "title": "Action Params",
+    "type": "object"
+   },
+   "action_retry": {
+    "anyOf": [
+     {
+      "type": "integer"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": 0,
+    "title": "Action Retry"
+   },
+   "action_server": {
+    "$ref": "#/$defs/MachineModel",
+    "default": {
+     "hostname": null,
+     "machine_name": null,
+     "port": null,
+     "server_name": null
+    }
+   },
+   "action_split": {
+    "anyOf": [
+     {
+      "type": "integer"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": 0,
+    "title": "Action Split"
+   },
+   "action_status": {
+    "default": [],
+    "items": {
+     "$ref": "#/$defs/HloStatus"
+    },
+    "title": "Action Status",
+    "type": "array"
+   },
+   "action_sub_name": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Action Sub Name"
+   },
+   "action_timestamp": {
+    "anyOf": [
+     {
+      "format": "date-time",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Action Timestamp"
+   },
+   "action_uuid": {
+    "anyOf": [
+     {
+      "format": "uuid",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Action Uuid"
+   },
+   "campaign_name": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Campaign Name"
+   },
+   "campaign_uuid": {
+    "anyOf": [
+     {
+      "format": "uuid",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Campaign Uuid"
+   },
+   "child_action_uuid": {
+    "anyOf": [
+     {
+      "format": "uuid",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Child Action Uuid"
+   },
+   "data_request_id": {
+    "anyOf": [
+     {
+      "format": "uuid",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Data Request Id"
+   },
+   "dummy": {
+    "default": false,
+    "title": "Dummy",
+    "type": "boolean"
+   },
+   "error_code": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/ErrorCodes"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": "none"
+   },
+   "exec_id": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Exec Id"
+   },
+   "experiment_timestamp": {
+    "anyOf": [
+     {
+      "format": "date-time",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Experiment Timestamp"
+   },
+   "experiment_uuid": {
+    "anyOf": [
+     {
+      "format": "uuid",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Experiment Uuid"
+   },
+   "files": {
+    "default": [],
+    "items": {
+     "$ref": "#/$defs/FileInfo"
+    },
+    "title": "Files",
+    "type": "array"
+   },
+   "from_global_act_params": {
+    "additionalProperties": true,
+    "default": {},
+    "title": "From Global Act Params",
+    "type": "object"
+   },
+   "hlo_version": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "title": "Hlo Version"
+   },
+   "manual_action": {
+    "default": false,
+    "title": "Manual Action",
+    "type": "boolean"
+   },
+   "nonblocking": {
+    "default": false,
+    "title": "Nonblocking",
+    "type": "boolean"
+   },
+   "orch_host": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Orch Host"
+   },
+   "orch_key": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Orch Key"
+   },
+   "orch_port": {
+    "anyOf": [
+     {
+      "type": "integer"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Orch Port"
+   },
+   "orch_submit_order": {
+    "anyOf": [
+     {
+      "type": "integer"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": 0,
+    "title": "Orch Submit Order"
+   },
+   "orchestrator": {
+    "$ref": "#/$defs/MachineModel",
+    "default": {
+     "hostname": null,
+     "machine_name": null,
+     "port": null,
+     "server_name": null
+    }
+   },
+   "parent_action_uuid": {
+    "anyOf": [
+     {
+      "format": "uuid",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Parent Action Uuid"
+   },
+   "prefinish_errors": {
+    "default": [],
+    "items": {
+     "additionalProperties": true,
+     "type": "object"
+    },
+    "title": "Prefinish Errors",
+    "type": "array"
+   },
+   "process_contrib": {
+    "default": [],
+    "items": {
+     "$ref": "#/$defs/ProcessContrib"
+    },
+    "title": "Process Contrib",
+    "type": "array"
+   },
+   "process_finish": {
+    "default": false,
+    "title": "Process Finish",
+    "type": "boolean"
+   },
+   "process_uuid": {
+    "anyOf": [
+     {
+      "format": "uuid",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Process Uuid"
+   },
+   "run_id": {
+    "anyOf": [
+     {
+      "format": "uuid",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Run Id"
+   },
+   "run_type": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Run Type"
+   },
+   "run_use": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/RunUse"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": "data"
+   },
+   "samples_in": {
+    "default": [],
+    "items": {
+     "anyOf": [
+      {
+       "discriminator": {
+        "mapping": {
+         "assembly": "#/$defs/AssemblySample",
+         "gas": "#/$defs/GasSample",
+         "liquid": "#/$defs/LiquidSample",
+         "solid": "#/$defs/SolidSample"
+        },
+        "propertyName": "sample_type"
+       },
+       "oneOf": [
+        {
+         "$ref": "#/$defs/AssemblySample"
+        },
+        {
+         "$ref": "#/$defs/LiquidSample"
+        },
+        {
+         "$ref": "#/$defs/GasSample"
+        },
+        {
+         "$ref": "#/$defs/SolidSample"
+        }
+       ]
+      },
+      {
+       "$ref": "#/$defs/NoneSample"
+      },
+      {
+       "$ref": "#/$defs/SampleModel"
+      }
+     ]
+    },
+    "title": "Samples In",
+    "type": "array"
+   },
+   "samples_out": {
+    "default": [],
+    "items": {
+     "anyOf": [
+      {
+       "discriminator": {
+        "mapping": {
+         "assembly": "#/$defs/AssemblySample",
+         "gas": "#/$defs/GasSample",
+         "liquid": "#/$defs/LiquidSample",
+         "solid": "#/$defs/SolidSample"
+        },
+        "propertyName": "sample_type"
+       },
+       "oneOf": [
+        {
+         "$ref": "#/$defs/AssemblySample"
+        },
+        {
+         "$ref": "#/$defs/LiquidSample"
+        },
+        {
+         "$ref": "#/$defs/GasSample"
+        },
+        {
+         "$ref": "#/$defs/SolidSample"
+        }
+       ]
+      },
+      {
+       "$ref": "#/$defs/NoneSample"
+      },
+      {
+       "$ref": "#/$defs/SampleModel"
+      }
+     ]
+    },
+    "title": "Samples Out",
+    "type": "array"
+   },
+   "save_act": {
+    "default": true,
+    "title": "Save Act",
+    "type": "boolean"
+   },
+   "save_data": {
+    "default": true,
+    "title": "Save Data",
+    "type": "boolean"
+   },
+   "simulation": {
+    "default": false,
+    "title": "Simulation",
+    "type": "boolean"
+   },
+   "start_condition": {
+    "$ref": "#/$defs/ActionStartCondition",
+    "default": 3
+   },
+   "sync_data": {
+    "default": true,
+    "title": "Sync Data",
+    "type": "boolean"
+   },
+   "technique_name": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "items": {},
+      "type": "array"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Technique Name"
+   },
+   "to_global_params": {
+    "anyOf": [
+     {
+      "items": {},
+      "type": "array"
+     },
+     {
+      "additionalProperties": true,
+      "type": "object"
+     }
+    ],
+    "default": [],
+    "title": "To Global Params"
+   }
+  },
+  "title": "ActionModel",
+  "type": "object"
+ },
+ {
+  "$defs": {
+   "AssemblySample": {
+    "description": "Composite sample built from constituent samples.\n\nAttributes:\n    sample_type (Literal[SampleType.assembly]): Discriminator pinned to ``assembly``.\n    parts (list): Constituent samples (any sample subtype).\n    sample_position (Optional[str]): Position label; default ``\"cell1_we\"``.\n    parent_assembly_label (Optional[str]): Label of a parent assembly, if any.",
+    "properties": {
+     "action_uuid": {
+      "default": [],
+      "items": {
+       "format": "uuid",
+       "type": "string"
+      },
+      "title": "Action Uuid",
+      "type": "array"
+     },
+     "chemical": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Chemical",
+      "type": "array"
+     },
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Comment"
+     },
+     "etc": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Etc",
+      "type": "object"
+     },
+     "global_label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Global Label"
+     },
+     "hlo_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hlo Version"
+     },
+     "inheritance": {
+      "anyOf": [
+       {
+        "$ref": "#/$defs/SampleInheritance"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null
+     },
+     "last_update": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Last Update"
+     },
+     "lot_number": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Lot Number",
+      "type": "array"
+     },
+     "machine_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Machine Name"
+     },
+     "parent_assembly_label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Parent Assembly Label"
+     },
+     "partial_molarity": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Partial Molarity",
+      "type": "array"
+     },
+     "parts": {
+      "default": [],
+      "items": {
+       "anyOf": [
+        {
+         "discriminator": {
+          "mapping": {
+           "assembly": "#/$defs/AssemblySample",
+           "gas": "#/$defs/GasSample",
+           "liquid": "#/$defs/LiquidSample",
+           "solid": "#/$defs/SolidSample"
+          },
+          "propertyName": "sample_type"
+         },
+         "oneOf": [
+          {
+           "$ref": "#/$defs/AssemblySample"
+          },
+          {
+           "$ref": "#/$defs/LiquidSample"
+          },
+          {
+           "$ref": "#/$defs/GasSample"
+          },
+          {
+           "$ref": "#/$defs/SolidSample"
+          }
+         ]
+        },
+        {
+         "$ref": "#/$defs/NoneSample"
+        },
+        {
+         "$ref": "#/$defs/SampleModel"
+        }
+       ]
+      },
+      "title": "Parts",
+      "type": "array"
+     },
+     "prep_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Prep Date"
+     },
+     "sample_creation_action_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Action Uuid"
+     },
+     "sample_creation_experiment_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Experiment Uuid"
+     },
+     "sample_creation_timecode": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Timecode"
+     },
+     "sample_hash": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Hash"
+     },
+     "sample_no": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample No"
+     },
+     "sample_position": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": "cell1_we",
+      "title": "Sample Position"
+     },
+     "sample_type": {
+      "const": "assembly",
+      "default": "assembly",
+      "title": "Sample Type",
+      "type": "string"
+     },
+     "server_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Server Name"
+     },
+     "source": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Source",
+      "type": "array"
+     },
+     "status": {
+      "default": [],
+      "items": {
+       "$ref": "#/$defs/SampleStatus"
+      },
+      "title": "Status",
+      "type": "array"
+     },
+     "supplier": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Supplier",
+      "type": "array"
+     }
+    },
+    "title": "AssemblySample",
+    "type": "object"
+   },
+   "FileInfo": {
+    "description": "Metadata record describing one file produced by an action.\n\nAttributes:\n    file_type (Optional[str]): File type tag.\n    file_name (Optional[str]): Path to the file relative to the record's own\n        directory, forward-slash separated on every platform. A bare file\n        name is the common case; a file written into a subdirectory of the\n        action directory keeps its subdirectory segments, so that the\n        syncer's ``files``-driven upload set can address it.\n    data_keys (list[str]): Data keys present in the file.\n    sample (list[str]): Sample labels associated with the file.\n    action_uuid (Optional[UUID]): UUID of the producing action.\n    run_use (Optional[RunUse]): Intended use of the file's data.\n    nosync (bool): True to exclude the file from data sync.",
+    "properties": {
+     "action_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Action Uuid"
+     },
+     "data_keys": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Data Keys",
+      "type": "array"
+     },
+     "file_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "File Name"
+     },
+     "file_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "File Type"
+     },
+     "nosync": {
+      "default": false,
+      "title": "Nosync",
+      "type": "boolean"
+     },
+     "run_use": {
+      "anyOf": [
+       {
+        "$ref": "#/$defs/RunUse"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null
+     },
+     "sample": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Sample",
+      "type": "array"
+     }
+    },
+    "title": "FileInfo",
+    "type": "object"
+   },
+   "GasSample": {
+    "description": "Gas sample with volume and dilution-factor fields.\n\nAttributes:\n    sample_type (Literal[SampleType.gas]): Discriminator pinned to ``gas``.\n    volume_ml (Optional[float]): Volume in millilitres.\n    dilution_factor (Optional[float]): Dilution factor relative to a stock.",
+    "properties": {
+     "action_uuid": {
+      "default": [],
+      "items": {
+       "format": "uuid",
+       "type": "string"
+      },
+      "title": "Action Uuid",
+      "type": "array"
+     },
+     "chemical": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Chemical",
+      "type": "array"
+     },
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Comment"
+     },
+     "dilution_factor": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": 1.0,
+      "title": "Dilution Factor"
+     },
+     "etc": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Etc",
+      "type": "object"
+     },
+     "global_label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Global Label"
+     },
+     "hlo_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hlo Version"
+     },
+     "inheritance": {
+      "anyOf": [
+       {
+        "$ref": "#/$defs/SampleInheritance"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null
+     },
+     "last_update": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Last Update"
+     },
+     "lot_number": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Lot Number",
+      "type": "array"
+     },
+     "machine_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Machine Name"
+     },
+     "partial_molarity": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Partial Molarity",
+      "type": "array"
+     },
+     "prep_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Prep Date"
+     },
+     "sample_creation_action_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Action Uuid"
+     },
+     "sample_creation_experiment_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Experiment Uuid"
+     },
+     "sample_creation_timecode": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Timecode"
+     },
+     "sample_hash": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Hash"
+     },
+     "sample_no": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample No"
+     },
+     "sample_position": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Position"
+     },
+     "sample_type": {
+      "const": "gas",
+      "default": "gas",
+      "title": "Sample Type",
+      "type": "string"
+     },
+     "server_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Server Name"
+     },
+     "source": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Source",
+      "type": "array"
+     },
+     "status": {
+      "default": [],
+      "items": {
+       "$ref": "#/$defs/SampleStatus"
+      },
+      "title": "Status",
+      "type": "array"
+     },
+     "supplier": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Supplier",
+      "type": "array"
+     },
+     "volume_ml": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": 0.0,
+      "title": "Volume Ml"
+     }
+    },
+    "title": "GasSample",
+    "type": "object"
+   },
+   "HloStatus": {
+    "description": "Lifecycle status flags applied to actions, experiments, and sequences.\n\nMembers:\n    active: Currently running.\n    finished: Completed normally.\n    errored: Terminated due to an error.\n    aborted: Terminated by user/operator request.\n    skipped: Skipped without running.\n    estopped: Halted by an emergency stop.\n    split: Split into sub-actions.\n    busy: Server/endpoint busy but action not yet started.\n    retired: Archived/no longer active.",
+    "enum": [
+     "active",
+     "finished",
+     "errored",
+     "aborted",
+     "skipped",
+     "estopped",
+     "split",
+     "busy",
+     "retired"
+    ],
+    "title": "HloStatus",
+    "type": "string"
+   },
+   "LiquidSample": {
+    "description": "Liquid sample with volume, pH, dilution, and electrolyte fields.\n\nAttributes:\n    sample_type (Literal[SampleType.liquid]): Discriminator pinned to ``liquid``.\n    volume_ml (Optional[float]): Sample volume in millilitres.\n    ph (Optional[float]): pH of the sample.\n    dilution_factor (Optional[float]): Dilution factor relative to a stock.\n    electrolyte (Optional[str]): Electrolyte identifier (see `Electrolyte`).",
+    "properties": {
+     "action_uuid": {
+      "default": [],
+      "items": {
+       "format": "uuid",
+       "type": "string"
+      },
+      "title": "Action Uuid",
+      "type": "array"
+     },
+     "chemical": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Chemical",
+      "type": "array"
+     },
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Comment"
+     },
+     "dilution_factor": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": 1.0,
+      "title": "Dilution Factor"
+     },
+     "electrolyte": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Electrolyte"
+     },
+     "etc": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Etc",
+      "type": "object"
+     },
+     "global_label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Global Label"
+     },
+     "hlo_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hlo Version"
+     },
+     "inheritance": {
+      "anyOf": [
+       {
+        "$ref": "#/$defs/SampleInheritance"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null
+     },
+     "last_update": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Last Update"
+     },
+     "lot_number": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Lot Number",
+      "type": "array"
+     },
+     "machine_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Machine Name"
+     },
+     "partial_molarity": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Partial Molarity",
+      "type": "array"
+     },
+     "ph": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Ph"
+     },
+     "prep_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Prep Date"
+     },
+     "sample_creation_action_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Action Uuid"
+     },
+     "sample_creation_experiment_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Experiment Uuid"
+     },
+     "sample_creation_timecode": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Timecode"
+     },
+     "sample_hash": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Hash"
+     },
+     "sample_no": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample No"
+     },
+     "sample_position": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Position"
+     },
+     "sample_type": {
+      "const": "liquid",
+      "default": "liquid",
+      "title": "Sample Type",
+      "type": "string"
+     },
+     "server_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Server Name"
+     },
+     "source": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Source",
+      "type": "array"
+     },
+     "status": {
+      "default": [],
+      "items": {
+       "$ref": "#/$defs/SampleStatus"
+      },
+      "title": "Status",
+      "type": "array"
+     },
+     "supplier": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Supplier",
+      "type": "array"
+     },
+     "volume_ml": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": 0.0,
+      "title": "Volume Ml"
+     }
+    },
+    "title": "LiquidSample",
+    "type": "object"
+   },
+   "MachineModel": {
+    "description": "Network identity of a HELAO server.\n\nAttributes:\n    server_name (Optional[str]): Logical server key from the config.\n    machine_name (Optional[str]): Host machine name.\n    hostname (Optional[str]): Network hostname or IP.\n    port (Optional[int]): TCP port.",
+    "properties": {
+     "hostname": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Hostname"
+     },
+     "machine_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Machine Name"
+     },
+     "port": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Port"
+     },
+     "server_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Server Name"
+     }
+    },
+    "title": "MachineModel",
+    "type": "object"
+   },
+   "NoneSample": {
+    "description": "Sentinel sample representing the absence of a sample.\n\nAttributes:\n    sample_type (Literal[None]): Always `None`.\n    global_label (Literal[None]): Always `None`.\n    inheritance (Optional[SampleInheritance]): Internal inheritance state.\n    status (list[SampleStatus]): Internal lifecycle status flags.",
+    "properties": {
+     "action_uuid": {
+      "default": [],
+      "items": {
+       "format": "uuid",
+       "type": "string"
+      },
+      "title": "Action Uuid",
+      "type": "array"
+     },
+     "chemical": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Chemical",
+      "type": "array"
+     },
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Comment"
+     },
+     "etc": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Etc",
+      "type": "object"
+     },
+     "global_label": {
+      "const": null,
+      "default": null,
+      "title": "Global Label",
+      "type": "null"
+     },
+     "hlo_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hlo Version"
+     },
+     "inheritance": {
+      "anyOf": [
+       {
+        "$ref": "#/$defs/SampleInheritance"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null
+     },
+     "last_update": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Last Update"
+     },
+     "lot_number": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Lot Number",
+      "type": "array"
+     },
+     "machine_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Machine Name"
+     },
+     "partial_molarity": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Partial Molarity",
+      "type": "array"
+     },
+     "prep_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Prep Date"
+     },
+     "sample_creation_action_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Action Uuid"
+     },
+     "sample_creation_experiment_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Experiment Uuid"
+     },
+     "sample_creation_timecode": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Timecode"
+     },
+     "sample_hash": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Hash"
+     },
+     "sample_no": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample No"
+     },
+     "sample_position": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Position"
+     },
+     "sample_type": {
+      "const": null,
+      "default": null,
+      "title": "Sample Type",
+      "type": "null"
+     },
+     "server_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Server Name"
+     },
+     "source": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Source",
+      "type": "array"
+     },
+     "status": {
+      "default": [],
+      "items": {
+       "$ref": "#/$defs/SampleStatus"
+      },
+      "title": "Status",
+      "type": "array"
+     },
+     "supplier": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Supplier",
+      "type": "array"
+     }
+    },
+    "title": "NoneSample",
+    "type": "object"
+   },
+   "RunUse": {
+    "description": "Intended use of the data produced by a run.\n\nMembers:\n    data: Standard experiment data.\n    ref: Generic reference measurement.\n    ref_light: Light reference (spectroscopy).\n    ref_dark: Dark reference (spectroscopy).\n    ref_bkg: Background reference.\n    baseline: Baseline measurement.\n    standard: Calibration standard.\n    blank: Blank measurement.\n    preca_baseline: Pre-calibration baseline.\n    pre_anneal: Measurement taken before annealing.\n    post_anneal: Measurement taken after annealing.\n    shutter_closed: Measurement with the shutter closed.\n    izero: I-zero (incident intensity) reference.\n    energy_calib: Energy calibration scan.",
+    "enum": [
+     "data",
+     "ref",
+     "ref_light",
+     "ref_dark",
+     "ref_bkg",
+     "baseline",
+     "standard",
+     "blank",
+     "preca_baseline",
+     "pre_anneal",
+     "post_anneal",
+     "shutter_closed",
+     "izero",
+     "energy_calib"
+    ],
+    "title": "RunUse",
+    "type": "string"
+   },
+   "SampleInheritance": {
+    "description": "How a sample's identity propagates across actions.\n\nMembers:\n    none: No inheritance rule.\n    give_only: The sample only provides material to descendants.\n    receive_only: The sample only receives material.\n    allow_both: Both giving and receiving are allowed.\n    block_both: Neither giving nor receiving is allowed.",
+    "enum": [
+     "none",
+     "give_only",
+     "receive_only",
+     "allow_both",
+     "block_both"
+    ],
+    "title": "SampleInheritance",
+    "type": "string"
+   },
+   "SampleModel": {
+    "description": "Generic sample record with shared identifying and provenance fields.\n\nSubclassed by `LiquidSample`, `GasSample`, `SolidSample`, `AssemblySample`,\nand `NoneSample` to narrow `sample_type` and add type-specific fields.\n\nAttributes:\n    hlo_version (Optional[str]): HELAO version stamped at construction.\n    global_label (Optional[str]): Global identifier; `None` denotes a reference sample.\n    sample_type (Optional[str]): Discriminator naming the sample form.\n    sample_creation_timecode (Optional[int]): Creation time in nanoseconds since epoch.\n    last_update (Optional[int]): Last-update time in nanoseconds since epoch.\n    sample_no (Optional[int | str]): Local sample number or label.\n    machine_name (Optional[str]): Source machine name.\n    sample_hash (Optional[str]): Optional content hash.\n    server_name (Optional[str]): Server that created the sample.\n    action_uuid (list[UUID]): Actions that referenced this sample.\n    sample_creation_action_uuid (Optional[UUID]): Action that created the sample.\n    sample_creation_experiment_uuid (Optional[UUID]): Experiment that created the sample.\n    sample_position (Optional[str]): Position label on the station.\n    inheritance (Optional[SampleInheritance]): Inheritance rule (internal use).\n    status (list[SampleStatus]): Lifecycle status flags (internal use).\n    chemical (list[str]): Chemicals composing the sample.\n    partial_molarity (list[str]): Per-chemical molarity entries.\n    supplier (list[str]): Suppliers per chemical.\n    lot_number (list[str]): Lot numbers per chemical.\n    source (list[str]): Source labels.\n    prep_date (Optional[datetime.date]): Preparation date.\n    comment (Optional[str]): Free-form comment.\n    etc (dict): Catch-all for additional fields not in the standard schema.",
+    "properties": {
+     "action_uuid": {
+      "default": [],
+      "items": {
+       "format": "uuid",
+       "type": "string"
+      },
+      "title": "Action Uuid",
+      "type": "array"
+     },
+     "chemical": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Chemical",
+      "type": "array"
+     },
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Comment"
+     },
+     "etc": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Etc",
+      "type": "object"
+     },
+     "global_label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Global Label"
+     },
+     "hlo_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hlo Version"
+     },
+     "inheritance": {
+      "anyOf": [
+       {
+        "$ref": "#/$defs/SampleInheritance"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null
+     },
+     "last_update": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Last Update"
+     },
+     "lot_number": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Lot Number",
+      "type": "array"
+     },
+     "machine_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Machine Name"
+     },
+     "partial_molarity": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Partial Molarity",
+      "type": "array"
+     },
+     "prep_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Prep Date"
+     },
+     "sample_creation_action_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Action Uuid"
+     },
+     "sample_creation_experiment_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Experiment Uuid"
+     },
+     "sample_creation_timecode": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Timecode"
+     },
+     "sample_hash": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Hash"
+     },
+     "sample_no": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample No"
+     },
+     "sample_position": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Position"
+     },
+     "sample_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Type"
+     },
+     "server_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Server Name"
+     },
+     "source": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Source",
+      "type": "array"
+     },
+     "status": {
+      "default": [],
+      "items": {
+       "$ref": "#/$defs/SampleStatus"
+      },
+      "title": "Status",
+      "type": "array"
+     },
+     "supplier": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Supplier",
+      "type": "array"
+     }
+    },
+    "title": "SampleModel",
+    "type": "object"
+   },
+   "SampleStatus": {
+    "description": "Lifecycle state of a sample relative to the current action.\n\nMembers:\n    none: No status set.\n    created: Sample was created during the action.\n    destroyed: Sample was destroyed during the action.\n    merged: Sample was merged with another sample.\n    preserved: Sample exists before and after the action unchanged in identity.\n    incorporated: Sample was combined into an assembly.\n    recovered: Sample was extracted from an assembly.\n    loaded: Sample was loaded into a station.\n    unloaded: Sample was unloaded from a station.",
+    "enum": [
+     "none",
+     "created",
+     "destroyed",
+     "merged",
+     "preserved",
+     "incorporated",
+     "recovered",
+     "loaded",
+     "unloaded"
+    ],
+    "title": "SampleStatus",
+    "type": "string"
+   },
+   "ShortActionModel": {
+    "description": "Lightweight summary of a HELAO action.\n\nUsed in places that need an action reference without carrying the full\n`ActionModel` payload (e.g. dispatched-action lists on experiments).\n\nAttributes:\n    hlo_version (Optional[str]): HELAO version stamped at construction.\n    action_uuid (Optional[UUID]): Unique identifier for the action.\n    action_output_dir (Optional[Path]): Directory holding the action's output files.\n    action_actual_order (Optional[int]): Position assigned when the action actually ran.\n    orch_submit_order (Optional[int]): Position the orchestrator submitted the action in.\n    action_server (MachineModel): Server that owns/executes the action.\n    action_comment (Optional[str]): Free-form comment attached to the action.\n    orch_key (Optional[str]): Identifier of the orchestrator that owns the action.\n    orch_host (Optional[str]): Hostname of the owning orchestrator.\n    orch_port (Optional[int]): Port of the owning orchestrator.",
+    "properties": {
+     "action_actual_order": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": 0,
+      "title": "Action Actual Order"
+     },
+     "action_comment": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Action Comment"
+     },
+     "action_output_dir": {
+      "anyOf": [
+       {
+        "format": "path",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Action Output Dir"
+     },
+     "action_server": {
+      "$ref": "#/$defs/MachineModel",
+      "default": {
+       "hostname": null,
+       "machine_name": null,
+       "port": null,
+       "server_name": null
+      }
+     },
+     "action_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Action Uuid"
+     },
+     "hlo_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hlo Version"
+     },
+     "orch_host": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Orch Host"
+     },
+     "orch_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Orch Key"
+     },
+     "orch_port": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Orch Port"
+     },
+     "orch_submit_order": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": 0,
+      "title": "Orch Submit Order"
+     }
+    },
+    "title": "ShortActionModel",
+    "type": "object"
+   },
+   "SolidSample": {
+    "description": "Solid sample tied to a plate id and sample number.\n\nAttributes:\n    sample_type (Literal[SampleType.solid]): Discriminator pinned to ``solid``.\n    machine_name (Optional[str]): Machine context for label formatting; defaults to ``\"legacy\"``.\n    plate_id (Optional[int | str]): Plate identifier hosting the sample.",
+    "properties": {
+     "action_uuid": {
+      "default": [],
+      "items": {
+       "format": "uuid",
+       "type": "string"
+      },
+      "title": "Action Uuid",
+      "type": "array"
+     },
+     "chemical": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Chemical",
+      "type": "array"
+     },
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Comment"
+     },
+     "etc": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Etc",
+      "type": "object"
+     },
+     "global_label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Global Label"
+     },
+     "hlo_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hlo Version"
+     },
+     "inheritance": {
+      "anyOf": [
+       {
+        "$ref": "#/$defs/SampleInheritance"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null
+     },
+     "last_update": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Last Update"
+     },
+     "lot_number": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Lot Number",
+      "type": "array"
+     },
+     "machine_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": "legacy",
+      "title": "Machine Name"
+     },
+     "partial_molarity": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Partial Molarity",
+      "type": "array"
+     },
+     "plate_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Plate Id"
+     },
+     "prep_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Prep Date"
+     },
+     "sample_creation_action_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Action Uuid"
+     },
+     "sample_creation_experiment_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Experiment Uuid"
+     },
+     "sample_creation_timecode": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Creation Timecode"
+     },
+     "sample_hash": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Hash"
+     },
+     "sample_no": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample No"
+     },
+     "sample_position": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Sample Position"
+     },
+     "sample_type": {
+      "const": "solid",
+      "default": "solid",
+      "title": "Sample Type",
+      "type": "string"
+     },
+     "server_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Server Name"
+     },
+     "source": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Source",
+      "type": "array"
+     },
+     "status": {
+      "default": [],
+      "items": {
+       "$ref": "#/$defs/SampleStatus"
+      },
+      "title": "Status",
+      "type": "array"
+     },
+     "supplier": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Supplier",
+      "type": "array"
+     }
+    },
+    "title": "SolidSample",
+    "type": "object"
+   }
+  },
+  "description": "Full record of an experiment.\n\nExtends `ShortExperimentModel` with status, samples, files, planned and\ndispatched actions, process bookkeeping, and global parameter snapshots.\n\nAttributes:\n    hlo_version (Optional[str]): HELAO version stamped at construction.\n    orchestrator (Optional[MachineModel]): Orchestrator that ran the experiment.\n    access (Optional[str]): Access tier identifier (e.g. ``\"hte\"``).\n    dummy (bool): True if this is a dummy/test experiment.\n    simulation (bool): True if the experiment ran against simulated drivers.\n    run_type (Optional[str]): Instrument/run-type label.\n    run_use (Optional[RunUse]): How the resulting data is used.\n    sequence_uuid (Optional[UUID]): UUID of the parent sequence.\n    experiment_timestamp (Optional[datetime]): Creation timestamp.\n    experiment_status (list[HloStatus]): Accumulated status flags.\n    experiment_codehash (Optional[str]): Git hash of the experiment source.\n    experiment_codepath (Optional[str]): Source file path of the experiment.\n    experiment_funcname (Optional[str]): Implementing function name.\n    experiment_label (Optional[str]): Free-form label.\n    experiment_finished_timestamp (Optional[datetime]): When the experiment finished.\n    planned_actions (list): Planned action records prior to dispatch.\n    dispatched_actions_abbr (list[ShortActionModel]): Short records of dispatched actions.\n    samples_in (list): Input samples (union of sample types).\n    samples_out (list): Output samples (union of sample types).\n    files (list[FileInfo]): Files produced by the experiment.\n    aux_files (list[str]): Auxiliary file paths.\n    process_list (list[UUID]): Processes generated by this experiment.\n    process_order_groups (dict[int, list[int]]): Map of process group index to action orders.\n    orch_key (Optional[str]): Orchestrator identifier.\n    orch_host (Optional[str]): Orchestrator hostname.\n    orch_port (Optional[int]): Orchestrator port.\n    sync_data (bool): True to ship experiment data via the syncer.\n    campaign_name (Optional[str]): Campaign label.\n    campaign_uuid (Optional[UUID]): Campaign UUID.\n    run_id (Optional[UUID]): Run identifier.\n    initial_global_params (dict): Snapshot of global params at start.\n    finished_global_params (dict): Snapshot of global params at end.",
+  "properties": {
+   "access": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": "hte",
+    "title": "Access"
+   },
+   "aux_files": {
+    "default": [],
+    "items": {
+     "type": "string"
+    },
+    "title": "Aux Files",
+    "type": "array"
+   },
+   "campaign_name": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Campaign Name"
+   },
+   "campaign_uuid": {
+    "anyOf": [
+     {
+      "format": "uuid",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Campaign Uuid"
+   },
+   "data_request_id": {
+    "anyOf": [
+     {
+      "format": "uuid",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Data Request Id"
+   },
+   "dispatched_actions_abbr": {
+    "default": [],
+    "items": {
+     "$ref": "#/$defs/ShortActionModel"
+    },
+    "title": "Dispatched Actions Abbr",
+    "type": "array"
+   },
+   "dummy": {
+    "default": false,
+    "title": "Dummy",
+    "type": "boolean"
+   },
+   "experiment_codehash": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Experiment Codehash"
+   },
+   "experiment_codepath": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Experiment Codepath"
+   },
+   "experiment_comment": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Experiment Comment"
+   },
+   "experiment_finished_timestamp": {
+    "anyOf": [
+     {
+      "format": "date-time",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Experiment Finished Timestamp"
+   },
+   "experiment_funcname": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Experiment Funcname"
+   },
+   "experiment_label": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Experiment Label"
+   },
+   "experiment_name": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Experiment Name"
+   },
+   "experiment_output_dir": {
+    "anyOf": [
+     {
+      "format": "path",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Experiment Output Dir"
+   },
+   "experiment_params": {
+    "additionalProperties": true,
+    "default": {},
+    "title": "Experiment Params",
+    "type": "object"
+   },
+   "experiment_status": {
+    "default": [],
+    "items": {
+     "$ref": "#/$defs/HloStatus"
+    },
+    "title": "Experiment Status",
+    "type": "array"
+   },
+   "experiment_timestamp": {
+    "anyOf": [
+     {
+      "format": "date-time",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Experiment Timestamp"
+   },
+   "experiment_uuid": {
+    "anyOf": [
+     {
+      "format": "uuid",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Experiment Uuid"
+   },
+   "files": {
+    "default": [],
+    "items": {
+     "$ref": "#/$defs/FileInfo"
+    },
+    "title": "Files",
+    "type": "array"
+   },
+   "finished_global_params": {
+    "additionalProperties": true,
+    "default": {},
+    "title": "Finished Global Params",
+    "type": "object"
+   },
+   "from_global_exp_params": {
+    "additionalProperties": true,
+    "default": {},
+    "title": "From Global Exp Params",
+    "type": "object"
+   },
+   "hlo_version": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "title": "Hlo Version"
+   },
+   "initial_global_params": {
+    "additionalProperties": true,
+    "default": {},
+    "title": "Initial Global Params",
+    "type": "object"
+   },
+   "orch_host": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Orch Host"
+   },
+   "orch_key": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Orch Key"
+   },
+   "orch_port": {
+    "anyOf": [
+     {
+      "type": "integer"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Orch Port"
+   },
+   "orchestrator": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/MachineModel"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null
+   },
+   "planned_actions": {
+    "default": [],
+    "items": {},
+    "title": "Planned Actions",
+    "type": "array"
+   },
+   "prefinish_errors": {
+    "default": [],
+    "items": {
+     "additionalProperties": true,
+     "type": "object"
+    },
+    "title": "Prefinish Errors",
+    "type": "array"
+   },
+   "process_list": {
+    "default": [],
+    "items": {
+     "format": "uuid",
+     "type": "string"
+    },
+    "title": "Process List",
+    "type": "array"
+   },
+   "process_order_groups": {
+    "additionalProperties": {
+     "items": {
+      "type": "integer"
+     },
+     "type": "array"
+    },
+    "default": {},
+    "title": "Process Order Groups",
+    "type": "object"
+   },
+   "run_id": {
+    "anyOf": [
+     {
+      "format": "uuid",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Run Id"
+   },
+   "run_type": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Run Type"
+   },
+   "run_use": {
+    "anyOf": [
+     {
+      "$ref": "#/$defs/RunUse"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": "data"
+   },
+   "samples_in": {
+    "default": [],
+    "items": {
+     "anyOf": [
+      {
+       "discriminator": {
+        "mapping": {
+         "assembly": "#/$defs/AssemblySample",
+         "gas": "#/$defs/GasSample",
+         "liquid": "#/$defs/LiquidSample",
+         "solid": "#/$defs/SolidSample"
+        },
+        "propertyName": "sample_type"
+       },
+       "oneOf": [
+        {
+         "$ref": "#/$defs/AssemblySample"
+        },
+        {
+         "$ref": "#/$defs/LiquidSample"
+        },
+        {
+         "$ref": "#/$defs/GasSample"
+        },
+        {
+         "$ref": "#/$defs/SolidSample"
+        }
+       ]
+      },
+      {
+       "$ref": "#/$defs/NoneSample"
+      },
+      {
+       "$ref": "#/$defs/SampleModel"
+      }
+     ]
+    },
+    "title": "Samples In",
+    "type": "array"
+   },
+   "samples_out": {
+    "default": [],
+    "items": {
+     "anyOf": [
+      {
+       "discriminator": {
+        "mapping": {
+         "assembly": "#/$defs/AssemblySample",
+         "gas": "#/$defs/GasSample",
+         "liquid": "#/$defs/LiquidSample",
+         "solid": "#/$defs/SolidSample"
+        },
+        "propertyName": "sample_type"
+       },
+       "oneOf": [
+        {
+         "$ref": "#/$defs/AssemblySample"
+        },
+        {
+         "$ref": "#/$defs/LiquidSample"
+        },
+        {
+         "$ref": "#/$defs/GasSample"
+        },
+        {
+         "$ref": "#/$defs/SolidSample"
+        }
+       ]
+      },
+      {
+       "$ref": "#/$defs/NoneSample"
+      },
+      {
+       "$ref": "#/$defs/SampleModel"
+      }
+     ]
+    },
+    "title": "Samples Out",
+    "type": "array"
+   },
+   "sequence_uuid": {
+    "anyOf": [
+     {
+      "format": "uuid",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Sequence Uuid"
+   },
+   "simulation": {
+    "default": false,
+    "title": "Simulation",
+    "type": "boolean"
+   },
+   "sync_data": {
+    "default": true,
+    "title": "Sync Data",
+    "type": "boolean"
+   }
+  },
+  "title": "ExperimentModel",
+  "type": "object"
+ },
+ {
+  "$defs": {
+   "FileInfo": {
+    "description": "Metadata record describing one file produced by an action.\n\nAttributes:\n    file_type (Optional[str]): File type tag.\n    file_name (Optional[str]): Path to the file relative to the record's own\n        directory, forward-slash separated on every platform. A bare file\n        name is the common case; a file written into a subdirectory of the\n        action directory keeps its subdirectory segments, so that the\n        syncer's ``files``-driven upload set can address it.\n    data_keys (list[str]): Data keys present in the file.\n    sample (list[str]): Sample labels associated with the file.\n    action_uuid (Optional[UUID]): UUID of the producing action.\n    run_use (Optional[RunUse]): Intended use of the file's data.\n    nosync (bool): True to exclude the file from data sync.",
+    "properties": {
+     "action_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Action Uuid"
+     },
+     "data_keys": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Data Keys",
+      "type": "array"
+     },
+     "file_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "File Name"
+     },
+     "file_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "File Type"
+     },
+     "nosync": {
+      "default": false,
+      "title": "Nosync",
+      "type": "boolean"
+     },
+     "run_use": {
+      "anyOf": [
+       {
+        "$ref": "#/$defs/RunUse"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null
+     },
+     "sample": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Sample",
+      "type": "array"
+     }
+    },
+    "title": "FileInfo",
+    "type": "object"
+   },
+   "HloStatus": {
+    "description": "Lifecycle status flags applied to actions, experiments, and sequences.\n\nMembers:\n    active: Currently running.\n    finished: Completed normally.\n    errored: Terminated due to an error.\n    aborted: Terminated by user/operator request.\n    skipped: Skipped without running.\n    estopped: Halted by an emergency stop.\n    split: Split into sub-actions.\n    busy: Server/endpoint busy but action not yet started.\n    retired: Archived/no longer active.",
+    "enum": [
+     "active",
+     "finished",
+     "errored",
+     "aborted",
+     "skipped",
+     "estopped",
+     "split",
+     "busy",
+     "retired"
+    ],
+    "title": "HloStatus",
+    "type": "string"
+   },
+   "MachineModel": {
+    "description": "Network identity of a HELAO server.\n\nAttributes:\n    server_name (Optional[str]): Logical server key from the config.\n    machine_name (Optional[str]): Host machine name.\n    hostname (Optional[str]): Network hostname or IP.\n    port (Optional[int]): TCP port.",
+    "properties": {
+     "hostname": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Hostname"
+     },
+     "machine_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Machine Name"
+     },
+     "port": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Port"
+     },
+     "server_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Server Name"
+     }
+    },
+    "title": "MachineModel",
+    "type": "object"
+   },
+   "RunUse": {
+    "description": "Intended use of the data produced by a run.\n\nMembers:\n    data: Standard experiment data.\n    ref: Generic reference measurement.\n    ref_light: Light reference (spectroscopy).\n    ref_dark: Dark reference (spectroscopy).\n    ref_bkg: Background reference.\n    baseline: Baseline measurement.\n    standard: Calibration standard.\n    blank: Blank measurement.\n    preca_baseline: Pre-calibration baseline.\n    pre_anneal: Measurement taken before annealing.\n    post_anneal: Measurement taken after annealing.\n    shutter_closed: Measurement with the shutter closed.\n    izero: I-zero (incident intensity) reference.\n    energy_calib: Energy calibration scan.",
+    "enum": [
+     "data",
+     "ref",
+     "ref_light",
+     "ref_dark",
+     "ref_bkg",
+     "baseline",
+     "standard",
+     "blank",
+     "preca_baseline",
+     "pre_anneal",
+     "post_anneal",
+     "shutter_closed",
+     "izero",
+     "energy_calib"
+    ],
+    "title": "RunUse",
+    "type": "string"
+   },
+   "ShortExperimentModel": {
+    "description": "Lightweight summary of an experiment.\n\nUsed by sequences and orchestrator state to reference experiments without\ncarrying the full `ExperimentModel` payload.\n\nAttributes:\n    experiment_uuid (Optional[UUID]): Unique identifier for the experiment.\n    experiment_name (Optional[str]): Name of the experiment.\n    experiment_params (dict): Parameters supplied to the experiment.\n    experiment_output_dir (Optional[Path]): Directory holding experiment output.\n    experiment_comment (Optional[str]): Free-form comment attached to the experiment.\n    orch_key (Optional[str]): Identifier of the owning orchestrator.\n    orch_host (Optional[str]): Hostname of the owning orchestrator.\n    orch_port (Optional[int]): Port of the owning orchestrator.\n    data_request_id (Optional[UUID]): Optional data-request linkage.\n    from_global_exp_params (dict): Params injected from the global experiment context.",
+    "properties": {
+     "data_request_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Data Request Id"
+     },
+     "experiment_comment": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Experiment Comment"
+     },
+     "experiment_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Experiment Name"
+     },
+     "experiment_output_dir": {
+      "anyOf": [
+       {
+        "format": "path",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Experiment Output Dir"
+     },
+     "experiment_params": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Experiment Params",
+      "type": "object"
+     },
+     "experiment_uuid": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Experiment Uuid"
+     },
+     "from_global_exp_params": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "From Global Exp Params",
+      "type": "object"
+     },
+     "orch_host": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Orch Host"
+     },
+     "orch_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Orch Key"
+     },
+     "orch_port": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Orch Port"
+     }
+    },
+    "title": "ShortExperimentModel",
+    "type": "object"
+   }
+  },
+  "description": "Full record of a sequence executed by the orchestrator.\n\nExtends `ShortSequenceModel` with identity, status, code provenance,\ndispatched experiment history, and global parameter snapshots.\n\nAttributes:\n    hlo_version (Optional[str]): HELAO version stamped at construction.\n    access (Optional[str]): Access tier identifier (e.g. ``\"hte\"``).\n    dummy (bool): True if this is a dummy/test sequence.\n    simulation (bool): True if the sequence ran against simulated drivers.\n    sequence_uuid (Optional[UUID]): Unique identifier for the sequence.\n    sequence_timestamp (Optional[datetime]): Creation timestamp.\n    sequence_status (list[HloStatus]): Accumulated status flags.\n    sequence_output_dir (Optional[Path]): Output directory.\n    sequence_codehash (Optional[str]): Git hash of the sequence source.\n    sequence_codepath (Optional[str]): Source file path.\n    sequence_funcname (Optional[str]): Implementing function name.\n    sequence_finished_timestamp (Optional[datetime]): When the sequence finished.\n    files (list[FileInfo]): Files produced.\n    aux_files (list[str]): Auxiliary file paths.\n    data_request_id (Optional[UUID]): Optional data-request linkage.\n    orchestrator (MachineModel): Owning orchestrator.\n    dispatched_experiments_abbr (list[ShortExperimentModel]): Short records of dispatched experiments.\n    sync_data (bool): True to ship sequence data via the syncer.\n    manual_action (bool): True if the sequence contains manual actions.\n    initial_global_params (dict): Snapshot of global params at start.\n    finished_global_params (dict): Snapshot of global params at end.",
+  "properties": {
+   "access": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": "hte",
+    "title": "Access"
+   },
+   "aux_files": {
+    "default": [],
+    "items": {
+     "type": "string"
+    },
+    "title": "Aux Files",
+    "type": "array"
+   },
+   "campaign_name": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Campaign Name"
+   },
+   "campaign_uuid": {
+    "anyOf": [
+     {
+      "format": "uuid",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Campaign Uuid"
+   },
+   "data_request_id": {
+    "anyOf": [
+     {
+      "format": "uuid",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Data Request Id"
+   },
+   "dispatched_experiments_abbr": {
+    "default": [],
+    "items": {
+     "$ref": "#/$defs/ShortExperimentModel"
+    },
+    "title": "Dispatched Experiments Abbr",
+    "type": "array"
+   },
+   "dummy": {
+    "default": false,
+    "title": "Dummy",
+    "type": "boolean"
+   },
+   "files": {
+    "default": [],
+    "items": {
+     "$ref": "#/$defs/FileInfo"
+    },
+    "title": "Files",
+    "type": "array"
+   },
+   "finished_global_params": {
+    "additionalProperties": true,
+    "default": {},
+    "title": "Finished Global Params",
+    "type": "object"
+   },
+   "from_global_seq_params": {
+    "additionalProperties": true,
+    "default": {},
+    "title": "From Global Seq Params",
+    "type": "object"
+   },
+   "hlo_version": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "title": "Hlo Version"
+   },
+   "initial_global_params": {
+    "additionalProperties": true,
+    "default": {},
+    "title": "Initial Global Params",
+    "type": "object"
+   },
+   "manual_action": {
+    "default": false,
+    "title": "Manual Action",
+    "type": "boolean"
+   },
+   "orchestrator": {
+    "$ref": "#/$defs/MachineModel",
+    "default": {
+     "hostname": null,
+     "machine_name": null,
+     "port": null,
+     "server_name": null
+    }
+   },
+   "planned_experiments": {
+    "default": [],
+    "items": {
+     "$ref": "#/$defs/ShortExperimentModel"
+    },
+    "title": "Planned Experiments",
+    "type": "array"
+   },
+   "prefinish_errors": {
+    "default": [],
+    "items": {
+     "additionalProperties": true,
+     "type": "object"
+    },
+    "title": "Prefinish Errors",
+    "type": "array"
+   },
+   "run_id": {
+    "anyOf": [
+     {
+      "format": "uuid",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Run Id"
+   },
+   "run_sequence_parameter_variable": {
+    "anyOf": [
+     {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Run Sequence Parameter Variable"
+   },
+   "run_type": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Run Type"
+   },
+   "sequence_codehash": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Sequence Codehash"
+   },
+   "sequence_codepath": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Sequence Codepath"
+   },
+   "sequence_comment": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Sequence Comment"
+   },
+   "sequence_finished_timestamp": {
+    "anyOf": [
+     {
+      "format": "date-time",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Sequence Finished Timestamp"
+   },
+   "sequence_funcname": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Sequence Funcname"
+   },
+   "sequence_label": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": "noLabel",
+    "title": "Sequence Label"
+   },
+   "sequence_name": {
+    "anyOf": [
+     {
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Sequence Name"
+   },
+   "sequence_output_dir": {
+    "anyOf": [
+     {
+      "format": "path",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Sequence Output Dir"
+   },
+   "sequence_params": {
+    "additionalProperties": true,
+    "default": {},
+    "title": "Sequence Params",
+    "type": "object"
+   },
+   "sequence_status": {
+    "default": [],
+    "items": {
+     "$ref": "#/$defs/HloStatus"
+    },
+    "title": "Sequence Status",
+    "type": "array"
+   },
+   "sequence_timestamp": {
+    "anyOf": [
+     {
+      "format": "date-time",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Sequence Timestamp"
+   },
+   "sequence_uuid": {
+    "anyOf": [
+     {
+      "format": "uuid",
+      "type": "string"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "default": null,
+    "title": "Sequence Uuid"
+   },
+   "simulation": {
+    "default": false,
+    "title": "Simulation",
+    "type": "boolean"
+   },
+   "sync_data": {
+    "default": true,
+    "title": "Sync Data",
+    "type": "boolean"
+   }
+  },
+  "title": "SequenceModel",
+  "type": "object"
+ }
+]

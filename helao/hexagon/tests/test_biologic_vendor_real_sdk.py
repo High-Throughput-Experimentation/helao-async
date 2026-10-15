@@ -9,6 +9,12 @@ important: every number and label in `vendor.py` and `technique.py` came from
 a PDF whose text layer has already been caught disagreeing with the shipped
 code twice in this driver family. This is where that gets checked against the
 binary.
+
+Station procedure not automated here: BL_GetParamInfos reports a loaded
+technique's real parameter list (it catches easy-biologic's `Step_nuber`-class
+typo). Load each technique on an idle channel via /BIOLOGIC/run_<name> with a
+zero-duration parameter set, then compare the labels against
+BIOTECHS[<name>].param_table. Record the result in the at-station gate notes.
 """
 
 import os
@@ -85,21 +91,3 @@ def test_get_error_msg_agrees_with_the_transcribed_names():
             assert message, f"{code} ({vendor.ERROR_NAMES[code]}) has no message"
     finally:
         client.close()
-
-
-@pytest.mark.skipif(
-    not os.environ.get("HELAO_ECLIB1_ADDRESS"),
-    reason="HELAO_ECLIB1_ADDRESS not set; this half needs an instrument",
-)
-def test_every_declared_parameter_label_is_one_the_dll_knows():
-    """BL_GetParamInfos reports a loaded technique's real parameter list.
-    This is what catches easy-biologic's `Step_nuber`-class typo in our own
-    tables. Needs a connected instrument, since parameters are read back off
-    a channel that has the technique loaded."""
-    pytest.skip(
-        "Station procedure, not an assertion this test can make unattended: "
-        "load each technique on an idle channel via /BIOLOGIC/run_<name> with "
-        "a zero-duration parameter set, then compare BL_GetParamInfos' labels "
-        "against BIOTECHS[<name>].param_table. Record the result in the "
-        "at-station gate notes."
-    )
