@@ -10,7 +10,9 @@ actions are re-run under fresh uuids and the old uuids are retired to ``skipped`
 
 import asyncio
 
+from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.hlostatus import HloStatus
+from helao.core.models.server import ActionServerModel, EndpointModel
 from helao.core.models.orchstatus import LoopIntent, LoopStatus
 from helao.core.tests.test_orch_dispatch_golden_master import (
     _PatchedOrchGlobals,
@@ -75,7 +77,41 @@ async def _until(pred, what):
         raise AssertionError(f"timed out waiting for {what}")
 
 
-async def _mid_run_pck(tmp_path, loop_intent=LoopIntent.stop):
+# What a server-returned (live status) Action lacks: dispatch fills these onto
+# queued actions at plan time, never onto the copy the action server reports.
+_LINKAGE_FIELDS = (
+    "sequence_uuid",
+    "sequence_name",
+    "sequence_label",
+    "sequence_timestamp",
+    "sequence_params",
+    "sequence_output_dir",
+    "sequence_status",
+    "planned_experiments",
+    "experiment_name",
+    "experiment_params",
+    "experiment_output_dir",
+    "experiment_status",
+)
+
+
+def _strip_linkage(orch):
+    """Blank the linkage fields on every live in-flight Action, as a real server does."""
+    gsm = orch.globalstatusmodel
+    live = list(gsm.active_dict.values())
+    for srv in gsm.server_dict.values():
+        for ep in srv.endpoints.values():
+            live += list(ep.active_dict.values())
+    for act in live:
+        for name in _LINKAGE_FIELDS:
+            setattr(
+                act,
+                name,
+                type(act).model_fields[name].get_default(call_default_factory=True),
+            )
+
+
+async def _mid_run_pck(tmp_path, loop_intent=LoopIntent.stop, strip=False):
     """Run a real orchestrator until a1 is in flight (a0 done, a2 queued) and export.
 
     Returns (src, pck_path, in_flight_uuid).
@@ -115,6 +151,8 @@ async def _mid_run_pck(tmp_path, loop_intent=LoopIntent.stop):
     assert len(src.sequence_dq) == 0  # popped, as in a real mid-run export
     src.globalstatusmodel.loop_state = LoopStatus.started
     src.globalstatusmodel.loop_intent = loop_intent
+    if strip:
+        _strip_linkage(src)
     return src, src.export_queues(timestamp_pck=False), old_uuid
 
 
@@ -176,5 +214,152 @@ def test_restore_then_start_reruns_inflight_action_and_finishes(tmp_path):
         # the interrupted attempt's run directory
         assert calls[0]["submit_order"] == 2 and calls[1]["submit_order"] == 3
         assert old_uuid in dst.globalstatusmodel.nonactive_dict[HloStatus.skipped]
+
+    asyncio.run(run())
+
+
+def test_restored_rerun_stays_in_active_experiment_not_manual(tmp_path):
+    """A server-returned in-flight copy has no sequence/experiment linkage; the
+    re-run must get it back from the active sequence/experiment, or init_act turns
+    it into a manual action under DIAG whose data lands in no process."""
+
+    async def run():
+        _, pck, _ = await _mid_run_pck(tmp_path, strip=True)
+        dst = _orch(tmp_path / "dst")
+        dst.import_queues(pck_path=pck)
+        seq, exp = dst.active_sequence, dst.active_experiment
+        assert seq is not None and exp is not None
+        rerun = dst.action_dq[0]
+        assert rerun.action_name == "a1"
+        for name in _LINKAGE_FIELDS:
+            src_obj = seq if name.startswith("sequence_") else exp
+            if name == "planned_experiments":
+                src_obj = seq
+            assert getattr(rerun, name) == getattr(src_obj, name), name
+
+        rerun.init_act()  # what dispatch staging does
+        assert rerun.manual_action is False
+        assert rerun.access != "manual"
+        assert rerun.sequence_uuid == seq.sequence_uuid
+        assert rerun.experiment_uuid == exp.experiment_uuid
+        assert str(rerun.action_output_dir).startswith(str(exp.experiment_output_dir))
+        assert "__manual" not in str(rerun.action_output_dir)
+        assert "DIAG" not in str(rerun.action_output_dir)
+
+    asyncio.run(run())
+
+
+async def _parked_head_orch(tmp_path):
+    """Run until a1 (wait_for_server) is popped and parked, with a2 still queued.
+
+    a0, acknowledged as active but never finished, keeps a1's condition false, so
+    a1 is only a local in ``_launch_action`` for as long as the test holds it there.
+    """
+    src = _orch(tmp_path / "src")
+    specs = [
+        {
+            "server": "SRV1",
+            "name": "a0",
+            "params": {},
+            "start_condition": ActionStartCondition.no_wait,
+        },
+        {
+            "server": "SRV1",
+            "name": "a1",
+            "params": {},
+            "start_condition": ActionStartCondition.wait_for_server,
+        },
+        {"server": "SRV1", "name": "a2", "params": {}},
+    ]
+    await src.add_sequence(
+        _mk_sequence(
+            [
+                {
+                    "experiment_name": "generic_exp",
+                    "experiment_params": {"actions_spec": specs},
+                }
+            ]
+        )
+    )
+    trace: list = []
+    inner = make_fake_action_dispatcher(src, trace, script={"a0": {"skip_ping": True}})
+
+    async def dispatcher(world_cfg, A, params=None):
+        # a0 is acknowledged as ACTIVE and then never finishes: the history poll
+        # releases on that acknowledgement, and a1's condition stays false
+        resp, code = await inner(world_cfg, A, params)
+        if A.action_name == "a0" and resp is not None:
+            live = A.model_copy(deep=True)
+            live.action_uuid = resp["action_uuid"]
+            live.action_status = [HloStatus.active]
+            asm = ActionServerModel(
+                action_server=live.action_server,
+                endpoints={
+                    "a0": EndpointModel(
+                        endpoint_name="a0", active_dict={live.action_uuid: live}
+                    )
+                },
+                last_action_uuid=live.action_uuid,
+            )
+            assert src.aloop is not None
+            src.aloop.create_task(src.update_status(asm))
+        return resp, code
+
+    drainer = HexDispatchLoop(src._hex_runtime)
+    with _PatchedOrchGlobals(
+        dispatcher, _make_fake_private_dispatcher(trace), _make_fake_move_dir(trace)
+    ):
+        drainer.start()
+        await src.start_loop()
+        await _until(
+            lambda: [a.action_name for a in src.action_dq] == ["a2"],
+            "a1 popped (parked) with a2 still queued",
+        )
+        await asyncio.sleep(0.1)  # settled in the wait
+        assert [a.action_name for a in src.action_dq] == ["a2"]
+        assert [e["action_name"] for e in trace if e["event"] == "dispatch_call"] == [
+            "a0"
+        ]
+        await _stop(drainer)
+    return src
+
+
+def test_export_while_head_parked_on_start_condition_restores_it_first_once(tmp_path):
+    async def run():
+        src = await _parked_head_orch(tmp_path)
+        pck = src.export_queues(timestamp_pck=False)
+        dst = _orch(tmp_path / "dst")
+        dst.import_queues(pck_path=pck)
+        # a0's re-run (in flight at export) leads, then the parked a1, then a2
+        assert [a.action_name for a in dst.action_dq] == ["a0", "a1", "a2"]
+
+    asyncio.run(run())
+
+
+def test_export_does_not_duplicate_head_already_reinserted(tmp_path):
+    async def run():
+        src = await _parked_head_orch(tmp_path)
+        head = src.parked_head_action
+        assert head is not None and head.action_name == "a1"
+        # a stop arrives mid-wait: wait_for_interrupt puts the head back itself
+        src.globalstatusmodel.loop_intent = LoopIntent.stop
+        src.interrupt_q.put_nowait(object())
+        assert await src.wait_for_interrupt(pending_action=head) is False
+        assert [a.action_name for a in src.action_dq] == ["a1", "a2"]
+        pck = src.export_queues(timestamp_pck=False)
+        dst = _orch(tmp_path / "dst")
+        dst.import_queues(pck_path=pck)
+        assert [a.action_name for a in dst.action_dq] == ["a0", "a1", "a2"]
+
+    asyncio.run(run())
+
+
+def test_export_without_parked_head_is_unchanged(tmp_path):
+    async def run():
+        src, pck, _ = await _mid_run_pck(tmp_path)
+        assert src.parked_head_action is None
+        dst = _orch(tmp_path / "dst")
+        dst.import_queues(pck_path=pck)
+        assert [a.action_name for a in dst.action_dq] == ["a1", "a2"]
 
     asyncio.run(run())

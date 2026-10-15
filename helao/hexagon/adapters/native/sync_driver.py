@@ -2043,6 +2043,16 @@ class SyncDriver:
         elif act_idx in exp_prog.dict["process_actions_done"]:
             return exp_prog
 
+        # Is this uuid a re-attempt of an (action_order, action_split) another uuid
+        # already filled (a --restore re-run, an errored retry)? A later split of
+        # the same action differs in action_split and is not one.
+        reattempt = False
+        if act_uuid is not None:
+            seen = exp_prog.dict.setdefault("process_action_keys", {})
+            key = [act_idx, act_meta.get("action_split", 0)]
+            reattempt = any(v == key for v in seen.values())
+            seen[str(act_uuid)] = key
+
         # handle legacy experiments (no pre-declared process_order_groups)
         if exp_prog.dict["legacy_experiment"]:
             # if action is a process finisher, add to exp progress
@@ -2196,6 +2206,15 @@ class SyncDriver:
                     if deduped_samples:
                         process_meta[new_name] = deduped_samples
             exp_prog.dict["process_metas"][pidx] = process_meta
+            # A re-attempt (see ``reattempt``) of an action whose group was
+            # already pushed without it: reopen the group so the next sync_process
+            # pass re-pushes it, overwriting process/{uuid}.json and the -prc.yml;
+            # a re-push is not a failure, so no strike is recorded. Any other new
+            # uuid (a later split) leaves a pushed group alone, as it always did.
+            if reattempt:
+                for done_key in ("process_s3", "process_api"):
+                    if pidx in exp_prog.dict[done_key]:
+                        exp_prog.dict[done_key].remove(pidx)
 
         # register finished action in process_actions_done {order: ymltargetname}
         exp_prog.dict["process_actions_done"].update({act_idx: act_yml.target.name})

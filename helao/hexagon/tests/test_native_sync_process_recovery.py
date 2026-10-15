@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from helao.core.drivers.data.sync_driver import SyncDriver as LegacySyncDriver
 from helao.core.models.run_dir import RunDir
 from helao.hexagon.adapters.native.sync_driver import HelaoYml
 from helao.hexagon.adapters.native.sync_driver import SyncDriver as NativeSyncDriver
@@ -305,5 +306,101 @@ async def test_unrebuildable_group_parked_experiment_finishes(tmp_path):
         ), "unrebuildable_group_parked"
         s3_unf, api_unf = ep.list_unfinished_procs()
         assert not s3_unf and not api_unf, "unrebuildable_experiment_completes"
+    finally:
+        await teardown_driver(drv)
+
+
+# --- 5. A late action reopens an already-pushed process group --------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "cls", [NativeSyncDriver, LegacySyncDriver], ids=["native", "legacy"]
+)
+async def test_late_action_reopens_pushed_group_for_repush(tmp_path, cls):
+    """A --restore re-run (or errored retry) shares action_order with the attempt
+    that already synced. Its fold must reopen the group so the next pass pushes a
+    process that lists the re-run; folding the same uuid again must not."""
+    drv = make_sync_driver(str(tmp_path), cls)
+    try:
+        exp_yml = make_exp_tree(
+            Path(tmp_path),
+            RunDir.FINISHED.value,
+            mk_uuid(1004),
+            process_order_groups={0: [0, 1]},
+        )
+        a0 = make_action(exp_yml, 0)
+        old = make_action(exp_yml, 1)
+        drv.update_process(HelaoYml(a0), act_meta(0))
+        ep = drv.update_process(HelaoYml(old), act_meta(1))
+
+        # the group is pushed with only the old attempt
+        ep = await drv.sync_process(ep)
+        assert ep.list_unfinished_procs() == ([], [])
+        (prc,) = list(exp_yml.parent.glob("0__*-prc.yml"))
+        assert mk_uuid(500) not in prc.read_text(encoding="utf-8")
+
+        # the re-run: same action_order, new uuid, its own contribution
+        rerun_meta = {
+            **act_meta(1),
+            "action_uuid": mk_uuid(500),
+            "action_retry": 1,
+            "action_params": {"rerun_only": 1},
+        }
+        rerun = make_action(exp_yml, 1)
+        rerun.write_text(
+            rerun.read_text(encoding="utf-8"), encoding="utf-8"
+        )  # file exists on disk like a real one
+        ep = drv.update_process(HelaoYml(rerun), rerun_meta)
+        assert ep.list_unfinished_procs() == ([0], [0]), "group reopened"
+
+        ep = await drv.sync_process(ep)
+        assert ep.list_unfinished_procs() == ([], [])
+        text = prc.read_text(encoding="utf-8")
+        assert mk_uuid(500) in text and mk_uuid(1) in text, "both uuids listed"
+        assert "rerun_only" in text, "re-run's contribution pushed"
+
+        # folding the same uuid again is idempotent: nothing reopens
+        ep = drv.update_process(HelaoYml(rerun), rerun_meta)
+        assert ep.list_unfinished_procs() == ([], [])
+    finally:
+        await teardown_driver(drv)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "cls", [NativeSyncDriver, LegacySyncDriver], ids=["native", "legacy"]
+)
+async def test_later_split_does_not_reopen_pushed_group(tmp_path, cls):
+    """Splits share action_order and differ in action_split (and technique). A
+    later split is not a re-attempt: the pushed group stays pushed, so there is
+    one -prc.yml per process and its technique name does not flip."""
+    drv = make_sync_driver(str(tmp_path), cls)
+    try:
+        exp_yml = make_exp_tree(
+            Path(tmp_path),
+            RunDir.FINISHED.value,
+            mk_uuid(1005),
+            process_order_groups={0: [0]},
+        )
+        act = make_action(exp_yml, 0)
+        techs = ["tech_s0", "tech_s1"]
+        split0 = {**act_meta(0), "technique_name": techs, "action_split": 0}
+        split1 = {
+            **split0,
+            "action_uuid": mk_uuid(600),
+            "action_split": 1,
+            "action_params": {"split1_only": 1},
+        }
+        ep = drv.update_process(HelaoYml(act), split0)
+        ep = await drv.sync_process(ep)
+        assert ep.list_unfinished_procs() == ([], [])
+        (prc,) = list(exp_yml.parent.glob("0__*-prc.yml"))
+        assert "tech_s0" in prc.name
+
+        ep = drv.update_process(HelaoYml(act), split1)
+        assert ep.list_unfinished_procs() == ([], []), "a later split must not reopen"
+        ep = await drv.sync_process(ep)
+        assert [p.name for p in exp_yml.parent.glob("0__*-prc.yml")] == [prc.name]
     finally:
         await teardown_driver(drv)

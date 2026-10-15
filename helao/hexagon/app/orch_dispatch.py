@@ -767,7 +767,18 @@ class DispatchRunner:
 
         A = orch.action_dq.popleft()  # :789
 
-        rc = await self._wait_for_start_condition(A)  # :791-793
+        # Reachable for the whole wait so a shutdown export keeps it. Cleared on
+        # a normal return only (wait_for_interrupt has by then re-inserted it on a
+        # stop), never in a ``finally``: a cancelled wait must leave it set.
+        orch.parked_head_action = A
+        try:
+            rc = await self._wait_for_start_condition(A)  # :791-793
+        except Exception:
+            # an ordinary failure drops the action as before; only cancellation
+            # (shutdown) leaves it parked for the export
+            orch.parked_head_action = None
+            raise
+        orch.parked_head_action = None
         if rc is not None:
             return rc
 
