@@ -1,16 +1,17 @@
-# hte pstat — BioLogic potentiostats, two backends
+# hte pstat — BioLogic potentiostats, three backends
 
 <!-- Split out of the root CLAUDE.md. Loaded when work touches this directory. -->
 
-`helao/deploy/hte/servers/action/biologic_server.py` serves the same seven
-technique endpoints from either of two drivers, chosen by the server's
+`helao/deploy/hte/servers/action/biologic_server.py` serves the same
+technique endpoints from any of three drivers (the `BACKENDS` dict), chosen by the server's
 `pstat_backend` param — `eclib` (default, `drivers/pstat/biologic/`, via
 easy-biologic over TCP) or `olecom` (`drivers/pstat/biologic_ole/`, by
-piloting the EC-Lab application over OLE COM). An absent key yields `eclib`,
+piloting the EC-Lab application over OLE COM) or `eclib2`
+(`drivers/pstat/biologic_eclib2/`). An absent key yields `eclib`,
 so the four station configs that declare one (`hispec`, `odspechw`, `clad`,
 `adss3`) keep working unedited; an *unrecognized* value raises,
 because a typo must not hand an EC-Lab station the easy-biologic driver.
-Both satisfy the `BiologicBackend` Protocol in `drivers/pstat/biologic_backend.py`.
+All three satisfy the `BiologicBackend` Protocol in `drivers/pstat/biologic_backend.py`; `run_plan` excludes `olecom`.
 
 The OLE path is not a variation on the EClib one. What is worth knowing before
 editing it:

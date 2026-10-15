@@ -35,8 +35,8 @@ CLI flags (position-independent; parsed separately from `extraopt`):
 - `--hot-reload` / `--no-hot-reload` — the hot-reload watcher (watches the parent repo and each nested `helao/deploy/*` git repo; on a pulled commit, restarts idle servers whose loaded code changed) runs **on by default**. Disable with `--no-hot-reload` or `hot_reload.enabled: false` in the config; `hot_reload.poll_seconds` (default 30) tunes the poll interval. Precedence: `--no-hot-reload` > `--hot-reload` > config. Affected servers are mapped via each server's `/loaded_modules` endpoint (bokeh servers use a `STATES/loaded_modules_<key>.json` startup snapshot); orchestrators are only reloaded when idle and restart with `--restore`.
 
 Other utilities:
-- `python run_unit_tests.py` — runs `helao.core.tests.unit_test_sample_models.sample_model_unit_test`. `launch.py` runs this automatically before launching anything and aborts on failure.
-- `python run_tests.py` — the full pytest sweep across this repo and every deployment (`--list` to preview, `--filter <substr>` to narrow, `--timeout` to raise the per-file cap). **Runs one file per pytest process**, because collecting the tree as a single session hangs indefinitely and ignores SIGINT while the same files pass individually — the tests start event loops, bind sockets, and spawn Bokeh servers, so cross-file interference is expected. Deliberately separate from `run_unit_tests.py`, which stays a fast pre-launch gate. Deployments opt in by having a `tests/` directory; the whole deployment is then swept for `test_*.py`, so a test filed beside its subject is not missed. Third-party import failures report as `ENV` rather than `FAIL` (a Windows-only vendor SDK cannot be collected on Linux), while a missing `helao*` module stays a failure.
+- `python run_unit_tests.py` — runs the `unit_test_*` gate registered in its `TESTS` list (core plus deployment modules). `launch.py` runs it before launching only when the config sets `run_unit_tests: true`, and aborts on failure.
+- `python run_tests.py` — the full pytest sweep across this repo and every deployment (`--list` to preview, `--filter <substr>` to narrow, `--timeout` to raise the per-file cap). **Runs one file per pytest process**, because collecting the tree as a single session hangs indefinitely and ignores SIGINT while the same files pass individually — the tests start event loops, bind sockets, and spawn Bokeh servers, so cross-file interference is expected. Deliberately separate from `run_unit_tests.py`, the offline unit gate that `launch.py` runs only when a config sets `run_unit_tests: true`. Deployments opt in by having a `tests/` directory; the whole deployment is then swept for `test_*.py`, so a test filed beside its subject is not missed. Third-party import failures report as `ENV` rather than `FAIL` (a Windows-only vendor SDK cannot be collected on Linux), while a missing `helao*` module stays a failure.
 - Standalone report and repair utilities under `helao/core/tests/` — `check_queue_pcks`, `check_long_paths`, `scan_prg_ghosts`, `set_run_use`. Invocation and the reasoning behind each: `helao/core/tests/CLAUDE.md`.
 
 There is no project-wide build step for the Python side. Tests are a mix of pytest modules (most of `helao/hexagon/tests/`, `harness/tests/`, and each deployment's `tests/`) and standalone `__main__` scripts under `helao/core/tests/` that `run_tests.py` reports as `NOTESTS` and which must be invoked directly.
@@ -90,7 +90,7 @@ Action servers, experiments, and sequences are written as importable Python; the
 Server output is rooted at the YAML's `root:` key (e.g. `C:\INST_hlo`):
 - `LOGS/<server_name>/` — rotating text logs; `launch.py` zips old `*.txt` logs at startup using a timestamp parsed from the first log line.
 - `STATES/` — pickled PID files and other runtime state.
-- `RUNS_*` — per-run output trees consumed by `HelaoSyncer` (e.g. `RUNS_SYNCED` is the canonical "shipped" location; recent commits in `git log` show ongoing churn around this name).
+- `RUNS` (or `DIAG` for manual/diagnostic runs) — the single per-run output tree consumed by `HelaoSyncer`. Records are written there once and never move; lifecycle state lives in the per-server journals. `RUNS_*` (e.g. `RUNS_SYNCED`) is legacy read-only vocabulary for existing archives; see `helao/core/models/run_dir.py`.
 
 **What the syncer uploads to `raw_data/` is decided by a directory glob, not by `Action.files`.** The consequences that have bitten in production — transient staging files getting shipped, the `staging_path` length rule, and the once-unbounded push loop — are in `helao/core/drivers/data/CLAUDE.md`.
 
@@ -105,9 +105,9 @@ The orchestrator is the long-lived queue-and-dispatch service used in production
 - Logging: do not instantiate loggers directly; use `helao.helpers.helao_logging.make_logger(__file__)` (or the already-initialized `logging.LOGGER`) so per-server log routing and email alerts work.
 - Windows-only drivers: Galil (`gclib`) and Gamry (`comtypes`) here, plus Ocean Insight (`oceandirect`) in a private deployment. Most other code, and the `test` deployment's simulators, run on Linux. All three import their vendor package *inside* `connect()`, not at module scope, so the driver module and its tests still import on Linux; `run_tests.py` then reports the missing package as `ENV` rather than `FAIL`.
 
-### BioLogic potentiostats: two backends
+### BioLogic potentiostats: three backends
 
-`helao/deploy/hte/servers/action/biologic_server.py` serves the same seven technique endpoints from either of two drivers, chosen by the server's `pstat_backend` param — `eclib` (default) or `olecom` (piloting EC-Lab over OLE COM). An absent key yields `eclib`; an *unrecognized* value raises. Both satisfy the `BiologicBackend` Protocol.
+`helao/deploy/hte/servers/action/biologic_server.py` serves the same technique endpoints from any of three drivers (`run_plan` excludes `olecom`) (the `BACKENDS` dict), chosen by the server's `pstat_backend` param — `eclib` (default), `olecom` (piloting EC-Lab over OLE COM) or `eclib2`. An absent key yields `eclib`; an *unrecognized* value raises. All three satisfy the `BiologicBackend` Protocol.
 
 The OLE path is not a variation on the EClib one. What to know before editing it: `helao/deploy/hte/drivers/pstat/CLAUDE.md`.
 

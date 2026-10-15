@@ -90,7 +90,7 @@ def get_ntp_time(ntp_server, output_path):
         ntp_last_sync = response.orig_time
         ntp_offset = response.offset
         print(f"retrieved time at {ctime(ntp_response.tx_timestamp)} from {ntp_server}")
-    except ntplib.NTPException:
+    except (ntplib.NTPException, OSError):
         print(f"{ntp_server} ntp timeout")
         ntp_last_sync = time()
         ntp_offset = 0.0

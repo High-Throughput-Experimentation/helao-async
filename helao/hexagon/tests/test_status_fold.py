@@ -203,3 +203,20 @@ def test_identity_rule_foreign_orchestrator_not_folded_into_own_dicts():
         last_dispatched_action_uuid=None,
     )
     assert foreign.action_uuid not in gsm.nonactive_dict.get(HloStatus.finished, {})
+
+
+def test_sort_status_files_errored_action_in_new_errored_bucket():
+    """The errored bucket is created fresh on every fan-out; the uuid must
+    land in it, not be dropped."""
+    act = _action([HloStatus.finished, HloStatus.errored])
+    act_uuid = act.action_uuid
+    assert act_uuid is not None
+    ep = EndpointModel(endpoint_name="acquire")
+    ep.active_dict = {act_uuid: act}
+    ep.nonactive_dict = {HloStatus.finished: {}}
+
+    ep.sort_status()
+
+    assert ep.active_dict == {}
+    assert act_uuid in ep.nonactive_dict[HloStatus.errored]
+    assert act_uuid in ep.nonactive_dict[HloStatus.finished]

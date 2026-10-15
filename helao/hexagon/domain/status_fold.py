@@ -85,8 +85,10 @@ class PushLiveBuffer:
 
     ``items`` is flat -- one ``(uuid, status_name)`` pair per bucket a uuid
     newly transitioned into, matching
-    ``GlobalStatusModel.update_global_with_acts`` verbatim (a uuid can appear
-    more than once, e.g. once for ``errored`` and once for ``finished``).
+    ``GlobalStatusModel.update_global_with_acts`` verbatim. A uuid appears at
+    most once: the ``finished`` bucket is iterated first and a uuid is removed
+    from the active dict the first time it is seen (so an errored action that
+    is also in ``finished`` is pushed once, as ``finished``).
     """
 
     items: tuple[tuple[UUID, str], ...]

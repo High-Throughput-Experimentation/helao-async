@@ -17,6 +17,7 @@ deployment-tree import at module top -- mirrors
 ``sample_state.py``/``calibration_store.py``.
 """
 
+import asyncio
 import logging
 import os
 import subprocess
@@ -27,6 +28,9 @@ import aiofiles
 import psutil
 
 from helao.core.error import ErrorCodes
+
+_SSH_ATTEMPTS = 10
+_SSH_TIMEOUT = 5  # seconds per connect/banner/auth phase
 
 LOGGER = logging.getLogger(__name__)
 
@@ -46,24 +50,37 @@ class LegacyPalTransport:
 
     def _ssh_connect(self):
         """Open a paramiko SSH client to ``self._host``, retrying every 1s
-        on failure (legacy behavior, both here and in the original
-        ``kill_PAL_cygwin``/``_sendcommand_submitjoblist_helper``). Lazy
-        import: only reached when ``host`` is a remote SSH hostname.
+        up to ``_SSH_ATTEMPTS`` times; returns None when exhausted. Blocking:
+        call via ``_connect`` from async code. Lazy import: only reached
+        when ``host`` is a remote SSH hostname.
         """
         import paramiko
 
-        while True:
+        for _ in range(_SSH_ATTEMPTS):
             try:
                 k = paramiko.RSAKey.from_private_key_file(self._key)
                 mysshclient = paramiko.SSHClient()
                 mysshclient.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                mysshclient.connect(hostname=self._host, username=self._user, pkey=k)
+                # bound each attempt so 10 retries cannot stall for minutes
+                mysshclient.connect(
+                    hostname=self._host,
+                    username=self._user,
+                    pkey=k,
+                    timeout=_SSH_TIMEOUT,
+                    banner_timeout=_SSH_TIMEOUT,
+                    auth_timeout=_SSH_TIMEOUT,
+                )
                 return mysshclient
             except Exception:
                 LOGGER.error(
                     "SSH connection error. Retrying in 1 seconds.", exc_info=True
                 )
                 time.sleep(1)
+        return None
+
+    async def _connect(self):
+        """`_ssh_connect` off the event loop (its retry sleep blocks)."""
+        return await asyncio.to_thread(self._ssh_connect)
 
     async def ensure_aux_logfile(
         self, aux_output_filepath: str, auxheader: str
@@ -73,19 +90,15 @@ class LegacyPalTransport:
             FIFO_rshs_dir, _rshs_logfile = os.path.split(aux_output_filepath)
             LOGGER.info(f"RSHS saving to: {FIFO_rshs_dir}")
             if not os.path.exists(FIFO_rshs_dir):
-                # NOTE (P3a-PAL slice 4, discovered via unit test, not fixed
-                # here): `os.makedirs` has no `cwd` kwarg -- this raises
-                # TypeError whenever FIFO_rshs_dir doesn't already exist.
-                # Preserved verbatim from the shipped driver (same call,
-                # same latent bug); apparently never hit at the station
-                # because the aux-log directory always pre-exists there.
-                os.makedirs(FIFO_rshs_dir, exist_ok=True, cwd=FIFO_rshs_dir)
+                os.makedirs(FIFO_rshs_dir, exist_ok=True)
             async with aiofiles.open(
                 aux_output_filepath, mode="w+", encoding="utf-8"
             ) as f:
                 await f.write(auxheader)
         elif self._host is not None:
-            mysshclient = self._ssh_connect()
+            mysshclient = await self._connect()
+            if mysshclient is None:
+                return ErrorCodes.ssh_error
             try:
                 FIFO_rshs_dir, rshs_logfile = os.path.split(aux_output_filepath)
                 FIFO_rshs_dir = FIFO_rshs_dir.replace("C:\\", "")
@@ -129,7 +142,9 @@ class LegacyPalTransport:
                 LOGGER.error("CMD error. Could not send commands.")
                 error = ErrorCodes.cmd_error
         elif self._host is not None:
-            mysshclient = self._ssh_connect()
+            mysshclient = await self._connect()
+            if mysshclient is None:
+                return ErrorCodes.ssh_error
             tmpjob = " ".join(
                 f"/loadmethod '{method}' '{params}'" for method, params in joblist
             )
@@ -167,7 +182,9 @@ class LegacyPalTransport:
         return error_code
 
     async def _kill_cygwin(self) -> ErrorCodes:
-        mysshclient = self._ssh_connect()
+        mysshclient = await self._connect()
+        if mysshclient is None:
+            return ErrorCodes.ssh_error
         try:
             sshcmd = "tmux new-window taskkill /F /FI 'WINDOWTITLE eq PAL*'"
             mysshclient.exec_command(sshcmd)

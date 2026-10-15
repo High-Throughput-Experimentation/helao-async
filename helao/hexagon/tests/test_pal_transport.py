@@ -83,32 +83,73 @@ def test_ensure_aux_logfile_local_writes_header(tmp_path):
     asyncio.run(_run())
 
 
-def test_ensure_aux_logfile_local_missing_dir_hits_preexisting_bug(tmp_path):
-    """Locks in a genuine pre-existing bug discovered while writing this
-    slice's tests (not fixed here, per the port-lift's preserve-verbatim
-    mandate -- see the adapter's inline NOTE): `os.makedirs(..., cwd=...)`
-    is not a valid call (`makedirs` has no `cwd` kwarg), so this path
-    raises `TypeError` whenever the aux-log parent directory doesn't
-    already exist. Apparently never hit at the station because that
-    directory is always pre-created there."""
+def test_ensure_aux_logfile_local_creates_missing_dir(tmp_path):
+    """The aux-log parent directory is created when absent."""
 
     async def _run():
         transport = LegacyPalTransport(host="localhost")
-        aux_path = str(tmp_path / "not_yet_created" / "AUX__PAL__log.txt")
-
-        try:
-            await transport.ensure_aux_logfile(aux_path, "header\r\n")
-            raised = False
-        except TypeError:
-            raised = True
-
-        assert raised, (
-            "expected the pre-existing os.makedirs(cwd=...) bug to raise "
-            "TypeError -- if this now passes, the bug was fixed upstream "
-            "and this test (and the adapter's NOTE) should be updated"
-        )
+        aux_path = tmp_path / "not_yet_created" / "AUX__PAL__log.txt"
+        err = await transport.ensure_aux_logfile(str(aux_path), "header\r\n")
+        assert err is ErrorCodes.none
+        assert aux_path.exists()
 
     asyncio.run(_run())
+
+
+def test_unreachable_ssh_host_returns_error_without_blocking_loop(monkeypatch):
+    """Retries are bounded and off-loop: the loop keeps ticking while the
+    connect retries, and exhaustion yields ssh_error."""
+    import types
+
+    import helao.hexagon.adapters.shared.pal_transport as mod
+
+    class _Boom:
+        @staticmethod
+        def from_private_key_file(*_a, **_k):
+            raise OSError("unreachable")
+
+    monkeypatch.setitem(sys.modules, "paramiko", types.SimpleNamespace(RSAKey=_Boom))
+    monkeypatch.setattr(mod, "_SSH_ATTEMPTS", 2)
+
+    async def _run():
+        ticks = 0
+
+        async def _ticker():
+            nonlocal ticks
+            while True:
+                await asyncio.sleep(0.05)
+                ticks += 1
+
+        t = asyncio.create_task(_ticker())
+        err = await LegacyPalTransport(host="pal-host", user="u", key="k").kill()
+        t.cancel()
+        assert err is ErrorCodes.ssh_error
+        assert ticks >= 5
+
+    asyncio.run(_run())
+
+
+def test_ssh_connect_passes_bounded_timeouts(monkeypatch):
+    import types
+
+    seen = {}
+
+    class _Client:
+        def set_missing_host_key_policy(self, _p):
+            pass
+
+        def connect(self, **kw):
+            seen.update(kw)
+
+    fake = types.SimpleNamespace(
+        RSAKey=types.SimpleNamespace(from_private_key_file=lambda *_a: object()),
+        SSHClient=_Client,
+        AutoAddPolicy=lambda: None,
+    )
+    monkeypatch.setitem(sys.modules, "paramiko", fake)
+    assert LegacyPalTransport(host="pal-host", user="u", key="k")._ssh_connect()
+    for k in ("timeout", "banner_timeout", "auth_timeout"):
+        assert 0 < seen[k] <= 5
 
 
 def test_submit_joblist_local_dispatches_and_reap_waits():

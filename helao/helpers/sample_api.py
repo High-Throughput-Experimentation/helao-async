@@ -544,14 +544,10 @@ class SampleModelAPI:
                         self._cur.execute(cmd)
                     else:
                         if val is not None:
-                            # val = val.replace('"', '""')
-                            # val = val.replace("'", "''")
                             val = val.strip("'").strip('"')
-                            cmd = f"""UPDATE {self._sample_type} SET {key} = '{val}' WHERE idx = {idx};"""
-                        else:
-                            cmd = f"""UPDATE {self._sample_type} SET {key} = NULL WHERE idx = {idx};"""
-                        LOGGER.info(f"dbcommand: {cmd}")
-                        self._cur.execute(cmd)
+                        cmd = f"UPDATE {self._sample_type} SET {key} = ? WHERE idx = ?;"
+                        LOGGER.info(f"dbcommand: {cmd} {(val, idx)}")
+                        self._cur.execute(cmd, (val, idx))
 
             else:
                 if key != "idx":
@@ -777,7 +773,7 @@ class SolidSampleAPI(SampleModelAPI):
         xylist = []
         for sample in samples:
             pmdata = self.legacyAPI.get_platemap_plateid(plateid=sample.plate_id)
-            if (sample.sample_no - 1) > len(pmdata) or (sample.sample_no - 1) < 0:
+            if (sample.sample_no - 1) >= len(pmdata) or (sample.sample_no - 1) < 0:
                 LOGGER.warning(
                     f"get_xy: invalid sample no '{sample.sample_no}' on plate {sample.plate_id}"
                 )
@@ -817,9 +813,16 @@ class SolidSampleAPI(SampleModelAPI):
             )
             await asyncio.sleep(0.01)
             if sample.machine_name == "legacy":
-                # verify legacy sample by getting its xy coordinates
-                xylist = await self.get_samples_xy(samples=[sample])
-                if xylist != [(None, None)]:
+                # verify legacy sample by getting its xy coordinates; an empty
+                # map means the lookup failed, not that the sample is invalid
+                pmdata = self.legacyAPI.get_platemap_plateid(plateid=sample.plate_id)
+                xylist = await self.get_samples_xy(samples=[sample]) if pmdata else None
+                if not pmdata:
+                    LOGGER.warning(
+                        f"platemap lookup failed for plate {sample.plate_id}; "
+                        f"accepting legacy sample no '{sample.sample_no}' unverified"
+                    )
+                if not pmdata or xylist != [[None, None]]:
                     ret_samples.append(
                         SolidSample(
                             plate_id=sample.plate_id,

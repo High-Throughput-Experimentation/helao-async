@@ -337,13 +337,13 @@ class HTEPlateAPI:
             return None
 
         printd = self.get_print(print_id)
-        if "sources" not in printd.keys() and isinstance(plateid, int):
+        if (printd is None or "sources" not in printd) and isinstance(plateid, int):
             LOGGER.warning(
                 "No sources found in print record. Using alternate retrieval."
             )
             printd = self.get_print_plateid(plateid)
 
-        if printd is not None and self.loader is not None:
+        if printd is not None and "sources" in printd and self.loader is not None:
 
             els = [
                 d["chemical_id"].split("_")[0].capitalize() for d in printd["sources"]

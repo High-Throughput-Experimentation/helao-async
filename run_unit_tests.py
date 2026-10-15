@@ -15,6 +15,7 @@ __all__ = []
 
 import sys
 
+from helao.core.tests.unit_test_action_provenance import action_provenance_unit_test
 from helao.core.tests.unit_test_action_experiment_sequence import (
     action_experiment_sequence_unit_test,
 )
@@ -44,11 +45,15 @@ from helao.core.tests.unit_test_orch_queues import orch_queues_unit_test
 from helao.core.tests.unit_test_orch_status import orch_status_unit_test
 from helao.core.tests.unit_test_orch_status_sync import orch_status_sync_unit_test
 from helao.core.tests.unit_test_orch_unpack import orch_unpack_unit_test
+from helao.core.tests.unit_test_server_keys import run_all as server_keys_unit_test
 from helao.core.tests.unit_test_sample_models import sample_model_unit_test
 from helao.core.tests.unit_test_sample_status import sample_status_unit_test
 from helao.core.tests.unit_test_sample_union import sample_union_unit_test
 from helao.core.tests.unit_test_sync_process_recovery import (
     sync_process_recovery_unit_test,
+)
+from helao.core.tests.unit_test_sync_relative_paths import (
+    sync_relative_path_unit_test,
 )
 from helao.core.tests.unit_test_sync_to_thread import sync_to_thread_unit_test
 from helao.core.tests.unit_test_version import version_unit_test
@@ -85,6 +90,9 @@ TESTS = [
     ("base_status", base_status_unit_test),
     ("echem_params", echem_params_unit_test),
     ("oersim_params", oersim_params_unit_test),
+    ("action_provenance", action_provenance_unit_test),
+    ("server_keys", server_keys_unit_test),
+    ("sync_relative_paths", sync_relative_path_unit_test),
 ]
 
 
