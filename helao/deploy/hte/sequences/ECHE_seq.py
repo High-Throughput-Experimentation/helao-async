@@ -93,7 +93,7 @@ def ECHE_move(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=4)
+@sequence(version=5)
 def ECHE_4CA_led_1CV_led(
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -160,7 +160,7 @@ def ECHE_4CA_led_1CV_led(
         ref_type: Reference-electrode type.
         ref_offset__V: Reference-electrode potential offset (V).
         measurement_area: Electrode measurement area (cm^2).
-        ref_vs_nhe: Reference-electrode potential vs NHE (V).
+        ref_vs_nhe: Unused since version 5; ref_type and ref_offset__V set the reference.
         CA1_potential: Chronoamperometry 1 potential.
         CA1_duration_sec: Chronoamperometry 1 duration (s).
         CA2_potential: Chronoamperometry 2 potential.
@@ -382,7 +382,10 @@ def ECHE_4CA_led_1CV_led(
         epm.add(
             "ECHE_sub_preCV",
             {
-                "CA_potential": CV_Vinit_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
+                "CA_potential": CV_Vinit_vsRHE
+                - 1.0 * ref_offset__V
+                - ref_offset(ref_type)
+                - 0.059 * solution_ph,
                 "samplerate_sec": CV_samplerate_mV / (CV_scanrate_voltsec * 1000),
                 "CA_duration_sec": preCV_duration,
             },
