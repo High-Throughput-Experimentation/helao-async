@@ -49,6 +49,7 @@ from helao.core.models.run_dir import (
     SYNC_PROGRESSION,
     RunDir,
     is_legacy_path,
+    is_run_root,
     is_same_location,
 )
 
@@ -1772,14 +1773,15 @@ class SyncDriver:
 
     @staticmethod
     def _rel_under_runs(path: Path) -> Optional[str]:
-        """Return ``path`` relative to its ``RUNS_*`` root, or ``None`` if absent.
+        """Return ``path`` relative to its run root, or ``None`` if absent.
 
-        Keying locks by a yml's position under the ``RUNS_*`` root keeps the
+        The root is ``RUNS``, ``DIAG`` or a legacy ``RUNS_*`` segment. Keying
+        locks by a yml's position under it keeps the
         key stable across the ``RUNS_{ACTIVE,FINISHED,SYNCED}`` trees, so the
         same logical record always maps to the same lock as it is moved.
         """
         parts = list(path.parts)
-        run_idxs = [i for i, x in enumerate(parts) if x.startswith("RUNS_")]
+        run_idxs = [i for i, x in enumerate(parts) if is_run_root(x)]
         if not run_idxs:
             return None
         return "/".join(parts[run_idxs[0] + 1 :])
