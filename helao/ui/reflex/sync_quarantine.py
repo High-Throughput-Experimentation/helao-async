@@ -17,6 +17,7 @@ from helao.ui.shared.palette import reflex_muted_text_class
 _CONFIG: dict = {"enabled": False, "target": None}
 
 POLL_MS = 60_000
+ACT_TIMEOUT = 30  # s, call + re-fetch together, held under the process lock
 UNREACHABLE = "SYNC unreachable: quarantine state unknown"
 NOTHING = "nothing quarantined"
 BUSY = "busy: another release or write-off is running"
@@ -169,8 +170,17 @@ async def _act(state, yml: str, call) -> None:
             state.busy = True
             state.gen += 1
             target = _CONFIG["target"]
-        _ok, msg = await call(target)
-        entries = await sq.fetch(target)
+
+        async def go():
+            return (await call(target))[1], await sq.fetch(target)
+
+        try:
+            msg, entries = await asyncio.wait_for(go(), ACT_TIMEOUT)
+        except asyncio.TimeoutError:
+            async with state:
+                state.gen += 1
+                state.message = sq.UNKNOWN
+            return
         async with state:
             state.gen += 1
             state.message = msg

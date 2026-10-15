@@ -155,7 +155,7 @@ async def test_write_off_block_stops_f3_and_marks_only_its_group(
         assert any(b.get("missing_action_orders") == [2] for b in bodies)
         g0 = [b for b in bodies if b.get("process_group_index") == 0]
         assert g0 and all("missing_action_orders" not in b for b in g0)
-        assert "synced: true" in exp_yml.with_suffix(".prg").read_text()
+        assert "synced: true" in exp_yml.with_suffix(".prg").read_text(encoding="utf-8")
     finally:
         await teardown_driver(drv)
 
@@ -354,7 +354,9 @@ async def test_write_off_refuses_an_incomplete_but_unparked_exp(
         before = prg.read_bytes()
         res = await drv.write_off(str(exp_yml), "r", "op")
         assert res["ok"] is False and "not in sync quarantine" in res["error"]
-        assert prg.read_bytes() == before and "\nwrite_off:" not in prg.read_text()
+        assert prg.read_bytes() == before and "\nwrite_off:" not in prg.read_text(
+            encoding="utf-8"
+        )
     finally:
         await teardown_driver(drv)
 
@@ -390,7 +392,11 @@ async def test_write_off_refuses_bad_args_without_touching_disk(
             assert res["ok"] is False, (path.name, reason[:5], operator[:5])
         assert prg.read_bytes() == before
         assert not under_root.with_suffix(".prg").exists()
-        assert not outside.with_suffix(".prg").read_text().count("write_off")
+        assert (
+            not outside.with_suffix(".prg")
+            .read_text(encoding="utf-8")
+            .count("write_off")
+        )
         assert alerts == [] and _ledger(tmp_path) == []
     finally:
         await teardown_driver(drv)
@@ -439,7 +445,9 @@ async def test_ledger_failure_writes_no_block(tmp_path, mod, monkeypatch):
         prg = exp_yml.with_suffix(".prg")
         res = await drv.write_off(str(exp_yml), "estop", "op")
         assert res["ok"] is False
-        assert _prg_is_quarantined(prg) and "\nwrite_off:" not in prg.read_text()
+        assert _prg_is_quarantined(prg) and "\nwrite_off:" not in prg.read_text(
+            encoding="utf-8"
+        )
         assert alerts == []
     finally:
         await teardown_driver(drv)
@@ -473,7 +481,9 @@ async def test_write_off_waits_for_the_experiment_lock(tmp_path, mod, monkeypatc
             task = asyncio.create_task(drv.write_off(str(exp_yml), "r", "op"))
             await asyncio.sleep(0.3)
             assert not task.done()
-            assert "\nwrite_off:" not in exp_yml.with_suffix(".prg").read_text()
+            assert "\nwrite_off:" not in exp_yml.with_suffix(".prg").read_text(
+                encoding="utf-8"
+            )
         res = await asyncio.wait_for(task, 15)
         assert res["status"] == "written off"
     finally:
@@ -514,7 +524,7 @@ async def test_tail_failure_is_a_warning_not_a_raise(tmp_path, mod, monkeypatch)
         res = await drv.write_off(str(exp_yml), "r", "op")
         assert res["ok"] is True and res["status"] == "written off"
         assert "not re-queued" in res["warning"]
-        assert "\nwrite_off:" in exp_yml.with_suffix(".prg").read_text()
+        assert "\nwrite_off:" in exp_yml.with_suffix(".prg").read_text(encoding="utf-8")
     finally:
         await teardown_driver(drv)
 

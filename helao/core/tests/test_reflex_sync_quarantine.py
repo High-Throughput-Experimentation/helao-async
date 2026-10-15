@@ -81,7 +81,7 @@ def _armed(monkeypatch, entries=(E1, E2)):
     """A state with rows loaded, Y1 selected and the form filled."""
     _fetch_returns(monkeypatch, list(entries))
     s = _Fake()
-    asyncio.run(s.refresh())
+    asyncio.run(s.refresh(""))
     s.select(Y1, "dirA")
     s.set_confirm("dirA")
     s.set_reason("why")
@@ -135,10 +135,10 @@ def test_refresh_unknown_vs_empty(enabled, monkeypatch):
     s = _Fake()
     s.rows = [["stale"] * 7]
     _fetch_returns(monkeypatch, None)
-    asyncio.run(s.refresh())
+    asyncio.run(s.refresh(""))
     assert s.status == qr.UNREACHABLE and s.rows == []
     _fetch_returns(monkeypatch, [])
-    asyncio.run(s.refresh())
+    asyncio.run(s.refresh(""))
     assert s.status == qr.NOTHING and s.rows == []
     assert qr.UNREACHABLE != qr.NOTHING
 
@@ -148,10 +148,10 @@ def test_refresh_skips_while_busy_and_drops_a_stale_selection(enabled, monkeypat
     calls = []
     _fetch_returns(monkeypatch, [E2], calls)
     s.busy = True
-    asyncio.run(s.refresh())
+    asyncio.run(s.refresh(""))
     assert calls == []
     s.busy = False
-    asyncio.run(s.refresh())
+    asyncio.run(s.refresh(""))
     assert calls == [TARGET]
     assert (s.selected, s.confirm, s.armed) == ("", "", False)
     assert [r[0] for r in s.rows] == [Y2]
@@ -160,7 +160,7 @@ def test_refresh_skips_while_busy_and_drops_a_stale_selection(enabled, monkeypat
 def test_refresh_keeps_a_selection_that_is_still_listed(enabled, monkeypatch):
     s = _armed(monkeypatch)
     _fetch_returns(monkeypatch, [E2, E1])
-    asyncio.run(s.refresh())
+    asyncio.run(s.refresh(""))
     assert s.selected == Y1 and s.confirm == "dirA" and s.armed is True
 
 
@@ -207,7 +207,7 @@ def test_actions_target_yml_not_index(enabled, monkeypatch):
     s = _armed(monkeypatch)  # Y1 is row 0
     calls = _spy(monkeypatch)
     _fetch_returns(monkeypatch, [E2, E1])  # reordered: Y1 is now row 1
-    asyncio.run(s.refresh())
+    asyncio.run(s.refresh(""))
     asyncio.run(s.write_off())
     assert calls == [("write_off", Y1, "why", "op")]
     asyncio.run(s.release_row(Y2))
@@ -296,7 +296,7 @@ def test_a_tick_spanning_an_action_neither_resurrects_rows_nor_eats_the_message(
     s.rows = [qr.sq.rows([E1])[0]]
 
     async def go():
-        tick = asyncio.create_task(s.refresh())
+        tick = asyncio.create_task(s.refresh(""))
         await asyncio.sleep(0)
         await s.release_row(Y1)
         gate.set()
@@ -312,7 +312,7 @@ def test_message_survives_a_tick(enabled, monkeypatch):
     _spy(monkeypatch, (True, "written off; WARNING: x"))
     asyncio.run(s.write_off())
     _fetch_returns(monkeypatch, [E2])
-    asyncio.run(s.refresh())
+    asyncio.run(s.refresh(""))
     assert s.message == "written off; WARNING: x" and s.status == "1 quarantined"
 
 
@@ -327,6 +327,20 @@ def test_busy_and_lock_are_released_when_the_call_raises(enabled, monkeypatch, e
     monkeypatch.setattr(qr.sq, "release", boom)
     with pytest.raises(exc):
         asyncio.run(s.release_row(Y1))
+    assert s.busy is False and qr._LOCK.locked() is False
+
+
+def test_a_hung_call_times_out_to_the_unknown_message(enabled, monkeypatch):
+    """Mutation: drop asyncio.wait_for in _act (test then hangs, 5 s guard)."""
+    s = _armed(monkeypatch)
+    monkeypatch.setattr(qr, "ACT_TIMEOUT", 0.05)
+
+    async def hang(*a):
+        await asyncio.sleep(60)
+
+    monkeypatch.setattr(qr.sq, "release", hang)
+    asyncio.run(asyncio.wait_for(s.release_row(Y1), 5))
+    assert s.message == qr.sq.UNKNOWN
     assert s.busy is False and qr._LOCK.locked() is False
 
 
@@ -352,7 +366,7 @@ def test_refresh_is_a_no_op_when_disabled(enabled, monkeypatch):
     calls = []
     _fetch_returns(monkeypatch, [E1], calls)
     monkeypatch.setitem(qr._CONFIG, "enabled", False)
-    asyncio.run(_Fake().refresh())
+    asyncio.run(_Fake().refresh(""))
     assert calls == []
 
 
@@ -364,7 +378,7 @@ def test_refresh_drops_rows_when_an_action_starts_during_its_fetch(
     gate = _hold_fetch(monkeypatch, [E1], [])
 
     async def go():
-        tick = asyncio.create_task(s.refresh())
+        tick = asyncio.create_task(s.refresh(""))
         await asyncio.sleep(0)
         s.busy = True
         gate.set()
