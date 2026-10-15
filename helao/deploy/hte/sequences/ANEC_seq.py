@@ -2160,7 +2160,7 @@ def ANEC_create_and_load_liquid_sample(
         lot_number: Per-constituent lot-number strings.
         electrolyte_name: Electrolyte label.
         prep_date: Preparation date.
-        tray: PAL tray index (the call site hard-codes tray=2).
+        tray: PAL tray index recorded on every created sample.
         slot: PAL slot index.
         vial: Iterable of PAL vial indices to fill.
 
@@ -2181,7 +2181,7 @@ def ANEC_create_and_load_liquid_sample(
                 "lot_number": lot_number,
                 "electrolyte_name": electrolyte_name,
                 "prep_date": prep_date,
-                "tray": 2,
+                "tray": tray,
                 "slot": slot,
                 "vial": vial_no,
             },

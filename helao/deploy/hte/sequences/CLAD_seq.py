@@ -10,7 +10,7 @@ from helao.helpers.premodels import ExperimentPlanMaker
 SEQUENCES = ["CLAD_seq"]
 
 
-@sequence(version=2)
+@sequence(version=3)
 def CLAD_seq(
     solid_plate_id: int = 6307,
     plate_sample_no_list: list = [],
@@ -127,7 +127,7 @@ def CLAD_seq(
         epm.add(
             "CLAD_sub_reference_setup",
             {
-                "reference_position": reference_position,
+                "reference_position_name": reference_position,
                 "liquid_sample_no": electrolyte_sample_no,
                 "electrolyte_ph": electrolyte_ph,
                 "fill_volume_ul": fill_volume_ul,
@@ -296,7 +296,7 @@ def CLAD_seq(
         epm.add(
             "CLAD_sub_reference_setup",
             {
-                "reference_position": reference_position,
+                "reference_position_name": reference_position,
                 "liquid_sample_no": electrolyte_sample_no,
                 "electrolyte_ph": electrolyte_ph,
                 "fill_volume_ul": fill_volume_ul,

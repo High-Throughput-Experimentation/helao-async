@@ -1259,7 +1259,7 @@ def ADSS_sub_CA_photo(
     return apm.planned_actions  # returns complete action list to orch
 
 
-@experiment(version=8)
+@experiment(version=9)
 def ADSS_sub_CV(
     Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
     Vapex1_vsRHE: float = 1.0,  # Apex 1 value in volts or amps.
@@ -1366,27 +1366,19 @@ def ADSS_sub_CV(
             )
         )
 
+    # an RHE reference carries no pH or reference-table offset (as in ADSS_sub_CA)
+    rhe = ref_type == "rhe"
+    ref_tbl = 0.0 if rhe else ref_offset(ref_type)
+    ph_term = 0.0 if rhe else 0.059 * ph
     # apply potential
     apm.add(
         PSTAT_server,
         "run_CV",
         {
-            "Vinit__V": Vinit_vsRHE
-            - 1.0 * ref_offset__V
-            - ref_offset(ref_type)
-            - 0.059 * ph,
-            "Vapex1__V": Vapex1_vsRHE
-            - 1.0 * ref_offset__V
-            - ref_offset(ref_type)
-            - 0.059 * ph,
-            "Vapex2__V": Vapex2_vsRHE
-            - 1.0 * ref_offset__V
-            - ref_offset(ref_type)
-            - 0.059 * ph,
-            "Vfinal__V": Vfinal_vsRHE
-            - 1.0 * ref_offset__V
-            - ref_offset(ref_type)
-            - 0.059 * ph,
+            "Vinit__V": Vinit_vsRHE - 1.0 * ref_offset__V - ref_tbl - ph_term,
+            "Vapex1__V": Vapex1_vsRHE - 1.0 * ref_offset__V - ref_tbl - ph_term,
+            "Vapex2__V": Vapex2_vsRHE - 1.0 * ref_offset__V - ref_tbl - ph_term,
+            "Vfinal__V": Vfinal_vsRHE - 1.0 * ref_offset__V - ref_tbl - ph_term,
             "ScanRate__V_s": scanrate_voltsec,
             "AcqInterval__s": samplerate_sec,
             "Cycles": cycles,

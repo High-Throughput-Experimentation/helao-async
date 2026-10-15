@@ -180,7 +180,7 @@ def CCSI_sub_load_liquid(
     return apm.planned_actions
 
 
-@experiment(version=2)
+@experiment(version=3)
 def CCSI_sub_load_gas(
     reservoir_gas_sample_no: int = 1,
     volume_ul_cell_gas: int = 1000,
@@ -198,13 +198,12 @@ def CCSI_sub_load_gas(
     apm = ActionPlanMaker()
     apm.add(
         SAMPLE_server,
-        "archive_custom_load",  # not sure there is a server function for gas
+        "archive_custom_load",  # add_gas rejects the empty cell after unload_cell
         {
             "custom": "cell1_we",
             "load_sample_in": GasSample(
                 sample_no=reservoir_gas_sample_no, machine_name=ORCH_HOST
             ).model_dump(),
-            "volume_ml": volume_ul_cell_gas / 1000,
         },
         process_finish=True,
         process_contrib=[
@@ -243,7 +242,7 @@ def CCSI_sub_alloff() -> list:
     return apm.planned_actions
 
 
-@experiment(version=7)
+@experiment(version=8)
 def CCSI_sub_headspace_purge_and_measure(
     HSpurge_duration: float = 20,
     DeltaDilute1_duration: float = 0,
@@ -320,7 +319,7 @@ def CCSI_sub_headspace_purge_and_measure(
             "duration": co2measure_duration,
             "acquisition_rate": co2measure_acqrate,
         },
-        technique_name="pressure_measurre",
+        technique_name="pressure_measure",
         process_finish=True,
         process_contrib=[
             ProcessContrib.files,
@@ -346,7 +345,7 @@ def CCSI_sub_headspace_purge_and_measure(
     return apm.planned_actions
 
 
-@experiment(version=1)
+@experiment(version=2)
 def CCSI_sub_headspace_measure(
     recirculation_rate_uL_min: int = 10000,
     co2measure_duration: float = 10,
@@ -383,7 +382,7 @@ def CCSI_sub_headspace_measure(
             "duration": co2measure_duration,
             "acquisition_rate": co2measure_acqrate,
         },
-        technique_name="pressure_measurre",
+        technique_name="pressure_measure",
         process_finish=True,
         process_contrib=[
             ProcessContrib.files,

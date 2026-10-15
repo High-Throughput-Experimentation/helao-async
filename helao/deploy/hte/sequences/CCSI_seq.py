@@ -993,7 +993,7 @@ def CCSI_Solution_testing(  # assumes initialization performed previously
 # =============================================================================
 
 
-@sequence(version=21)
+@sequence(version=22)
 def CCSI_Solution_co2maintainconcentration(  # assumes initialization performed previously
     #                   v 14, list for solution/total sample volumes+ extra clean 15 added rinses/16agitation
     #                   17 repeat cleans/rinses/flushes
@@ -1193,7 +1193,7 @@ def CCSI_Solution_co2maintainconcentration(  # assumes initialization performed 
                 "SyringePushWait_s": SyringePushWait_s,
                 "LiquidFillWait_s": LiquidFillWait_s,
                 "CleanFillWait_s": Clean_FillWait_s,
-                "WaterFillWait": secondliquid_injection_FillWait,
+                "WaterFillWait_s": secondliquid_injection_FillWait,
                 "n2_push": n2_push,
                 "co2_fill_after_n2push": n2_push,
                 "co2_filltime_s": co2_filltime_s,
