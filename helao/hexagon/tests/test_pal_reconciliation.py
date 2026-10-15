@@ -326,13 +326,10 @@ def test_check_source_next_empty_always_rejected():
     asyncio.run(_run())
 
 
-def test_check_source_next_full_vial_dispatch_preserves_legacy_bug():
-    """Pre-existing shipped-driver bug (documented in pal_reconciliation.py):
-    the `next_full_vial` dispatch branch calls the next_EMPTY checker, not
-    `_check_source_next_full`/`_next_full_vial` -- so it always rejects,
-    even when a full vial is seeded. Preserved verbatim; this test locks
-    that (mis-)behavior in place so a future fix is a deliberate, visible
-    diff rather than an accidental one."""
+def test_check_source_next_full_vial_resolves_the_next_full_vial():
+    """A `next_full_vial` source dispatches to `_check_source_next_full` and
+    resolves the first full vial after the requested cursor (it used to be
+    routed to the next_empty checker and always rejected)."""
 
     async def _run():
         state = FakeSampleState()
@@ -342,19 +339,9 @@ def test_check_source_next_full_vial_dispatch_preserves_legacy_bug():
 
         err = await recon._check_source(microcam)
 
-        assert err is ErrorCodes.not_available
-        # the real _next_full_vial path (below) would have found the seeded
-        # vial -- proving the dispatcher truly never reaches it.
-        (
-            direct_err,
-            tray,
-            slot,
-            vial,
-            sample,
-        ) = await recon._next_full_vial(after_tray=0, after_slot=0, after_vial=0)
-        assert direct_err is ErrorCodes.none
-        assert (tray, slot, vial) == (1, 1, 1)
-        assert sample.global_label == "liq_c"
+        assert err is ErrorCodes.none
+        rs = microcam.requested_source
+        assert (rs.tray, rs.slot, rs.vial) == (1, 1, 1)
 
     asyncio.run(_run())
 
@@ -1034,5 +1021,28 @@ def test_reconcile_after_trigger_aborts_on_ref_sample_bug():
 
         assert should_abort is True
         assert error is ErrorCodes.bug
+
+    asyncio.run(_run())
+
+
+def test_update_archive_helper_failed_source_update_is_not_masked_by_dest():
+    async def _run():
+        state = FakeSampleState()
+
+        async def _src_fails(custom=None, sample=None, dilute=False):
+            return custom != "src_pos", sample
+
+        state.custom_update_position = _src_fails
+        recon = PalReconciliation(sample_state=state, cams=None)
+        palaction = _palaction(
+            source_position="src_pos",
+            source_samples_initial=[_liquid("s")],
+            dest_position="dst_pos",
+            dest_samples_initial=[_liquid("d")],
+        )
+
+        error = await recon._update_archive_helper(palaction, action_uuid="u1")
+
+        assert error is ErrorCodes.not_available
 
     asyncio.run(_run())

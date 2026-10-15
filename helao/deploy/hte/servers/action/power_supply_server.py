@@ -493,8 +493,8 @@ async def power_supply_dyn_endpoints(app: ActionHost):
             The active action dictionary from ``start_executor``.
         """
 
-        # Prepare json_data_keys for logging/serialization (for example: ["elapsed_time_s", "voltage_v", "current_a"])
-        data_keys = ["elapsed_time_s", "voltage_v", "current_a"]  # Adjust as needed
+        # Columns must match what the executor's _poll emits.
+        data_keys = ["current_a"]
 
         active = await ctx.begin(
             json_data_keys=data_keys,
@@ -535,8 +535,8 @@ async def power_supply_dyn_endpoints(app: ActionHost):
             The active action dictionary from ``start_executor``.
         """
 
-        # Prepare json_data_keys for logging/serialization (for example: ["elapsed_time_s", "voltage_v", "current_a"])
-        data_keys = ["elapsed_time_s", "voltage_v", "current_a"]  # Adjust as needed
+        # Columns must match what the executor's _poll emits.
+        data_keys = ["current_a"]
 
         active = await ctx.begin(
             json_data_keys=data_keys,
@@ -585,8 +585,8 @@ async def power_supply_dyn_endpoints(app: ActionHost):
             The active action dictionary from ``start_executor``.
         """
 
-        # Prepare json_data_keys for logging/serialization (for example: ["elapsed_time_s", "voltage_v", "current_a"])
-        data_keys = ["elapsed_time_s", "voltage_v", "current_a"]  # Adjust as needed
+        # Columns must match what the executor's _poll emits.
+        data_keys = ["t_s", "voltage_v"]
 
         active = await ctx.begin(
             json_data_keys=data_keys,

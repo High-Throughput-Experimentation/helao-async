@@ -213,6 +213,7 @@ class C_vis(LiveVisualizer):
                     LOGGER.info(f"data_dict {data_dict[mvar]}")
                     data_dict[f"{mvar}_mean"] = data_dict[mvar]
 
+        control_mode = self.control_mode
         for dev_name in self.devices:
             control_modes = data_dict[f"{dev_name}__control_point"]
             if control_modes:
@@ -227,7 +228,7 @@ class C_vis(LiveVisualizer):
                     self.datasource.data = {k: [] for k in self.data_dict_keys}
 
         self.datasource.stream(data_dict, rollover=self.max_points)
-        keys = list(data_dict.keys())
+        keys = [k for k in data_dict if data_dict[k]]
         values = [data_dict[k][-1] for k in keys]
         table_data_dict = {"name": keys, "value": values}
         self.datasource_table.stream(table_data_dict, rollover=len(keys))

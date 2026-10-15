@@ -255,12 +255,13 @@ class AndorSpectrographDriver(AndorDriver):
                 if spc.IsSlitPresent(0, 1) == (20202, 1):
                     spc.SetSlitWidth(0, 1, 10)
                     LOGGER.info("slit set")
+                # create a np array of zeros of length 6
+                optimality_array = np.zeros(6)
+                max_array = np.zeros(6)
+                ND_filter_num = None
                 if spc.IsFilterPresent(0) == (20202, 1):
                     spc.SetFilter(0, 1)
                     LOGGER.info("filter set")
-                    # create a np array of zeros of length 6
-                    optimality_array = np.zeros(6)
-                    max_array = np.zeros(6)
                     # create a for loop iterating from 1 to 6, setting each filter and getting the optimality value
                     for i in range(1, 7):
                         spc.SetFilter(0, i)
@@ -276,7 +277,7 @@ class AndorSpectrographDriver(AndorDriver):
                             ND_filter_num = np.argmin(optimality_array)
                     else:
                         ND_filter_num = np.argmin(optimality_array)
-                    spc.SetFilter(0, ND_filter_num)
+                    spc.SetFilter(0, int(ND_filter_num) + 1)  # filters are 1-based
 
                     LOGGER.info(
                         f"filter number set to {ND_filter_num}, with optimality value of {optimality_array[ND_filter_num]} and a max intensity of {max_array[ND_filter_num]}"

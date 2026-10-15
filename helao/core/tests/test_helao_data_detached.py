@@ -37,3 +37,13 @@ def test_record_in_a_run_tree_still_reads(tmp_path: Path):
     assert result is not None
     _, data = result
     assert data["t_s"] == [1.0, 2.0]
+
+
+def test_zip_record_without_nosync_dir_has_empty_nosync_files(tmp_path: Path):
+    import zipfile
+
+    (tmp_path / "RUNS_SYNCED").mkdir()  # its RUNS_NOSYNC twin never exists
+    zpath = tmp_path / "RUNS_SYNCED" / "rec.zip"
+    with zipfile.ZipFile(zpath, "w") as zf:
+        zf.writestr("RUNS/2026/1006/seqdir/261006.122552210917-seq.yml", "a: 1\n")
+    assert HelaoData(str(zpath)).nosync_files == []

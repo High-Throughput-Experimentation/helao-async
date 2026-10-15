@@ -619,3 +619,10 @@ def test_the_assembled_file_keeps_crlf_throughout():
 def test_a_trigger_template_with_more_than_one_technique_is_refused():
     with pytest.raises(ValueError, match="exactly one technique"):
         ma.assemble(MAIN, ma.TtlPlan(wait=0), REFERENCE, TRIGGER_OUT)
+
+
+def test_spacing_value_refuses_an_unknown_sweep_mode():
+    assert ot.spacing_value("lin") == "Linear"
+    assert ot.spacing_value("log") == "Logarithmic"
+    with pytest.raises(ValueError):
+        ot.spacing_value("linear")

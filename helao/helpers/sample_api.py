@@ -136,6 +136,8 @@ class SampleModelAPI:
         self._db = os.path.join(self._dbfilepath, self._dbfilename)
         self._con = None
         self._cur = None
+        # _con/_cur are shared by every coroutine on this instance (one db file)
+        self._db_lock = asyncio.Lock()
         # convert these to json when saving them to the db
         self._jsonkeys = [
             "chemical",
@@ -271,8 +273,7 @@ class SampleModelAPI:
             The persisted sample as read back from the database.
         """
         await asyncio.sleep(0.01)
-        lock = asyncio.Lock()
-        async with lock:
+        async with self._db_lock:
             await self._open_db()
             self._cur.execute(f"select count(idx) from {self._sample_type};")
             counts = self._cur.fetchone()[0]
@@ -371,8 +372,7 @@ class SampleModelAPI:
 
     async def init_db(self):
         """Create the sample table if absent and mark the API ready."""
-        lock = asyncio.Lock()
-        async with lock:
+        async with self._db_lock:
             await self._open_db()
             # check if table exists
             listOfTables = self._cur.execute(
@@ -396,8 +396,7 @@ class SampleModelAPI:
             LOGGER.info("db not ready")
             await asyncio.sleep(0.1)
         await asyncio.sleep(0.01)
-        lock = asyncio.Lock()
-        async with lock:
+        async with self._db_lock:
             await self._open_db()
             self._cur.execute(f"select count(idx) from {self._sample_type};")
             counts = self._cur.fetchone()[0]
@@ -429,8 +428,7 @@ class SampleModelAPI:
         await asyncio.sleep(0.01)
         ret_samples = []
 
-        lock = asyncio.Lock()
-        async with lock:
+        async with self._db_lock:
             await self._open_db()
 
             for i, sample in enumerate(samples):
@@ -496,8 +494,7 @@ class SampleModelAPI:
         await asyncio.sleep(0.01)
         ret_samples = []
         inherit = 'WHERE inheritance = "give_only"' if give_only else ""
-        lock = asyncio.Lock()
-        async with lock:
+        async with self._db_lock:
             await self._open_db()
             LOGGER.info(f"getting {limit} samples of type {self._sample_type}")
             await asyncio.sleep(0.01)
@@ -574,8 +571,7 @@ class SampleModelAPI:
 
         await asyncio.sleep(0.01)
 
-        lock = asyncio.Lock()
-        async with lock:
+        async with self._db_lock:
             await self._open_db()
 
             for sample in samples:

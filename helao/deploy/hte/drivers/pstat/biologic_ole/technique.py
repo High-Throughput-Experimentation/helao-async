@@ -322,8 +322,19 @@ SPACING_VALUES = {"lin": "Linear", "log": "Logarithmic"}
 
 
 def spacing_value(value: str) -> str:
-    """EC-Lab's ``spacing`` word for a HELAO ``SweepMode``."""
-    return SPACING_VALUES.get(str(value), "Logarithmic")
+    """EC-Lab's ``spacing`` word for a HELAO ``SweepMode``.
+
+    Raises:
+        ValueError: On anything but ``lin``/``log``; a guessed spacing would
+            sweep differently from the recorded ``SweepMode``.
+    """
+    try:
+        return SPACING_VALUES[str(value)]
+    except KeyError:
+        raise ValueError(
+            f"no EC-Lab spacing for SweepMode {value!r}; expected one of "
+            f"{sorted(SPACING_VALUES)}"
+        ) from None
 
 
 #: Shared current-range and bandwidth captions. Present on every technique

@@ -137,3 +137,52 @@ def test_every_tracked_dev_do_port_is_an_integer():
                 if not isinstance(port, int):
                     findings.append(f"{path.name}:{server}:{name} = {port!r}")
     assert not findings, "non-integer dev_do ports:\n  " + "\n  ".join(findings)
+
+
+@pytest.mark.asyncio
+async def test_list_toggle_init_delay_is_rounded_not_truncated():
+    drv = _driver({"doric_wled": 1, "spec_trig": 5})
+    await drv.set_digital_cycle(
+        trigger_name="gamry_ttl0",
+        triggertype=TriggerType.fallingedge,
+        out_name=["doric_wled", "spec_trig"],
+        toggle_init_delay=[1.001, 1.001],  # 1.001 * 1e3 == 1000.9999999999999
+        toggle_duty=[0.5, 0.5],
+        toggle_period=[2.0, 2.0],
+        toggle_duration=[10.0, 10.0],
+        out_name_gamry=None,
+    )
+    assert "cnt1=cnt1+1001;" in drv.uploaded[0]
+
+
+@pytest.mark.asyncio
+async def test_stop_digital_cycle_halts_the_gamry_companion_thread():
+    drv = _driver({"doric_wled": 1, "gamry_aux": 6})
+    await drv.set_digital_cycle(
+        trigger_name="gamry_ttl0",
+        triggertype=TriggerType.fallingedge,
+        out_name="doric_wled",
+        toggle_init_delay=0.0,
+        toggle_duty=0.5,
+        toggle_period=2.0,
+        toggle_duration=10.0,
+        out_name_gamry="gamry_aux",
+    )
+    drv.commands.clear()
+    await drv.stop_digital_cycle()
+    assert {"HX1", "HX2"} <= set(drv.commands)
+
+
+@pytest.mark.asyncio
+async def test_estop_drives_analog_outs_through_set_analog_out():
+    drv = _driver({"doric_wled": 1})
+    drv.dev_ao = {"ao0": 0}
+    calls = []
+
+    async def _ao(value, ao_name="analog_out", *a, **k):
+        calls.append((ao_name, value))
+        return {}
+
+    drv.set_analog_out = _ao
+    assert await drv.estop(True) is True
+    assert calls == [("ao0", 0.0)]

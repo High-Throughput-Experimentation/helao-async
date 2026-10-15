@@ -26,11 +26,9 @@ methods and is not yet wired to call into this service; the cutover (dest
 resolution, ``plan()``, and the after-trigger reconciliation) lands in
 slices 3b-3d.
 
-Known pre-existing bug preserved verbatim (not this slice's concern to
-fix): the legacy ``_sendcommand_check_source``'s ``next_full_vial`` branch
-calls the ``next_empty_vial`` checker instead of ``_next_full_vial`` --
-copied here unchanged in ``_check_source`` to keep behavior byte-identical
-to the shipped driver.
+The legacy ``_sendcommand_check_source``'s ``next_full_vial`` branch called
+the ``next_empty_vial`` checker (so such a source was always rejected);
+``_check_source`` here dispatches to ``_check_source_next_full`` instead.
 """
 
 import logging
@@ -295,11 +293,7 @@ class PalReconciliation:
                 return palposition.error
 
         elif microcam.cam.source == _positiontype.next_full_vial:
-            # NOTE: pre-existing bug in the shipped driver -- this branch
-            # calls the next_empty_vial checker, not _check_source_next_full.
-            # Preserved verbatim (see module docstring); not this slice's
-            # concern to fix.
-            palposition = await self._check_source_next_empty(microcam=microcam)
+            palposition = await self._check_source_next_full(microcam=microcam)
             if palposition.error != ErrorCodes.none:
                 return palposition.error
 
@@ -1110,7 +1104,7 @@ class PalReconciliation:
             sample.action_uuid = [action_uuid]
 
         error = ErrorCodes.none
-        retval = False
+        results = []  # one entry per position update; every one must succeed
         if palaction.source.samples_final:
             if palaction.source.position == "tray":
                 retval = await self.sample_state.tray_update_position(
@@ -1124,6 +1118,7 @@ class PalReconciliation:
                     custom=palaction.source.position,
                     sample=palaction.source.samples_final[0],
                 )
+            results.append(retval)
         else:
             LOGGER.info("No sample in PAL source.")
 
@@ -1140,10 +1135,11 @@ class PalReconciliation:
                     custom=palaction.dest.position,
                     sample=palaction.dest.samples_final[0],
                 )
+            results.append(retval)
         else:
             LOGGER.info("No sample in PAL dest.")
 
-        if not retval:
+        if not results or not all(results):
             error = ErrorCodes.not_available
 
         return error

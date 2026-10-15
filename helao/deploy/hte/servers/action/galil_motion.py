@@ -716,7 +716,7 @@ async def galil_dyn_endpoints(app: ActionHost):
                             "d_mm": [z_value],
                             "axis": ["z"],
                             "mode": MoveModes.absolute,
-                            "transofmration": TransformationModes.instrxy,
+                            # z moves run in the motor frame (no transformation key)
                         }
                     )
                     datadict = await app.driver.motor_move(active)

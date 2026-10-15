@@ -195,6 +195,7 @@ class HelaoData:
                     RunDir.SYNCED.value, RunDir.NOSYNC.value
                 )
 
+            self._nosync_files = []
             if os.path.exists(nosync_path):
                 self._nosync_files = [
                     p for p in self._data_files if RunDir.NOSYNC.value in p

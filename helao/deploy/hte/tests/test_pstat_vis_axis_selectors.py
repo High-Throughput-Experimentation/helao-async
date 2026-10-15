@@ -128,3 +128,18 @@ if __name__ == "__main__":
         test_axis_selectors_are_dropdowns(name)
         test_changing_an_axis_replots_that_column(name)
     print("ALL PSTAT_VIS_AXIS_SELECTOR TESTS PASS")
+
+
+def test_biologic_vis_plots_every_single_technique_endpoint():
+    from helao.deploy.hte.servers.visualizer import biologic_vis
+
+    for name in (
+        "run_CALIMIT",
+        "run_CPLIMIT",
+        "run_GEIS",
+        "run_SPEIS",
+        "run_SGEIS",
+        "run_plan",
+        "run_protocol",
+    ):
+        assert name in biologic_vis.VALID_ACTION_NAME
