@@ -158,3 +158,32 @@ Each test must fail when the code it covers is reverted (mutation check), per th
 - Any change to post-finish hook retry semantics.
 - Bulk re-queue after an outage longer than the window: an operator POSTs `/finish_yml` per
   record listed in `/tasks`. Add a bulk route only if this turns out to be common.
+
+## 7. Addendum 2026-10-14: immediate quarantine of a permanently incomplete process group
+
+The strike/age threshold (Q3) fits failures a retry may cure. One failure no retry can: a
+finished experiment whose process group lists an `action_order` for which no action record
+(`*-act.yml`, any state) exists under the experiment dir, e.g. an action lost at a crash. Its group
+can never complete, and `s3_upload` would raise "did not sync after N tries" on every pass.
+
+- Detection (`SyncDriver._incomplete_process_groups`, run in `sync_yml` after
+  `reconcile_processes`, which is reached only once no child is active or unsynced): an unfinished
+  group of a non-legacy experiment with at least one synced action, and a missing order that is
+  neither synced nor on disk. A group with no synced action stays a phantom (dropped by
+  `sync_process`). A record that exists but has not synced stays on ordinary retry.
+- Action: `_strike(..., immediate=True)` sets `quarantined_at` now (strikes and age are bypassed;
+  `quarantine_strikes: 0` still disables parking), `last_error` names the group index,
+  `process_uuid` and the missing orders, and the usual single `LOGGER.alert` fires. The record is
+  parked, never force-closed: nothing incomplete is presented as complete.
+- Re-enqueue stops at the existing `enqueue_yml` gate. A parent whose every unsynced child is
+  parked no longer re-queues itself either (otherwise the sequence burned its rank budget alone).
+- Release is unchanged: `POST /finish_yml`. If the record is still absent the next pass parks it
+  again, with a new alert.
+- Likely causes: an operator skip or E-STOP partway through a process group (the orchestrator
+  clears the remaining actions, the experiment finishes with a partial group and nothing to
+  restore), or an action lost at a crash. The alert and `last_error` say so.
+- Releasing via `/finish_yml` re-parks the record (with a new alert) while the action record is
+  still absent; an explicit operator "write off" route is a planned follow-up, not built here.
+- A group whose actions are ALL absent is still dropped as a phantom by `sync_process`
+  (unchanged behaviour), so a fully lost group is not parked.
+- With `quarantine_strikes: 0` the incomplete-group message is logged at ERROR each pass.
