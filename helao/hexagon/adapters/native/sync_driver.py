@@ -1649,7 +1649,8 @@ class SyncDriver:
                     f"reason: {' '.join(str(reason).split())}. It syncs with the "
                     "actions that exist."
                 )
-            await self.enqueue_yml(yml_path, 1)
+            if result.get("status") != "already synced":  # a no-op stays one
+                await self.enqueue_yml(yml_path, 1)
         except Exception as err:
             LOGGER.error(f"Write-off tail of {yml_path} failed", exc_info=True)
             return {**result, "warning": f"not re-queued: {type(err).__name__}: {err}"}

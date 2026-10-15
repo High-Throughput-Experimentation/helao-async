@@ -417,8 +417,10 @@ async def test_write_off_is_idempotent(tmp_path, mod, monkeypatch):
         await drv.enqueue_yml(exp_yml, 1)
         await drain(drv, timeout=15)
         assert _prg_is_complete(prg)
+        held = _hold_enqueue(drv)
         done = await drv.write_off(str(exp_yml), "r", "op")
         assert done == {"ok": True, "status": "already synced"}
+        assert held == []  # a no-op must not re-queue
         assert len(_ledger(tmp_path)) == 2 and len(alerts) == 1
     finally:
         await teardown_driver(drv)
