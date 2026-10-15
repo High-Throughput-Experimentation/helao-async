@@ -277,9 +277,10 @@ class QueuePersister:
                 new.action_retry = (act.action_retry or 0) + 1
                 fresh.append(new)
             # retire the old uuid: the experiment record shows the attempt as
-            # [skipped, finished], but the killed server's on-disk -act.yml still
-            # reads active (pre-existing on any crash/relaunch; the syncer will not
-            # sync that experiment until the record is repaired -- tracked separately)
+            # [skipped, finished]. The killed server's on-disk -act.yml reads
+            # active until that action server's next startup, when
+            # ActionHost.reconcile_interrupted() finalizes it [finished, errored]
+            # and hands it to the syncer (the experiment syncs only after that).
             act.action_status = [HloStatus.skipped, HloStatus.finished]
             for d in [gsm.active_dict] + [
                 e.active_dict

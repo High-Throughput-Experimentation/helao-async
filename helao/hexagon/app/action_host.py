@@ -34,9 +34,13 @@ import asyncio
 import faulthandler
 import json
 import os
+import sys
 import time
 import traceback
 from collections import namedtuple
+from datetime import datetime
+from glob import glob
+from pathlib import Path
 from typing import Annotated, Any, Callable, Optional
 
 from fastapi import Body, WebSocket, WebSocketDisconnect
@@ -48,14 +52,17 @@ from helao.core.hooks.loader import load_hook_set
 from helao.core.models.server import ActionServerModel, EndpointModel
 from helao.helpers import helao_logging as logging
 from helao.core.error import ErrorCodes
+from helao.core.models.file import FileInfo
 from helao.core.models.hlostatus import HloStatus
 from helao.helpers.dequedict import DequeDict
 from helao.helpers.dispatcher import async_private_dispatcher
 from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.loaded_modules import loaded_repo_modules
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
-from helao.helpers.run_state import RunStateJournal
-from helao.helpers.time_utils import read_saved_offset
+from helao.helpers.run_state import ACTIVE, RunStateJournal
+from helao.helpers.time_utils import read_saved_offset, set_time
+from helao.helpers.file_utils import _relative_file_name
+from helao.helpers.yml_tools import move_dir, yml_load
 from helao.helpers.premodels import Action
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.ws_utils import WsPublisher
@@ -204,6 +211,9 @@ class ActionHost(HelaoFastAPI):
         #: legacy estop handler and deployment code both use that spelling.
         self.actives: dict = {}
         self.last_10_active: list = []
+        #: Startup reconcile of interrupted actions; see start_reconcile.
+        self.reconcile_task: Optional[asyncio.Task] = None
+        self._key_lock = None
         self.hotreload_busy_hook: Optional[Callable] = None
 
         self.actionservermodel = ActionServerModel(action_server=self.server)
@@ -1281,6 +1291,225 @@ class ActionHost(HelaoFastAPI):
                 "driver": driver_resp,
             }
 
+    def start_reconcile(self) -> None:
+        """Run :meth:`reconcile_interrupted` as a background task.
+
+        Not awaited by startup: the pass reads yml files and may wait on the
+        syncer, and neither may delay the server coming up. A task, not a
+        bounded await, because there is nothing a request could need from it.
+        """
+        assert self.aloop is not None
+        if not self._lock_server_key():
+            LOGGER.warning(
+                f"Another process holds the {self.server_key} lock; skipping "
+                "reconcile of interrupted actions (that server may be live)."
+            )
+            return
+        self.reconcile_task = self.aloop.create_task(self.reconcile_interrupted())
+        self.reconcile_task.add_done_callback(self._log_reconcile_result)
+
+    @staticmethod
+    def _log_reconcile_result(task: asyncio.Task) -> None:
+        if not task.cancelled() and task.exception() is not None:
+            LOGGER.error(
+                "Reconcile of interrupted actions failed.",
+                exc_info=task.exception(),
+            )
+
+    def _lock_server_key(self) -> bool:
+        """Take a per-key exclusive OS lock for the process lifetime.
+
+        uvicorn runs startup before it binds, so a second process for a live
+        key would reconcile that key's *live* actions before dying on the
+        port. The lock lives in STATES and is released by the OS at exit.
+        Returns False when another process holds it.
+        """
+        states_root = self.helaodirs.states_root
+        if not states_root:
+            return True
+        os.makedirs(states_root, exist_ok=True)
+        f = open(
+            os.path.join(states_root, f"action_host_{self.server_key}.lock"), "a+b"
+        )
+        try:
+            if sys.platform == "win32":
+                import msvcrt
+
+                f.seek(0)
+                msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            f.close()
+            return False
+        self._key_lock = f
+        return True
+
+    def _unlock_server_key(self) -> None:
+        f, self._key_lock = getattr(self, "_key_lock", None), None
+        if f is not None:
+            f.close()  # closing releases the flock / byte-range lock
+
+    async def reconcile_interrupted(self) -> list[str]:
+        """Finish the actions an earlier process of this server left ``active``.
+
+        Every ``active`` action in this server's own run-state journal at
+        startup is stale: one process per server key, and the launcher refuses
+        to start over live members. Their ``-act.yml`` still reads ``active``
+        because shutdown never touches ``self.actives``, and the syncer will
+        not ship a parent experiment with such a child. Each record is set to
+        ``[finished, errored]`` (an already-terminal yml, i.e. a finish whose
+        fire-and-forget ``move_dir`` was lost, is not rewritten) and then
+        handed off exactly as the finalizer does, through ``move_dir``.
+
+        Never broadcasts on ``status_q``: the orchestrator must not see this
+        as a live error. Never raises: a record that cannot be read is logged
+        and left in the journal for the next start. An unreachable syncer is
+        logged too; its startup sweep picks the finished yml up. Idempotent:
+        ``move_dir`` evicts the journal entry, so a second pass finds nothing.
+        Only this server's actions are touched; the orchestrator's own
+        experiment and sequence records are out of scope.
+
+        Returns:
+            The uuids reconciled or evicted by this pass.
+        """
+        journal = self.run_journal
+        if journal is None:
+            return []
+        try:
+            stale = journal.working_set()
+        except Exception:
+            LOGGER.warning(
+                "Cannot reconcile interrupted actions: run-state journal unreadable.",
+                exc_info=True,
+            )
+            return []
+        # An action admitted since startup is live, not stale.
+        live = {str(k) for k in self.actives} | {str(k) for k in self.history}
+        done: list[str] = []
+        for uuid, rec in stale.items():
+            # The journal file is shared with any other writer of this key (the
+            # syncer journals UNSYNCED lines in runstate_SYNC): only `active`
+            # action entries are interrupted-run candidates.
+            if (
+                rec.get("kind") != "action"
+                or rec.get("state") != ACTIVE
+                or uuid in live
+            ):
+                continue
+            try:
+                if await self._reconcile_one(uuid, rec):
+                    done.append(uuid)
+            except Exception:
+                LOGGER.warning(
+                    f"Could not reconcile interrupted action {uuid} "
+                    f"({rec.get('path')}); leaving it for the next start.",
+                    exc_info=True,
+                )
+        return done
+
+    async def _reconcile_one(self, uuid: str, rec: dict) -> bool:
+        """Reconcile one stale journal entry; see :meth:`reconcile_interrupted`."""
+        act_dir = os.path.join(str(self.helaodirs.root), rec["path"])
+        action = None
+        for yml in sorted(glob(os.path.join(act_dir, "*-act.yml"))):
+            candidate = Action.model_validate(yml_load(yml))
+            if str(candidate.action_uuid) == uuid:
+                action = candidate
+                break
+        assert self.run_journal is not None
+        if action is None:
+            LOGGER.warning(
+                f"Interrupted action {uuid}: no -act.yml in {act_dir}; "
+                "evicting its journal entry."
+            )
+            self.run_journal.append(uuid, "action", "done", rec["path"])
+            return True
+        if str(action.action_server.server_name) != str(self.server.server_name):
+            LOGGER.debug(
+                f"Skipping action {uuid}: owned by server "
+                f"{action.action_server.server_name}, not {self.server.server_name}."
+            )
+            return False
+        if action.experiment_output_dir is None:
+            # Not persisted in the yml, but move_dir derives the record's path
+            # from it (get_action_dir); the action dir's parent is that value.
+            action.experiment_output_dir = Path(str(action.action_output_dir)).parent
+        if HloStatus.active in action.action_status:
+            action.replace_action_status(HloStatus.active, HloStatus.finished)
+            self._register_present_files(action, act_dir)
+            if action.action_finished_timestamp is None:
+                mtimes = [
+                    os.path.getmtime(p)
+                    for p in Path(act_dir).rglob("*")
+                    if p.is_file() and not p.name.startswith(".")
+                ]
+                action.action_finished_timestamp = (
+                    datetime.fromtimestamp(max(mtimes))
+                    if mtimes
+                    else set_time(offset=self.ntp_offset)
+                )
+            action.error_code = ErrorCodes.critical_error
+            if HloStatus.errored not in action.action_status:
+                action.append_action_status(HloStatus.errored)
+            action.action_output["error_message"] = (
+                "The action server stopped while the action was running; the "
+                "record was reconciled at the next server startup."
+            )
+            await self.write_act(action)
+            LOGGER.warning(f"Reconciled interrupted action {uuid} ({act_dir}).")
+        try:
+            await move_dir(action, base=self)
+        except Exception:
+            # yml_finisher catches only TimeoutError, so a refused connection
+            # (syncer not up yet) raises. The journal entry is already evicted
+            # and the yml is finished: the syncer's startup sweep finds it.
+            LOGGER.warning(
+                f"Syncer handoff failed for reconciled action {uuid}; the "
+                "syncer's startup sweep will pick it up.",
+                exc_info=True,
+            )
+        return True
+
+    def _register_present_files(self, action: Action, act_dir: str) -> None:
+        """Register the data files on disk in ``action.files``.
+
+        The yml written at action start has ``files: []``; the finalizer fills
+        it in memory, which an interrupted run never reached. The syncer ships
+        only registered files, so without this the partial data is dropped.
+        Skips what the finalizer never registers: ymls, locks, staging and
+        other dotfiles. ``data_keys`` and sample labels are unknown here.
+        """
+        known = {str(f.file_name) for f in action.files}
+        for path in sorted(Path(act_dir).rglob("*")):
+            if (
+                not path.is_file()
+                or path.name.startswith(".")
+                or path.suffix in (".yml", ".lock", ".tmp", ".prg")
+            ):
+                continue
+            name = _relative_file_name(str(path), act_dir)
+            if name in known:
+                continue
+            is_hlo = path.suffix == ".hlo"
+            if is_hlo:
+                file_type = f"{self.server_key.lower()}_helao__file"
+            elif path.suffix == ".csv":
+                file_type = "aux__csv"
+            else:
+                file_type = "helao__file"
+            action.files.append(
+                FileInfo(
+                    file_type=file_type,
+                    file_name=name,
+                    action_uuid=action.action_uuid,
+                    run_use=action.run_use,
+                    nosync=bool(is_hlo and not action.sync_data),
+                )
+            )
+
     def _register_lifecycle_hooks(self) -> None:
         """Register startup (drivers, poller, dyn_endpoints) and shutdown."""
 
@@ -1339,6 +1568,7 @@ class ActionHost(HelaoFastAPI):
                 self.regular_updater = self.aloop.create_task(
                     self.regular_status_task(regular_delay)
                 )
+            self.start_reconcile()
 
         @self.on_event("shutdown")
         async def shutdown_event():
@@ -1380,9 +1610,15 @@ class ActionHost(HelaoFastAPI):
         # is already stopped, so nothing new reaches the queues, and the
         # relays get their turn to unwind before the loops are cancelled.
         await self.detach_subscribers()
-        for task in (self.status_logger, self.bufferer, self.regular_updater):
+        for task in (
+            self.status_logger,
+            self.bufferer,
+            self.regular_updater,
+            getattr(self, "reconcile_task", None),
+        ):
             if task is not None:
                 task.cancel()
+        self._unlock_server_key()
 
         # Close the fan-out queues so every /ws_* subscriber breaks out of its
         # iterator and the endpoint returns. Without this the sockets stay open

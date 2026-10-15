@@ -199,7 +199,8 @@ def test_latched_kmove_is_refused_with_no_session_and_no_move(gated, tmp_path):
     assert host.actives == {} and host.executors == {}
     # a rejected call creates no artifact: nothing was written under the root
     written = [f for _, _, fs in os.walk(tmp_path) for f in fs]
-    assert written == ["KMOTOR_faults.txt"]  # startup's fault log, nothing else
+    # startup's fault log and its per-key lock file, nothing else
+    assert sorted(written) == ["KMOTOR_faults.txt", "action_host_KMOTOR.lock"]
 
 
 def test_latched_move_axis_is_refused_and_sends_no_move(gated):
