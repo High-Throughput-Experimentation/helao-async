@@ -789,6 +789,7 @@ class MfcConstConcExec(MfcExec):
         self.filling = False
         self.fill_end = self.start_time
 
+        self.wsc = None
         self.co2serv_key = self.active.base.server_params.get("co2_server_name", None)
         LOGGER.info(f"checking config for co2 server named: {self.co2serv_key}")
         co2serv_config = self.active.base.world_cfg["servers"].get(
@@ -804,19 +805,20 @@ class MfcConstConcExec(MfcExec):
 
         self.wsc = WSC(co2serv_host, co2serv_port, "ws_live")
 
-    def eval_conc(self) -> tuple:
+    async def eval_conc(self) -> Optional[tuple]:
         """Read recent CO2 readings and compute the refill time and volume.
 
-        Blocks (with 1 s sleeps) until at least one CO2 packet arrives on the
-        WebSocket, then averages up to the last 10 `co2_ppm` samples and
-        returns `(fill_time_seconds, fill_volume_scc)` needed to reach
+        The blocking WebSocket read runs in a worker thread. Returns `None`
+        when no CO2 packet arrived (the caller skips this cycle); otherwise
+        averages up to the last 10 `co2_ppm` samples and returns
+        `(fill_time_seconds, fill_volume_scc)` needed to reach
         `target_co2_ppm` in `headspace_scc`.
         """
-        data_package = self.wsc.read_messages()
-        while not data_package:
-            data_package = self.wsc.read_messages()
-            LOGGER.info("No co2_ppm readings have been received, sleeping for 1 second")
-            time.sleep(1)
+        assert self.wsc is not None  # _pre_exec guarantees it
+        data_package = await asyncio.to_thread(self.wsc.read_messages)
+        if not data_package:
+            LOGGER.info("No co2_ppm readings have been received")
+            return None
         data_dict = defaultdict(list)
         for datalab, (dataval, epochsec) in data_package.items():
             if datalab == "sim_dict":
@@ -846,6 +848,12 @@ class MfcConstConcExec(MfcExec):
         guard = self._device_not_connected_error()
         if guard is not None:
             return guard
+        if self.wsc is None:
+            LOGGER.error(
+                f"co2_server_name {self.co2serv_key!r} is not in the world config; "
+                "cannot hold a CO2 concentration. Aborting action (fail-fast)."
+            )
+            return {"error": ErrorCodes.critical_error}
         LOGGER.info("MfcConstConcExec running setup methods.")
         rate_resp = await self.active.driver.set_flowrate(
             device_name=self.device_name,
@@ -875,7 +883,8 @@ class MfcConstConcExec(MfcExec):
         )
         self.last_acq_time = iter_time
         self.last_acq_flow = live_flow
-        fill_time, fill_scc = self.eval_conc()
+        # no CO2 packet yet: no new fill, but still honour closing and duration
+        fill_time, fill_scc = await self.eval_conc() or (0, 0)
         # LOGGER.info(f"eval_conc() returned {fill_time}, {fill_scc}")
         if (
             fill_time > 0

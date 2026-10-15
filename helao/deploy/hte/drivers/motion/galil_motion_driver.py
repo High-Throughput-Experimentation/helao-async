@@ -196,8 +196,8 @@ class Galil(HelaoDriver):
                     f"miscalibrated (place the plate_calib file and reconnect)"
                 )
                 self.plate_transfermatrix = self.dflt_matrix
-
-            self._calib_store.save_plate_calibration(self.plate_transfermatrix)
+            else:
+                self._calib_store.save_plate_calibration(self.plate_transfermatrix)
             LOGGER.info(f"plate_transfermatrix is: \n{self.plate_transfermatrix}")
 
             self.M_instr = None
@@ -478,15 +478,16 @@ class Galil(HelaoDriver):
         )
         if not self.blocked and self.galil_enabled:
             self.blocked = True
-            retval = await self._motor_move(
-                d_mm=d_mm,
-                axis=axis,
-                speed=speed,
-                mode=mode,
-                transformation=transformation,
-            )
-            self.blocked = False
-            return retval
+            try:
+                return await self._motor_move(
+                    d_mm=d_mm,
+                    axis=axis,
+                    speed=speed,
+                    mode=mode,
+                    transformation=transformation,
+                )
+            finally:
+                self.blocked = False
         else:
             return {
                 "moved_axis": None,
@@ -499,6 +500,28 @@ class Galil(HelaoDriver):
             }
 
     async def _motor_move(self, d_mm, axis, speed, mode, transformation) -> dict:
+        """Busy-guarded wrapper: `motor_busy` is always cleared, even on error."""
+        if self.motor_busy or not self.galil_enabled:
+            return {
+                "moved_axis": None,
+                "speed": None,
+                "accepted_rel_dist": None,
+                "supplied_rel_dist": None,
+                "err_dist": None,
+                "err_code": ErrorCodes.in_progress,
+                "counts": None,
+            }
+        self.motor_busy = True
+        try:
+            return await self._motor_move_unguarded(
+                d_mm, axis, speed, mode, transformation
+            )
+        finally:
+            self.motor_busy = False
+
+    async def _motor_move_unguarded(
+        self, d_mm, axis, speed, mode, transformation
+    ) -> dict:
         """Internal mover: transforms coordinates, issues `BG` per axis, and waits.
 
         Converts `d_mm` from the requested `transformation` frame (motor/plate/
@@ -514,19 +537,6 @@ class Galil(HelaoDriver):
             controller error, all values may be None and `err_code` reflects
             the failure.
         """
-        if self.motor_busy or not self.galil_enabled:
-            return {
-                "moved_axis": None,
-                "speed": None,
-                "accepted_rel_dist": None,
-                "supplied_rel_dist": None,
-                "err_dist": None,
-                "err_code": ErrorCodes.in_progress,
-                "counts": None,
-            }
-
-        self.motor_busy = True
-
         # in order to enable easy mode for swagger:
         if not isinstance(axis, list):
             axis = [axis]

@@ -631,35 +631,37 @@ class cNIMAX(HelaoDriver):
         self.Heatloop_run = True
         mdata = {}
 
-        while (time.time() - heatloopstarttime < duration) and self.Heatloop_run:
-            readtempdict = {}
-            for i, myname in enumerate(self.config_dict["dev_monitor"]):
-                mdata[i], _ = self._get_lbuf(myname)
-                readtempdict[myname] = mdata[i]
-            cell_temp = float(readtempdict["Ttemp_Ktc_in_cell_C"])
-            reservoir_temp = float(readtempdict["Ttemp_Ttc_in_reservoir_C"])
+        try:
+            while (time.time() - heatloopstarttime < duration) and self.Heatloop_run:
+                readtempdict = {}
+                for i, myname in enumerate(self.config_dict["dev_monitor"]):
+                    mdata[i], _ = self._get_lbuf(myname)
+                    readtempdict[myname] = mdata[i]
+                cell_temp = float(readtempdict["Ttemp_Ktc_in_cell_C"])
+                reservoir_temp = float(readtempdict["Ttemp_Ttc_in_reservoir_C"])
+                for myheat, myport in self.dev_heat.items():
+                    if myheat == "cellheater":
+                        if cell_temp < celltemp_min:
+                            await self.set_digital_out(
+                                do_port=myport, do_name=myheat, on=True
+                            )
+                        if cell_temp > celltemp_max:
+                            await self.set_digital_out(
+                                do_port=myport, do_name=myheat, on=False
+                            )
+                    if myheat == "res_heater":
+                        if reservoir_temp < reservoir2_min:
+                            await self.set_digital_out(
+                                do_port=myport, do_name=myheat, on=True
+                            )
+                        if reservoir_temp > reservoir2_max:
+                            await self.set_digital_out(
+                                do_port=myport, do_name=myheat, on=False
+                            )
+                await asyncio.sleep(1)
+        finally:
             for myheat, myport in self.dev_heat.items():
-                if myheat == "cellheater":
-                    if cell_temp < celltemp_min:
-                        await self.set_digital_out(
-                            do_port=myport, do_name=myheat, on=True
-                        )
-                    if cell_temp > celltemp_max:
-                        await self.set_digital_out(
-                            do_port=myport, do_name=myheat, on=False
-                        )
-                if myheat == "res_heater":
-                    if reservoir_temp < reservoir2_min:
-                        await self.set_digital_out(
-                            do_port=myport, do_name=myheat, on=True
-                        )
-                    if reservoir_temp > reservoir2_max:
-                        await self.set_digital_out(
-                            do_port=myport, do_name=myheat, on=False
-                        )
-            await asyncio.sleep(1)
-        await self.set_digital_out(do_port=myport, do_name=myheat, on=False)
-        await self.set_digital_out(do_port=myport, do_name=myheat, on=False)
+                await self.set_digital_out(do_port=myport, do_name=myheat, on=False)
         return (
             self.Heatloop_run
         )  # indicates whether heatloop terminated via time duration or stop

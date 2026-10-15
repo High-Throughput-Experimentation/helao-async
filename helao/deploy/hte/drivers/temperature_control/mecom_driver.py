@@ -214,16 +214,16 @@ class MeerstetterTEC(HelaoDriver):
         """Set the object temperature setpoint for this channel.
 
         Args:
-            value: Target temperature in degrees Celsius. Must be ``float``.
+            value: Target temperature in degrees Celsius (int accepted).
 
         Returns:
             The result of the underlying ``set_parameter`` call.
 
         Raises:
-            AssertionError: If ``value`` is not a ``float``.
+            ValueError, TypeError: If ``value`` is not convertible to ``float``.
         """
-        # assertion to explicitly enter floats
-        assert type(value) is float
+        # JSON sequence params may arrive as ints
+        value = float(value)
         LOGGER.info(
             "set object temperature for channel {} to {} C".format(self.channel, value)
         )
