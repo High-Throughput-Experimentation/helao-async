@@ -1663,7 +1663,7 @@ def ADSS_sub_OCV(
     return apm.planned_actions  # returns complete action list to orch
 
 
-@experiment(version=9)
+@experiment(version=10)
 def ADSS_sub_OCV_photo(
     Tval__s: float = 60.0,
     gamry_i_range: str = "auto",
@@ -1790,7 +1790,7 @@ def ADSS_sub_OCV_photo(
             )
         )
 
-        apm.add(NI_server, "led", {"led": "led", "on": 0})
+    apm.add(NI_server, "led", {"led": "led", "on": 0})
 
     if aliquot_post:
         washmod += 1

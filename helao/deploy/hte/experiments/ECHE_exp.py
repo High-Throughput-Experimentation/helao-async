@@ -448,7 +448,7 @@ def ECHE_sub_OCV(
     return apm.planned_actions  # returns complete action list to orch
 
 
-@experiment(version=1)
+@experiment(version=2)
 def ECHE_sub_preCV(
     CA_potential: float = 0.0,  # need to get from CV initial
     samplerate_sec: float = 0.05,
@@ -483,9 +483,9 @@ def ECHE_sub_preCV(
         PSTAT_server,
         "run_CA",
         {
-            "Vval": CA_potential,
+            "Vval__V": CA_potential,
             "Tval__s": CA_duration_sec,
-            "SampleRate": samplerate_sec,
+            "AcqInterval__s": samplerate_sec,
             "TTLwait": -1,  # -1 disables, else select TTL 0-3
             "TTLsend": -1,  # -1 disables, else select TTL 0-3
             "IErange": "auto",
