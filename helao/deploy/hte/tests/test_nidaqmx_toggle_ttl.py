@@ -209,3 +209,18 @@ def test_cancel_toggle_ttl_filters_by_line(monkeypatch):
     cancel_all, _ = _ctx(app, ttl=None)
     asyncio.run(app.routes["cancel_toggle_ttl"](cancel_all))
     assert sessions["shutter"].stopped
+
+
+def test_toggle_ttl_without_a_line_is_rejected_before_begin(monkeypatch):
+    app = _build_app(monkeypatch, {"dev_ttl": DEV_TTL})
+    ctx, session = _ctx(app, ttl=None, duration=-1)
+    began = []
+
+    async def begin(**kwargs):
+        began.append(1)
+        return session
+
+    ctx.begin = begin
+    result = asyncio.run(app.routes["toggle_ttl"](ctx))
+    assert result["error_code"] == ErrorCodes.cmd_error
+    assert not began and session.executor is None

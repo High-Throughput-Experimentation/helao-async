@@ -783,6 +783,10 @@ def makeApp(server_key) -> ActionHost:
                 (the first to finish would drop the line under the second).
             """
             A = ctx.action
+            if A.action_params["ttl"] is None:
+                LOGGER.error("toggle_ttl needs a ttl line name")
+                A.error_code = ErrorCodes.cmd_error
+                return A.as_dict()
             if _ttl_sessions(A.action_params["ttl"]):
                 A.error_code = ErrorCodes.in_progress
                 return A.as_dict()

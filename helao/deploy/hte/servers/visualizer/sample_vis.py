@@ -261,7 +261,10 @@ class C_vis(ActionVisualizer):
                 return None
 
         newpts = to_int(new)
-        self.max_smps = newpts
+        if newpts is None:
+            newpts = to_int(old)  # bad input: keep the previous value
+        if newpts is not None:
+            self.max_smps = newpts
         self.vis.doc.add_next_tick_callback(
             partial(self.update_input_value, sender, f"{self.max_smps}")
         )

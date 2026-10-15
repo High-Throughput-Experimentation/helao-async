@@ -11,6 +11,7 @@ __all__ = ["makeApp"]
 
 import pandas as pd
 
+from helao.core.error import ErrorCodes
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -291,13 +292,18 @@ def makeApp(server_key):
         active = await ctx.begin()
         platespaces = app.driver.list_spaces()
         if active.action.action_params["ph"] is not None:
-            platespaces = [
+            matches = [
                 x
                 for x in platespaces
                 if x["solution_ph"] == active.action.action_params["ph"]
                 and sorted(x["elements"])
                 == sorted(active.action.action_params["elements"])
-            ][0]
+            ]
+            if not matches:
+                active.action.error_code = ErrorCodes.not_available
+                finished_action = await active.finish()
+                return finished_action.as_dict()
+            platespaces = matches[0]
         active.action.action_params.update(
             {
                 "_elements": platespaces["elements"],

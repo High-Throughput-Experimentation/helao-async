@@ -545,7 +545,7 @@ class EcheUvisAnalysis(BaseAnalysis):
         ptup = parse_spechlo(self.inputs.presitu_spec)
 
         # if any([x is False for x in rdtups + rltups + [btup, itup]]):
-        if any([x is False for x in [btup, itup]]):
+        if any([x is False for x in [btup, itup, ptup]]):
             return False
 
         ap = self.analysis_params

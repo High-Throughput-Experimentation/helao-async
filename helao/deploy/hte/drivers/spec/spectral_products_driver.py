@@ -354,29 +354,21 @@ class SM303(HelaoDriver):
                 retdict.update({f"ch_{i:04}": x for i, x in enumerate(self.data)})
                 retdict["error_code"] = ErrorCodes.none
                 arr_data = np.array(self.data)
-                lower_lim = (
-                    0
-                    if kwargs.get("peak_lower_wl") is None
-                    else min(
-                        [
-                            i
-                            for i, v in enumerate(self.pxwl)
-                            if v >= kwargs.get("peak_lower_wl")
-                        ]
+                # window by wavelength mask (no assumption about pxwl order)
+                lower_wl = kwargs.get("peak_lower_wl")
+                upper_wl = kwargs.get("peak_upper_wl")
+                wl_arr = np.asarray(self.pxwl, dtype=float)
+                in_win = np.ones(len(wl_arr), dtype=bool)
+                if lower_wl is not None:
+                    in_win &= wl_arr >= lower_wl
+                if upper_wl is not None:
+                    in_win &= wl_arr <= upper_wl
+                if not in_win.any():
+                    LOGGER.error(
+                        f"peak window {lower_wl}-{upper_wl} nm has no detector pixel"
                     )
-                )
-                upper_lim = (
-                    len(self.pxwl) - 1
-                    if kwargs.get("peak_upper_wl") is None
-                    else max(
-                        [
-                            i
-                            for i, v in enumerate(self.pxwl)
-                            if v <= kwargs.get("peak_upper_wl")
-                        ]
-                    )
-                )
-                retdict["peak_intensity"] = int(arr_data[lower_lim:upper_lim].max())
+                    return {"error_code": ErrorCodes.not_available}
+                retdict["peak_intensity"] = int(arr_data[in_win].max())
                 return retdict
             else:
                 LOGGER.info("No data available.")

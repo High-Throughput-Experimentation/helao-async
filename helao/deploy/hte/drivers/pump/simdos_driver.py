@@ -338,7 +338,7 @@ class SIMDOS(HelaoDriver):
         Returns:
             A :class:`PumpMode` value, or ``False`` if no response was received.
         """
-        retry_num = 5
+        retry_num = 0
         resp = self.send("?MS")
         while resp is None and retry_num < retries:
             resp = self.send("?MS")

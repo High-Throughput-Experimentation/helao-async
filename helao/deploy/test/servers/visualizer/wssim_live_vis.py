@@ -168,9 +168,9 @@ class C_vis(LiveVisualizer):
         # remove all old lines
         self.plot.renderers = []
 
-        colors = [SERIES[0], SERIES[1], SERIES[2], SERIES[3]]
         non_epoch_keys = [x for x in self.data_dict_keys if x not in ["datetime"]]
-        for pres_key, color in zip(non_epoch_keys, colors):
+        for i, pres_key in enumerate(non_epoch_keys):
+            color = SERIES[i % len(SERIES)]
             self.plot.line(
                 x="datetime",
                 y=pres_key,

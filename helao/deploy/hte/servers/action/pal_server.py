@@ -290,11 +290,9 @@ def makeApp(server_key) -> ActionHost:
             return await _pal_start(ctx, palcam)
 
     if (
-        "injection_custom_GC_liquid_start" in _cams
-        or "injection_custom_GC_liquid_wait" in _cams
-        or "injection_custom_GC_gas_start" in _cams
-        or "injection_custom_GC_gas_wait" in _cams
-        and "archive"
+        "injection_custom_GC_gas_start" in _cams
+        and "injection_custom_GC_gas_wait" in _cams
+        and "archive" in _cams
     ):
 
         @app.action()
@@ -940,9 +938,10 @@ def makeApp(server_key) -> ActionHost:
                 The active action dictionary returned by the driver.
             """
             A = ctx.action
-            A.action_abbr = "dilute"
-            active_dict = await app.driver.method_dilute(A)
-            return active_dict
+            # the driver's method_dilute is commented out; fail clearly
+            LOGGER.error("PAL_dilute is not implemented by the PAL driver")
+            A.error_code = ErrorCodes.not_available
+            return A.as_dict()
 
     if "autodilute" in _cams:
 
@@ -982,8 +981,9 @@ def makeApp(server_key) -> ActionHost:
                 The active action dictionary returned by the driver.
             """
             A = ctx.action
-            A.action_abbr = "autodilute"
-            active_dict = await app.driver.method_autodilute(A)
-            return active_dict
+            # the driver's method_autodilute is commented out; fail clearly
+            LOGGER.error("PAL_autodilute is not implemented by the PAL driver")
+            A.error_code = ErrorCodes.not_available
+            return A.as_dict()
 
     return app

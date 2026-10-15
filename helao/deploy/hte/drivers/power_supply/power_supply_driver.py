@@ -245,7 +245,7 @@ class PowerSupplyDriver(HelaoDriver):
             voltage_v = float(self.instrument.query("VOUT1?"))
 
             return DriverResponse(
-                response=DriverResponseType.failed,
+                response=DriverResponseType.success,
                 status=DriverStatus.ok,
                 data={"voltage_v": voltage_v},
             )

@@ -7,6 +7,7 @@ voltage/current, and writes the result as a wavelength-melted,
 cycle/direction-partitioned parquet dataset.
 """
 
+import contextlib
 import os
 import tempfile
 from copy import copy
@@ -46,15 +47,22 @@ class PostProcess(HloPostProcessor):
                     hd = HelaoData(self.exp_yml_path)
                     if hd.name == "HISPEC_sub_SpEC":
                         cvact = hd.act[3]
-                        with tempfile.NamedTemporaryFile(
-                            mode="w+", delete=False, suffix=".csv"
-                        ) as temp_file:
-                            hlo_to_parquet(file_path, temp_file.name, HISPEC=True)
-                            df = fully_read_and_calibrate_parquet(
-                                cv_dataframe=pd.DataFrame(cvact.data[1]),
-                                spec_path=temp_file.name,
-                                write_file=False,
-                            ).sort_values(by="t (s)")
+                        temp_name = None
+                        try:
+                            with tempfile.NamedTemporaryFile(
+                                mode="w+", delete=False, suffix=".csv"
+                            ) as temp_file:
+                                temp_name = temp_file.name
+                                hlo_to_parquet(file_path, temp_name, HISPEC=True)
+                                df = fully_read_and_calibrate_parquet(
+                                    cv_dataframe=pd.DataFrame(cvact.data[1]),
+                                    spec_path=temp_name,
+                                    write_file=False,
+                                ).sort_values(by="t (s)")
+                        finally:
+                            if temp_name is not None:
+                                with contextlib.suppress(OSError):
+                                    os.unlink(temp_name)
                         action_comment = self.action.action_params.get("comment", "")
                         new_file_path = file_path.replace(".hlo", ".parquet")
                         if action_comment:

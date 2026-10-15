@@ -181,6 +181,7 @@ class NativeGalilMotion(HelaoDriver):
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
         except (GalilChannelError, Exception):
+            LOGGER.error("Galil connect failed", exc_info=True)
             self.galil_enabled = False
             return DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
@@ -885,7 +886,7 @@ class NativeGalilMotion(HelaoDriver):
         try:
             self._channel.close()
         except GalilChannelError as exc:
-            return {"connection": {"Unexpected GalilChannelError:", exc}}
+            return {"connection": f"Unexpected GalilChannelError: {exc}"}
         return {"connection": "motor_offline"}
 
     # --- calibration matrix management ------------------------------------
