@@ -39,6 +39,8 @@ __all__ = ["Spacingmethod", "PALtools", "PALposition", "PAL", "GCsampletype"]
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+
 import asyncio
 import os
 import time
@@ -85,6 +87,26 @@ from ...drivers.robot.enum import (
     _positiontype,
 )
 from .sample_shim import SampleArchiveShim
+
+
+def _env_param(config: dict, name: str, default):
+    """Return ``config[name]``, else the env var named by ``config[name + "_env"]``.
+
+    A literal value wins (backward compatible). A named but unset/blank
+    variable logs an error and yields ``default``: for ``host`` that is
+    ``None``, so ``connect()`` fails and PAL actions return ``not_available``.
+    """
+    if config.get(name):
+        return config[name]
+    env_name = config.get(f"{name}_env")
+    if env_name:
+        value = os.environ.get(env_name)
+        if value:
+            return value
+        LOGGER.error(
+            f"Environment variable '{env_name}' named by '{name}_env' is unset or empty."
+        )
+    return config.get(name, default)
 
 
 class _palcmd(BaseModel):
@@ -205,9 +227,9 @@ class PAL(HelaoDriver):
         # shim the adapter wraps, behavior is unchanged 1:1.
         self.sample_state: SampleStatePort = SampleShimAdapter(self.archive)
 
-        sshuser = self.config_dict.get("user", "")
-        sshkey = self.config_dict.get("key", "")
-        self.sshhost = self.config_dict.get("host", None)
+        sshuser = _env_param(self.config_dict, "user", "")
+        sshkey = _env_param(self.config_dict, "key", "")
+        self.sshhost = _env_param(self.config_dict, "host", None)
         self.cam_file_path = self.config_dict.get("cam_file_path", "")
         self.timeout = self.config_dict.get("timeout", 30 * 60)
 

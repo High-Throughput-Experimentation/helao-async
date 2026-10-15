@@ -200,9 +200,11 @@ servers:
     fast: pal_server
     regular_update: true
     params:
-      user: RSHS
-      key: c:\helao\sshkeys\adss_private_newff.pem
-      host: 10.231.100.128
+      # SSH identifiers come from env vars; set per station with
+      #   conda env config vars set HELAO_PAL_SSH_USER=... HELAO_PAL_SSH_KEY=... HELAO_PAL_SSH_HOST=... -n helao
+      user_env: HELAO_PAL_SSH_USER
+      key_env: HELAO_PAL_SSH_KEY
+      host_env: HELAO_PAL_SSH_HOST
       timeout: 1800
       dev_trigger: NImax
       trigger:

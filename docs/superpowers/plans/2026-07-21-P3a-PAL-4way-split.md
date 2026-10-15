@@ -29,7 +29,7 @@ composes `TransformXY` + `JsonFileCalibrationStore`).
 - **5. PalTriggerPort + NidaqmxPalTrigger** (Linux construct/import; NI runtime at station).
 - **6. Engine thin-out + final parity sweep** (Linux).
 
-Linux-completable: 0-3, 6. Station-gated runtime only: 4-5 (SSH `10.231.100.128` + NI DIO), Linux portion = construct-disconnected + import-sweep.
+Linux-completable: 0-3, 6. Station-gated runtime only: 4-5 (SSH `<PAL host>` + NI DIO), Linux portion = construct-disconnected + import-sweep.
 
 ## Verification (every slice)
 Import-sweep (pal_driver + both pal_server + hexagon subtrees, incl. lazy paramiko/nidaqmx) · pyright (authoritative) on changed files · **openapi/checklist diff EMPTY vs `pal_server.json`** · `run_unit_tests` PASS · black pre-commit. Slices 1-3 add domain/port unit tests with fakes. Slices 4-5 Linux-stop at construct+import-green; runtime parity via `pal_canary.bat` at station.
