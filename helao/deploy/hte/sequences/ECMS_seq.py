@@ -233,6 +233,7 @@ def ECMS_initiation_ECSA(
     WE_potential_apex1__V: float = -0.2,
     WE_potential_apex2__V: float = 0,
     WE_potential_final__V: float = 0,
+    WE_versus: str = "OCV",
     ScanRate_V_s_1: list[float] = [0.02, 0.05, 0.1],
     SampleRate: float = 0.1,
     Cycles: int = 1,
@@ -316,7 +317,7 @@ def ECMS_initiation_ECSA(
         epm.add(
             "ECMS_sub_CV",
             {
-                "WE_versus": "OCV",
+                "WE_versus": WE_versus,
                 "WE_potential_init__V": WE_potential_init__V,
                 "WE_potential_apex1__V": WE_potential_apex1__V,
                 "WE_potential_apex2__V": WE_potential_apex2__V,
