@@ -252,11 +252,7 @@ class Galil(HelaoDriver):
         LOGGER.info("IO Estop")
         if switch:
             for ao_name in self.dev_ao.keys():
-                await self.set_digital_out(
-                    on=False,
-                    value=0.0,
-                    ao_name=ao_name,
-                )
+                await self.set_analog_out(value=0.0, ao_name=ao_name)
             for do_name in self.dev_do.keys():
                 await self.set_digital_out(
                     on=False,
@@ -477,7 +473,7 @@ class Galil(HelaoDriver):
             else int(round(toggle_period * (1 - toggle_duty) * 1e3))
         )
         t_offset = (
-            [int((x * 1e3)) for x in toggle_init_delay]
+            [int(round(x * 1e3)) for x in toggle_init_delay]
             if isinstance(toggle_init_delay, list)
             else int(round(toggle_init_delay * 1e3))
         )
@@ -642,6 +638,7 @@ class Galil(HelaoDriver):
             self.digital_cycle_out = None
             self.digital_cycle_subthread = None
         if self.digital_cycle_out_gamry is not None:
+            self.galilcmd("HX2")  # Gamry companion thread (second subthread)
             cmd = f"CB {int(self.digital_cycle_out_gamry)}"
             _ = self.galilcmd(cmd)
             self.digital_cycle_out_gamry = None

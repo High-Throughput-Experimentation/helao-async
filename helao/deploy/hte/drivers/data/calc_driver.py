@@ -379,6 +379,7 @@ class Calc(HelaoDriver):
                         wllist.append(d["meta"]["optional"]["wl"])
                         actuuids.append(actd["action_uuid"])
                         bsnlist.append(d["raw"])
+                        epochlist.append(d["epoch"])
 
                 wlarr = np.array(wllist).mean(axis=0)
                 mini = np.where(wlarr > params["lower_wl"])[0].min()

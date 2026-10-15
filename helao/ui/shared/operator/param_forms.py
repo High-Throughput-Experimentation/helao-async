@@ -22,7 +22,6 @@ __all__ = [
 
 import builtins
 import inspect
-import json
 import re
 from enum import Enum
 from typing import Optional
@@ -142,24 +141,17 @@ def build_lib(
                 if argspec.annotations.get(arg) == filter_type
             ]
             for j, idx in enumerate(idxlist):
-                if len(tmpargs) == len(tmpdefs):
-                    tmpargs.pop(idx - j)
-                    tmpdefs.pop(idx - j)
-                    tmptypes.pop(idx - j)
-                else:
-                    tmpargs.pop(idx - j)
-                    tmptypes.pop(idx - j)
+                # Python defaults belong to the LAST len(tmpdefs) args.
+                pos = idx - j
+                off = len(tmpargs) - len(tmpdefs)
+                if pos >= off:
+                    tmpdefs.pop(pos - off)
+                tmpargs.pop(pos)
+                tmptypes.pop(pos)
 
         cfg_defs = world_cfg.get(config_key, {})
-        tmpdefs = [cfg_defs.get(ta, td) for ta, td in zip(tmpargs, tmpdefs)]
-        for t in tmpdefs:
-            try:
-                if isinstance(t, Enum):
-                    t = json.dumps(t.value)
-                else:
-                    t = json.dumps(t)
-            except Exception:
-                t = ""
+        off = len(tmpargs) - len(tmpdefs)
+        tmpdefs = [cfg_defs.get(ta, td) for ta, td in zip(tmpargs[off:], tmpdefs)]
         codehash = codehash_map.get(name)
         items.append(
             model_class(

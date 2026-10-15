@@ -292,3 +292,35 @@ async def test_power_supply_post_exec_output_off_before_disconnect(cls, off_rais
     res = await ex._post_exec()
     assert res == {"error": ErrorCodes.none}
     assert calls == [("output", False), "disconnect"]
+
+
+# power_supply_server: the .hlo header columns must be the keys _poll emits
+@pytest.mark.asyncio
+async def test_power_supply_hlo_columns_match_polled_keys():
+    funcs = {}
+    app = types.SimpleNamespace(
+        server=types.SimpleNamespace(server_name="PS"),
+        server_params={},
+        action=lambda: lambda f: funcs.setdefault(f.__name__, f),
+    )
+    await power_supply_server.power_supply_dyn_endpoints(app)
+
+    class _Stop(Exception):
+        pass
+
+    async def header_of(name):
+        seen = {}
+
+        class Ctx:
+            async def begin(self, **kw):
+                seen.update(kw)
+                raise _Stop
+
+        with pytest.raises(_Stop):
+            await funcs[name](Ctx())
+        assert seen["hloheader"].column_headings == seen["json_data_keys"]
+        return seen["json_data_keys"]
+
+    assert await header_of("constant_current_square_wave") == ["t_s", "voltage_v"]
+    assert await header_of("apply_voltage") == ["current_a"]
+    assert await header_of("square_wave") == ["current_a"]

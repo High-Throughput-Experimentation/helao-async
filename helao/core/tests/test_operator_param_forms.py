@@ -216,3 +216,25 @@ def test_a_malformed_campaign_uuid_is_hashed_rather_than_raising():
 
 def test_campaign_uuid_hashing_differs_by_campaign():
     assert pf.resolve_campaign_uuid("a", "") != pf.resolve_campaign_uuid("b", "")
+
+
+def test_build_lib_right_aligns_defaults_and_config_overrides():
+    """Python defaults belong to the trailing args, also after filtering."""
+
+    class Marker:
+        pass
+
+    def exp_b(required, injected: Marker, alpha: int = 1, beta: int = 2):
+        """d"""
+
+    items, _ = pf.build_lib(
+        _lib(exp_b=exp_b),
+        filter_type=Marker,
+        config_key="sequence_params",
+        world_cfg={"sequence_params": {"beta": 9}},
+        loaded_config_path="/cfg/right_align.yml",
+        model_class=_Item,
+        name_field="sequence_name",
+    )
+    assert items[0]["args"] == ("required", "alpha", "beta")
+    assert items[0]["defaults"] == (1, 9)

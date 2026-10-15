@@ -61,3 +61,32 @@ def test_calc_uvis_abs_trapezoid(monkeypatch):
     expected = -1 * np.log(2) * (sel[-1] - sel[0])
     got = np.asarray(datadict[f"abs_{lo}_{hi}"])
     assert np.allclose(got, expected, rtol=1e-6)
+
+
+def test_calc_uvis_abs_emits_data_epochs(monkeypatch):
+    calc = Calc(config={})
+    data = _entry("data", 0.5, "s1")
+    data["data"]["epoch_s"] = np.array([10.0, 11.0])
+    hlo = {
+        "a_dark.hlo": _entry("ref_dark", 0.0, "s1"),
+        "a_light.hlo": _entry("ref_light", 1.0, "s1"),
+        "a_data.hlo": data,
+    }
+    monkeypatch.setattr(calc, "gather_seq_data", lambda *a, **k: hlo)
+    params = dict(
+        skip_nspec=0,
+        lower_wl=400.0,
+        upper_wl=900.0,
+        bin_width=BIN,
+        window_length=5,
+        poly_order=2,
+        delta=1.0,
+        min_mthd_allowed=-1.0,
+        max_mthd_allowed=2.0,
+        min_limit=0.0,
+        max_limit=0.9,
+        ev_parts=EV_PARTS,
+    )
+    _, arraydict = calc.calc_uvis_abs("unused", params)
+    eps = [ad["epoch"] for ad in arraydict.values() if "epoch" in ad]
+    assert eps and all(e == [[10.0, 11.0]] for e in eps)

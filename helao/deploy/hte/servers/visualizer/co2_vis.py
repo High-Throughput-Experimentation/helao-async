@@ -192,6 +192,7 @@ class C_vis(LiveVisualizer):
             y="co2_ppm_mean",
             line_color=SERIES[1],
             legend_label="CO2 ppm rolling mean",
+            source=self.datasource,
         )
         self.plot.legend.border_line_alpha = 0.2
         self.plot.legend.background_fill_alpha = 0.2
