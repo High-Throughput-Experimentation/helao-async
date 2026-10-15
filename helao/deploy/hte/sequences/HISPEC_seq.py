@@ -12,7 +12,7 @@ from helao.helpers.lib_decorators import sequence
 from helao.helpers.premodels import ExperimentPlanMaker
 
 
-@sequence(version=1)
+@sequence(version=2)
 def HISPEC_CV(
     plate_id: int = 1,  # @Dan - what is this? -- plate_id is the ID of the material library in our database. it's first assigned to a substrate after which we can use this ID to track the library's deposition, annealing, and experiment history
     plate_sample_no_list: list = [
@@ -196,8 +196,8 @@ def HISPEC_CV(
                 "SweepMode": SweepMode,
                 "Repeats": Repeats,
                 "DelayFraction": DelayFraction,
-                "gamrychannelwait": gamrychannelwait,
-                "gamrychannelsend": gamrychannelsend,
+                "TTLwait": -1,  # EIS step keeps TTL off
+                "TTLsend": -1,
                 "IRange": IRange,
                 "ERange": ERange,
                 "Bandwidth": Bandwidth,
@@ -285,7 +285,7 @@ def HISPEC_CV(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=1)
+@sequence(version=2)
 def HISPEC_EIS_only(
     plate_id: int = 1,  # @Dan - what is this? -- plate_id is the ID of the material library in our database. it's first assigned to a substrate after which we can use this ID to track the library's deposition, annealing, and experiment history
     plate_sample_no_list: list = [
@@ -344,8 +344,8 @@ def HISPEC_EIS_only(
         SweepMode: PEIS sweep mode (e.g. ``"log"``).
         Repeats: PEIS repeats per frequency.
         DelayFraction: PEIS settling delay fraction.
-        gamrychannelwait: Gamry channel wait flag.
-        gamrychannelsend: Gamry channel send flag.
+        gamrychannelwait: Unused: the PEIS step runs with TTL off.
+        gamrychannelsend: Unused: the PEIS step runs with TTL off.
         IRange: Gamry current range string.
         ERange: Gamry voltage range string.
         Bandwidth: Gamry bandwidth selection string.
@@ -449,8 +449,8 @@ def HISPEC_EIS_only(
                 "SweepMode": SweepMode,
                 "Repeats": Repeats,
                 "DelayFraction": DelayFraction,
-                "gamrychannelwait": gamrychannelwait,
-                "gamrychannelsend": gamrychannelsend,
+                "TTLwait": -1,  # EIS step keeps TTL off
+                "TTLsend": -1,
                 "IRange": IRange,
                 "ERange": ERange,
                 "Bandwidth": Bandwidth,

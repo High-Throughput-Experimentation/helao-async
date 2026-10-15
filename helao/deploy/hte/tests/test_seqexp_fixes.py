@@ -153,3 +153,80 @@ def test_adss_cv_samplerate_not_scanrate(fn):
         if e.experiment_params["scanrate_voltsec"] == 0.31
     ]
     assert cvs and all(p["samplerate_sec"] == 0.017 for p in cvs)
+
+
+# ---- low round w2 ----
+
+
+def test_adss_cv_rhe_reference_has_no_ph_term():
+    from helao.deploy.hte.experiments import ADSS_exp
+
+    def vinit(ref_type, ph):
+        acts = ADSS_exp.ADSS_sub_CV(Vinit_vsRHE=0.5, ref_type=ref_type, ph=ph)
+        return _by(acts, name="run_CV")[0].action_params["Vinit__V"]
+
+    assert vinit("rhe", 1.0) == pytest.approx(0.5)
+    assert vinit("rhe", 13.0) == pytest.approx(0.5)
+    assert vinit("inhouse", 13.0) != pytest.approx(0.5)
+
+
+def test_ccsi_load_gas_uses_custom_load_without_volume():
+    acts = CCSI_exp.CCSI_sub_load_gas(reservoir_gas_sample_no=2, volume_ul_cell_gas=500)
+    assert not _by(acts, name="archive_custom_add_gas")
+    p = _by(acts, name="archive_custom_load")[0].action_params
+    assert "volume_ml" not in p and p["load_sample_in"]["sample_no"] == 2
+
+
+def test_ccsi_pressure_technique_name_spelling():
+    from helao.deploy.hte.experiments import CSIL_exp
+
+    for mod in (CCSI_exp, CSIL_exp):
+        src = inspect.getsource(mod)
+        assert "pressure_measurre" not in src and "pressure_measure" in src
+
+
+def test_clad_seq_reference_position_override_reaches_experiment():
+    seq = CLAD_seq.CLAD_seq(plate_sample_no_list=[1], reference_position="custom_ref")
+    ref = _exps(seq, "CLAD_sub_reference_setup")[0].experiment_params
+    assert ref["reference_position_name"] == "custom_ref"
+    assert "reference_position" not in ref
+
+
+def test_hispec_peis_ttl_explicitly_off():
+    from helao.deploy.hte.sequences import HISPEC_seq
+
+    for fn in (HISPEC_seq.HISPEC_CV, HISPEC_seq.HISPEC_EIS_only):
+        peis = _exps(fn(gamrychannelwait=2, gamrychannelsend=3), "HISPEC_sub_PEIS")
+        assert peis
+        for e in peis:
+            assert e.experiment_params["TTLwait"] == -1
+            assert e.experiment_params["TTLsend"] == -1
+
+
+def test_anec_create_and_load_liquid_sample_honours_tray():
+    sig = inspect.signature(ANEC_seq.ANEC_create_and_load_liquid_sample)
+    kw = {
+        k: v.default
+        for k, v in sig.parameters.items()
+        if v.default is not inspect.Parameter.empty
+    }
+    kw["tray"] = 5
+    exps = ANEC_seq.ANEC_create_and_load_liquid_sample(
+        **{k: v for k, v in kw.items() if k in sig.parameters}
+    )
+    assert exps and all(e.experiment_params["tray"] == 5 for e in exps)
+
+
+def test_ccsi_co2maintain_passes_waterfillwait_s():
+    from helao.deploy.hte.sequences import CCSI_seq
+
+    seq = CCSI_seq.CCSI_Solution_co2maintainconcentration(
+        secondliquid_injection_FillWait=77
+    )
+    fills = [
+        e.experiment_params
+        for e in _exps(seq, "CCSI_sub_cellfill")
+        if "WaterFillWait_s" in e.experiment_params
+        and e.experiment_params["WaterFillWait_s"] == 77
+    ]
+    assert fills

@@ -97,12 +97,6 @@ ALLOWED = {
     (
         "CCSI_seq.py",
         "CCSI_Solution_co2maintainconcentration",
-        "CCSI_sub_cellfill",
-        "WaterFillWait",
-    ),
-    (
-        "CCSI_seq.py",
-        "CCSI_Solution_co2maintainconcentration",
         "CCSI_sub_n2rinse",
         "WaterFillWait_s",
     ),
@@ -136,7 +130,6 @@ ALLOWED = {
         )
     },
     # Other undeclared keys (owner decides: add the param or drop the key).
-    ("CLAD_seq.py", "CLAD_seq", "CLAD_sub_reference_setup", "reference_position"),
     ("ECHE_seq.py", "ECHE_CV_CA_CV", "ECHE_sub_startup", "reservoir_electrolyte"),
     ("ECHE_seq.py", "ECHE_CVs_CAs", "ECHE_sub_startup", "reservoir_electrolyte"),
     (
@@ -162,7 +155,7 @@ ALLOWED = {
     *{
         ("HISPEC_seq.py", f, "HISPEC_sub_PEIS", k)
         for f in ("HISPEC_CV", "HISPEC_EIS_only")
-        for k in ("gamrychannelwait", "gamrychannelsend", "solution_ph", "ref_vs_nhe")
+        for k in ("solution_ph", "ref_vs_nhe")
     },
 }
 
