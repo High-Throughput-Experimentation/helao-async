@@ -22,7 +22,7 @@ SEQUENCES = [
     "ECMS_series_CA_change_gasflow",
     "ECMS_series_CA_recirculation",
     "ECMS_series_CA_recirculation_mixedreactant",
-    "ECMS_series_CA_recirculation_mixedgas_comp"
+    "ECMS_series_CA_recirculation_mixedgas_comp",
     "ECMS_series_CA_recirculation_mixedthreereactant",
     "ECMS_series_pulseCA",
     "ECMS_MS_calibration_second",
@@ -212,6 +212,7 @@ def ECMS_initiation_recirculation(
     )
     return epm.planned_experiments
 
+
 @sequence(version=2)
 def ECMS_initiation_ECSA(
     plate_id: int = 4534,
@@ -234,11 +235,11 @@ def ECMS_initiation_ECSA(
     WE_potential_final__V: float = 0,
     ScanRate_V_s_1: list[float] = [0.02, 0.05, 0.1],
     SampleRate: float = 0.1,
-    Cycles: int=1,
+    Cycles: int = 1,
     IErange: str = "auto",
     SamplingMode: str = "SamplingModeSurface",
     versus_OCV: bool = True,
-    OCV_duration__s: float = 10.0, 
+    OCV_duration__s: float = 10.0,
     OCV_acquisition_period__s: float = 0.1,
     MS_equilibrium_time: float = 0.0,
 ) -> list:
@@ -327,7 +328,7 @@ def ECMS_initiation_ECSA(
                 "MS_equilibrium_time": MS_equilibrium_time,
                 "SamplingMode": SamplingMode,
                 "versus_OCV": versus_OCV,
-                "OCV_duration__s": OCV_duration__s, 
+                "OCV_duration__s": OCV_duration__s,
                 "OCV_acquisition_period__s": OCV_acquisition_period__s,
             },
         )
@@ -337,6 +338,7 @@ def ECMS_initiation_ECSA(
         {"tube_clear_time": tube_clear_time, "liquid_drain_time": liquid_drain_time},
     )
     return epm.planned_experiments
+
 
 @sequence(version=2)
 def ECMS_initiation_recirculation_mixedreactant(
@@ -1823,6 +1825,7 @@ def ECMS_series_CA_recirculation_mixedreactant(
 
     return epm.planned_experiments
 
+
 @sequence(version=1)
 def ECMS_series_CA_recirculation_mixedgas_comp(
     plate_id: int = 4534,
@@ -1899,12 +1902,14 @@ def ECMS_series_CA_recirculation_mixedgas_comp(
     )
     # epm.add("ECMS_sub_prevacuum_cell",{"vacuum_time": vacuum_time})
 
-    for cycle, (CO2flow, Califlow) in enumerate(zip(CO2flowrate_sccm, Califlowrate_sccm)):
+    for cycle, (CO2flow, Califlow) in enumerate(
+        zip(CO2flowrate_sccm, Califlowrate_sccm)
+    ):
         print(
-            f" ... cycle {cycle} potential:",
-            potential,
-            f" ... cycle {cycle} duration:",
-            time,
+            f" ... cycle {cycle} CO2 flow (sccm):",
+            CO2flow,
+            f" ... cycle {cycle} cali flow (sccm):",
+            Califlow,
         )
         epm.add(
             "ECMS_sub_electrolyte_fill_recirculationreservoir",
@@ -1981,6 +1986,7 @@ def ECMS_series_CA_recirculation_mixedgas_comp(
         )
 
     return epm.planned_experiments
+
 
 @sequence(version=1)
 def ECMS_series_CA_recirculation_mixedthreereactant(
@@ -2460,7 +2466,8 @@ def ECMS_MS_calibration_recirculation(
 #     return epm.planned_experiments
 # =============================================================================
 
-#used for when calibration gas is connected to first MFC_Caligas"
+
+# used for when calibration gas is connected to first MFC_Caligas"
 @sequence(version=1)
 def ECMS_MS_calibration(
     reservoir_liquid_sample_no: int = 2,
@@ -2545,7 +2552,7 @@ def ECMS_MS_calibration(
     return epm.planned_experiments
 
 
-#used for when calibration gas is connected to second MFC_Caligassecond"
+# used for when calibration gas is connected to second MFC_Caligassecond"
 @sequence(version=1)
 def ECMS_MS_calibration_second(
     reservoir_liquid_sample_no: int = 2,
@@ -2628,6 +2635,8 @@ def ECMS_MS_calibration_second(
     epm.add("ECMS_sub_drain", {"liquid_drain_time": liquid_drain_time})
 
     return epm.planned_experiments
+
+
 @sequence(version=1)
 def ECMS_MS_pulsecalibration(
     reservoir_liquid_sample_no: int = 2,
@@ -2875,6 +2884,7 @@ def ECMS_series_CA_change_gasflow(
 
     return epm.planned_experiments
 
+
 @sequence(version=1)
 def ECMS_transition_clean(
     plate_id: int = 4534,
@@ -2939,7 +2949,10 @@ def ECMS_transition_clean(
     )
     epm.add(
         "ECMS_sub_drain_recirculation",
-        {"tube_clear_time": tube_clear_time, "liquid_drain_time": liquid_drain_time_init},
+        {
+            "tube_clear_time": tube_clear_time,
+            "liquid_drain_time": liquid_drain_time_init,
+        },
     )
     # cleaning tubing
 
@@ -2966,6 +2979,9 @@ def ECMS_transition_clean(
         )
         epm.add(
             "ECMS_sub_drain_recirculation",
-            {"tube_clear_time": tube_clear_time, "liquid_drain_time": liquid_drain_time},
+            {
+                "tube_clear_time": tube_clear_time,
+                "liquid_drain_time": liquid_drain_time,
+            },
         )
     return epm.planned_experiments
