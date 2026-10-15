@@ -52,7 +52,17 @@ class EndpointManager:
 
     def dyn_endpoints_init(self) -> None:
         """Register endpoint status, invoking the ``dyn_endpoints`` callback first."""
-        asyncio.gather(self.init_endpoint_status(self.host._dyn_endpoints))
+        # Hold the task: the loop keeps only a weak reference, so a bare
+        # gather() can be collected mid-run and its exception is never seen.
+        self._init_task = asyncio.ensure_future(
+            self.init_endpoint_status(self.host._dyn_endpoints)
+        )
+        self._init_task.add_done_callback(self._log_init_failure)
+
+    @staticmethod
+    def _log_init_failure(task: "asyncio.Future") -> None:
+        if not task.cancelled() and task.exception() is not None:
+            LOGGER.error("endpoint status init failed", exc_info=task.exception())
 
     def endpoint_queues_init(self) -> None:
         """Create a per-endpoint action queue for every action route."""

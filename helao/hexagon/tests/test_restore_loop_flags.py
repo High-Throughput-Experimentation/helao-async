@@ -166,6 +166,7 @@ def test_restore_resets_loop_flags_keeps_progress(tmp_path):
         assert gsm.loop_intent == LoopIntent.none
         assert dst.active_sequence is not None and src.active_sequence is not None
         assert dst.active_sequence.sequence_uuid == src.active_sequence.sequence_uuid
+        assert dst.seq_model.sequence_uuid == dst.active_sequence.sequence_uuid
         assert dst.active_experiment is not None and src.active_experiment is not None
         assert (
             dst.active_experiment.experiment_uuid

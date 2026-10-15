@@ -240,3 +240,26 @@ def test_estop_wakes_the_interrupt_queue():
 
     src = inspect.getsource(OrchHost.estop_loop)
     assert "interrupt_q.put" in src, "estop_loop must wake the interrupt queue"
+
+
+def test_experiment_routes_reject_when_no_sequence_is_active():
+    from fastapi.testclient import TestClient
+
+    host = _host()
+    assert host.seq_model is None
+    client = TestClient(host)
+    for path in ("/append_experiment", "/prepend_experiment", "/insert_experiment"):
+        r = client.post(path, json={"experiment": {}})
+        assert r.status_code == 409, (path, r.status_code)
+
+
+def test_experiment_routes_reject_a_stale_seq_model():
+    from types import SimpleNamespace
+
+    from fastapi.testclient import TestClient
+
+    host = _host()
+    host.active_sequence = SimpleNamespace(sequence_uuid="new")
+    host.seq_model = SimpleNamespace(sequence_uuid="old")  # not yet replaced
+    r = TestClient(host).post("/append_experiment", json={"experiment": {}})
+    assert r.status_code == 409

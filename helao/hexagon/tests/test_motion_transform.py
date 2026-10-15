@@ -97,3 +97,12 @@ def test_get_mplate_msystem_recovers_plate_from_global():
 
     assert result.shape == (3, 3)
     assert np.allclose(result, np.identity(3))
+
+
+def test_singular_minstr_leaves_system_inverse_intact():
+    t = TransformXY(np.matrix(np.identity(4)), None)
+    t.Minstr = np.matrix(np.zeros((4, 4)))
+
+    assert t.get_Mplate_Msystem(np.identity(3)) is None
+    assert t.Minv.shape == (4, 4)
+    assert t.transform_motorxy_to_platexy([1.0, 2.0]) is not None

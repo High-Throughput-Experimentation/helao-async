@@ -16,9 +16,11 @@ Usage::
 """
 
 import copy
+import gzip
 import logging
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import time
@@ -124,7 +126,14 @@ class GZipRotator:
     def __call__(self, source, dest):
         """Move ``source`` to ``dest`` then spawn ``gzip`` to compress it."""
         os.rename(source, dest)
-        subprocess.Popen(["gzip", dest])
+        try:
+            subprocess.Popen(["gzip", dest])
+        except FileNotFoundError:
+            # No gzip on PATH (e.g. Windows): leaving the plain ``dest`` would
+            # make the stdlib handler skip every later rollover.
+            with open(dest, "rb") as fin, gzip.open(dest + ".gz", "wb") as fout:
+                shutil.copyfileobj(fin, fout)
+            os.remove(dest)
 
 
 class TitledSMTPHandler(SMTPHandler):

@@ -23,6 +23,7 @@ from helao.core.drivers.data.loaders.model_base import (
     HloPayload,
 )
 from helao.core.models.credentials import HelaoCredentials
+from helao.helpers import helao_logging as logging
 
 #: The SQL metadata backend is being retired and no deployment queries it.
 _SQL_DEPRECATED = (
@@ -263,6 +264,11 @@ class HelaoProcess(HelaoDataModel):
         self.process_params = self.params
 
 
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+DEFAULT_READ_BUCKET = "helao.data"
+
+
 class HelaoLoader:
     """Cached access layer over the HELAO S3 bucket and metadata SQL database.
 
@@ -354,6 +360,21 @@ class HelaoLoader:
         self.s3_cache = {}  # {s3_path: hlo_dict}
         self.sql_cache = {}  # {(uuid, type): json_dict}
 
+    _warned_empty_bucket = False
+
+    @property
+    def read_bucket(self) -> str:
+        """Credential bucket for reads; ``helao.data`` (warned once) when it is empty."""
+        if self.s3_bucket:
+            return self.s3_bucket
+        if not HelaoLoader._warned_empty_bucket:
+            HelaoLoader._warned_empty_bucket = True
+            LOGGER.warning(
+                f"AWS_BUCKET is empty in the credentials; reading from "
+                f"'{DEFAULT_READ_BUCKET}'. Set AWS_BUCKET to silence this."
+            )
+        return DEFAULT_READ_BUCKET
+
     def get_bytes(self, s3_bucket: str, s3_key: str) -> io.BytesIO:
         """Fetch ``s3://s3_bucket/s3_key`` and return its body as a ``BytesIO``."""
         obj = self.res.Object(bucket_name=s3_bucket, key=s3_key)
@@ -362,12 +383,12 @@ class HelaoLoader:
 
     def read_artifact_bytes(self, artifact: HelaoArtifact) -> io.BytesIO:
         """Fetch a :class:`HelaoArtifact`'s body from S3 (locator is the S3 key)."""
-        return self.get_bytes(s3_bucket="helao.data", s3_key=artifact.locator)
+        return self.get_bytes(s3_bucket=self.read_bucket, s3_key=artifact.locator)
 
     def get_json(self, helao_type: str, uuid: UUID) -> dict:
-        """Fetch and decode ``s3://helao.data/<helao_type>/<uuid>.json``."""
+        """Fetch and decode ``s3://<s3_bucket>/<helao_type>/<uuid>.json``."""
         obytes = self.get_bytes(
-            s3_bucket="helao.data", s3_key=f"{helao_type}/{str(uuid)}.json"
+            s3_bucket=self.read_bucket, s3_key=f"{helao_type}/{str(uuid)}.json"
         )
         md = json.load(obytes)
         return md
@@ -453,7 +474,7 @@ class HelaoLoader:
             return HloPayload()
         if keystr in self.s3_cache:
             return self.s3_cache[keystr]
-        obj = self.res.Object(bucket_name="helao.data", key=keystr)
+        obj = self.res.Object(bucket_name=self.read_bucket, key=keystr)
         obytes = io.BytesIO(obj.get()["Body"].read())
         raw = json.load(obytes)
         jd = HloPayload(raw.get("meta"), raw.get("data"))

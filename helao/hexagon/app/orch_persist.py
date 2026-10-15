@@ -390,6 +390,9 @@ class QueuePersister:
                 orch.active_experiment = queue_dict["active_exp"]
                 orch.last_experiment = queue_dict["last_exp"]
                 orch.active_sequence = queue_dict["active_seq"]
+                orch.seq_model = (
+                    orch.active_sequence.get_seq() if orch.active_sequence else None
+                )
                 orch.last_sequence = queue_dict["last_seq"]
                 orch.active_seq_exp_counter = queue_dict["active_counter"]
                 orch.last_action_uuid = queue_dict["last_act"]

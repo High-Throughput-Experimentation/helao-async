@@ -25,6 +25,8 @@ import time
 from typing import TYPE_CHECKING, Optional, Union
 from uuid import UUID
 
+from fastapi import HTTPException
+
 from helao.core.drivers.data.sync_driver import HelaoSyncer
 from helao.core.hooks.config import prefinish_config
 from helao.core.hooks.loader import load_hook_set
@@ -180,6 +182,7 @@ class OrchHost(ActionHost):
         self.active_experiment: Optional[Experiment] = None
         self.last_experiment: Optional[Experiment] = None
         self.active_sequence: Optional[Sequence] = None
+        self.seq_model = None  # set by dispatch when a sequence activates
         self.active_seq_exp_counter = 0
         self.last_sequence: Optional[Sequence] = None
         self.active_run_id: Optional[UUID] = None
@@ -298,6 +301,16 @@ class OrchHost(ActionHost):
     # a caller paging the queue must add its own offset before calling --
     # dropping it deletes the wrong queued item with nothing on screen
     # looking wrong.
+
+    def _require_active_sequence(self) -> None:
+        """409 unless a sequence is active: ``seq_model`` goes stale once it ends."""
+        if (
+            self.active_sequence is None
+            or self.seq_model is None
+            # dispatch assigns active_sequence before it replaces seq_model
+            or self.seq_model.sequence_uuid != self.active_sequence.sequence_uuid
+        ):
+            raise HTTPException(409, "No active sequence to attach the experiment to.")
 
     def _prep_sequence_meta(self, sequence: Sequence) -> None:
         """Populate a sequence's metadata before it joins the queue."""
@@ -537,11 +550,13 @@ class OrchHost(ActionHost):
         @self.post("/append_experiment", tags=["private"])
         async def append_experiment(experiment: Experiment = Body({}, embed=True)):
             """Queue an experiment under the active sequence."""
+            self._require_active_sequence()
             return await self.add_experiment(self.seq_model, experiment.get_exp())
 
         @self.post("/prepend_experiment", tags=["private"])
         async def prepend_experiment(experiment: Experiment = Body({}, embed=True)):
             """Put an experiment at the front of the queue."""
+            self._require_active_sequence()
             return await self.add_experiment(
                 self.seq_model, experiment.get_exp(), prepend=True
             )
@@ -551,6 +566,7 @@ class OrchHost(ActionHost):
             experiment: Experiment = Body({}, embed=True), idx: int = 0
         ):
             """Insert an experiment at an ABSOLUTE queue index."""
+            self._require_active_sequence()
             return await self.add_experiment(
                 self.seq_model, experiment.get_exp(), at_index=idx
             )
@@ -784,7 +800,9 @@ class OrchHost(ActionHost):
                 check = param < thresh
             elif cond == checkcond.isnot:
                 check = param != thresh
-            if check:
+            if check and self.seq_model is None:
+                LOGGER.warning("conditional_exp: no active sequence; not adding.")
+            elif check:
                 await self.add_experiment(
                     seq=self.seq_model,
                     experimentmodel=experiment_model,

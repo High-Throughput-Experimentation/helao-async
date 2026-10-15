@@ -92,6 +92,7 @@ def test_remote_hlo_is_a_payload():
     body = json.dumps({"meta": {"probe": 1}, "data": {"v": [1.0]}}).encode()
     obj = SimpleNamespace(get=lambda: {"Body": io.BytesIO(body)})
     hl = object.__new__(helao_loader.HelaoLoader)
+    hl.s3_bucket = "b"
     hl.s3_cache, hl.cache_s3 = {}, False
     hl.res = SimpleNamespace(Object=lambda **_: obj)
     payload = hl.get_hlo("u", "d.hlo")
@@ -218,3 +219,39 @@ def test_failed_uuid_map_build_is_retried(tmp_path):
         assert not isinstance(err.value, KeyError)
     act_yml.write_text(good, encoding="utf-8")
     assert loader.get_act(ACT_UUID).action_uuid == ACT_UUID
+
+
+def test_remote_reads_use_the_credential_bucket():
+    buckets = []
+    obj = SimpleNamespace(get=lambda: {"Body": io.BytesIO(b"{}")})
+    hl = object.__new__(helao_loader.HelaoLoader)
+    hl.s3_bucket = "other.bucket"
+    hl.s3_cache, hl.cache_s3 = {}, False
+    hl.res = SimpleNamespace(
+        Object=lambda **kw: buckets.append(kw["bucket_name"]) or obj
+    )
+    hl.get_hlo("u", "d.hlo")
+    hl.get_json("action", "u")
+    hl.read_artifact_bytes(SimpleNamespace(locator="k"))
+    assert buckets == ["other.bucket"] * 3
+
+
+def test_empty_credential_bucket_falls_back_to_helao_data_and_warns_once(caplog):
+    buckets = []
+    obj = SimpleNamespace(get=lambda: {"Body": io.BytesIO(b"{}")})
+    hl = object.__new__(helao_loader.HelaoLoader)
+    hl.s3_bucket = ""
+    hl.s3_cache, hl.cache_s3 = {}, False
+    hl.res = SimpleNamespace(
+        Object=lambda **kw: buckets.append(kw["bucket_name"]) or obj
+    )
+    helao_loader.HelaoLoader._warned_empty_bucket = False
+    helper = helao_loader.LOGGER
+    helper.addHandler(caplog.handler)
+    try:
+        hl.get_json("action", "u")
+        hl.get_json("action", "u")
+    finally:
+        helper.removeHandler(caplog.handler)
+    assert buckets == ["helao.data"] * 2
+    assert caplog.text.count("AWS_BUCKET is empty") == 1
