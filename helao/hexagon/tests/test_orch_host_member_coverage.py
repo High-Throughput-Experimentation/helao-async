@@ -135,11 +135,11 @@ DELIBERATELY_ABSENT: Final[frozenset[str]] = frozenset(
         "myinit",
         # Assigned by the DISPATCH RUNNER at runtime (orch_dispatch.py:1170),
         # not by construction, on legacy Orch exactly as on OrchHost. A
-        # static scan cannot see them on either, so tracking them as
-        # outstanding work would keep this list permanently non-empty for
-        # something that is already correct.
+        # static scan cannot see it on either, so tracking it as outstanding
+        # work would keep this list permanently non-empty for something that
+        # is already correct. (``seq_model`` is initialised to None at
+        # construction and so is no longer listed.)
         "exp_model",
-        "seq_model",
     }
 )
 

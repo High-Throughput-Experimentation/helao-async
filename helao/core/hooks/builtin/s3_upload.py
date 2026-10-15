@@ -149,7 +149,7 @@ class Hook(FinishHook):
                                     f"Failed to convert hlo file {fp} to parquet, skipping upload.",
                                     exc_info=True,
                                 )
-                                msg = None
+                                continue
                     else:
                         # ``sp`` is already the record-relative POSIX form, which
                         # is exactly what the S3 key wants. This used to recompute

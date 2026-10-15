@@ -1154,21 +1154,17 @@ def validateConfig(PIDD, confDict, helao_repo_root):
 
     The function performs the following checks:
     1. Ensures the 'servers' key is present in the configuration dictionary.
-    2. Ensures all server keys are unique.
-    3. Validates each server configuration:
+    2. Validates each server configuration:
         - Checks for the presence of required keys.
         - Ensures 'host' is a string.
         - Ensures 'port' is an integer.
         - Ensures 'group' is a string.
         - Validates code keys, ensuring only one is present and it is a string.
         - Checks if the server code file exists in the specified path.
-    4. Ensures all server host:port combinations are unique.
+    3. Ensures all server host:port combinations are unique.
 
     If any of these checks fail, an appropriate error message is printed and the function returns False.
     """
-    if len(confDict["servers"]) != len(set(confDict["servers"])):
-        _mux_log("info", "Server keys are not unique.")
-        return False
     if "servers" not in confDict:
         _mux_log("info", "'servers' key not defined in config dictionary.")
         return False
@@ -1179,7 +1175,7 @@ def validateConfig(PIDD, confDict, helao_repo_root):
         if not all(hasKeys):
             _mux_log(
                 "info",
-                f"{server} config is missing {[k for k,b in zip(PIDD.reqKeys, hasKeys) if b]}.",
+                f"{server} config is missing {[k for k, b in zip(PIDD.reqKeys, hasKeys) if not b]}.",
             )
             return False
         if not isinstance(serverDict["host"], str):

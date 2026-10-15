@@ -347,8 +347,9 @@ async def upload_json(
             # sample. A station carries two independent AWS sources: SYNC takes
             # ``aws_bucket`` from the AWS_CONFIG_PATH ini, while this path takes
             # ``AWS_BUCKET`` from the HelaoCredentials env file, which defaults
-            # to "" when the key is absent. Reads never notice the difference,
-            # because the loader's fetch helpers name their bucket literally.
+            # to "" when the key is absent. The loader's reads use the same
+            # ``AWS_BUCKET`` but fall back to ``helao.data`` (with a one-time
+            # warning) when it is empty, so reads survive and only pushes fail.
             LOGGER.error(
                 f"Cannot push {target}: no S3 bucket is configured. Set "
                 "AWS_BUCKET in the credentials env file this process loads."

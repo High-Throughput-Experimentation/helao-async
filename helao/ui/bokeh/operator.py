@@ -1815,15 +1815,15 @@ class BokehOperator:
 
     def update_selector_layout(self, attr, old, new):
         """Switch the parameter panel to match the currently active selector tab."""
-        if new == 2:
+        if new == 2 and self.seqspec_select_list:
             self.seqspec_dropdown.value = self.seqspec_select_list[0]
             first_spec = self.seqspec_select_list[0]
             self.callback_seqspec_select("value", first_spec, first_spec)
-        if new == 1:
+        if new == 1 and self.experiment_select_list:
             self.experiment_dropdown.value = self.experiment_select_list[0]
             first_exp = self.experiment_select_list[0]
             self.callback_experiment_select("value", first_exp, first_exp)
-        if new == 0:
+        if new == 0 and self.sequence_select_list:
             self.sequence_dropdown.value = self.sequence_select_list[0]
             first_seq = self.sequence_select_list[0]
             self.callback_sequence_select("value", first_seq, first_seq)
@@ -2500,10 +2500,10 @@ class BokehOperator:
                         ".bk-input", MODIFIED_PARAM_TEXT, important=True
                     )
                     color_callback_js = CustomJS(
-                        args=dict(input=param_widget),
+                        args=dict(input=param_widget, def_val=def_val),
                         code=f"""
 cb_obj.stylesheets = [
-    cb_obj.value_input === '{def_val}' ? `{default_rule}` : `{modified_rule}`
+    cb_obj.value_input === def_val ? `{default_rule}` : `{modified_rule}`
 ]
 """,
                     )
@@ -2826,7 +2826,11 @@ cb_obj.stylesheets = [
 
         if input_plate_id is not None:
             # pmdata = json.loads(self.dataAPI.get_platemap_plateid(input_plate_id.value))
-            pmdata = self.dataAPI.get_platemap_plateid(int(input_plate_id.value))
+            try:
+                plate_id = int(input_plate_id.value)
+            except ValueError:
+                return [None]
+            pmdata = self.dataAPI.get_platemap_plateid(plate_id)
 
             xyarr = np.array((X, Y)).T
             pmxy = np.array([[col["x"], col["y"]] for col in pmdata])
@@ -2888,6 +2892,10 @@ cb_obj.stylesheets = [
             private_input = self.seq_private_input
             param_input = self.seq_param_input
 
+        elif sender in self.seqspec_param_input or sender in self.seqspec_private_input:
+            private_input = self.seqspec_private_input
+            param_input = self.seqspec_param_input
+
         return private_input, param_input
 
     def get_sample_infos(self, PMnum: Optional[list] = None, sender=None):
@@ -2912,12 +2920,16 @@ cb_obj.stylesheets = [
             and input_sample_no is not None
         ):
             # pmdata = json.loads(self.dataAPI.get_platemap_plateid(input_plate_id.value))
-            pmdata = self.dataAPI.get_platemap_plateid(int(input_plate_id.value))
+            try:
+                plate_id = int(input_plate_id.value)
+            except ValueError:
+                return False
+            pmdata = self.dataAPI.get_platemap_plateid(plate_id)
             buf = ""
             if PMnum is not None and pmdata:
                 if PMnum[0] is not None:  # need to check as this can also happen
                     LOGGER.info(f"selected sample_no: {PMnum[0]+1}")
-                    if PMnum[0] > len(pmdata) or PMnum[0] < 0:
+                    if PMnum[0] >= len(pmdata) or PMnum[0] < 0:
                         LOGGER.info("invalid sample no")
                         self.vis.doc.add_next_tick_callback(
                             partial(self.update_input_value, input_sample_no, "")
@@ -2933,7 +2945,7 @@ cb_obj.stylesheets = [
                         buf = "%s%s_%s " % (buf, fraclet, pmdata[PMnum[0]][fraclet])
                     if len(buf) == 0:
                         buf = "-"
-                    if input_sample_no != str(PMnum[0] + 1):
+                    if input_sample_no.value != str(PMnum[0] + 1):
                         self.vis.doc.add_next_tick_callback(
                             partial(
                                 self.update_input_value,

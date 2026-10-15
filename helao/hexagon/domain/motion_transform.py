@@ -365,8 +365,8 @@ class TransformXY:
         """Given a global system matrix `Mxy`, factor out `Minstr` to recover Mplate.
 
         Used during alignment to convert a fitted global transform into a
-        plate-only calibration. Falls back to a sentinel matrix when
-        `Minstr` is singular.
+        plate-only calibration. Returns ``None`` (and leaves ``Minv``
+        untouched) when `Minstr` is singular.
         """
         Mxy = np.asarray(Mxy)
         Mglobal = np.asmatrix(np.identity(4))
@@ -386,5 +386,5 @@ class TransformXY:
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             LOGGER.error(f"Instrument Matrix singular ", exc_info=True)
-            # use the -1 to signal inverse later --> platexy will then be [x,y,-1]
-            self.Minv = np.matrix([[0, 0, 0], [0, 0, 0], [0, 0, -1]])
+            # ``self.Minv`` is the 4x4 system inverse: leave it alone, or every
+            # later transform fails on a shape mismatch. Returns None.
