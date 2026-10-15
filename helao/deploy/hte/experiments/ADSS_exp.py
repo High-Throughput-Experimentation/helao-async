@@ -2673,7 +2673,7 @@ def ADSS_sub_keep_electrolyte(
 
 
 # need to move to clean spot first before beginning clean
-@experiment(version=4)
+@experiment(version=5)
 def ADSS_sub_clean_cell(
     Clean_volume_ul: float = 3000,
     Syringe_rate_ulsec: float = 300,
@@ -2688,7 +2688,7 @@ def ADSS_sub_clean_cell(
     """Run a clean-water flush + drain, with an optional manual water-cleaning pause.
 
     For ``Clean_volume_ul`` over 10000 uL the cycle is split into two
-    infuse/drain passes. When ``Watercleancycle`` is True a second
+    infuse/drain passes (6000 uL, then the remainder). When ``Watercleancycle`` is True a second
     manual-injection pause followed by another pump/drain cycle is appended.
     Optionally lifts Z to load at the end.
 
@@ -2740,7 +2740,10 @@ def ADSS_sub_clean_cell(
         "infuse",
         {
             "rate_uL_sec": Syringe_rate_ulsec,
-            "volume_uL": Clean_volume_ul,
+            # over 10000 uL the first 6000 uL went out in the pass above
+            "volume_uL": (
+                Clean_volume_ul - 6000 if Clean_volume_ul > 10000 else Clean_volume_ul
+            ),
         },
     )
     apm.add(ORCH_server, "wait", {"waittime": 10})

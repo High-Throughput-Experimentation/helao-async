@@ -91,7 +91,7 @@ def CLAD_sub_recirculate_alternating(
     return apm.planned_actions
 
 
-@experiment(version=1)
+@experiment(version=2)
 def CLAD_sub_load_sample(
     load_position: str = "cell1_we",
     clear_position: bool = True,
@@ -165,7 +165,7 @@ def CLAD_sub_load_sample(
             },
             start_condition=ActionStartCondition.wait_for_previous,
         )
-    if liquid_sample_no is not None and gas_volume_ml is not None:
+    if gas_sample_no is not None and gas_volume_ml is not None:
         apm.add(
             SAMPLE_server,
             "archive_custom_add_gas",
@@ -532,7 +532,7 @@ def CLAD_sub_OCV_bubble_check(
 
 
 # 3. SETUP SAMPLE
-@experiment(version=1)
+@experiment(version=2)
 def CLAD_sub_load_assembly(
     load_position: str = "cell1_we",
     solid_plate_id: int = 4534,

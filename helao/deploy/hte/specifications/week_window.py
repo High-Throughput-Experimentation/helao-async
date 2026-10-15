@@ -98,7 +98,7 @@ class WeekWindowSpecParser(BaseParser):
 
         Args:
             specfile: Path to the sequence zip file.
-            orch: Orchestrator providing sequence lib/codehash/codepath.
+            orch: Orchestrator or operator backend providing ``sequence_lib``.
             params: Optional overrides merged on top of the saved
                 sequence params.
             **kwargs: Ignored extra arguments.
@@ -113,8 +113,7 @@ class WeekWindowSpecParser(BaseParser):
         seqname = zyml["sequence_name"]
         seqfunc = orch.sequence_lib[seqname]
         newseq = constructor(seqfunc, loaded_params)
-        newseq.sequence_codehash = orch.sequence_codehash_lib[seqname]
-        newseq.sequence_codepath = orch.sequence_codepath_lib[seqname]
-        newseq.sequence_funcname = orch.sequence_codehash_lib[seqname].__name__
+        # codehash/codepath/funcname stay None: ``orch`` may be an operator
+        # backend (no per-sequence path/hash libs); enqueue fills them in.
         newseq.sequence_label = "synced-seq-params"
         return newseq

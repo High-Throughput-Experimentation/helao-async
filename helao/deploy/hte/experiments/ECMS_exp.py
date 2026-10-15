@@ -372,7 +372,7 @@ def ECMS_sub_electrolyte_fill_recirculationreservoir(
     return apm.planned_actions
 
 
-@experiment(version=1)
+@experiment(version=2)
 def ECMS_sub_electrolyte_fill_cell(
     # liquid_forward_time: float = 20,
     liquid_backward_time: float = 10,
@@ -384,7 +384,7 @@ def ECMS_sub_electrolyte_fill_cell(
     Args:
         liquid_backward_time: Reverse pump-on duration (s).
         reservoir_liquid_sample_no: Liquid sample number in the reservoir.
-        volume_ul_cell_liquid: Volume archived to the cell (mL forwarded to PAL).
+        volume_ul_cell_liquid: Volume archived to the cell (uL; converted to mL for PAL).
 
     Returns:
         List of planned actions for the orchestrator.
@@ -409,7 +409,7 @@ def ECMS_sub_electrolyte_fill_cell(
             "source_liquid_in": LiquidSample(
                 sample_no=reservoir_liquid_sample_no, machine_name=ORCH_HOST
             ).model_dump(),
-            "volume_ml": volume_ul_cell_liquid,
+            "volume_ml": volume_ul_cell_liquid / 1000,
             "combine_liquids": True,
             "dilute_liquids": True,
         },
@@ -459,7 +459,7 @@ def ECMS_sub_electrolyte_fill_cell(
 #     )
 #     return apm.planned_actions
 # =============================================================================
-@experiment(version=1)
+@experiment(version=2)
 def ECMS_sub_electrolyte_fill_cell_recirculation(
     liquid_backward_time: float = 80,
     reservoir_liquid_sample_no: int = 2,
@@ -495,7 +495,7 @@ def ECMS_sub_electrolyte_fill_cell_recirculation(
             "source_liquid_in": LiquidSample(
                 sample_no=reservoir_liquid_sample_no, machine_name=ORCH_HOST
             ).model_dump(),
-            "volume_ml": volume_ul_cell_liquid,
+            "volume_ml": volume_ul_cell_liquid / 1000,
             "combine_liquids": True,
             "dilute_liquids": True,
         },
@@ -793,7 +793,7 @@ def ECMS_sub_CA(
     return apm.planned_actions
 
 
-@experiment(version=2)
+@experiment(version=3)
 def ECMS_sub_pulseCA(
     Vinit__V: float = 0.0,
     Tinit__s: float = 0.5,
@@ -859,7 +859,7 @@ def ECMS_sub_pulseCA(
             "run_OCV",
             {
                 "Tval__s": Tocv__s,
-                "SampleRate": 0.05,
+                "AcqInterval__s": 0.05,
                 "IErange": IErange,
             },
             to_global_params=["Ewe_V__mean_final"],
@@ -932,7 +932,7 @@ def ECMS_sub_CV(
     pH: float = 6.8,
     SamplingMode: str = "SamplingModeFast",
     versus_OCV: bool = False,
-    OCV_duration__s: float = 0.0, 
+    OCV_duration__s: float = 0.0,
     OCV_acquisition_period__s: float = 0.1,
     WE_potential_init__V: float = 0.0,
     WE_potential_apex1__V: float = -1.0,
@@ -978,7 +978,7 @@ def ECMS_sub_CV(
     elif WE_versus == "OCV":
         potential_init_vsRef = WE_potential_init__V
         potential_apex1_vsRef = WE_potential_apex1__V
-        potential_apex2_vsRef = WE_potential_apex2__V 
+        potential_apex2_vsRef = WE_potential_apex2__V
         potential_final_vsRef = WE_potential_final__V
     elif WE_versus == "rhe":
         potential_init_vsRef = (
@@ -1027,7 +1027,7 @@ def ECMS_sub_CV(
             "IErange": IErange,
             "SamplingMode": SamplingMode,
             "versus_OCV": versus_OCV,
-            "OCV_duration__s": OCV_duration__s, 
+            "OCV_duration__s": OCV_duration__s,
             "OCV_acquisition_period__s": OCV_acquisition_period__s,
         },
         from_global_act_params={"_fast_samples_in": "fast_samples_in"},
@@ -1105,7 +1105,7 @@ def ECMS_sub_drain_recirculation(
 #     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
 #     return apm.planned_actions
 # =============================================================================
-@experiment(version=1)
+@experiment(version=2)
 def ECMS_sub_clean_cell_recirculation(
     cleaning_times: int = 2,
     liquid_fill_time: float = 30,
@@ -1200,7 +1200,7 @@ def ECMS_sub_drain(
     return apm.planned_actions
 
 
-@experiment(version=1)
+@experiment(version=2)
 def ECMS_sub_final_clean_cell(
     liquid_backward_time_1: float = 300,
     liquid_backward_time_2: float = 300,
@@ -1244,14 +1244,15 @@ def ECMS_sub_final_clean_cell(
             "source_liquid_in": LiquidSample(
                 sample_no=reservoir_liquid_sample_no, machine_name=ORCH_HOST
             ).model_dump(),
-            "volume_ml": volume_ul_cell_liquid,
+            "volume_ml": volume_ul_cell_liquid / 1000,
             "combine_liquids": True,
             "dilute_liquids": True,
         },
     )
     return apm.planned_actions
 
-#used for when calibration gas is connected to first MFC_caligas"
+
+# used for when calibration gas is connected to first MFC_caligas"
 @experiment(version=1)
 def ECMS_sub_cali(
     CO2flowrate_sccm: float = 20.0,
@@ -1313,8 +1314,8 @@ def ECMS_sub_cali(
     return apm.planned_actions
 
 
-#used for when calibration gas is connected to second MFC_Caligassecond"
-@experiment(version=1)
+# used for when calibration gas is connected to second MFC_Caligassecond"
+@experiment(version=2)
 def ECMS_sub_cali_second(
     CO2flowrate_sccm: float = 20.0,
     Califlowrate_sccm: float = 0.0,
@@ -1355,7 +1356,7 @@ def ECMS_sub_cali_second(
     # set Calibration gas flow rate
     apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 1})
     apm.add(
-        CALIBRATIONMFC_server,
+        CALIBRATIONMFCSECOND_server,
         "set_flowrate",
         {
             "flowrate_sccm": Califlowrate_sccm,
@@ -1365,7 +1366,7 @@ def ECMS_sub_cali_second(
         asc.no_wait,
     )
     apm.add(
-        CALIBRATIONMFC_server,
+        CALIBRATIONMFCSECOND_server,
         "cancel_hold_valve_action",
         {"device_name": "Caligassecond"},
         asc.no_wait,
@@ -1373,6 +1374,7 @@ def ECMS_sub_cali_second(
     apm.add(ORCH_server, "wait", {"waittime": MSsignal_quilibrium_time})
 
     return apm.planned_actions
+
 
 @experiment(version=1)
 def ECMS_sub_threegascali(

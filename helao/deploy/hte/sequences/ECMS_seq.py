@@ -436,7 +436,7 @@ def ECMS_initiation_recirculation_mixedreactant(
     return epm.planned_experiments
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ECMS_repeat_CV(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -558,6 +558,7 @@ def ECMS_repeat_CV(
             {
                 "WE_versus": WE_versus,
                 "ref_type": ref_type,
+                "ref_offset__V": ref_offset,
                 "pH": pH,
                 "WE_potential_init__V": WE_potential_init__V,
                 "WE_potential_apex1__V": WE_potential_apex1__V,
@@ -576,6 +577,7 @@ def ECMS_repeat_CV(
             {
                 "WE_versus": WE_versus,
                 "ref_type": ref_type,
+                "ref_offset__V": ref_offset,
                 "pH": pH,
                 "WE_potential_init__V": WE_potential_init__V,
                 "WE_potential_apex1__V": WE_potential_apex1__V,
@@ -603,7 +605,7 @@ def ECMS_repeat_CV(
 
 
 # =============================================================================
-@sequence(version=2)
+@sequence(version=3)
 def ECMS_repeat_CV_recirculation(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -733,6 +735,7 @@ def ECMS_repeat_CV_recirculation(
             {
                 "WE_versus": WE_versus,
                 "ref_type": ref_type,
+                "ref_offset__V": ref_offset,
                 "pH": pH,
                 "WE_potential_init__V": WE_potential_init__V,
                 "WE_potential_apex1__V": WE_potential_apex1__V,
@@ -751,6 +754,7 @@ def ECMS_repeat_CV_recirculation(
             {
                 "WE_versus": WE_versus,
                 "ref_type": ref_type,
+                "ref_offset__V": ref_offset,
                 "pH": pH,
                 "WE_potential_init__V": WE_potential_init__V,
                 "WE_potential_apex1__V": WE_potential_apex1__V,
@@ -919,7 +923,7 @@ def ECMS_repeat_CV_recirculation(
 # =============================================================================
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ECMS_repeat_CV_recirculation_mixedreactant(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -1050,6 +1054,7 @@ def ECMS_repeat_CV_recirculation_mixedreactant(
             {
                 "WE_versus": WE_versus,
                 "ref_type": ref_type,
+                "ref_offset__V": ref_offset,
                 "pH": pH,
                 "WE_potential_init__V": WE_potential_init__V,
                 "WE_potential_apex1__V": WE_potential_apex1__V,
@@ -1068,6 +1073,7 @@ def ECMS_repeat_CV_recirculation_mixedreactant(
             {
                 "WE_versus": WE_versus,
                 "ref_type": ref_type,
+                "ref_offset__V": ref_offset,
                 "pH": pH,
                 "WE_potential_init__V": WE_potential_init__V,
                 "WE_potential_apex1__V": WE_potential_apex1__V,
@@ -1111,7 +1117,7 @@ def ECMS_repeat_CV_recirculation_mixedreactant(
     return epm.planned_experiments
 
 
-@sequence(version=3)
+@sequence(version=4)
 def ECMS_CV_recirculation_mixedreactant(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -1241,6 +1247,7 @@ def ECMS_CV_recirculation_mixedreactant(
             {
                 "WE_versus": WE_versus,
                 "ref_type": ref_type,
+                "ref_offset__V": ref_offset,
                 "pH": pH,
                 "WE_potential_init__V": WE_potential_init__V,
                 "WE_potential_apex1__V": WE_potential_apex1__V,

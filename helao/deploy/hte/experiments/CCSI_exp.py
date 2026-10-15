@@ -537,7 +537,7 @@ def CCSI_sub_drain(
     return apm.planned_actions
 
 
-@experiment(version=4)
+@experiment(version=5)
 def CCSI_sub_n2drain(
     n2flowrate_sccm: float = 10,
     HSpurge_duration: float = 240,
@@ -614,8 +614,7 @@ def CCSI_sub_n2drain(
         )
         apm.add(ORCH_server, "wait", {"waittime": recirculation_duration}, asc.no_wait)
         apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
-
-        apm.add(NI_server, "gasvalve", {"gasvalve": "11-n2supply", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "11-n2supply", "on": 0})
     # apm.add(
     #         DOSEPUMP_server,
     #         "run_continuous",
@@ -2805,7 +2804,7 @@ def CCSI_sub_n2flush(
     return apm.planned_actions
 
 
-@experiment(version=10)
+@experiment(version=11)
 def CCSI_sub_n2clean(
     # 9change to no recirc drains, add one, 10 remove rinses
     Clean_reservoir_sample_no: int = 1,
@@ -2936,7 +2935,7 @@ def CCSI_sub_n2clean(
     return apm.planned_actions
 
 
-@experiment(version=4)
+@experiment(version=5)
 def CCSI_sub_n2rinse(
     rinse_cycles: int = 3,
     secondary_prerinse_cycles: int = 1,
