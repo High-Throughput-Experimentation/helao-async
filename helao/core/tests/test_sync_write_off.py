@@ -470,10 +470,13 @@ async def test_reason_and_operator_are_one_line(tmp_path, mod, monkeypatch):
         await teardown_driver(drv)
 
 
+@pytest.mark.parametrize("runs", ["RUNS_FINISHED", "RUNS", "DIAG"])
 @pytest.mark.parametrize("mod", MODS)
 @pytest.mark.asyncio
-async def test_write_off_waits_for_the_experiment_lock(tmp_path, mod, monkeypatch):
-    drv, exp_yml, _ = await _parked(tmp_path, mod, monkeypatch, runs="RUNS_FINISHED")
+async def test_write_off_waits_for_the_experiment_lock(
+    tmp_path, mod, monkeypatch, runs
+):
+    drv, exp_yml, _ = await _parked(tmp_path, mod, monkeypatch, runs=runs)
     try:
         _hold_enqueue(drv)
         _, exp_key = drv._node_keys(exp_yml)
