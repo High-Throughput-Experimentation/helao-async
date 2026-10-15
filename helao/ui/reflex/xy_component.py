@@ -212,6 +212,16 @@ FRAME_BUDGET_BYTES = 32 * 1024 * 1024
 #: serve the frame the browser is asking for.
 FRAME_MIN_KEEP = 4
 
+#: Panels retained store-wide, least recently *used* (put or get) first out. A
+#: closed tab never fires ``on_unmount``, so nothing else would ever forget its
+#: panels' frames. An evicted panel loses its whole frame history, so a live one
+#: starts 404ing in-flight versions again and a static one (a plate map, which
+#: publishes only on a click) stays blank on remount: size this well above the
+#: panels live at once (tabs x charts). 256 costs nothing extra in practice:
+#: live frames are tens of KB, and only the few photo-underlay maps approach
+#: :data:`FRAME_BUDGET_BYTES` each.
+FRAME_MAX_PANELS = 256
+
 
 class BufferStore:
     """Process-wide ``panel_id -> recent (version, buffers)`` map behind the route.
@@ -229,6 +239,7 @@ class BufferStore:
         history: int = FRAME_HISTORY,
         budget_bytes: int = FRAME_BUDGET_BYTES,
         min_keep: int = FRAME_MIN_KEEP,
+        max_panels: int = FRAME_MAX_PANELS,
     ):
         """Create an empty store retaining at most ``history`` frames per panel,
         within ``budget_bytes``, and never fewer than ``min_keep``."""
@@ -236,13 +247,19 @@ class BufferStore:
         self._history = max(1, int(history))
         self._budget = int(budget_bytes)
         self._min_keep = max(1, int(min_keep))
+        self._max_panels = max(1, int(max_panels))
         self._frames: dict = {}
 
     def put(self, panel_id: str, version: int, buffers) -> None:
         """Store a frame for ``panel_id``, dropping the oldest beyond the window."""
         encoded = encode_buffers(buffers)
         with self._lock:
-            frames = self._frames.setdefault(panel_id, collections.deque())
+            frames = self._frames.pop(panel_id, None) or collections.deque()
+            self._frames[panel_id] = frames  # re-insert: dict order is recency
+            while len(self._frames) > self._max_panels:
+                evicted = next(iter(self._frames))
+                del self._frames[evicted]
+                LOGGER.debug(f"xy BufferStore evicted idle panel {evicted}")
             frames.append((int(version), encoded))
             while len(frames) > self._history:
                 frames.popleft()
@@ -256,7 +273,10 @@ class BufferStore:
         """Return the encoded frame, or ``None`` if unknown or evicted."""
         wanted = int(version)
         with self._lock:
-            frames = self._frames.get(panel_id)
+            frames = self._frames.pop(panel_id, None)
+            if frames is None:
+                return None
+            self._frames[panel_id] = frames  # a read is a use: bump recency
             if not frames:
                 return None
             for stored, payload in frames:

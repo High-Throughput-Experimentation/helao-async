@@ -215,7 +215,7 @@ class RemoteBackend(OrchBackend):
             raise ValueError("RemoteBackend: no group:orchestrator server in config")
         return orch_keys[0]
 
-    async def _call(self, endpoint, params_dict=None, json_dict=None):
+    async def _call(self, endpoint, params_dict=None, json_dict=None, strict=False):
         resp, err = await self._dispatch(
             self.orch_key,
             self.host,
@@ -226,6 +226,8 @@ class RemoteBackend(OrchBackend):
         )
         if err != ErrorCodes.none:
             LOGGER.warning(f"RemoteBackend {endpoint} failed: {err}")
+            if strict:
+                raise RuntimeError(f"{endpoint} failed: {err}")
             return None
         return resp
 
@@ -313,18 +315,23 @@ class RemoteBackend(OrchBackend):
 
     async def add_sequence(self, sequence):
         return await self._call(
-            "append_sequence", json_dict={"sequence": sequence.model_dump()}
+            "append_sequence",
+            json_dict={"sequence": sequence.model_dump()},
+            strict=True,
         )
 
     async def add_split_sequences(self, sequence):
         return await self._call(
-            "append_split_sequences", json_dict={"sequence": sequence.model_dump()}
+            "append_split_sequences",
+            json_dict={"sequence": sequence.model_dump()},
+            strict=True,
         )
 
     async def prepend_sequences(self, sequences):
         return await self._call(
             "prepend_sequences",
             json_dict={"sequences": [s.model_dump() for s in sequences]},
+            strict=True,
         )
 
     async def move_sequence(self, from_idx, to_idx):
