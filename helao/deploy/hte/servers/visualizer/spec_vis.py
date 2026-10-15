@@ -85,16 +85,10 @@ class C_vis(ActionVisualizer):
         self._ramp = red_ramp(self.max_spectra)
         self.latest_coloridx = 0
 
-        self.wl = private_dispatcher(
-            self.serv_key,
-            self.host,
-            self.port,
-            "get_wl",
-            params_dict={},
-            json_dict={},
-        )[0]
+        self.wl_attempts = 0
+        self.wl, self.ev = [], []
+        self._fetch_wl()
         LOGGER.info(self.wl)
-        self.ev = [1239.8 / x for x in self.wl]
 
         self.data_dict_keys = ["wl", "ev", "trans", "color", "time"]
         self.datasource = ColumnDataSource(
@@ -249,6 +243,29 @@ class C_vis(ActionVisualizer):
             partial(self.update_input_value, sender, f"{self.downsample}")
         )
 
+    def _fetch_wl(self):
+        """Fetch the wavelength axis; failures are logged and bounded (5 tries)."""
+        self.wl_attempts += 1
+        try:
+            self.wl = list(
+                private_dispatcher(
+                    self.serv_key,
+                    self.host,
+                    self.port,
+                    "get_wl",
+                    params_dict={},
+                    json_dict={},
+                )[0]
+            )
+        except Exception:
+            LOGGER.error(
+                f"could not fetch wavelengths from spec server "
+                f"(attempt {self.wl_attempts}/5)",
+                exc_info=True,
+            )
+            return
+        self.ev = [1239.8 / x for x in self.wl]
+
     def add_points(self, datapackage_list: list):
         """Append new spectra to the live source and roll older colours.
 
@@ -260,6 +277,8 @@ class C_vis(ActionVisualizer):
         Args:
             datapackage_list: List of data packages from the WebSocket.
         """
+        if not self.wl and self.wl_attempts < 5:
+            self._fetch_wl()  # startup fetch failed: retry on this update
         for data_package in datapackage_list:
             # only resets if axis selector or action_uuid changes
             self.reset_plot(str(data_package.action_uuid))

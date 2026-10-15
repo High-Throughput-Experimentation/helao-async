@@ -345,7 +345,6 @@ class GamryExec(Executor):
             return {"error": error, "status": status, "data": resp.data}
         except Exception:
             LOGGER.error("GamryExec poll error", exc_info=True)
-            print(data_dq)
             return {"error": ErrorCodes.critical_error, "status": HloStatus.errored}
 
     async def _post_exec(self) -> dict:

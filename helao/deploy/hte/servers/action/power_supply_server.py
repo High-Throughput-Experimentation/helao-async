@@ -16,6 +16,7 @@ The ``power_supply_dyn_endpoints`` hook registers ``apply_voltage``,
 __all__ = ["makeApp"]
 
 
+import asyncio
 import time
 
 from helao.core.error import ErrorCodes
@@ -35,6 +36,16 @@ global LOGGER
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 from enum import Enum
+
+
+def _output_off(driver) -> None:
+    """Switch the supply output off before disconnect; log and continue on failure."""
+    try:
+        resp = driver.set_output(output_on=False)
+        if resp.response != DriverResponseType.success:
+            LOGGER.error(f"output off before disconnect failed: {resp.response}")
+    except Exception:
+        LOGGER.error("output off before disconnect raised:", exc_info=True)
 
 
 class ConstantCurrentSquareWaveExecutor(Executor):
@@ -163,13 +174,13 @@ class ConstantCurrentSquareWaveExecutor(Executor):
             if self.poll_flag == self.PollFlag.ON:
                 LOGGER.warning("changing poll flag from ON to OFF_1")
                 resp = await self.driver.apply_current_async(current=0, sleep_time=0.1)
-                time.sleep(0.1)
+                await asyncio.sleep(0.1)
                 resp = self.driver.set_output(output_on=False)
                 if resp.response != DriverResponseType.success:
                     LOGGER.warning("failed to set current to 0")
 
                 self.poll_flag = self.PollFlag.OFF_1
-                time.sleep(0.1)
+                await asyncio.sleep(0.1)
                 if resp.response != DriverResponseType.success:
                     LOGGER.error(f"set output failed in poll:", exc_info=True)
                 LOGGER.info(
@@ -180,7 +191,7 @@ class ConstantCurrentSquareWaveExecutor(Executor):
             if self.poll_flag == self.PollFlag.OFF_0:
                 resp = self.driver.set_output(output_on=True)
                 LOGGER.warning(f"output set for ON time, response is {resp.response}")
-                time.sleep(0.1)
+                await asyncio.sleep(0.1)
                 if resp.response != DriverResponseType.success:
                     LOGGER.error(f"set output failed in poll:", exc_info=True)
                 resp = await self.driver.apply_current_async(
@@ -201,12 +212,13 @@ class ConstantCurrentSquareWaveExecutor(Executor):
         return {"data": resp.data, "status": HloStatus.active}
 
     async def _post_exec(self) -> dict:
-        """Disconnect from the supply on completion.
+        """Switch the output off, then disconnect from the supply on completion.
 
         Returns:
             Dict with ``error`` set to :attr:`ErrorCodes.none` on success or
             :attr:`ErrorCodes.critical_error` on disconnect failure.
         """
+        _output_off(self.driver)
         resp = self.driver.disconnect()
         if resp.response != DriverResponseType.success:
             return {"error": ErrorCodes.critical_error}
@@ -296,12 +308,13 @@ class ApplyVoltageExecutor(Executor):
         return {"error": ErrorCodes.none, "data": resp.data, "status": status}
 
     async def _post_exec(self) -> dict:
-        """Disconnect from the supply on completion.
+        """Switch the output off, then disconnect from the supply on completion.
 
         Returns:
             Dict with ``error`` set to :attr:`ErrorCodes.none` on success or
             :attr:`ErrorCodes.critical_error` on disconnect failure.
         """
+        _output_off(self.driver)
         resp = self.driver.disconnect()
         if resp.response != DriverResponseType.success:
             return {"error": ErrorCodes.critical_error}
@@ -375,13 +388,17 @@ class SquareWaveExecutor(Executor):
         sleep_time = self.action_params["sleep_time"]
         try:
             resp = self.driver.set_output(output_on=False)
-            time.sleep(sleep_time)
+            await asyncio.sleep(sleep_time)
             if resp.response != DriverResponseType.success:
                 LOGGER.error(
                     f"SquareWaveExecutor set_output(output_on=False) failed:",
                     exc_info=True,
                 )
                 return {"error": ErrorCodes.critical_error}
+            if not self.active.action_loop_running:
+                # E-STOP/stop landed during the off phase: never re-energize
+                LOGGER.warning("SquareWaveExecutor stopped; output left off")
+                return {"error": ErrorCodes.none}
             resp = self.driver.set_output(output_on=True)
             if resp.response != DriverResponseType.success:
                 LOGGER.error(
@@ -398,7 +415,7 @@ class SquareWaveExecutor(Executor):
                 )
                 return {"error": ErrorCodes.critical_error}
             resp = self.driver.set_output(output_on=False)
-            time.sleep(sleep_time)
+            await asyncio.sleep(sleep_time)
             if resp.response != DriverResponseType.success:
                 LOGGER.error(
                     f"SquareWaveExecutor set_output(output_on=False) failed:",
@@ -433,12 +450,13 @@ class SquareWaveExecutor(Executor):
             return {"error": ErrorCodes.critical_error}
 
     async def _post_exec(self) -> dict:
-        """Disconnect from the supply on completion.
+        """Switch the output off, then disconnect from the supply on completion.
 
         Returns:
             Dict with ``error`` set to :attr:`ErrorCodes.none` on success or
             :attr:`ErrorCodes.critical_error` on disconnect failure.
         """
+        _output_off(self.driver)
         resp = self.driver.disconnect()
         if resp.response != DriverResponseType.success:
             return {"error": ErrorCodes.critical_error}

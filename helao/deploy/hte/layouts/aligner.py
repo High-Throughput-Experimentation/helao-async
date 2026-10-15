@@ -973,7 +973,10 @@ class Aligner:
                 new_matrix = np.matrix(json.loads(filecontent))
             except Exception:
                 LOGGER.error("error loading matrix", exc_info=True)
-                new_matrix = self.motor.dflt_matrix
+                self.vis.doc.add_next_tick_callback(
+                    partial(self.update_status, "Error!\nCould not load matrix file")
+                )
+                return
 
             LOGGER.info(f"loaded matrix \n'{new_matrix}'")
             self.motor.update_plate_transfermatrix(newtransfermatrix=new_matrix)

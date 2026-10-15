@@ -401,6 +401,7 @@ def main():
     sync_cfg = world_cfg["servers"][sync_key]
     test_idx = 0
     resumed = False
+    resume_warned = False
     request_count = 0
 
     while True:
@@ -421,9 +422,19 @@ def main():
                 if matching_requests:
                     data_request = matching_requests[0]
                     resumed = True
+                elif not resume_warned:
+                    resume_warned = True
+                    print(
+                        f"{gen_ts()} WARNING: RESUME_ID {RESUME_ID} matches no "
+                        "acknowledged data request; continuing with pending requests"
+                    )
 
-            elif pending_requests or TEST:
-                if TEST:
+            if data_request or pending_requests or TEST:
+                if data_request:
+                    print(
+                        f"{gen_ts()} Restarting acknowledged data request from beginning"
+                    )
+                elif TEST:
                     test_req = CreateDataRequestModel(
                         composition={"Z": 1.0},
                         score=1.0,
@@ -438,11 +449,6 @@ def main():
                         f"{gen_ts()} Pending data request count: {len(pending_requests)}"
                     )
                     data_request = pending_requests[0]
-                elif acknowledged_requests:
-                    print(
-                        f"{gen_ts()} Restarting acknowledged data request from beginning"
-                    )
-                    data_request = acknowledged_requests[0]
 
                 sample_no = int(data_request.sample_label.split("_")[-1])
 
@@ -511,7 +517,15 @@ def main():
                 ):
                     # Acknowledge the data request
                     with CLIENT:
-                        output = CLIENT.acknowledge_data_request(data_request.id)
+                        try:
+                            output = CLIENT.acknowledge_data_request(data_request.id)
+                        except httpx.HTTPStatusError as e:
+                            # a resumed request is already acknowledged
+                            print(
+                                f"{gen_ts()} WARNING: acknowledge of data request "
+                                f"{data_request.id} failed ({e}); continuing"
+                            )
+                            output = data_request
                         expected = CLIENT.set_expected_number_of_analyses(
                             len(ECHEUVIS_multiCA_led_defaults["CA_potential_vsRHE"]),
                             data_request.id,
