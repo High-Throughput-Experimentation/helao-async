@@ -89,7 +89,7 @@ class C_vis(ActionVisualizer):
         super().__init__(vis_serv, serv_key, max_points=5000)
         if not self.connected:
             return
-        self.num_channels = self.config_dict.get("num_channels", 1)
+        self.num_channels = self.serv_config.get("params", {}).get("num_channels", 1)
 
         self.data_dict_keys = ["t_s", "Ewe_V", "I_A", "P_W", "R_ohm", "X_ohm"]
 
@@ -257,6 +257,12 @@ class C_vis(ActionVisualizer):
                     channels = uuid_dict.get("channel", [])
                     if channels:
                         pstat_channel = channels[0]
+                        if pstat_channel not in self.channel_datasources:
+                            LOGGER.warning(
+                                f"data for channel {pstat_channel} but only "
+                                f"{self.num_channels} channels configured"
+                            )
+                            continue
                         # only resets if axis selector or action_uuid changes
                         self.reset_plot(
                             channel=pstat_channel,

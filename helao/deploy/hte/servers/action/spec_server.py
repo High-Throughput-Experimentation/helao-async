@@ -302,6 +302,7 @@ async def sm303_dyn_endpoints(app: ActionHost):
         return finished_act.as_dict()
 
     @app.action()
+    @action_version(2)
     async def calibrate_intensity(
         ctx: ActionContext,
         int_time_ms: int = 35,
@@ -359,10 +360,11 @@ async def sm303_dyn_endpoints(app: ActionHost):
             and adjust_count < active.action.action_params["max_iters"]
             and not max_reached
         ):
-            if peak_int < active.action.action_params["target_peak_min"]:
-                current_int_time = int(current_int_time * target_avg / peak_int)
-            else:
-                current_int_time = int(current_int_time * peak_int / target_avg)
+            # a dark (<= 0) peak would divide by zero: scale as if it were 1 count;
+            # floor at 1 ms so a persistently saturated peak never reaches 0
+            current_int_time = max(
+                1, int(current_int_time * target_avg / max(peak_int, 1))
+            )
 
             if current_int_time > active.action.action_params["max_integration_time"]:
                 current_int_time = active.action.action_params["max_integration_time"]
