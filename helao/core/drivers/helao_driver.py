@@ -248,15 +248,31 @@ class DriverPoller:
         and are forwarded to ``_base_hook.put_lbuf`` when a hook is attached.
         """
         LOGGER.info("polling task has started")
+        failures = 0
         while True:
             if self.polling:
-                resp = self.get_data()
-                if resp.data:
-                    self.last_update = resp.timestamp
-                    self.live_dict.update(resp.data)
-                    self.live_dict["last_updated"] = self.last_update
-                    if self._base_hook is not None:
-                        await self._base_hook.put_lbuf(resp.data)
+                try:
+                    resp = self.get_data()
+                    if failures:
+                        LOGGER.info(f"get_data() recovered after {failures} failures")
+                        failures = 0
+                    if resp.data:
+                        self.last_update = resp.timestamp
+                        self.live_dict.update(resp.data)
+                        self.live_dict["last_updated"] = self.last_update
+                        if self._base_hook is not None:
+                            await self._base_hook.put_lbuf(resp.data)
+                except Exception as exc:
+                    # One bad read must not end polling for the server's life;
+                    # a persistent fault logs a traceback once, then a count.
+                    failures += 1
+                    if failures == 1:
+                        LOGGER.exception("get_data() raised; polling continues")
+                    elif failures % 100 == 0:
+                        LOGGER.error(
+                            f"get_data() still failing: {failures} consecutive "
+                            f"failures, last: {exc!r}"
+                        )
             await asyncio.sleep(self.wait_time)
 
     def get_data(self) -> DriverResponse:

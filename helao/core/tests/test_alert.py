@@ -54,8 +54,7 @@ def describe(email_config: dict) -> list[str]:
     """Lines describing which ALERT channels this config would enable.
 
     Credentials are redacted: this prints to a terminal, often into a scrollback
-    that outlives the session. (``make_logger`` itself is less careful -- when
-    alerts are NOT enabled it logs the whole config dict, password included.)
+    that outlives the session.
     """
     lines = []
     smtp = {k: email_config.get(k) for k in SMTP_KEYS}

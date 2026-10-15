@@ -241,7 +241,11 @@ class AliCatMFC(HelaoDriver):
         except Exception as e:
             LOGGER.info(f"Exception occured on get_status() {e}. Resetting MFC.")
             self.make_fc_instance(device_name, self.config_dict["devices"][device_name])
-            self.fcs[device_name]._set_control_point(self.fcs_last_mode[device_name], 5)
+            # No mode is known when the very first read failed; keep the
+            # device's own control point rather than KeyError.
+            last_mode = self.fcs_last_mode.get(device_name)
+            if last_mode is not None:
+                self.fcs[device_name]._set_control_point(last_mode, 5)
             LOGGER.info("MFC connection restored")
             return None
         if all(

@@ -198,3 +198,13 @@ async def test_head_requests_short_circuit():
     async with _client(host) as c:
         resp = await c.head("/SIM/acquire_data")
     assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_a_bodyless_estop_post_latches_instead_of_500():
+    """``/estop`` takes only a query param; the middleware used to json.loads(b'')."""
+    host = _host()
+    async with _client(host) as c:
+        resp = await c.post("/SIM/estop")
+    assert resp.status_code == 200
+    assert host.actionservermodel.estop is True
