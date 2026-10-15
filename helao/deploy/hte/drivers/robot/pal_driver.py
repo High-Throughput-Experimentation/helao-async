@@ -1369,9 +1369,9 @@ class PAL(HelaoDriver):
         elif start == False:
             start = "wait"
 
-        sampletype = params.get("sampletype", GCsampletype.none)
+        sampletype = GCsampletype(params.get("sampletype") or GCsampletype.none)
 
-        method = f"injection_tray_GC_{str(sampletype)}_{start}"
+        method = f"injection_tray_GC_{sampletype.value}_{start}"
 
         palcam = PalCam(
             samples_in=samples_in,
@@ -1411,16 +1411,16 @@ class PAL(HelaoDriver):
 
     def build_palcam_injection_custom_GC(self, params: dict, samples_in) -> PalCam:
         """Inject a custom-position sample into the GC, optionally starting the GC method."""
-        start = params.get("startGC", None)
+        start = params.get("startGC", "start")
 
         if start == True:
             start = "start"
         elif start == False:
             start = "wait"
 
-        sampletype = params.get("sampletype", GCsampletype.none)
+        sampletype = GCsampletype(params.get("sampletype") or GCsampletype.none)
 
-        method = f"injection_custom_GC_{str(sampletype.name)}_{start}"
+        method = f"injection_custom_GC_{sampletype.value}_{start}"
 
         palcam = PalCam(
             samples_in=samples_in,

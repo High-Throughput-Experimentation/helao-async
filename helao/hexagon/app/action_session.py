@@ -18,11 +18,7 @@ not exist.
 The session satisfies :class:`ActionSessionPort` structurally; the collaborators
 declare that dependency rather than reaching into whatever ``Active`` exposes.
 
-**Two members raise rather than delegate:** ``start_executor`` and
-``oneoff_executor`` need the ``ExecutorRunner``, which is B1 Task 6. They raise
-``NotImplementedError`` naming the task rather than returning ``None``, so a
-ported module that starts an executor fails at the call site instead of
-silently doing nothing and finishing an action that never ran.
+``start_executor`` and ``oneoff_executor`` delegate to ``ExecutorRunner``.
 """
 
 import asyncio

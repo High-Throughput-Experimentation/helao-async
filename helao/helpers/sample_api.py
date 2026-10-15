@@ -435,7 +435,7 @@ class SampleModelAPI:
                 if sample.sample_no < 0:  # get sample from back
                     self._cur.execute(f"select count(idx) from {self._sample_type};")
                     counts = self._cur.fetchone()[0]
-                    if counts > abs(sample.sample_no):
+                    if counts >= abs(sample.sample_no):
                         LOGGER.info(
                             f"getting sample: {self._sample_type} {counts+sample.sample_no+1}"
                         )

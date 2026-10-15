@@ -14,10 +14,9 @@ are ``self``: ``orch_api`` reaches ``self.orch.<member>`` at 60 sites and
 ``Orch`` inherits ``Base``, so inventing an indirection would buy nothing.
 
 Scope: construction, state, the queue/persistence/estop/lifecycle
-collaborators, and every route that does not run the loop. The dispatch
-loop, status ingestion and the monitors are B3b; their routes are
-registered here and raise, so a caller fails at the call site instead of
-receiving a 404 that reads like a missing server.
+collaborators, the loop-control and status-ingestion routes, and the
+orchestrator's own action endpoints (including interrupt and the
+conditional stop/skip routes).
 """
 
 import asyncio
@@ -689,11 +688,8 @@ class OrchHost(ActionHost):
         wins -- and a route-surface check would still pass, since the path
         is present either way.
 
-        Three of the nine are NOT completable in B3a and are registered as
-        raising stubs alongside the loop routes: ``interrupt`` calls
-        ``stop()``, and ``conditional_stop``/``conditional_skip`` call
-        ``stop()``/``skip()``. All three are B3b members. The plan put all
-        nine action routes in B3a; that was wrong, and this is the seam.
+        ``interrupt`` calls ``stop()``, and ``conditional_stop`` /
+        ``conditional_skip`` call ``stop()`` / ``skip()``; all are implemented.
         """
         from helao.hexagon.app.orch_wait import WaitExec, checkcond
         from helao.hexagon.app.action_context import ActionContext, action_version

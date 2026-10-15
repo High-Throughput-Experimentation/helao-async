@@ -258,7 +258,7 @@ def sort_plate_sample_no_list(
     return apm.planned_actions  # returns complete action list to orch
 
 
-@experiment(version=1)
+@experiment(version=2)
 def generate_sample_no_list(
     plate_id: int = 1,
     sample_code: int = 0,
@@ -271,9 +271,6 @@ def generate_sample_no_list(
     platemap_xys_operator: str = "",
 ):
     """Queue a PAL ``generate_plate_sample_no_list`` action for a plate.
-
-    Note:
-        This function currently does not return ``apm.planned_actions``.
 
     Args:
         plate_id: Plate id to enumerate.
@@ -302,6 +299,8 @@ def generate_sample_no_list(
             # "platemap_xys_operator":platemap_xys_operator,
         },
     )
+
+    return apm.planned_actions  # returns complete action list to orch
 
 
 @experiment(version=1)

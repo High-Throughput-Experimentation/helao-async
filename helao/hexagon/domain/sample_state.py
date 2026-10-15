@@ -1,7 +1,7 @@
 """The sample-state collaborator contract, as the domain requires it.
 
 This Protocol lives in `domain/` rather than `ports/` because it is a DRIVEN
-(required) contract: `pal_reconciliation.PalReconciler` is written against it
+(required) contract: `pal_reconciliation.PalReconciliation` is written against it
 and calls all of it, so the core is what defines the shape. `ports/` re-exports
 it under the port name `SampleStatePort` for adapters and composition to bind
 against -- `ports/` may import `domain/`, so that direction is the allowed one.

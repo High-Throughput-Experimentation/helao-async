@@ -1861,7 +1861,7 @@ def ADSS_sub_insitu_actions(
 
         if insert_electrolyte_bool:
             eidx = [i for i, v in enumerate(atimes) if v < etime]
-            mlist.insert(max(eidx) + 1, ("electrolyte", etime))
+            mlist.insert(max(eidx, default=-1) + 1, ("electrolyte", etime))
 
         vwait = 0
         if len(mlist) > 1:

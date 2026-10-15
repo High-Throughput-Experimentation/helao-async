@@ -450,9 +450,18 @@ def test_variable_codes_are_the_documented_ones():
 
 
 def test_no_module_scope_vendor_import():
-    import sys
+    """No module in the OLE package imports comtypes at top level (AST scan)."""
+    import ast
 
-    assert "comtypes" not in sys.modules
+    pkg = Path(ot.__file__).parent
+    for f in pkg.glob("*.py"):
+        for node in ast.parse(f.read_text(encoding="utf-8")).body:
+            names = (
+                [a.name for a in node.names]
+                if isinstance(node, ast.Import)
+                else [node.module or ""] if isinstance(node, ast.ImportFrom) else []
+            )
+            assert not any(n.split(".")[0] == "comtypes" for n in names), f.name
 
 
 def test_bandwidth_is_written_as_an_integer():

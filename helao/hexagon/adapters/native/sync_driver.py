@@ -13,7 +13,7 @@ by name, so renaming would break byte-identity (D1).
 
 The ONLY legacy import dropped is ``helao.core.servers.base.Base`` (D2):
 the Base-coupled ``HelaoSyncer`` subclass is replaced by ``NativeSyncer``
-(below the P2c native-only sentinel at the bottom of this module), which
+(in ``native_syncer.py``), which
 replicates its config resolution against the narrow ``SyncerHost``
 protocol — so this module imports only ``helao.helpers.*`` /
 ``helao.core.models.*`` and passes the adapters/native boundary rule.

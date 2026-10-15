@@ -2,7 +2,7 @@
 
 The contract itself is declared in
 `helao.hexagon.domain.sample_state.SampleStateProtocol`, because the domain
-(`pal_reconciliation.PalReconciler`) is written against it and is what fixes its
+(`pal_reconciliation.PalReconciliation`) is written against it and is what fixes its
 shape. This module is the port-layer name adapters and composition bind to;
 `ports/` may import `domain/`, whereas the reverse is a rejected inversion. It
 is an alias, not a subclass, so `isinstance` checks against either name behave

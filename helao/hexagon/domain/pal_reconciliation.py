@@ -19,12 +19,8 @@ through opaquely (duck-typed, not imported from the deploy tree) and used
 for per-microcam cam-template lookup once cam-table assembly is folded in
 (slice 3b).
 
-Slice 3a scope: source-position resolution only (``_check_source*`` +
-the shared ``_next_full_vial`` helper both source and dest use). This is
-purely ADDITIVE -- ``pal_driver.py`` still carries its own copies of these
-methods and is not yet wired to call into this service; the cutover (dest
-resolution, ``plan()``, and the after-trigger reconciliation) lands in
-slices 3b-3d.
+``pal_driver.py`` constructs this service and delegates source/dest
+resolution, ``plan()`` and the after-trigger reconciliation to it.
 
 The legacy ``_sendcommand_check_source``'s ``next_full_vial`` branch called
 the ``next_empty_vial`` checker (so such a source was always rejected);

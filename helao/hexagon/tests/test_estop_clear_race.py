@@ -9,7 +9,7 @@ E-STOP: a second ``estop=True`` fan-out and an alert, with the clear undone.
 
 Part 1 (these tests): a step re-checks the record after each await and returns
 ``ErrorCodes.estop``. Part 2 (generation counter) is tested in
-``test_estop_generation.py``.
+``test_dispatch_loop.py``.
 """
 
 import asyncio

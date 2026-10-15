@@ -8,9 +8,7 @@ paramiko connection to a real host) and is not exercised here -- see the
 module docstring's boundary note and the plan's slice-4 verification
 recipe (the SSH path is proven at the station).
 
-`pytest-asyncio` is not installed in this env (see test_pal_reconciliation.
-py's docstring), so async bodies run via `asyncio.run(...)` from plain
-`def test_*` wrappers.
+Async bodies run via `asyncio.run(...)` from plain `def test_*` wrappers.
 """
 
 import asyncio

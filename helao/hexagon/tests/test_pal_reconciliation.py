@@ -5,10 +5,8 @@ assembly/`plan()`).
 Pattern: fake `SampleStatePort` + plain pydantic model construction, no
 Base/server/vendor fixtures needed (mirrors `test_motion_transform.py` /
 `test_calibration_store.py` -- Base-free domain service, Linux-unit-testable).
-`pytest-asyncio` is not installed in this env (confirmed: pre-existing
-`test_native_data_sink.py`'s `@pytest.mark.asyncio` tests fail to collect
-here), so async bodies are driven via `asyncio.run(...)` from plain
-`def test_*` wrappers -- the `test_fakes.py` pattern.
+Async bodies are driven via `asyncio.run(...)` from plain `def test_*`
+wrappers -- the `test_fakes.py` pattern.
 """
 
 import asyncio
