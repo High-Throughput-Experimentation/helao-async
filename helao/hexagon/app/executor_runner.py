@@ -16,10 +16,12 @@ Two behaviours in the loop are load-bearing and easy to lose in a rewrite:
   what makes ``ActionHost.stop_executor_by_id`` work, since the session is what
   carries ``stop_action_task``. Storing the executor there would break stop.
 
-A failure inside ``_exec`` or ``_poll`` is caught and turned into an empty
-result rather than propagating — legacy does this so one bad poll does not abort
-an action mid-flight, and the error surfaces through the action's own error code
-instead.
+A failure inside ``_exec`` or ``_poll`` is caught rather than propagating, so one
+bad poll does not abort an action mid-flight. A raising ``_poll`` becomes an
+empty result. An ``_exec`` error, returned or raised (``critical_error``), is
+latched: polling still runs, because ``_poll`` may carry hardware stops, and the
+action finishes with the latched error even if later polls return none. Poll
+errors are not latched; a later poll result replaces an earlier one.
 """
 
 import asyncio
@@ -102,8 +104,9 @@ class ExecutorRunner:
             result = await executor._exec()
         except Exception:
             LOGGER.error("Executor._exec() failed", exc_info=True)
-            result = {}
+            result = {"error": ErrorCodes.critical_error}
         error = result.get("error", ErrorCodes.none)
+        exec_error = error  # latched: polls below must not clear it
         data = result.get("data", {})
         if data:
             datamodel = DataModel(
@@ -137,6 +140,8 @@ class ExecutorRunner:
                     LOGGER.info("exiting executor polling loop")
                     self.active.action_loop_running = False
 
+        if exec_error != ErrorCodes.none:
+            error = exec_error
         if error != ErrorCodes.none:
             self.active.action.error_code = error
         self.active.action_loop_running = False
