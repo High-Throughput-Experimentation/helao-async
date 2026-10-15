@@ -484,3 +484,29 @@ def test_build_transform_no_warning_when_config_m_instr_present(monkeypatch):
     assert not any("identity instrument transform" in w for w in warnings)
     # plate is still absent here -> the plate warning is still expected
     assert any("identity plate transform" in w for w in warnings)
+
+
+def test_motor_disconnect_failure_is_json_serialisable():
+    import json
+
+    d, ch = _drv()
+
+    def _boom():
+        raise GalilChannelError("link down")
+
+    ch.close = _boom  # type: ignore
+    out = asyncio.run(d.motor_disconnect())
+    assert "link down" in json.loads(json.dumps(out))["connection"]
+
+
+def test_connect_failure_logs_the_cause(caplog):
+    d, ch = _drv()
+
+    def _boom(cmd):
+        raise GalilChannelError("no reply")
+
+    ch.command = _boom  # type: ignore
+    with caplog.at_level("ERROR"):
+        resp = d.connect()
+    assert resp.response.name == "failed"
+    assert any(r.exc_info for r in caplog.records)

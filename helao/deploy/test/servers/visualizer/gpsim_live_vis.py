@@ -220,7 +220,6 @@ class C_vis(LiveVisualizer):
         # remove all old lines
         self.plot.renderers = []
 
-        colors = [SERIES[0], SERIES[1], SERIES[2], SERIES[3]]
         for i, (k, (phist, pedge, pnum, ghist, gedge, gnum)) in enumerate(
             self.hists.items()
         ):
@@ -229,7 +228,7 @@ class C_vis(LiveVisualizer):
                 bottom=0,
                 left=pedge[:-1],
                 right=pedge[1:],
-                line_color=colors[i],
+                line_color=SERIES[i % len(SERIES)],
                 fill_color=None,
                 alpha=1.0,
                 legend_label=f"{k} predicted available n={pnum:d}",
@@ -240,7 +239,7 @@ class C_vis(LiveVisualizer):
                 left=gedge[:-1],
                 right=gedge[1:],
                 line_color=None,
-                fill_color=colors[i],
+                fill_color=SERIES[i % len(SERIES)],
                 alpha=0.3,
                 legend_label=f"{k} g.t. acquired n={gnum:d}",
             )

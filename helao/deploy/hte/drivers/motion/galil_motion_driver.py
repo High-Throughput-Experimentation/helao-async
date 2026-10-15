@@ -905,7 +905,7 @@ class Galil(HelaoDriver):
             self.g.GClose()  # don't forget to close connections!
         except gclib.GclibError as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            return {"connection": {"Unexpected GclibError:", e}}
+            return {"connection": f"Unexpected GclibError: {e}"}
         return {"connection": "motor_offline"}
 
     async def query_axis_position(self, axis, *args, **kwargs) -> dict:

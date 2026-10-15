@@ -69,6 +69,7 @@ class PostProcess(HloPostProcessor):
 
                     pfile = Path(new_file_path)
                     if not pfile.is_file():
+                        processed_file_list.append(act_file)
                         continue
                     new_file = copy(act_file)
                     new_file.file_type = act_file.file_type.replace(
@@ -93,5 +94,6 @@ class PostProcess(HloPostProcessor):
                 LOGGER.error(
                     f"Error processing file: {act_file.file_name}", exc_info=True
                 )
+                processed_file_list.append(act_file)  # keep the unconverted file
 
         return processed_file_list

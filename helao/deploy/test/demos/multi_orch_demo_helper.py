@@ -1,22 +1,12 @@
 """Helper script for launching active-learning demo sequences on multiple orchestrators.
 
-Resolves the demo config matching the ``demo0``/``demo1``/``demo2`` prefix supplied on
+Resolves the demo config matching the ``demo0``/``demo1`` prefix supplied on
 the command line, builds an ``OERSIM_activelearn`` sequence with the requested stop
 criteria, enqueues it through the orchestrator's ``append_sequence`` endpoint, and
 then starts the orchestrator.
 """
 
-import os
 import sys
-
-repo_root = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-)
-async_root = os.path.join(repo_root, "helao-async")
-core_root = os.path.join(repo_root, "helao-core")
-
-sys.path.append(async_root)
-sys.path.append(core_root)
 
 from helao.core.error import ErrorCodes
 from helao.helpers.config_loader import read_config
@@ -24,15 +14,14 @@ from helao.helpers.dispatcher import private_dispatcher
 from helao.helpers.premodels import Sequence
 from helao.helpers.time_utils import gen_uuid
 
-from ..sequences.OERSIM_seq import OERSIM_activelearn
+from helao.deploy.test.sequences.OERSIM_seq import OERSIM_activelearn
 
-cfgd = {f"demo{i}": read_config(f"demo{i}", async_root) for i in range(2)}
+cfgd = {f"demo{i}": read_config(f"demo{i}") for i in range(2)}
 
 if __name__ == "__main__":
-    if len(sys.argv) == 1:
-        print("no arguments specified: use 'demo0', 'demo1', or 'demo2'")
-    elif sys.argv[1] not in ["demo0", "demo1", "demo2"]:
-        print("invalid arguments specified: use 'demo0', 'demo1', or 'demo2'")
+    if len(sys.argv) == 1 or sys.argv[1] not in cfgd:
+        print(f"missing or invalid argument: use one of {sorted(cfgd)}")
+        sys.exit(1)
     if len(sys.argv) > 2:
         iters = int(sys.argv[2])
     else:

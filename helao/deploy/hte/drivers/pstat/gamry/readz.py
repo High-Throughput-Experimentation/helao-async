@@ -290,7 +290,7 @@ class ReadZ:
             client.PumpEvents(pump_rate)
             time.sleep(0.1)
             total_points = len(self.dtaqsink.acquired_points)
-            LOGGER.debug("acq_pts:", total_points)
+            LOGGER.debug("acq_pts: %s", total_points)
 
             sink_state = self.dtaqsink.status
             LOGGER.info(f"Data sink state: {sink_state}")

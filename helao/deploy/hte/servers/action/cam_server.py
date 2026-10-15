@@ -57,7 +57,7 @@ def makeApp(server_key) -> ActionHost:
         """Start an image-stream acquisition from the Axis webcam.
 
         Starts an :class:`AxisCamExec` (one-shot if ``duration == 0``,
-        otherwise continuous at ``acquisition_rate`` polls/sec).
+        otherwise continuous at ``acquisition_rate`` seconds between images).
         """
         active = await ctx.begin(action_abbr="acq_webcam")
         executor = AxisCamExec(
@@ -72,7 +72,7 @@ def makeApp(server_key) -> ActionHost:
     async def cancel_acquire_image(ctx: ActionContext):
         """Stop the running Axis webcam executor (registered as ``axis``)."""
         active = await ctx.begin()
-        app.executors["axis"].stop_action_task()
+        app.stop_executor("axis")
         finished_action = await active.finish()
         return finished_action.as_dict()
 

@@ -836,7 +836,8 @@ def makeApp(server_key) -> ActionHost:
         datadict = {"samples": sample_out_dicts}
         datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})
         active.enqueue_data_nowait(datamodel, action=active.action)
-        active.action.action_params["_fast_sample_out"] = sample_out_dicts[0]
+        if sample_out_dicts:
+            active.action.action_params["_fast_sample_out"] = sample_out_dicts[0]
         finished_action = await active.finish()
         return finished_action.as_dict()
 

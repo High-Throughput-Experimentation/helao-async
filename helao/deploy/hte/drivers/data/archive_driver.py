@@ -443,7 +443,7 @@ class Archive:
         if load_sample_in is None:
             return error, sample
 
-        LOGGER.info("!!!load_sample_in:", load_sample_in)
+        LOGGER.info("load_sample_in: %s", load_sample_in)
         # check if sample actually exists
         load_samples_in = await self.unified_db.get_samples(samples=[load_sample_in])
 
@@ -569,11 +569,11 @@ class Archive:
         """
         self.write_config()  # save backup
 
+        tmp_output_str = ""
         if tray in self.positions.trays_dict:
             if self.positions.trays_dict[tray] is not None:
                 if slot in self.positions.trays_dict[tray]:
                     if self.positions.trays_dict[tray][slot] is not None:
-                        tmp_output_str = ""
                         for i, vial in enumerate(
                             self.positions.trays_dict[tray][slot].vials
                         ):

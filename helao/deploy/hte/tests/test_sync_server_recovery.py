@@ -612,3 +612,23 @@ def test_write_off_route_forwards_the_stripped_path(installed_config):
     assert resp.status_code == 200
     assert resp.json() == {"ok": True, "status": "written off", "groups": {"1": [2]}}
     assert drv.calls == [("/x/a-exp.yml", "estop", "op")]
+
+
+@pytest.mark.asyncio
+async def test_list_exceptions_does_not_raise_on_a_running_task(installed_config):
+    """``.exception()`` on a still-running task raises InvalidStateError."""
+    app = _make_app(installed_config)
+    running = asyncio.ensure_future(asyncio.sleep(60))
+
+    async def _fail():
+        raise ValueError("boom")
+
+    failed = asyncio.ensure_future(_fail())
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    app.driver = SimpleNamespace(running_tasks={"run": running, "bad": failed})
+    try:
+        out = await _route(app, "/list_exceptions")()
+    finally:
+        running.cancel()
+    assert out == {"bad": repr(ValueError("boom"))}

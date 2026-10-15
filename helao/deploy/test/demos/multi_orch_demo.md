@@ -11,9 +11,9 @@ The multi-orchestrator demo launches two instrumentation groups, each with their
 
 ## Usage
 1. Setup the helao environment per [readme.md](../../readme.md), hardware drivers are not required for this simulator demo.
-2. Modify `root: C:/INST_hlo` in both `helao\configs\demo0.yml` and `helao\configs\demo1.yml` to change where instrument logs and data are saved. **This demo will save run files in subdirectories of the specified root location.**
+2. Modify `root: C:/INST_hlo` in both `helao/deploy/test/configs/demo0.yml` and `helao/deploy/test/configs/demo1.yml` to change where instrument logs and data are saved. **This demo will save run files in subdirectories of the specified root location.**
 3. *Linux only:* modify `TERMGUI` variable in `multi_orch_demo.sh` with the appropriate terminal emulator application installed on your system. Note that the `-e` command switch on lines 6, 10, and 12 is not universal to all terminal emulators and must be updated accordingly.
-4. From helao-async repo root, change directory to demos: ```cd helao\demos```
+4. From helao-async repo root, change directory to demos: ```cd helao/deploy/test/demos```
 5. Run ```multi_orch_demo.bat``` (Windows) or ```bash multi_orch_demo.sh``` (Linux).
 
 ## Description

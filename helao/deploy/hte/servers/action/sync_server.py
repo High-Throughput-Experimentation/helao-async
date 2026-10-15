@@ -289,7 +289,11 @@ def makeApp(server_key) -> ActionHost:
     @app.post("/list_exceptions", tags=["private"])
     async def list_exceptions() -> dict:
         """Return exceptions captured on currently running sync tasks."""
-        return {k: d.exception() for k, d in app.driver.running_tasks.items()}
+        return {
+            k: repr(t.exception())
+            for k, t in app.driver.running_tasks.items()
+            if t.done() and not t.cancelled()
+        }
 
     @app.post("/n_queue", tags=["private"])
     async def n_queue() -> int:

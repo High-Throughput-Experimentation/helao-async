@@ -79,6 +79,11 @@ class KinesisMotor(HelaoDriver):
         """
         super().__init__(config=config)
         self.motors = {}
+        # built from config so the server can type its endpoints even when an
+        # axis fails to open in connect()
+        self.dev_kinesis = make_str_enum(
+            "dev_kinesis", {key: key for key in self.config.get("axes", {})}
+        )
         self.connect()
 
     def connect(self) -> DriverResponse:
@@ -93,10 +98,6 @@ class KinesisMotor(HelaoDriver):
                 self.motors[axis_name] = Thorlabs.KinesisMotor(
                     conn=dev_dict["serial_no"], scale=scale_tup
                 )
-
-            self.dev_kinesis = make_str_enum(
-                "dev_kinesis", {key: key for key in self.motors}
-            )
 
             LOGGER.info(f"Managing {len(self.motors)} devices:\n{self.motors.keys()}")
 

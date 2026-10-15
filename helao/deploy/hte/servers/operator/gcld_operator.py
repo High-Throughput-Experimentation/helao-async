@@ -301,6 +301,17 @@ def qc_constructor(
     return seq
 
 
+def insitu_potential_list(z_start, scan_down: bool) -> list | None:
+    """Potential order for a request's ``z_start``; ``None`` if it is not a step."""
+    ordered_vs = sorted(
+        ECHEUVIS_multiCA_led_defaults["CA_potential_vsRHE"], reverse=scan_down
+    )
+    if z_start not in ordered_vs:
+        return None
+    idx = ordered_vs.index(z_start)
+    return ordered_vs[idx:] + ordered_vs[:idx][::-1]
+
+
 def gen_ts() -> str:
     """Return the current local time formatted as ``[HH:MM:SS]`` for log prefixes."""
     return f"[{time.strftime('%H:%M:%S')}]"
@@ -457,13 +468,15 @@ def main():
                 scan_down = (
                     True if data_request.parameters["z_direction"] == "down" else False
                 )
-                ordered_vs = sorted(
-                    ECHEUVIS_multiCA_led_defaults["CA_potential_vsRHE"],
-                    reverse=scan_down,
-                )
-                init_direction = ordered_vs[ordered_vs.index(z_start) :]
-                rev_direction = ordered_vs[: ordered_vs.index(z_start)][::-1]
-                potential_list = init_direction + rev_direction
+                potential_list = insitu_potential_list(z_start, scan_down)
+                if potential_list is None:
+                    print(
+                        f"{gen_ts()} z_start {z_start} is not a CA potential; "
+                        f"failing data request {data_request.id}"
+                    )
+                    with CLIENT:
+                        CLIENT.set_status("failed", data_request_id=data_request.id)
+                    continue
                 insitu_params = {"CA_potential_vsRHE": potential_list}
 
                 # INSITU MEASUREMENT
