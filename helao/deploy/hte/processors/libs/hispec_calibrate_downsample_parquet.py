@@ -841,7 +841,7 @@ def fully_read_and_calibrate_parquet(
         calibration_df=calibration_df, spec_path=spec_path, read_hlo=False
     )
 
-    drop_times_larger_than_CV_max_time(
+    spectra_calibrated = drop_times_larger_than_CV_max_time(
         calibrated_spectra=spectra_calibrated,
         CV_data=CV,
         default_time_header=default_time_header,

@@ -19,8 +19,8 @@ ANDOR = Path("helao/deploy/hte/drivers/spec/andor")
 ALLOWED = {"spectrograph.py"}
 
 # Standalone exploratory scripts that predate the split and are not part of
-# any station's import graph: each constructs `AndorSDK3()` at module scope,
-# so importing one drives hardware. Nothing imports them, which is what makes
+# any station's import graph: each constructs `AndorSDK3()` only under
+# `__main__` (and sets `__test__ = False`), so importing one is inert. Nothing imports them, which is what makes
 # their vendor imports harmless -- a spectrograph-free connect() never reaches
 # them -- and `test_the_exempt_scripts_are_imported_by_nothing` pins that.
 # Exempted by exact name rather than by a `test_*` pattern, so a real module

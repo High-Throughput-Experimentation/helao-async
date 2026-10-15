@@ -189,9 +189,9 @@ class AndorCalibrateWavelength(Executor):
         error = (
             ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
         )
-        # The failed branch of run_wl_calibration builds a DriverResponse with
-        # no `data` at all, so every field here is absent on exactly the path
-        # an operator most needs a result on. Reading one unguarded would
+        # A failed run_wl_calibration carries at most `{"applied": False}` (and
+        # nothing on an unexpected exception), so most fields here are absent on
+        # exactly the path an operator most needs a result on. Reading one unguarded would
         # raise out of the executor and turn a reported failure into a crash.
         return {"error": error, "data": resp.data or {}}
 

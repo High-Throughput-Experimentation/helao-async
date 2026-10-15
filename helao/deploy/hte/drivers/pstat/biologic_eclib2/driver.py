@@ -60,6 +60,13 @@ NOT_PLUGGED = "not_plugged"
 #: the single SDK worker thread, forever.
 MAX_DRAINS_PER_CALL = 64
 
+#: Polls a started channel may spend without reaching RUNNING or producing a
+#: row before the action fails. ``BL_StartChannel`` returns before the channel
+#: is RUNNING, so an early poll that sees "not running" is not "finished"; the
+#: cap keeps a channel that never starts from polling forever. Same bound as
+#: the EClib1 backend's ``MAX_STARTING_POLLS``.
+MAX_STARTING_POLLS = 500
+
 
 class BiologicEclib2Driver(HelaoDriver):
     """BioLogic potentiostat driver over EC-Lib 2.0.
@@ -96,6 +103,10 @@ class BiologicEclib2Driver(HelaoDriver):
         }
         self.channel_params: dict[int, dict] = {i: {} for i in range(self.num_channels)}
         self._done: dict[int, bool] = {i: False for i in range(self.num_channels)}
+        # Per-channel: has RUNNING (or a row) been observed since start, and how
+        # many polls have passed without it.
+        self._seen_running: set[int] = set()
+        self._starting_polls: dict[int, int] = {}
         # Filled in by connect() from the instrument's own DeviceInfo.
         self.plugged_channels: list[int] = []
         self.usable_channels: list[int] = []
@@ -400,6 +411,8 @@ class BiologicEclib2Driver(HelaoDriver):
             start_time = time.time()
             self._client.start(channel)
             self._done[channel] = False
+            self._seen_running.discard(channel)
+            self._starting_polls[channel] = 0
             return DriverResponse(
                 response=DriverResponseType.success,
                 message="measurement started",
@@ -463,7 +476,18 @@ class BiologicEclib2Driver(HelaoDriver):
                     MAX_DRAINS_PER_CALL,
                 )
 
-            done = not running and not truncated
+            if running or any(table.values()):
+                self._seen_running.add(channel)
+            elif channel not in self._seen_running:
+                polls = self._starting_polls.get(channel, 0) + 1
+                self._starting_polls[channel] = polls
+                if polls > MAX_STARTING_POLLS:
+                    self.stop(channel)  # best effort: don't leave it to start late
+                    raise TimeoutError(
+                        f"channel {channel} never reached RUNNING after "
+                        f"{MAX_STARTING_POLLS} polls"
+                    )
+            done = channel in self._seen_running and not running and not truncated
             self._done[channel] = done
             return DriverResponse(
                 response=DriverResponseType.success,

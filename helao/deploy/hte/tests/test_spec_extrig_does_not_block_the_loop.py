@@ -165,3 +165,31 @@ async def test_post_exec_leaves_the_channel_open_while_a_read_is_parked():
     assert result["error"] == spec_server.ErrorCodes.none
     assert driver.spec.closed == 0 and driver.unset_calls == 0
     ex._read_future.cancel()
+
+
+@pytest.mark.asyncio
+async def test_async_shutdown_does_not_freeze_the_event_loop():
+    drv = object.__new__(spec_driver.SM303)
+    drv.spec = _Spec(0.4)
+    drv.dev_num = 0
+
+    counter: list = []
+    stop = asyncio.Event()
+    ticker = asyncio.create_task(_tick(counter, stop))
+    await asyncio.sleep(0)
+    await drv.async_shutdown()
+    stop.set()
+    await ticker
+
+    assert drv.spec.closed == 1
+    assert len(counter) > 10, "async_shutdown closed the channel inline on the loop"
+
+
+@pytest.mark.asyncio
+async def test_async_shutdown_timeout_returns_a_failed_response(monkeypatch):
+    monkeypatch.setattr(spec_driver, "DEVICE_CALL_TIMEOUT_S", 0.1)
+    drv = object.__new__(spec_driver.SM303)
+    drv.spec = _Spec(1.0)
+    drv.dev_num = 0
+    resp = await drv.async_shutdown()
+    assert resp.response == spec_driver.DriverResponseType.failed
