@@ -179,6 +179,35 @@ async def test_a_raising_poll_does_not_abort_the_action():
 
 
 @pytest.mark.asyncio
+async def test_an_exec_error_is_latched_but_polling_still_runs():
+    s = _Session()
+    ex = _exec_for(s, polls=2)
+
+    async def bad_exec():
+        ex.calls.append("exec")
+        return {"error": ErrorCodes.motor}
+
+    ex._exec = bad_exec
+    await s.runner.action_loop_task(ex)
+    assert ex.calls == ["pre", "exec", "poll", "poll", "post"]
+    assert s.action.error_code == ErrorCodes.motor
+
+
+@pytest.mark.asyncio
+async def test_a_raising_exec_is_critical_error_and_polling_still_runs():
+    s = _Session()
+    ex = _exec_for(s, polls=1)
+
+    async def boom():
+        raise RuntimeError("driver hiccup")
+
+    ex._exec = boom
+    await s.runner.action_loop_task(ex)
+    assert "poll" in ex.calls
+    assert s.action.error_code == ErrorCodes.critical_error
+
+
+@pytest.mark.asyncio
 async def test_a_non_concurrent_executor_waits_for_the_head_of_the_queue():
     s = _Session()
     s.base.local_action_task_queue = ["someone-else", s.action.action_uuid]

@@ -116,9 +116,8 @@ class KinesisMotorExec(Executor):
         # still stop the move.
         if self.base.actionservermodel.estop:
             LOGGER.error("KMOTOR is in estop.")
-            # Also set it on the action: for a polling executor the runner
-            # overwrites ``_exec``'s returned error with ``_poll``'s, so the
-            # returned dict alone would leave the action ending error 'none'.
+            # Also set it on the action directly. The runner latches the
+            # returned error too, so this is belt and braces.
             self.active.action.error_code = ErrorCodes.estop
             return {"error": ErrorCodes.estop}
         LOGGER.info("KinesisMotorExec validating move mode & limit.")
