@@ -1123,7 +1123,7 @@ def test_plan_edits_do_not_mutate_the_original_buffer():
 def test_dispatch_plan_appends_each_sequence_in_order():
     backend = LibBackend()
     plan = [_seq("A"), _seq("B")]
-    assert asyncio.run(opx.dispatch_plan(backend, plan, "append")) == ""
+    assert asyncio.run(opx.dispatch_plan(backend, plan, "append"))[0] == ""
     added = [c[1].sequence_name for c in backend.calls if c[0] == "add_sequence"]
     assert added == ["A", "B"]
 
@@ -1133,27 +1133,27 @@ def test_dispatch_plan_prepends_the_whole_buffer_at_once():
     reverse the buffer's order at the head of the queue."""
     backend = LibBackend()
     plan = [_seq("A"), _seq("B")]
-    assert asyncio.run(opx.dispatch_plan(backend, plan, "prepend")) == ""
+    assert asyncio.run(opx.dispatch_plan(backend, plan, "prepend"))[0] == ""
     call = [c for c in backend.calls if c[0] == "prepend_sequences"][0]
     assert [s.sequence_name for s in call[1]] == ["A", "B"]
 
 
 def test_dispatch_plan_routes_the_split_variant():
     backend = LibBackend()
-    assert asyncio.run(opx.dispatch_plan(backend, [_seq("A")], "split")) == ""
+    assert asyncio.run(opx.dispatch_plan(backend, [_seq("A")], "split"))[0] == ""
     assert [c[0] for c in backend.calls] == ["add_split_sequences"]
 
 
 def test_dispatch_plan_refuses_an_unknown_mode():
     backend = LibBackend()
-    error = asyncio.run(opx.dispatch_plan(backend, [_seq("A")], "sideways"))
+    error, _ = asyncio.run(opx.dispatch_plan(backend, [_seq("A")], "sideways"))
     assert "unknown" in error
     assert backend.calls == []
 
 
 def test_dispatch_plan_on_an_empty_buffer_does_nothing():
     backend = LibBackend()
-    assert asyncio.run(opx.dispatch_plan(backend, [], "append")) == ""
+    assert asyncio.run(opx.dispatch_plan(backend, [], "append")) == ("", [])
     assert backend.calls == []
 
 
@@ -1169,15 +1169,16 @@ def test_dispatch_plan_reports_which_sequence_failed():
         backend.calls.append(("add_sequence", sequence))
 
     backend.add_sequence = fail_on_b
-    error = asyncio.run(opx.dispatch_plan(backend, plan, "append"))
+    error, unsent = asyncio.run(opx.dispatch_plan(backend, plan, "append"))
     assert "B" in error
     assert [c[1].sequence_name for c in backend.calls] == ["A"]
+    assert [s.sequence_name for s in unsent] == ["B"]
 
 
 def test_dispatch_plan_without_a_backend():
-    assert "no orchestrator" in asyncio.run(
-        opx.dispatch_plan(None, [_seq("A")], "append")
-    )
+    error, unsent = asyncio.run(opx.dispatch_plan(None, [_seq("A")], "append"))
+    assert "no orchestrator" in error
+    assert [s.sequence_name for s in unsent] == ["A"]
 
 
 # -- history -----------------------------------------------------------------
@@ -1848,3 +1849,20 @@ def test_the_backend_omits_limit_rather_than_sending_none():
 
     assert _page(None, 0) == {"offset": 0}
     assert _page(50, 100) == {"offset": 100, "limit": 50}
+
+
+def test_dispatch_plan_reports_a_remote_backend_dispatcher_error():
+    from helao.core.error import ErrorCodes
+    from helao.ui.shared.operator.orch_backend import RemoteBackend
+
+    async def fake_dispatch(*_a, **_k):
+        return None, ErrorCodes.http
+
+    be = RemoteBackend.__new__(RemoteBackend)
+    be.orch_key, be.host, be.port = "orch", "127.0.0.1", 1
+    be._dispatch = fake_dispatch
+    plan = [_seq("A"), _seq("B")]
+    for mode in ("append", "split", "prepend"):
+        error, unsent = asyncio.run(opx.dispatch_plan(be, plan, mode))
+        assert error and "check the orchestrator queue" in error
+        assert [s.sequence_name for s in unsent] == ["A", "B"]

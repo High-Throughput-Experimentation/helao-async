@@ -147,6 +147,17 @@ def test_store_history_is_per_panel():
     assert store.get("panel-b", 1) is not None
 
 
+def test_store_forgets_the_least_recently_used_panel_past_the_cap():
+    store = xc.BufferStore(max_panels=2)
+    store.put("a", 1, _bufs())
+    store.put("b", 1, _bufs())
+    store.put("a", 2, _bufs())  # a is now newer than b
+    store.put("c", 1, _bufs())
+    assert store.versions("b") == []
+    assert store.versions("a") == [1, 2]
+    assert store.versions("c") == [1]
+
+
 def test_store_reports_no_versions_for_an_unknown_panel():
     assert xc.BufferStore().versions("nope") == []
 
@@ -615,3 +626,13 @@ def test_component_passes_the_current_url_into_refetch():
         "wrapper calls refetch with no argument; the controller would no-op "
         "silently and the chart would freeze after one paint"
     )
+
+
+def test_a_panel_that_is_only_read_is_not_evicted_before_one_only_written():
+    store = xc.BufferStore(max_panels=2)
+    store.put("static", 1, _bufs())
+    store.put("live", 1, _bufs())
+    assert store.get("static", 1) is not None  # on screen, read but never re-put
+    store.put("other", 1, _bufs())  # forces one eviction
+    assert store.versions("static") == [1]
+    assert store.versions("live") == []

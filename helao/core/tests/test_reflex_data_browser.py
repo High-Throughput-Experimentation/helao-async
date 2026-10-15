@@ -250,3 +250,13 @@ def test_chart_series_skips_a_non_numeric_column_instead_of_aborting_the_chart(
     series, skipped = dbx.chart_series([ds], "t_s", "orchestrator", 50000)
     assert series == []
     assert len(skipped) == 1 and "not numeric" in skipped[0][1]
+
+
+def test_legacy_diag_source_reads_runs_diag_not_the_current_diag_tree(tmp_path):
+    from helao.ui.shared.data_browser import sources
+
+    legacy = sources.build_source_index(tmp_path, "RUNS_DIAG")
+    current = sources.build_source_index(tmp_path, "DIAG")
+    assert legacy.base == tmp_path / "RUNS_DIAG"
+    assert legacy.source == "RUNS_DIAG"
+    assert current.base == tmp_path / "DIAG"

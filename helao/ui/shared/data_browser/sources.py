@@ -222,11 +222,15 @@ class RunsSourceIndex(SourceIndex):
 
     def __init__(self, root, state):
         # state is "RUNS", "DIAG" (the current trees) or the legacy
-        # "FINISHED"/"DIAG"/"SYNCED" -- "DIAG" names the current tree; the
-        # legacy one is reached as the RunDir.DIAG source value.
+        # "FINISHED"/"LEGACY_DIAG"/"SYNCED" -- "DIAG" names the current tree,
+        # so the legacy one needs its own token.
         self.root = Path(root)
         self.state = state
-        self.source = state if state in ("RUNS", "DIAG") else f"RUNS_{state}"
+        self.source = (
+            state
+            if state in ("RUNS", "DIAG")
+            else f"RUNS_{state.removeprefix('LEGACY_')}"
+        )
         self.base = self.root / self.source
 
     def list_dates(self):
@@ -598,7 +602,7 @@ def build_source_index(root, source):
     if source == RunDir.FINISHED:
         return RunsSourceIndex(root, "FINISHED")
     if source == RunDir.DIAG:
-        return RunsSourceIndex(root, "DIAG")
+        return RunsSourceIndex(root, "LEGACY_DIAG")
     if source == RunDir.SYNCED:
         return RunsSourceIndex(root, "SYNCED")
     if source in ("PROCESSES", "ANALYSES"):

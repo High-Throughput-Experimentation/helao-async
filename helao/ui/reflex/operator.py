@@ -1948,40 +1948,50 @@ def plan_removed(plan: list, index: int):
     return remaining
 
 
-async def dispatch_plan(backend, plan: list, mode: str) -> str:
+async def dispatch_plan(backend, plan: list, mode: str) -> tuple[str, list]:
     """Send the buffered plan to the orchestrator.
 
     ``prepend`` hands over the whole list in one call. Prepending one sequence
     at a time would reverse the buffer's order at the head of the queue.
 
     Returns:
-        str: Empty on success, else a message naming the sequence that failed.
-        A partial flush is the dangerous case -- some queued, some not -- so
-        the message says where it stopped rather than that "something" failed.
+        tuple[str, list]: ``(error, unsent)``. ``error`` is empty on success,
+        else a message naming the sequence that failed. A partial flush is the
+        dangerous case -- some queued, some not -- so the message says where it
+        stopped rather than that "something" failed. ``unsent`` is what never
+        reached the orchestrator, for the caller to put back in the buffer.
     """
     if mode not in PLAN_MODES:
         LOGGER.warning(f"operator refused plan mode '{mode}'")
-        return f"unknown plan mode '{mode}'"
+        return f"unknown plan mode '{mode}'", list(plan)
     if not plan:
-        return ""
+        return "", []
     if backend is None:
-        return "no orchestrator connection"
+        return "no orchestrator connection", list(plan)
     if mode == "prepend":
         try:
             await backend.prepend_sequences(list(plan))
         except Exception as exc:
             LOGGER.warning(f"operator could not prepend the plan: {exc}")
-            return f"the plan could not be prepended: {exc}"
-        return ""
+            return (
+                f"the plan could not be prepended: {exc}. It may already be "
+                "queued; check the orchestrator queue before resending",
+                list(plan),
+            )
+        return "", []
     method = backend.add_sequence if mode == "append" else backend.add_split_sequences
-    for sequence in plan:
+    for i, sequence in enumerate(plan):
         try:
             await method(sequence)
         except Exception as exc:
             name = sequence.sequence_name
             LOGGER.warning(f"operator could not enqueue '{name}': {exc}")
-            return f"stopped at {name}: {exc}"
-    return ""
+            return (
+                f"stopped at {name}: {exc}. {name} may already be queued; "
+                "check the orchestrator queue before resending",
+                list(plan[i:]),
+            )
+    return "", []
 
 
 # -- history -----------------------------------------------------------------
@@ -2339,7 +2349,8 @@ class OperatorPlanState(rx.State):
         The buffer is emptied *before* the first await. A flush that cleared
         afterwards would let a second click dispatch the same sequences again
         while the first was still in flight -- the same reason the Bokeh
-        operator clears synchronously and dispatches on the next tick.
+        operator clears synchronously and dispatches on the next tick. Whatever
+        the dispatch failed to send is put back at the front of the buffer.
         """
         async with self:
             plan = list(self._plan)
@@ -2347,8 +2358,10 @@ class OperatorPlanState(rx.State):
             self._set_plan([])
             self.error = ""
             self.status = f"sending {len(plan)} sequence(s)..." if plan else ""
-        error = await dispatch_plan(session_backend(token), plan, mode)
+        error, unsent = await dispatch_plan(session_backend(token), plan, mode)
         async with self:
+            if unsent:
+                self._set_plan(unsent + list(self._plan))
             self.error = error
             self.status = "" if error else f"sent {len(plan)} sequence(s)"
 
