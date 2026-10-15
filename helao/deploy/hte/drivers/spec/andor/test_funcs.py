@@ -5,7 +5,8 @@ helpers: cool, set up the spectrograph, acquire a single image, optimise
 the ND filter, run a timed acquisition burst and an SEC acquisition, then
 warm down.
 
-Importing this file executes the test sequence at module scope.
+Running this file as a script executes the test sequence; importing it (e.g.
+by a pytest sweep) does not touch the camera.
 """
 
 import time as time
@@ -17,9 +18,8 @@ import pandas as pd
 from pyAndorSDK3 import AndorSDK3
 from pyAndorSpectrograph.spectrograph import ATSpectrograph
 
-sdk3 = AndorSDK3()
-cam = sdk3.GetCamera(0)
-
+# standalone hardware script: keep pytest from collecting its helpers
+__test__ = False
 
 # The following functions are listed roughly in the order they are called in the main function
 
@@ -724,19 +724,22 @@ def generate_spectral_array(WL_arr, acqs, clockHz) -> pd.DataFrame:
     return Spectra
 
 
-cool(cam)
-PixelWidth = setup_image(cam)
-WL_arr = SetupSpectroscope(PixelWidth)
-horiz_pixels, vert_pixels, Stride, clockHz = GetMetaData(cam)
+if __name__ == "__main__":
+    sdk3 = AndorSDK3()
+    cam = sdk3.GetCamera(0)
 
-test, max, range_bool, optimality = image_and_check_dynamic_range(cam, WL_arr)
-_, _, _ = adjust_ND(cam, WL_arr)
+    cool(cam)
+    PixelWidth = setup_image(cam)
+    WL_arr = SetupSpectroscope(PixelWidth)
+    horiz_pixels, vert_pixels, Stride, clockHz = GetMetaData(cam)
 
-setup_SEC_aquisition(cam)
-acqs, timez, measurment_time = test_aquisition(cam, 100, 5000)
-acqs2 = SEC_aquisition(cam, 1000, 5000)
-spectra = generate_spectral_array(WL_arr, acqs2, clockHz)
+    test, max, range_bool, optimality = image_and_check_dynamic_range(cam, WL_arr)
+    _, _, _ = adjust_ND(cam, WL_arr)
 
+    setup_SEC_aquisition(cam)
+    acqs, timez, measurment_time = test_aquisition(cam, 100, 5000)
+    acqs2 = SEC_aquisition(cam, 1000, 5000)
+    spectra = generate_spectral_array(WL_arr, acqs2, clockHz)
 
-process_timings(timez, measurment_time)
-WarmAndClose(cam, False)
+    process_timings(timez, measurment_time)
+    WarmAndClose(cam, False)

@@ -19,7 +19,8 @@ selected by the action server's `wl_source` param (`spectrograph` | `calibration
   inherits that `connect()`. Two pre-existing standalone scripts in that package
   (`test_funcs.py`, `test_read_loop.py`) do import the vendor package; they are
   exempted by exact name because nothing imports *them* — each builds `AndorSDK3()`
-  at module scope, so they are in no station's import graph, and a test pins that.
+  only under `if __name__ == "__main__":` and sets `__test__ = False` (so a pytest sweep
+  neither runs nor collects them); they are in no station's import graph, and a test pins that.
 - **An absent `wl_source` yields the spectrograph driver**, so every existing station
   config keeps working unedited. An *unrecognized* value raises: a typo would
   otherwise hand a lamp-calibrated station the spectrograph driver and fail much

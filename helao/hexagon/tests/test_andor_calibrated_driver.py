@@ -619,3 +619,30 @@ def test_connect_says_nothing_when_the_axis_matches(tmp_path, monkeypatch, caplo
         assert d.connect().response == "success"
 
     assert [r.getMessage() for r in caplog.records if r.levelname == "WARNING"] == []
+
+
+def test_anchor_minimum_follows_the_fit_degree_and_the_operator_is_told(
+    tmp_path, monkeypatch
+):
+    """Two anchors do not suffice at degree 4: fit_wavelength needs degree+1+MIN_EXCESS."""
+    d = _driver(tmp_path)
+    monkeypatch.setattr(
+        d, "_capture_lamp_frame", lambda *a: pytest.fail("lamp exposed")
+    )
+    need = 4 + 1 + wl_fit.MIN_EXCESS_LINES
+    resp = d.run_wl_calibration([[100 * i, 400.0 + 20 * i] for i in range(need - 1)])
+    assert resp.response == "failed"
+    assert f"at least {need}" in resp.message
+
+
+def test_a_calibration_fit_error_is_refused_with_its_message(tmp_path, monkeypatch):
+    d = _driver(tmp_path)
+    monkeypatch.setattr(d, "_capture_lamp_frame", lambda *a: np.zeros(8))
+
+    def _raise(*a, **k):
+        raise wl_fit.CalibrationFitError("no usable lines")
+
+    monkeypatch.setattr(wl_fit, "fit_wavelength", _raise)
+    resp = d.run_wl_calibration([[i, float(i)] for i in range(10)])
+    assert resp.response == "failed"
+    assert "no usable lines" in resp.message

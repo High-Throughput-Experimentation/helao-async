@@ -822,14 +822,13 @@ class Archive:
                                             and vial_no <= after_vial
                                         ):
                                             continue
-                                        else:
-                                            if vial[vial_no]:
-                                                new_tray = tray_no
-                                                new_slot = slot_no
-                                                new_vial = (
-                                                    vial_no + 1
-                                                )  # starts at 0 in []
-                                                break
+                                        elif vial:
+                                            return {
+                                                "tray": tray_no,
+                                                "slot": slot_no,
+                                                "vial": vial_no
+                                                + 1,  # starts at 0 in []
+                                            }
 
         return {"tray": new_tray, "slot": new_slot, "vial": new_vial}
 

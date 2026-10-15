@@ -309,7 +309,7 @@ async def test_the_executor_forwards_a_successful_calibration(tmp_path, monkeypa
 async def test_the_executor_reports_a_failed_calibration_without_raising(
     tmp_path, monkeypatch
 ):
-    """The failed DriverResponse carries no `data`; reading a field would raise.
+    """The failed DriverResponse carries only `applied`; reading a fit field would raise.
 
     An operator whose lamp was off, or whose lines did not resolve, must get a
     reported failure. Indexing `resp.data` unguarded would instead raise out of
@@ -332,7 +332,7 @@ async def test_the_executor_reports_a_failed_calibration_without_raising(
     result = await executor._exec()
 
     assert result["error"] == ErrorCodes.critical_error
-    assert result["data"] == {}
+    assert result["data"] == {"applied": False}
 
 
 @pytest.mark.asyncio
@@ -378,7 +378,7 @@ async def test_the_executor_reports_a_calibration_the_driver_refused(
         driver,
         {
             "anchors": [[p, 400.0 + 0.2 * p] for p in line_pixels],
-            "degree": 3,
+            "degree": 1,
         },
     )
 
@@ -413,7 +413,7 @@ async def test_the_executor_threads_the_rms_limit_through(tmp_path, monkeypatch)
         driver,
         {
             "anchors": [[p, 400.0 + 0.2 * p] for p in line_pixels],
-            "degree": 3,
+            "degree": 1,
             "max_fit_rms_nm": 1e6,
         },
     )

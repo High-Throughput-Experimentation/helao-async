@@ -314,7 +314,8 @@ class AndorDriver(HelaoDriver):
         line, so the fit succeeding is not evidence that it is right.
 
         Args:
-            anchors: At least two ``[pixel, wavelength_nm]`` pairs the
+            anchors: At least ``degree + 1 + wl_fit.MIN_EXCESS_LINES``
+                ``[pixel, wavelength_nm]`` pairs the
                 operator has identified by eye in the lamp spectrum. Required.
                 Both halves are approximate: the pixel is snapped to the
                 nearest detected line and the wavelength to the nearest
@@ -337,9 +338,11 @@ class AndorDriver(HelaoDriver):
         """
         try:
             pairs = [tuple(a) for a in anchors] if anchors else []
-            if len(pairs) < 2:
+            min_anchors = degree + 1 + wl_fit.MIN_EXCESS_LINES
+            if len(pairs) < min_anchors:
                 return self._refused(
-                    f"need at least 2 anchors, got {len(pairs)}. Read two "
+                    f"need at least {min_anchors} anchors for a degree-{degree} "
+                    f"fit, got {len(pairs)}. Read {min_anchors} or more "
                     "widely separated lines off the raw lamp spectrum and "
                     "pass [[pixel, wavelength_nm], ...]. There is no default: "
                     "which lines land on the detector depends on the grating "
@@ -419,6 +422,8 @@ class AndorDriver(HelaoDriver):
                     "applied": self.uses_lamp_calibration,
                 },
             )
+        except wl_fit.CalibrationFitError as exc:
+            return self._refused(str(exc))
         except Exception:
             LOGGER.error("run_wl_calibration failed", exc_info=True)
             return DriverResponse(

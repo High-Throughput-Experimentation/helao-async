@@ -551,3 +551,63 @@ def test_an_active_ttl_request_is_refused_not_ignored(connected, ttl):
     assert "no TTL" in response.message
     # And the channel was not started.
     assert connected.get_status(channel=CHANNEL).status == DriverStatus.ok
+
+
+def test_done_needs_running_observed_first(connected):
+    # BL_StartChannel returns before the channel is RUNNING, so a first poll
+    # of "not running, no rows" is "not started yet", not "finished".
+    setup(connected, "OCV")
+    connected.start_channel(CHANNEL)
+    real_poll = connected._client.poll
+
+    def not_yet(channel):
+        r = real_poll(channel)
+        return type(r)(
+            running=False,
+            rows=0,
+            table={c: [] for c in ec2data.OCV_COLUMNS},
+            technique_index=0,
+            technique_identifier="EC_SDK_TECHNIQUE_OCV",
+        )
+
+    connected._client.poll = not_yet
+    try:
+        response = asyncio.run(connected.get_data(CHANNEL))
+    finally:
+        connected._client.poll = real_poll
+    assert response.message == "measuring"
+
+
+def test_a_channel_that_never_starts_is_stopped_then_times_out(connected, monkeypatch):
+    from helao.deploy.hte.drivers.pstat.biologic_eclib2 import driver as ec2driver
+
+    monkeypatch.setattr(ec2driver, "MAX_STARTING_POLLS", 2)
+    setup(connected, "OCV")
+    connected.start_channel(CHANNEL)
+    real_poll = connected._client.poll
+    stopped = []
+    real_stop = connected._client.stop
+    connected._client.stop = lambda ch: stopped.append(ch) or real_stop(ch)
+
+    def not_yet(channel):
+        r = real_poll(channel)
+        return type(r)(
+            running=False,
+            rows=0,
+            table={c: [] for c in ec2data.OCV_COLUMNS},
+            technique_index=0,
+            technique_identifier="EC_SDK_TECHNIQUE_OCV",
+        )
+
+    connected._client.poll = not_yet
+    try:
+        for _ in range(2):
+            assert asyncio.run(connected.get_data(CHANNEL)).message == "measuring"
+        assert stopped == []
+        response = asyncio.run(connected.get_data(CHANNEL))
+    finally:
+        connected._client.poll = real_poll
+        connected._client.stop = real_stop
+    assert response.response == DriverResponseType.failed
+    assert "never reached RUNNING" in response.message
+    assert stopped == [CHANNEL]

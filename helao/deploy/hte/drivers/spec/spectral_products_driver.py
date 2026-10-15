@@ -208,7 +208,11 @@ class SM303(HelaoDriver):
 
     async def async_shutdown(self) -> DriverResponse:
         """Close the spectrometer channel on server shutdown (sync ``shutdown`` is omitted)."""
-        return self.disconnect()
+        return await device_call("disconnect", self.disconnect) or DriverResponse(
+            response=DriverResponseType.failed,
+            status=DriverStatus.error,
+            message="SM303 disconnect timed out",
+        )
 
     def setup_sm303(self):
         """Run vendor initialisation sequence and load the wavelength table.

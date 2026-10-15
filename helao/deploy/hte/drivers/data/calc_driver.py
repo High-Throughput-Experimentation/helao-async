@@ -453,7 +453,7 @@ class Calc(HelaoDriver):
             pred[k]["rsi"] = rsi  # raw indices from full vector
 
             for bin_key in ("bin", "smooth", "smooth_refadj", "smooth_refadj_scl"):
-                pred[k][bin_key]["wl"] = pred["T"]["full"]["wl"][
+                pred[k][bin_key]["wl"] = pred[k]["full"]["wl"][
                     rsi
                 ]  # center index of bin
                 pred[k][bin_key]["epoch"] = pred[k]["full"]["epoch"]

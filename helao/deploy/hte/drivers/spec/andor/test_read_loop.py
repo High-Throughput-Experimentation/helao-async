@@ -1,8 +1,8 @@
 """Long-duration Andor read-loop test script.
 
 Drives the Andor SDK3 camera through a multi-hour acquisition loop that
-writes one CSV spectrum per ``read_rate_s`` interval. Importing this
-module runs the loop end-to-end (cool, set up spectroscope, periodic
+writes one CSV spectrum per ``read_rate_s`` interval. Running this
+script executes the loop end-to-end (cool, set up spectroscope, periodic
 acquire/save, warm down).
 """
 
@@ -15,9 +15,8 @@ import pandas as pd
 from pyAndorSDK3 import AndorSDK3
 from pyAndorSpectrograph.spectrograph import ATSpectrograph
 
-sdk3 = AndorSDK3()
-cam = sdk3.GetCamera(0)
-
+# standalone hardware script: keep pytest from collecting its helpers
+__test__ = False
 
 # The following functions are listed roughly in the order they are called in the main function
 
@@ -739,35 +738,38 @@ def generate_spectral_array(WL_arr, acqs, clockHz) -> pd.DataFrame:
     return Spectra
 
 
-cool(cam)
-PixelWidth = setup_image(cam)
-WL_arr = SetupSpectroscope(PixelWidth)
-horiz_pixels, vert_pixels, Stride, clockHz = GetMetaData(cam)
+if __name__ == "__main__":
+    sdk3 = AndorSDK3()
+    cam = sdk3.GetCamera(0)
 
-# test, max, range_bool, optimality=image_and_check_dynamic_range(cam, WL_arr)
-# _, _, _=adjust_ND(cam, WL_arr)
+    cool(cam)
+    PixelWidth = setup_image(cam)
+    WL_arr = SetupSpectroscope(PixelWidth)
+    horiz_pixels, vert_pixels, Stride, clockHz = GetMetaData(cam)
 
-# setup_SEC_aquisition(cam)
-no_hours = 1.5
-total_time_s = 3600 * no_hours
-read_rate_s = 120
-start_time = time.time()
-setup_shot(cam)
-while time.time() - start_time < total_time_s:
-    aq = cam.acquire()
-    time_elapsed = time.time() - start_time
-    # round time elaped to nearest whole number
-    time_elapsed = round(time_elapsed)
-    spec = generate_spectral_array(WL_arr, [aq], clockHz)
-    # write the spectrum to a csv file with a title of the time elapsed
-    spec.to_csv(str(time_elapsed) + ".csv")
-    # wait for the read rate
-    time.sleep(read_rate_s)
+    # test, max, range_bool, optimality=image_and_check_dynamic_range(cam, WL_arr)
+    # _, _, _=adjust_ND(cam, WL_arr)
 
-# acqs, timez, measurment_time = test_aquisition(cam, 100, 5000)
-# acqs2=SEC_aquisition(cam, 1000, 5000)
-# spectra=generate_spectral_array(WL_arr, acqs2, clockHz)
+    # setup_SEC_aquisition(cam)
+    no_hours = 1.5
+    total_time_s = 3600 * no_hours
+    read_rate_s = 120
+    start_time = time.time()
+    setup_shot(cam)
+    while time.time() - start_time < total_time_s:
+        aq = cam.acquire()
+        time_elapsed = time.time() - start_time
+        # round time elaped to nearest whole number
+        time_elapsed = round(time_elapsed)
+        spec = generate_spectral_array(WL_arr, [aq], clockHz)
+        # write the spectrum to a csv file with a title of the time elapsed
+        spec.to_csv(str(time_elapsed) + ".csv")
+        # wait for the read rate
+        time.sleep(read_rate_s)
 
+    # acqs, timez, measurment_time = test_aquisition(cam, 100, 5000)
+    # acqs2=SEC_aquisition(cam, 1000, 5000)
+    # spectra=generate_spectral_array(WL_arr, acqs2, clockHz)
 
-# process_timings(timez, measurment_time)
-WarmAndClose(cam, False)
+    # process_timings(timez, measurment_time)
+    WarmAndClose(cam, False)
