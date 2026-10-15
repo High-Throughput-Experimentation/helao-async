@@ -89,3 +89,60 @@ async def test_orch_shutdown_exports_the_queues_once(monkeypatch):
         "a second export writes a second queue file from deques the first "
         "one already exported"
     )
+
+
+@pytest.mark.asyncio
+async def test_shutdown_exports_a_parked_head_when_every_deque_is_empty(
+    monkeypatch, tmp_path
+):
+    """The last action of an experiment waiting on its start condition leaves all
+    three deques empty; the head is then the only thing a restore could recover."""
+    import pickle
+    from types import SimpleNamespace
+
+    from helao.hexagon.app.orch_persist import QueuePersister
+
+    async def _host_shutdown(self):
+        return {}
+
+    monkeypatch.setattr(ActionHost, "shutdown", _host_shutdown, raising=True)
+    (tmp_path / "STATES").mkdir()
+    head = "the parked head action"
+
+    class _Exporting(_Probe):
+        def export_queues(self, timestamp_pck=False):
+            self.exports += 1
+            fields = dict.fromkeys(
+                (
+                    "active_experiment",
+                    "last_experiment",
+                    "active_sequence",
+                    "last_sequence",
+                    "active_seq_exp_counter",
+                    "last_action_uuid",
+                    "last_dispatched_action_uuid",
+                    "globalstatusmodel",
+                    "active_run_id",
+                )
+            )
+            orch = SimpleNamespace(
+                world_cfg={"root": str(tmp_path)},
+                sequence_dq=self.sequence_dq,
+                experiment_dq=self.experiment_dq,
+                action_dq=self.action_dq,
+                parked_head_action=self.parked_head_action,
+                action_history={},
+                experiment_history={},
+                sequence_history={},
+                **fields,
+            )
+            return QueuePersister(orch).export_queues(timestamp_pck)
+
+    probe = _Exporting()
+    probe.sequence_dq = []
+    probe.parked_head_action = head  # type: ignore[assignment]
+    await probe.orch_shutdown()
+
+    assert probe.exports == 1
+    with open(tmp_path / "STATES" / "queues.pck", "rb") as f:
+        assert pickle.load(f)["act"] == [head]

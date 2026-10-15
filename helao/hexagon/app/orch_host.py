@@ -86,6 +86,11 @@ class OrchHost(ActionHost):
     # Q5 / P2b-2 D3: the orchestrator serves its own /ws_* relays, so no bridge.
     _binds_ws_bridge = False
 
+    #: Head action popped from ``action_dq`` while its start condition is awaited;
+    #: ``export_queues`` serializes it so a shutdown mid-wait keeps it. A class
+    #: default, so hosts built without ``__init__`` (test probes) read ``None``.
+    parked_head_action = None
+
     def __init__(
         self,
         server_key: str,
@@ -1014,6 +1019,9 @@ class OrchHost(ActionHost):
         ):
             pending_action.action_server.machine_name = self.server.machine_name
             self.action_dq.insert(0, pending_action)
+            self.parked_head_action = (
+                None  # back in the queue; export must not repeat it
+            )
             return False
         return True
 
@@ -1500,7 +1508,7 @@ class OrchHost(ActionHost):
         stop = getattr(self._hex_health, "stop", None)
         if callable(stop):
             stop()
-        if any(
+        if self.parked_head_action is not None or any(
             len(x) > 0 for x in (self.sequence_dq, self.experiment_dq, self.action_dq)
         ):
             export_path = self.export_queues(timestamp_pck=False)

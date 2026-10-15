@@ -27,6 +27,7 @@ stage still imports cleanly after it, and vice versa.
 import os
 import pickle
 import re
+from copy import deepcopy
 from datetime import datetime
 from typing import Optional
 
@@ -75,6 +76,27 @@ _RUNTIME_ACTION_FIELDS = (
     "prefinish_errors",
 )
 
+# What the live status copy of an in-flight action lacks: dispatch fills the
+# sequence/experiment linkage onto queued actions at plan time, never onto the copy
+# an action server reports. Without it ``init_act`` sees no sequence timestamp and
+# re-runs the action as a manual one, under DIAG, outside every process.
+_SEQUENCE_LINK_FIELDS = (
+    "sequence_uuid",
+    "sequence_name",
+    "sequence_label",
+    "sequence_timestamp",
+    "sequence_params",
+    "sequence_output_dir",
+    "sequence_status",
+    "planned_experiments",
+)
+_EXPERIMENT_LINK_FIELDS = (
+    "experiment_name",
+    "experiment_params",
+    "experiment_output_dir",
+    "experiment_status",
+)
+
 # How many timestamped exports to keep. The dispatch post-loop writes one every
 # time the orchestrator stops with non-empty queues, so uncapped they accumulate
 # indefinitely -- instruments have been found holding files over a year old.
@@ -114,11 +136,14 @@ class QueuePersister:
         """
         orch = self.orch
         save_dir = orch.world_cfg["root"]
+        acts = list(orch.action_dq)
+        if orch.parked_head_action is not None:
+            acts.insert(0, orch.parked_head_action)
         queue_dict = {
             "schema": QUEUE_PCK_SCHEMA,
             "seq": list(orch.sequence_dq),
             "exp": list(orch.experiment_dq),
-            "act": list(orch.action_dq),
+            "act": acts,
             "active_exp": orch.active_experiment,
             "last_exp": orch.last_experiment,
             "active_seq": orch.active_sequence,
@@ -240,6 +265,15 @@ class QueuePersister:
                             call_default_factory=True
                         ),
                     )
+                # Experiment subclasses Sequence, so it can stand in for it
+                seq = orch.active_sequence or exp
+                for src, names in (
+                    (seq, _SEQUENCE_LINK_FIELDS),
+                    (exp, _EXPERIMENT_LINK_FIELDS),
+                ):
+                    if src is not None:
+                        for name in names:
+                            setattr(new, name, deepcopy(getattr(src, name)))
                 new.action_retry = (act.action_retry or 0) + 1
                 fresh.append(new)
             # retire the old uuid: the experiment record shows the attempt as
