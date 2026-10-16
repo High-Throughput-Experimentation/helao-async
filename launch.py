@@ -205,13 +205,18 @@ class ConsoleMux:
         child inherits this process's stdout and stderr exactly as it did before
         the mux existed.
 
+        Always gives the child ``stdin=DEVNULL``: no server reads stdin, and on
+        Windows it reduces how much a child can disturb the console input that
+        the hotkey reader owns. It does not stop a child opening ``CONIN$``
+        directly; :func:`read_menu_line` is what keeps the CTRL-r prompt usable.
+
         Also carries the Windows ``creationflags``, because every server is
         spawned through here and that is the only place the flag has to be
         added. The key is omitted entirely when the value is 0 rather than passed
         as ``creationflags=0``: POSIX ``Popen`` rejects a non-zero value, and
         leaving the key out keeps the Linux call byte-identical to what it was.
         """
-        kwargs = {}
+        kwargs = {"stdin": subprocess.DEVNULL}
         if self.active:
             kwargs.update(stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         creationflags = win_job.spawn_creationflags()
@@ -385,7 +390,7 @@ class ConsoleMux:
         """End suppression: leave the alternate screen and flush the buffer.
 
         Idempotent and safe to call from the watchdog thread while the menu's
-        blocking ``input()`` is still pending -- that intentionally restores the
+        blocking menu read is still pending -- that intentionally restores the
         output flow around the live prompt rather than cancelling the prompt.
 
         Args:
@@ -1258,7 +1263,8 @@ def _posix_getchar():
     terminal. cbreak leaves OPOST/ONLCR enabled (it only turns off canonical
     mode and echo), so '\\n' -> '\\r\\n' translation still happens and log
     lines stay left-aligned. Control keys (CTRL-r/x/d) arrive as single bytes
-    either way.
+    either way. TCSANOW, not setcbreak's default TCSAFLUSH: the flush threw away
+    unread input on every key, which ate pasted or fast-typed menu digits.
     """
     import termios
     import tty
@@ -1266,7 +1272,7 @@ def _posix_getchar():
     fd = sys.stdin.fileno()
     old_settings = termios.tcgetattr(fd)
     try:
-        tty.setcbreak(fd)
+        tty.setcbreak(fd, termios.TCSANOW)
         ch = os.read(fd, 1)
         if not ch:
             raise EOFError
@@ -1317,6 +1323,92 @@ def wait_key():
             )
         keypress = "\x1a" if os.name == "nt" else "\x04"
     return keypress
+
+
+def read_menu_line(prompt: str) -> str:
+    """Read one line of menu input a key at a time, echoing it ourselves.
+
+    ``input()`` needs the console in line mode with echo on, and on Windows that
+    mode is shared with every attached process, so it cannot be trusted. Going
+    through :func:`wait_key` depends on no mode. Enter returns the text; Esc and
+    the interrupt/EOF/failure characters ``wait_key`` returns cancel with ``""``.
+    ``click.getchar`` already folds a Windows special key (arrow, F-key) into one
+    multi-character string, which is ignored here. On POSIX the same keys send
+    an escape sequence whose leading ``\x1b`` cancels the prompt; cancelling is
+    the safe direction, since nothing restarts.
+    """
+    sys.stdout.write(prompt)
+    sys.stdout.flush()
+    text = ""
+    while True:
+        key = wait_key()
+        if key in ("\r", "\n"):
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+            return text
+        if key in ("\x1b", "\x03", "\x04", "\x1a"):
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+            return ""
+        if key in ("\x08", "\x7f"):
+            if text:
+                text = text[:-1]
+                sys.stdout.write("\b \b")
+                sys.stdout.flush()
+        elif len(key) == 1 and key.isprintable():
+            text += key
+            sys.stdout.write(key)
+            sys.stdout.flush()
+
+
+def _kernel32():
+    """The Windows ``kernel32`` handle; a seam so tests can fake it."""
+    import ctypes
+
+    k32 = win_job._kernel32()
+    if k32 is not None:
+        k32.GetStdHandle.restype = ctypes.c_void_p  # a HANDLE, not a C int
+    return k32
+
+
+def _check_console_input_mode() -> None:
+    """Windows only: put the console back in line+echo mode if it is not.
+
+    The input mode is shared by every process on the console. The CTRL-r prompt
+    no longer depends on it (:func:`read_menu_line`), but a raw mode is worth a
+    log line, and the shell gets its echo back when the launcher exits. Never
+    raises.
+    """
+    if os.name != "nt":
+        return
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        k32 = _kernel32()
+        handle = ctypes.c_void_p(k32.GetStdHandle(-10))  # STD_INPUT_HANDLE
+        mode = wintypes.DWORD()
+        if not k32.GetConsoleMode(handle, ctypes.byref(mode)):
+            return
+        if mode.value & 0x6 == 0x6:  # ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT
+            return
+        # LAUNCH_LOGGER is None until the launcher builds it.
+        if LAUNCH_LOGGER is not None:
+            LAUNCH_LOGGER.warning(
+                f"console input mode is {mode.value:#x} (line input or echo off); "
+                "another process on this console, or a launcher that exited "
+                "mid-read, left it that way."
+            )
+        ok = bool(k32.SetConsoleMode(handle, mode.value | 0x7))
+        if LAUNCH_LOGGER is not None:
+            LAUNCH_LOGGER.warning(
+                f"restored console input mode to {mode.value | 0x7:#x}"
+                if ok
+                else "could not restore the console input mode"
+            )
+    except Exception as exc:
+        if LAUNCH_LOGGER is not None:
+            LAUNCH_LOGGER.debug(f"console input mode check failed: {exc!r}")
 
 
 def watch_until(stop: threading.Event, poll_seconds: float, poll_once) -> None:
@@ -2591,6 +2683,8 @@ def main():
                     # Only the prompt is isolated. The restart itself runs with
                     # output visible -- that is exactly when you want to watch
                     # the servers come back up.
+                    # Before isolating, so its warning is not gated off screen.
+                    _check_console_input_mode()
                     with CONSOLE.isolated():
                         print("Currently running server type/name:")
                         for i, (gk, sk) in enumerate(slist):
@@ -2600,7 +2694,7 @@ def main():
                             optionstr = f"{min(opts)}-{max(opts)}"
                         else:
                             optionstr = "0"
-                        sind = input(
+                        sind = read_menu_line(
                             f"Enter server num to restart, R to relaunch all, "
                             f"or blank to cancel [{optionstr}/R]: "
                         )

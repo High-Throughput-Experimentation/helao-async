@@ -703,6 +703,9 @@ if __name__ == "__main__":
         ],
         cwd=os.path.join(helao_repo_root, APP_DIR),
         env=build_env(confArg, server_key, servHost, servPort, root),
+        # No stdin: nothing here reads it, and it limits how much the backend can
+        # disturb the console input the launcher's hotkey reader owns.
+        stdin=subprocess.DEVNULL,
         start_new_session=(os.name == "posix"),
         preexec_fn=(
             (lambda: install_pdeathsig(signal.SIGTERM))
