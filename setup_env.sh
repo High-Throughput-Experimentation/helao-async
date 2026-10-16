@@ -11,6 +11,12 @@ echo ""
 echo ""
 echo "setting PYTHONPATH in 'helao' conda environment vars"
 conda activate helao
+if [ "$CONDA_DEFAULT_ENV" != "helao" ] || [[ "$CONDA_PREFIX" != */envs/helao ]]
+then
+    echo "ERROR: expected conda env 'helao', got '$CONDA_DEFAULT_ENV' ($CONDA_PREFIX)" >&2
+    exit 1
+fi
+uv pip install --python "$CONDA_PREFIX/bin/python" -r "$HA_DIR/requirements.txt" || exit 1
 conda env config vars set PYTHONPATH=$HA_DIR > /dev/null
 conda env config vars set HELAOLAUNCH="$HA_DIR/helao.sh" > /dev/null
 chmod +x $HA_DIR/helao.sh

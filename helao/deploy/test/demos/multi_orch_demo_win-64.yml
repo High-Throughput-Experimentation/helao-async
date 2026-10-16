@@ -3,16 +3,6 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - pip:
-    - aiodebug
-    - aioshutil
-    - nidaqmx
-    - plumbum
-    - pydasher
-    - pyft232
-    - sqlmodel
-    - uuid7
-    - git+https://github.com/spomjaksilp/pyMeCom
   - aiofiles
   - aiohttp
   - bokeh=2
@@ -68,6 +58,7 @@ dependencies:
   - starlette
   - termcolor
   - tqdm
+  - uv
   - uvicorn
   - websockets
   - zeroconf

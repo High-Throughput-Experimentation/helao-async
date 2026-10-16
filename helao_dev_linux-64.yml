@@ -2,15 +2,6 @@ name: helao
 channels:
   - conda-forge
 dependencies:
-  - pip:
-    - aiodebug
-    - aioshutil
-    - nidaqmx
-    - pydasher
-    - uuid7
-    - reflex
-    - xy
-    - https://github.com/meerstetter/pyMeCom/archive/master.zip
   - aioboto3
   - aiofiles
   - aiohttp
@@ -91,6 +82,7 @@ dependencies:
   - statsmodels
   - termcolor
   - tqdm
+  - uv
   - uvicorn
   - websockets
   - zeroconf

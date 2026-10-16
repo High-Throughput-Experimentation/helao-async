@@ -1,0 +1,9 @@
+aiodebug
+aioshutil
+nidaqmx
+plumbum
+pydasher
+pyft232
+sqlmodel
+uuid7
+git+https://github.com/spomjaksilp/pyMeCom

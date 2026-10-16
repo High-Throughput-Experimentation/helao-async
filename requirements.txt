@@ -1,0 +1,8 @@
+aiodebug
+aioshutil
+nidaqmx
+pydasher
+uuid7
+reflex
+xy[reflex]
+https://github.com/meerstetter/pyMeCom/archive/master.zip

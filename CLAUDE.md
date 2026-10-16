@@ -10,7 +10,7 @@ Development happens on `unstable`; only stable releases land on `main`.
 
 ## Environment & common commands
 
-The codebase runs inside a conda env named `helao` (Python 3.14, pinned by `helao_dev_linux-64.yml` / `helao_dev_win-64.yml`), and `PYTHONPATH` must point at the repo root. The setup script sets this in the conda env config.
+The codebase runs inside a conda env named `helao` (Python 3.14, pinned by `helao_dev_linux-64.yml` / `helao_dev_win-64.yml`), and `PYTHONPATH` must point at the repo root. The setup script sets this in the conda env config. Conda installs the yml's conda packages; the pip packages live in `requirements.txt` (pins: `requirements_pinned_<platform>.txt`) and the setup/update scripts install them with `uv` after conda finishes.
 
 ```
 bash setup_env.sh                   # (Linux) create+configure 'helao' env

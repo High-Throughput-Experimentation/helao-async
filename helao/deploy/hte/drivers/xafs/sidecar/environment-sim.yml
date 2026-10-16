@@ -10,6 +10,7 @@ dependencies:
   - plotly=5.11
   - ipython
   - tqdm
+  - uv
   - xraydb=4.5
   - fastapi=0.125.0
   - starlette=0.49.3

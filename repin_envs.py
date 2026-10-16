@@ -1,14 +1,16 @@
 """Regenerate the pinned conda env files from fresh solves of the dev env files.
 
 For each platform, ``<prefix>_dev_<platform>.yml`` is solved from scratch
-(dry run, nothing installed) and ``<prefix>_pinned_<platform>.yml`` is
-rewritten against that solve:
+(dry run, nothing installed) and ``<prefix>_pinned_<platform>.yml`` plus
+``requirements_pinned_<platform>.txt`` (the pip pins, installed with uv after
+conda) are rewritten against that solve:
 
 * a pinned conda package takes the solved version, written as ``name=version``
   with no build string;
 * a pinned conda package the fresh solve no longer installs is dropped;
 * a pinned pip package takes the version pip resolves for the target platform
-  from the dev file's pip list; one pip cannot resolve is kept as-is;
+  from ``requirements.txt`` (the dev pip list); one pip cannot resolve is
+  kept as-is;
 * pip lines that install from a URL are kept verbatim and never pinned;
 * packages the solve adds that are not already pinned are reported, not added.
 
@@ -45,32 +47,33 @@ PIP_PLATFORMS = {
     "win-64": ["win_amd64"],
 }
 CONDA_PIN = re.compile(r"^  - ([A-Za-z0-9_.\-]+)=([^=\s]+)(?:=\S+)?$")
-PIP_PIN = re.compile(r"^      - ([A-Za-z0-9_.\-]+)==(\S+)$")
+PIP_PIN = re.compile(r"^([A-Za-z0-9_.\-]+)==(\S+)$")
 
 
 def norm(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
-def read_dev(path: Path) -> tuple[list[str], list[str], list[str]]:
-    """Return (channels, conda specs, pip specs without URLs) from a dev env file."""
-    channels, conda, pip, section = [], [], [], None
+def read_dev(path: Path, requirements: Path) -> tuple[list[str], list[str], list[str]]:
+    """Return (channels, conda specs, pip specs without URLs).
+
+    Channels and conda specs come from the dev env file, pip specs from the
+    requirements file; blank lines, comments and URL lines are skipped.
+    """
+    channels, conda, section = [], [], None
     for line in path.read_text(encoding="utf-8").splitlines():
         if line.startswith("channels:"):
             section = "channels"
         elif line.startswith("dependencies:"):
             section = "deps"
-        elif section == "deps" and line.strip() == "- pip:":
-            section = "pip"
-        elif section == "pip" and line.startswith("    - "):
-            spec = line[6:].strip()
-            if "://" not in spec:
-                pip.append(spec)
         elif line.startswith("  - "):
-            if section == "pip":
-                section = "deps"
             (channels if section == "channels" else conda).append(line[4:].strip())
-    return channels, conda, pip
+    pip = [
+        s
+        for s in requirements.read_text(encoding="utf-8").splitlines()
+        if s.strip() and not s.lstrip().startswith("#") and "://" not in s
+    ]
+    return channels, conda, [s.strip() for s in pip]
 
 
 def conda_solve(
@@ -111,28 +114,37 @@ def pip_resolve(specs: list[str], platform: str, python: str) -> dict[str, str]:
     return {norm(i["metadata"]["name"]): i["metadata"]["version"] for i in items}
 
 
-def regenerate(
-    text: str, conda: dict[str, str], pip: dict[str, str]
-) -> tuple[str, list[str]]:
-    """Rewrite a pinned env file's text against solved versions.
+def regenerate_pip(text: str, pip: dict[str, str]) -> tuple[str, list[str]]:
+    """Rewrite a pinned requirements file's text against resolved versions.
 
     Returns the new text and human-readable report lines. Line endings are
     preserved, so a CRLF file stays CRLF.
     """
     eol = "\r\n" if "\r\n" in text else "\n"
-    out, report, in_pip = [], [], False
+    out, report = [], []
     for line in text.splitlines():
-        if line.strip() == "- pip:":
-            in_pip = True
-        elif in_pip and (m := PIP_PIN.match(line)):
+        if m := PIP_PIN.match(line):
             new = pip.get(norm(m[1]))
             if new is None:
                 report.append(f"  pip {m[1]}=={m[2]}: not resolved, kept")
             else:
                 if new != m[2]:
                     report.append(f"  pip {m[1]}: {m[2]} -> {new}")
-                line = f"      - {m[1]}=={new}"
-        elif not in_pip and (m := CONDA_PIN.match(line)):
+                line = f"{m[1]}=={new}"
+        out.append(line)
+    return eol.join(out) + eol, report
+
+
+def regenerate(text: str, conda: dict[str, str]) -> tuple[str, list[str]]:
+    """Rewrite a pinned env file's text against solved conda versions.
+
+    Returns the new text and human-readable report lines. Line endings are
+    preserved, so a CRLF file stays CRLF.
+    """
+    eol = "\r\n" if "\r\n" in text else "\n"
+    out, report = [], []
+    for line in text.splitlines():
+        if m := CONDA_PIN.match(line):
             new = conda.get(m[1])
             if new is None:
                 report.append(f"  drop {m[1]}={m[2]}: not in the fresh solve")
@@ -145,10 +157,9 @@ def regenerate(
 
 
 def conda_pins(text: str) -> list[str]:
-    pins, in_pip = [], False
+    pins = []
     for line in text.splitlines():
-        in_pip = in_pip or line.strip() == "- pip:"
-        if not in_pip and (m := CONDA_PIN.match(line)):
+        if m := CONDA_PIN.match(line):
             pins.append(f"{m[1]}=={m[2]}")
     return pins
 
@@ -165,14 +176,18 @@ def main(argv: list[str] | None = None) -> int:
     for platform in args.platforms:
         dev = args.root / f"{args.prefix}_dev_{platform}.yml"
         pinned = args.root / f"{args.prefix}_pinned_{platform}.yml"
-        channels, conda_specs, pip_specs = read_dev(dev)
+        pinned_pip = args.root / f"requirements_pinned_{platform}.txt"
+        channels, conda_specs, pip_specs = read_dev(dev, args.root / "requirements.txt")
         print(f"== {pinned.name}: solving {dev.name} for {platform}")
         conda = conda_solve(channels, conda_specs, platform, args.solver)
         python = ".".join(conda["python"].split(".")[:2])
         pip = pip_resolve(pip_specs, platform, python) if pip_specs else {}
 
         old = pinned.read_bytes().decode()
-        new, report = regenerate(old, conda, pip)
+        new, report = regenerate(old, conda)
+        old_pip = pinned_pip.read_bytes().decode()
+        new_pip, pip_report = regenerate_pip(old_pip, pip)
+        report += pip_report
         pinned_names = {p.split("==")[0] for p in conda_pins(new)}
         added = sorted(set(conda) - pinned_names)
         print("\n".join(report) or "  no version changes")
@@ -184,6 +199,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.write and new != old:
             pinned.write_bytes(new.encode())
             print(f"  wrote {pinned}")
+        if args.write and new_pip != old_pip:
+            pinned_pip.write_bytes(new_pip.encode())
+            print(f"  wrote {pinned_pip}")
     return 0
 
 
