@@ -10,7 +10,7 @@ The multi-orchestrator demo launches two instrumentation groups, each with their
 | HelaoData_example.ipynb   | example notebook for parsing helao data structures                              |
 
 ## Usage
-1. Setup the helao environment per [readme.md](../../readme.md), hardware drivers are not required for this simulator demo.
+1. Set up the main `helao` env: run `setup_env.bat` (Windows) or `bash setup_env.sh` (Linux) from the helao-async root, per the [readme](../../../../readme.md). Hardware drivers are not required for this simulator demo. The demo scripts start each server group through `HELAOLAUNCH`, which `setup_env` sets in the env. An env built before 2026-10-16 has no `uv`; run `update_env` once instead.
 2. Modify `root: C:/INST_hlo` in both `helao/deploy/test/configs/demo0.yml` and `helao/deploy/test/configs/demo1.yml` to change where instrument logs and data are saved. **This demo will save run files in subdirectories of the specified root location.**
 3. *Linux only:* modify `TERMGUI` variable in `multi_orch_demo.sh` with the appropriate terminal emulator application installed on your system. Note that the `-e` command switch on lines 6, 10, and 12 is not universal to all terminal emulators and must be updated accordingly.
 4. From helao-async repo root, change directory to demos: ```cd helao/deploy/test/demos```
