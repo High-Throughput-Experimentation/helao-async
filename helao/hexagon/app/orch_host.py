@@ -26,7 +26,6 @@ from uuid import UUID
 
 from fastapi import HTTPException
 
-from helao.core.drivers.data.sync_driver import HelaoSyncer
 from helao.core.hooks.config import prefinish_config
 from helao.core.hooks.loader import load_hook_set
 from helao.core.models.experiment import ExperimentModel, ShortExperimentModel
@@ -41,6 +40,8 @@ from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.server_keys import resolve_sync_server_key
 from helao.helpers.ws_utils import WsPublisher
 from helao.helpers.zdeque import zdeque
+from helao.hexagon.adapters.native.native_syncer import NativeSyncer
+from helao.hexagon.adapters.native.sync_adapter import NativeSyncAdapter
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from helao.hexagon.app.action_session import ActionSession
@@ -147,13 +148,10 @@ class OrchHost(ActionHost):
         )
 
         # --- orch.py:114-119: the syncer --------------------------------
-        # B7 follow-up, recorded not fixed: this is the legacy HelaoSyncer,
-        # imported from helao/core/drivers/. The native re-body lives at
-        # hexagon/adapters/native/sync_driver.py and the DB server already
-        # runs on it, but switching the orchestrator's own instance is a
-        # behaviour decision, and B3a makes none.
+        # The syncer is the native one (hexagon/adapters/native/native_syncer.py)
+        # and reaches callers through the SyncPort, bound at startup.
         # `use_sync` is decided here because collaborators read it, but the
-        # SyncDriver itself is constructed at startup: its __init__ calls
+        # syncer itself is constructed at startup: its __init__ calls
         # asyncio.create_task, and there is no running loop yet.
         #
         # Legacy never hit this because OrchAPI constructs Orch INSIDE its
@@ -162,7 +160,6 @@ class OrchHost(ActionHost):
         # a constructor that runs at import/build time moves it off one.
         self._sync_server_key = resolve_sync_server_key(self.world_cfg)
         self.use_sync = self._sync_server_key is not None
-        self.syncer = None
 
         # --- orch.py:121-125: the three queues --------------------------
         self.sequence_dq = zdeque([])
@@ -1445,9 +1442,11 @@ class OrchHost(ActionHost):
 
         @self.on_event("startup")
         async def _orch_startup():
-            if self.use_sync and self.syncer is None:
-                self.syncer = HelaoSyncer(
-                    action_serv=self, sync_server_name=self._sync_server_key
+            if self.use_sync and self.hexagon_wiring.sync is None:
+                self.hexagon_wiring.sync = NativeSyncAdapter(
+                    NativeSyncer(  # type: ignore[arg-type]
+                        self, sync_server_name=self._sync_server_key
+                    )
                 )
             self.status_subscriber = asyncio.create_task(self.subscribe_all())
             self.driver_monitor = asyncio.create_task(self.action_server_monitor())

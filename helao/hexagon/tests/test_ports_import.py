@@ -81,7 +81,7 @@ PORT_MODULES = {
     ],
     "helao.hexagon.ports.data_sink": ["DataSinkPort"],
     "helao.hexagon.ports.artifact_store": ["ArtifactStorePort"],
-    "helao.hexagon.ports.sync": ["SyncPort", "S3FacePort"],
+    "helao.hexagon.ports.sync": ["SyncPort"],
     "helao.hexagon.ports.transport": ["TransportPort"],
     "helao.hexagon.ports.status": ["StatusPort"],
 }

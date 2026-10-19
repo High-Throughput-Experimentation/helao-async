@@ -1,7 +1,6 @@
-"""Sync / StatePersistence / Status / Hardware / SampleState adapters."""
+"""StatePersistence / Status / Hardware / SampleState adapters."""
 
 import pickle
-from pathlib import Path
 
 import pytest
 
@@ -11,68 +10,10 @@ from helao.hexagon.adapters.shared.hardware import LegacyDriverHardwareAdapter
 from helao.hexagon.adapters.shared.sample_state import SampleShimAdapter
 from helao.hexagon.adapters.shared.state_persistence import QueuePckStore
 from helao.hexagon.adapters.shared.status import DispatcherStatusAdapter
-from helao.hexagon.adapters.shared.sync import LegacySyncAdapter
 from helao.hexagon.ports.auxiliary import StatePersistencePort
 from helao.hexagon.ports.hardware import HardwarePort
 from helao.hexagon.ports.sample_state import SampleStatePort
 from helao.hexagon.ports.status import StatusPort
-from helao.hexagon.ports.sync import SyncPort
-
-
-# --- Sync -------------------------------------------------------------------
-class _StubSyncer:
-    def __init__(self):
-        self.calls = []
-
-        class _Q:
-            @staticmethod
-            def qsize():
-                return 3
-
-        self.task_queue = _Q()
-
-    async def enqueue_yml(self, upath, rank=0, rank_limit=-5):
-        self.calls.append(("enqueue_yml", upath, rank, rank_limit))
-
-    async def sync_yml(
-        self,
-        yml_path,
-        retries=3,
-        rank=5,
-        force_s3=False,
-        force_api=False,
-        compress=False,
-    ):
-        self.calls.append(("sync_yml", yml_path))
-        return {"ok": True}
-
-    async def finish_pending(self):
-        self.calls.append(("finish_pending",))
-        return []
-
-    def reset_sync(self, sync_path):  # SYNC in legacy
-        self.calls.append(("reset_sync", sync_path))
-        return True
-
-    async def to_s3(self, msg, target, retries=5, compress=False):
-        self.calls.append(("to_s3", target))
-        return True
-
-    def list_pending(self, omit_manual_exps=True):
-        return ["p"]
-
-
-@pytest.mark.asyncio
-async def test_sync_adapter_delegates():
-    stub = _StubSyncer()
-    a = LegacySyncAdapter(stub)
-    assert isinstance(a, SyncPort)
-    await a.enqueue_yml("x.yml", rank=1)
-    assert (await a.sync_yml(Path("y.yml"))) == {"ok": True}
-    assert await a.reset_sync("z") is True
-    assert a.list_pending() == ["p"]
-    assert a.n_queue() == 3
-    assert [c[0] for c in stub.calls] == ["enqueue_yml", "sync_yml", "reset_sync"]
 
 
 # --- StatePersistence: the queues.pck file contract --------------------------

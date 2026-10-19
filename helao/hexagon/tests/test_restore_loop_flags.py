@@ -9,6 +9,7 @@ actions are re-run under fresh uuids and the old uuids are retired to ``skipped`
 """
 
 import asyncio
+from types import SimpleNamespace
 
 from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.hlostatus import HloStatus
@@ -19,6 +20,7 @@ from helao.core.tests.test_orch_dispatch_golden_master import (
     _install_generic_libs,
     _install_recording_stubs,
     _make_fake_move_dir,
+    _make_fake_to_s3,
     _make_fake_private_dispatcher,
     _make_orch,
     _mk_sequence,
@@ -42,7 +44,11 @@ class _OkHealth:
 
 def _orch(root):
     orch = _make_orch(root)
-    orch.hexagon_wiring = PortWiring(logging=LegacyLoggingAdapter(), health=_OkHealth())  # type: ignore[arg-type]
+    orch.hexagon_wiring = PortWiring(
+        logging=LegacyLoggingAdapter(),
+        health=_OkHealth(),  # type: ignore[arg-type]
+        sync=SimpleNamespace(to_s3=_make_fake_to_s3()),  # type: ignore[arg-type]
+    )
     orch._build_reducer()
     _install_recording_stubs(orch, [])
     _install_generic_libs(orch)

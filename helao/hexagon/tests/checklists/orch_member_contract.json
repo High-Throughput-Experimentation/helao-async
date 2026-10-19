@@ -120,7 +120,6 @@
     "stop",
     "stop_executor",
     "stop_loop",
-    "syncer",
     "track_action_uuid",
     "unpack_sequence",
     "update_nonblocking",

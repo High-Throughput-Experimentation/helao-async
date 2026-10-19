@@ -40,7 +40,7 @@ What is FAKED/STUBBED (the harness surface):
   ``ActionStartCondition`` wait predicates using the REAL status-ingestion
   code, without any real network I/O or real wall-clock waiting.
 * ``async_private_dispatcher`` -- no-op recorder returning ``({}, none)``.
-* ``HelaoSyncer.to_s3`` -- no-op recorder (``self.syncer.to_s3``).
+* the ``SyncPort.to_s3`` stub (``orch.hexagon_wiring.sync.to_s3``) -- no-op recorder.
 * ``PLATE_API.has_access`` -- forced ``False`` for the harness's duration
   (module-global on ``helao.hexagon.app.orch_unpack``), so the plate-verification
   gate is a no-op in every scenario.
@@ -245,7 +245,6 @@ def _make_orch(tmp_root: Path) -> OrchHost:
     orch.sequence_codepath_lib = {}
 
     orch.use_sync = True
-    orch.syncer = SimpleNamespace(to_s3=_make_fake_to_s3())
 
     orch.sequence_dq = zdeque([])
     orch.experiment_dq = zdeque([])
@@ -298,7 +297,9 @@ def _make_orch(tmp_root: Path) -> OrchHost:
 
     orch._init_orch_collaborators()
     orch.hexagon_wiring = PortWiring(
-        logging=LegacyLoggingAdapter(), health=_OkHealth()  # type: ignore[arg-type]
+        logging=LegacyLoggingAdapter(),
+        health=_OkHealth(),  # type: ignore[arg-type]
+        sync=SimpleNamespace(to_s3=_make_fake_to_s3()),  # type: ignore[arg-type]
     )
     orch._build_reducer()
     assert type(orch) is OrchHost

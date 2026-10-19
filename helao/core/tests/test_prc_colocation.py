@@ -472,10 +472,12 @@ def test_finish_yml_route_drops_a_process_path(tmp_path, monkeypatch):
         },
     )
     app = sync_server.makeApp("DB")
-    # BaseAPI builds the real HelaoSyncer in its own startup event, which
+    # BaseAPI builds the real syncer in its own startup event, which
     # this test never runs; a stub standing in for it is enough to exercise
     # the route's suffix-to-rank branch and enqueue_yml's guard together.
     app.driver = _StubSyncer()
+    # the route reads the SyncPort; bind it the way startup does, after the driver
+    next(h for h in app.router.on_startup if h.__name__ == "_bind_sync_port")()
 
     route = next(r for r in app.routes if r.path == "/finish_yml")
     asyncio.run(route.endpoint(yml_path=str(prc)))

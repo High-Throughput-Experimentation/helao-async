@@ -3,7 +3,7 @@
 :func:`sync_server.sweep_pending` is the automatic half of a recovery mechanism
 whose durable half already worked: an unsynced yml stays in ``RUNS_FINISHED``
 and a ``.prg`` sidecar under ``RUNS_SYNCED`` records what already landed, so
-re-enqueueing is cheap and idempotent -- but :class:`HelaoSyncer` holds its work
+re-enqueueing is cheap and idempotent -- but :class:`NativeSyncer` holds its work
 queue in memory, action servers get no ``--restore``, and nothing ever called
 ``finish_pending`` on its own. These tests pin the sweep's contract:
 
@@ -22,7 +22,7 @@ driven directly against a recording stub driver.
 The second half covers the *wiring*, which the stub cannot reach: that the
 startup handler is registered after BaseAPI's own, that shutdown cancels it, and
 that ``/tasks`` carries the summary. ``makeApp`` is safe to call for this --
-:class:`HelaoSyncer` is constructed in BaseAPI's startup event, not at
+:class:`NativeSyncer` is constructed in BaseAPI's startup event, not at
 construction, so no AWS config is resolved and no syncer loop is spawned -- using
 the same injected-``CONFIG`` seam as ``helao/hexagon/tests/test_db_shim.py``.
 """
@@ -41,6 +41,7 @@ from helao.deploy.hte.servers.action.sync_server import (
     sweep_pending,
     wait_until_listening,
 )
+from helao.hexagon.adapters.native.sync_adapter import NativeSyncAdapter
 
 
 class _StubLogger:
@@ -367,6 +368,7 @@ def _prime(app, driver):
     dispatcher reads either way.
     """
     app.driver = driver
+    app.hexagon_wiring.sync = NativeSyncAdapter(driver)
     app.aloop = asyncio.get_running_loop()
 
 
@@ -472,6 +474,7 @@ async def test_tasks_reports_the_sweep_beside_the_queue_it_already_reported(
         task_queue=SimpleNamespace(qsize=lambda: 4),
         quarantined=lambda: [],
     )
+    app.hexagon_wiring.sync = NativeSyncAdapter(app.driver)  # type: ignore[arg-type]
     endpoint = next(
         r.endpoint for r in app.routes if getattr(r, "path", None) == "/tasks"
     )
@@ -605,6 +608,7 @@ def test_write_off_route_forwards_the_stripped_path(installed_config):
     app = _make_app(installed_config)
     drv = _WriteOffDriver()
     app.driver = drv  # _prime needs a running loop; TestClient brings its own
+    app.hexagon_wiring.sync = NativeSyncAdapter(drv)  # type: ignore[arg-type]
     resp = TestClient(app).post(
         "/write_off",
         params={"yml_path": '"/x/a-exp.yml"', "reason": "estop", "operator": "op"},
@@ -627,6 +631,7 @@ async def test_list_exceptions_does_not_raise_on_a_running_task(installed_config
     await asyncio.sleep(0)
     await asyncio.sleep(0)
     app.driver = SimpleNamespace(running_tasks={"run": running, "bad": failed})
+    app.hexagon_wiring.sync = NativeSyncAdapter(app.driver)  # type: ignore[arg-type]
     try:
         out = await _route(app, "/list_exceptions")()
     finally:

@@ -1,6 +1,6 @@
 """Consolidated analysis driver, executor, and FastAPI app builder.
 
-Provides a single :class:`AnalysisSyncer` (a :class:`HelaoSyncer` subclass) that
+Provides a single :class:`AnalysisSyncer` (a :class:`NativeSyncer` subclass) that
 maintains a queue of analysis tuples, runs each analysis in parallel worker
 coroutines, writes the resulting model and outputs to the local ANALYSES tree,
 and (unless ``local_only`` is set) uploads them to S3. The set of analysis
@@ -85,12 +85,12 @@ from helao.core.drivers.data.analysis_layout import (
 )
 from helao.core.drivers.data.loaders import pgs3
 from helao.core.drivers.data.loaders.localfs import LocalLoader
-from helao.core.drivers.data.sync_driver import HelaoSyncer
 from helao.core.error import ErrorCodes
 from helao.helpers import config_loader
 from helao.helpers import helao_logging as logging
 from helao.helpers.executor import Executor
 from helao.helpers.param_alias import resolve_sequence_path
+from helao.hexagon.adapters.native.native_syncer import NativeSyncer
 from helao.hexagon.app.action_context import ActionContext
 from helao.hexagon.app.action_host import ActionHost
 
@@ -470,7 +470,7 @@ def remove_journal_entry(path: str) -> None:
         LOGGER.warning(f"could not remove analysis journal entry {path}")
 
 
-class AnalysisSyncer(HelaoSyncer):
+class AnalysisSyncer(NativeSyncer):
     """Queue-based worker that runs analyses and syncs outputs to S3.
 
     Pulls ``(process_uuid, data_loader, params, analysis_class,
@@ -484,7 +484,7 @@ class AnalysisSyncer(HelaoSyncer):
     :func:`make_analysis_app` from the server config ``params.analyses`` list.
 
     Attributes:
-        base: Owning action server.
+        host: Owning action server.
         running_tasks: Mapping from process UUID string to the worker
             asyncio.Task currently processing it.
         config_dict: ``params`` block from the server config.
@@ -504,7 +504,7 @@ class AnalysisSyncer(HelaoSyncer):
         region: S3 region.
     """
 
-    base: "ActionHost"
+    host: "ActionHost"
     running_tasks: dict
 
     def __init__(self, action_serv: "ActionHost"):
@@ -514,7 +514,7 @@ class AnalysisSyncer(HelaoSyncer):
             action_serv: Hosting action server, used for its ``server_cfg``
                 ``params`` and the ``world_cfg``.
         """
-        self.base = action_serv
+        self.host = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
         self.env_file = (
@@ -1091,7 +1091,7 @@ class AnalysisSyncer(HelaoSyncer):
         keyed by **process uuid** -- ``syncer`` registers
         ``asyncio.current_task()``, the long-lived worker loop, under the uuid of
         whichever item it is handling. So the body below is inert here; it is the
-        inherited :class:`HelaoSyncer` seam, where tasks *are* named per uuid.
+        inherited :class:`NativeSyncer` seam, where tasks *are* named per uuid.
 
         Kept, and taught to clear the journal, so that seam stays coherent if it
         is ever wired: by process uuid, which is all a task name can offer, and

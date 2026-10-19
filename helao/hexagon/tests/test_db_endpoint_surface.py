@@ -11,7 +11,7 @@ deliberately absent on both (its assignment is commented out), so
 here so nobody "fixes" it by accident.
 
 Two drivers: the ``NativeSyncer`` the graft used to bind, and the
-``SimHelaoSyncer`` the ``ActionHost`` builds in its own startup event, which is
+``SimNativeSyncer`` the ``ActionHost`` builds in its own startup event, which is
 what the endpoints resolve now that nothing rebinds ``app.driver``. The
 recorder injection the graft replicated is pinned on the latter as well.
 """
@@ -123,7 +123,7 @@ async def test_the_driver_exposes_the_db_endpoint_surface(build, tmp_path, monke
 async def test_the_action_host_driver_records_s3_only_when_asked(
     s3_record, tmp_path, monkeypatch
 ):
-    """The graft used to replicate SimHelaoSyncer's recorder injection; the
+    """The graft used to replicate SimNativeSyncer's recorder injection; the
     driver the endpoints now resolve must do it itself (sim_db_server.py:82-86).
     """
     from helao.deploy.test.servers.action.sim_db_server import RecordingS3Client

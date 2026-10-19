@@ -632,7 +632,7 @@ class DispatchRunner:
                 LOGGER.info(
                     f"uploading initial active experiment json to s3 ({meta_s3_key})"
                 )
-                await orch.syncer.to_s3(
+                await orch.hexagon_wiring.sync.to_s3(
                     orch.exp_model.clean_dict(strip_private=True), meta_s3_key
                 )
             except Exception as e:
@@ -792,7 +792,7 @@ class DispatchRunner:
                     LOGGER.info(
                         f"uploading initial active sequence json to s3 ({meta_s3_key})"
                     )
-                    await orch.syncer.to_s3(
+                    await orch.hexagon_wiring.sync.to_s3(
                         orch.seq_model.clean_dict(strip_private=True), meta_s3_key
                     )
                 except Exception as e:
