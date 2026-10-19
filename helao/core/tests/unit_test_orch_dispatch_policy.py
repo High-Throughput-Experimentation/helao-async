@@ -23,7 +23,7 @@ from uuid import uuid4
 
 from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.orchstatus import LoopIntent, LoopStatus, OrchStatus
-from helao.hexagon.app.orch_dispatch import (
+from helao.hexagon.domain.dispatch_policy import (
     AwaitEndpointFree,
     AwaitPreviousActionDone,
     AwaitServerFree,

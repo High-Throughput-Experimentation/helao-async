@@ -977,15 +977,6 @@ class OrchHost(ActionHost):
         """Dispatch the action at the head of the queue."""
         return await self.dispatch_runner._launch_action()
 
-    async def dispatch_loop_task(self) -> None:
-        """The legacy loop. Replaced by the reducer at startup (D-B3.2).
-
-        Kept because ``start_loop`` names it and the reducer cut-over is a
-        startup-time swap, not a source deletion -- but on a launched
-        OrchHost the loop task is the reducer's, not this.
-        """
-        return await self.dispatch_runner.run()
-
     # -- background tasks legacy starts from myinit ----------------------
 
     async def subscribe_all(self, retry_limit: int = 15):

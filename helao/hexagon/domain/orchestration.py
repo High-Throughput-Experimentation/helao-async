@@ -222,7 +222,10 @@ Event = Union[
 
 @dataclass(frozen=True)
 class CreateDispatchLoopTask:
-    """start_loop(): create dispatch_loop_task (T1)."""
+    """start_loop(): wake the HexDispatchLoop (T1).
+
+    ``CreateDispatchLoopTask`` sets ``loop_wake``; the long-lived task is the loop.
+    """
 
 
 @dataclass(frozen=True)

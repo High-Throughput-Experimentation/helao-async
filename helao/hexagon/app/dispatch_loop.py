@@ -92,7 +92,7 @@ class HexRuntime:
                     if rc3 is not ErrorCodes.none:
                         rc = rc3
                 # one-shot ladder fall-through with na_drivers masked —
-                # mirrors orch_dispatch._loop's non-continue driver-health
+                # mirrors the retired legacy _loop's non-continue driver-health
                 # path (re-asking next_step with them still unknown would
                 # livelock; masking == calling ladder_step directly)
                 masked = replace(derive_state(self.orch), na_drivers=())
@@ -104,7 +104,7 @@ class HexRuntime:
             if cmd_rc is not None and cmd_rc is not ErrorCodes.none:
                 rc = cmd_rc
         if rc is not ErrorCodes.none:
-            # legacy _loop epilogue (orch_dispatch.py:583-585)
+            # legacy _loop epilogue (the loop is deleted)
             LOGGER.error(f"stopping orch with error code: {rc}")
             await self.orch.intend_stop()
         return rc

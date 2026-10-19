@@ -1,7 +1,8 @@
 """Pure dispatch decision policy — the hexagon domain copy (spec §4.2.2).
 
-Ported verbatim from helao/core/servers/orch_dispatch.py:128-482 (CARDS P5
-inversion) per Q6 rewrite-with-reference. Line references in docstrings point
+Ported verbatim from the former policy copy in helao/hexagon/app/orch_dispatch.py
+(CARDS P5 inversion; that copy is now deleted, this module is the only one)
+per Q6 rewrite-with-reference. Line references in docstrings point
 at the legacy orch.py the CARDS code annotated; they are retained as the
 behavioral provenance. The async DispatchRunner effect shell is NOT ported —
 the P1b app layer drives this policy through the reducer in

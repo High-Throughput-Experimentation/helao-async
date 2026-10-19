@@ -154,46 +154,6 @@ async def test_dispatch_sequence_refuses_under_estop():
 
 
 @pytest.mark.asyncio
-async def test_runner_race_estop_lands_during_finish_active_experiment(monkeypatch):
-    """The drill's shape, on the legacy-ladder runner (orch_dispatch.py:653)."""
-    from helao.hexagon.app.orch_dispatch import FinishThenDispatchExperiment
-
-    orch = _DispatchOrch(LoopStatus.started)
-    _forbid_staging(monkeypatch, orch)
-
-    async def finish_active_experiment():
-        await asyncio.sleep(0)  # the E-STOP lands inside this await
-        orch.globalstatusmodel.loop_state = LoopStatus.estopped
-        orch.active_experiment = None  # estop_finish_active's effect
-        orch.active_sequence = None
-
-    orch.finish_active_experiment = finish_active_experiment
-    rc = await orch.dispatch_runner._execute(
-        FinishThenDispatchExperiment(), ErrorCodes.unspecified
-    )
-    assert rc is ErrorCodes.estop
-    assert list(orch.experiment_dq) == ["exp1", "exp2"]
-
-
-@pytest.mark.asyncio
-async def test_runner_race_estop_lands_during_finish_active_sequence():
-    from helao.hexagon.app.orch_dispatch import FinishThenDispatchSequence
-
-    orch = _DispatchOrch(LoopStatus.started)
-
-    async def finish_active_sequence():
-        await asyncio.sleep(0)
-        orch.globalstatusmodel.loop_state = LoopStatus.estopped
-
-    orch.finish_active_sequence = finish_active_sequence
-    rc = await orch.dispatch_runner._execute(
-        FinishThenDispatchSequence(), ErrorCodes.unspecified
-    )
-    assert rc is ErrorCodes.estop
-    assert list(orch.sequence_dq) == ["seq1", "seq2"]
-
-
-@pytest.mark.asyncio
 async def test_effect_race_estop_lands_during_finish_active_experiment(monkeypatch):
     """The same race on the reducer's effect runner (orch_effects.py:227)."""
     from helao.hexagon.app.orch_effects import OrchCommandRunner
