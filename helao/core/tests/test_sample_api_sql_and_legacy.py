@@ -56,3 +56,12 @@ def test_legacy_boundary_index():
     bad = SimpleNamespace(machine_name="legacy", plate_id=1, sample_no=3)
     assert len(asyncio.run(api.get_samples(samples=[ok]))) == 1
     assert asyncio.run(api.get_samples(samples=[bad])) == []
+
+
+def test_legacy_sample_zero_is_the_plate_reference():
+    # UVIS_measure_references loads sample_no 0 for the builtin black/white
+    # targets; rejecting it left every reference process without a sample
+    api = _legacy_api([{"x": 0.0, "y": 0.0}] * 2)
+    ref = SimpleNamespace(machine_name="legacy", plate_id=1, sample_no=0)
+    out = asyncio.run(api.get_samples(samples=[ref]))
+    assert [o.global_label for o in out] == ["legacy__solid__1_0"]

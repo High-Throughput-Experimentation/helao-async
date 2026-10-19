@@ -818,7 +818,9 @@ class SolidSampleAPI(SampleModelAPI):
                         f"platemap lookup failed for plate {sample.plate_id}; "
                         f"accepting legacy sample no '{sample.sample_no}' unverified"
                     )
-                if not pmdata or xylist != [[None, None]]:
+                # sample_no 0 is the plate-level reference (UVIS builtin
+                # black/white targets), never a platemap spot
+                if sample.sample_no == 0 or not pmdata or xylist != [[None, None]]:
                     ret_samples.append(
                         SolidSample(
                             plate_id=sample.plate_id,
