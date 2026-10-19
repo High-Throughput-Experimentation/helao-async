@@ -3,10 +3,12 @@
 Verbatim re-body of the CARDS-P6 ``ActionFinalizer`` collaborator
 (``helao/core/servers/active_finalizer.py``) — the finish / split /
 substitute close-out state machine, including the ce846da1 join-drain-close
-chain: send finished data_stream packets (<=5 x 0.1 s), wait
-``num_data_queued <= num_data_written`` (<=5 x 0.1 s), THEN close every file
-handle and cancel ``data_logger`` (late data beyond the bounded retries is
-dropped exactly as legacy drops it); HLO post-processors may rewrite
+chain: drain the data logger by a marker round-trip (a data-less
+``finished`` package queued behind everything already queued; see
+``NativeDataStreamer.drain``), bounded by ``FINISH_DRAIN_TIMEOUT_S`` for a
+normal finish and ``ESTOP_FINISH_DRAIN_TIMEOUT_S`` when the session is
+estopped, THEN close every file handle and cancel ``data_logger`` (data that
+arrives after the marker is dropped, as legacy dropped it); HLO post-processors may rewrite
 ``files[]``; final ``write_act`` per action; fire-and-forget ``move_dir``
 promotion for non-manual actions only; ``finish_manual_action`` synthesizes
 the ``exp--``/``seq--`` metas. Method bodies were byte-identical to the legacy
@@ -36,7 +38,6 @@ from uuid import UUID
 
 from helao.core.error import ErrorCodes
 from helao.core.hooks.prefinish import run_prefinish
-from helao.core.models.data import DataModel
 from helao.core.models.file import FileConn, FileConnParams
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.run_dir import redirect_manual_dir
@@ -49,7 +50,17 @@ from helao.hexagon.ports.action_session import ActionSessionPort
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
-__all__ = ["NativeActionFinalizer"]
+__all__ = [
+    "ESTOP_FINISH_DRAIN_TIMEOUT_S",
+    "FINISH_DRAIN_TIMEOUT_S",
+    "NativeActionFinalizer",
+]
+
+#: Normal finish: wait for a genuinely slow logger.
+FINISH_DRAIN_TIMEOUT_S = 10.0
+#: E-STOP finish: ``/estop`` finishes a server's sessions serially inside one
+#: ``ESTOP_SEND_TIMEOUT_S`` (10 s) RPC from the orchestrator.
+ESTOP_FINISH_DRAIN_TIMEOUT_S = 1.0
 
 
 class NativeActionFinalizer:
@@ -323,62 +334,14 @@ class NativeActionFinalizer:
                 break
 
         if all_finished:
-            LOGGER.info("finish active: sending finish data_stream_status package")
-            retry_counter = 0
-            while (
-                not all(
-                    [
-                        action.data_stream_status != HloStatus.active
-                        for action in self.active.action_list
-                    ]
-                )
-                and retry_counter < 5
-            ):
-                try:
-                    await self.active.enqueue_data(
-                        datamodel=DataModel(
-                            data={}, errors=[], status=HloStatus.finished
-                        )
-                    )
-                    LOGGER.debug(
-                        f"Waiting for data_stream finished package: {[action.data_stream_status for action in self.active.action_list]}"
-                    )
-                    await asyncio.sleep(0.1)
-                except Exception:
-                    LOGGER.error(
-                        "Failed to enqueue finished data stream package",
-                        exc_info=True,
-                    )
-                retry_counter += 1
-
-            LOGGER.debug("checking if all queued data has written.")
-            write_retries = 5
-            write_iter = 0
-            while (
-                self.active.num_data_queued > self.active.num_data_written
-                and write_iter < write_retries
-            ):
-                try:
-                    LOGGER.info(
-                        f"num_queued {self.active.num_data_queued} > num_written {self.active.num_data_written}, sleeping for 0.1 second."
-                    )
-                    for action in self.active.action_list:
-                        if action.data_stream_status != HloStatus.active:
-                            await self.active.enqueue_data(
-                                datamodel=DataModel(
-                                    data={}, errors=[], status=HloStatus.finished
-                                )
-                            )
-                            LOGGER.info(
-                                f"Setting datastream to finished: {action.data_stream_status}"
-                            )
-                except Exception:
-                    LOGGER.error(
-                        "Failed to requeue finished data stream package",
-                        exc_info=True,
-                    )
-                write_iter += 1
-                await asyncio.sleep(0.1)
+            estopped = any(
+                HloStatus.estopped in a.action_status for a in self.active.action_list
+            )
+            timeout_s = (
+                ESTOP_FINISH_DRAIN_TIMEOUT_S if estopped else FINISH_DRAIN_TIMEOUT_S
+            )
+            LOGGER.info(f"finish active: draining the data logger (bound {timeout_s}s)")
+            await self.active.drain_data(timeout_s)
 
             try:
                 # self.action_list[-1] is the very first action

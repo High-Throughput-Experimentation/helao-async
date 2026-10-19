@@ -36,7 +36,7 @@ exactly as legacy.
 
 import asyncio
 import traceback
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 
 import numpy as np
@@ -71,6 +71,11 @@ class NativeDataStreamer:
 
     def __init__(self, active):
         self.active = active
+        # drain bookkeeping only (see :meth:`drain`); the queue, counters and
+        # uuid lists stay on ``Active``/``Base``
+        self._drain_marker = None
+        self._drain_event = None
+        self._consumed = 0
 
     async def get_realtime(
         self, epoch_ns: Optional[int] = None, offset: Optional[float] = None
@@ -153,6 +158,54 @@ class NativeDataStreamer:
         """Track ``new_uuid`` as a data-stream source for this active's data logger."""
         self.active.listen_uuids.append(new_uuid)
 
+    async def drain(self, timeout_s: float) -> bool:
+        """Return once everything queued before this call is written (FIFO marker).
+
+        Puts one data-less ``finished`` package, the marker, on ``data_q``; the
+        logger sets an event when it consumes that exact object. Each subscriber
+        queue is FIFO, so every package queued before the marker has been written
+        by then. Re-puts the marker only if the logger consumed nothing since the
+        last check (a logger that subscribed late), so a busy one is not buried
+        under markers. Returns ``False`` after logging a WARNING on timeout; data
+        that arrives after the marker is still dropped, as before.
+        """
+        logger: Any = self.active.data_logger
+        base: Any = self.active.base
+        if logger is None or logger.done():
+            return True
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout_s
+        self._drain_marker = self.active.assemble_data_msg(
+            DataModel(data={}, errors=[], status=HloStatus.finished)
+        )
+        self._drain_event = asyncio.Event()
+        try:
+            await base.data_q.put(self._drain_marker)
+            seen = self._consumed
+            while True:
+                if logger.done():
+                    # the logger exited mid-drain; nothing is left to wait for
+                    return True
+                try:
+                    await asyncio.wait_for(self._drain_event.wait(), 0.1)
+                    return True
+                except asyncio.TimeoutError:
+                    if loop.time() >= deadline:
+                        LOGGER.warning(
+                            f"finish drain timed out after {timeout_s}s: "
+                            f"num_queued {self.active.num_data_queued} > "
+                            f"num_written {self.active.num_data_written}; "
+                            f"rows queued after this are dropped"
+                        )
+                        return False
+                    if self._consumed == seen:
+                        # nothing moved: the marker may have been missed
+                        await base.data_q.put(self._drain_marker)
+                    seen = self._consumed
+        finally:
+            self._drain_marker = None
+            self._drain_event = None
+
     async def log_data_task(self):
         """Subscribe to the data queue and write matching packets to the active's HLO files.
 
@@ -173,6 +226,7 @@ class NativeDataStreamer:
 
         try:
             async for data_msg in dq_sub:
+                self._consumed += 1
                 # check if the new data_msg is in listen_uuids
                 if data_msg.action_uuid not in self.active.listen_uuids:
                     continue
@@ -181,6 +235,8 @@ class NativeDataStreamer:
                 data_dict = data_msg.datamodel.data
 
                 self.active.action.data_stream_status = data_status
+                if data_msg is self._drain_marker and self._drain_event is not None:
+                    self._drain_event.set()
 
                 if data_status not in (None, HloStatus.active):
                     LOGGER.debug(

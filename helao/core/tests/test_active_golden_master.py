@@ -1106,11 +1106,10 @@ async def _scenario_finish_late_data_drain(save_root: Path) -> dict:
 
     Every other scenario drains each enqueued packet (``_drain_data``) before the
     next lifecycle step, so ``num_data_queued == num_data_written`` at finish
-    entry and the finished-packet write-drain loops in ``_finish``
-    (``adapters/native/finalizer.py``, the two capped retry+``sleep(0.1)`` loops
-    that let the threadpool file writes complete BEFORE the file connections are
-    closed) never have anything to flush: the late-data-vs-file-close race is
-    unobservable.
+    entry and the finished-packet write drain in ``_finish``
+    (``adapters/native/finalizer.py``, the marker drain that lets the threadpool
+    file writes complete BEFORE the file connections are closed) never have
+    anything to flush: the late-data-vs-file-close race is unobservable.
 
     Here we open the file with one drained packet, then enqueue a SECOND packet
     with ``enqueue_data_nowait`` and IMMEDIATELY call ``finish()`` with NO drain
