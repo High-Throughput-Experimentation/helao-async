@@ -782,12 +782,10 @@ class ActionHost(HelaoFastAPI):
                             f"Failed to push status message to {client_servkey} "
                             f"after {retry_limit} attempts."
                         )
-                    # Blocking, deliberately, and deferred past B7: this is
-                    # the pacing legacy used, and asyncio.sleep would reorder
-                    # this loop against every other coroutine on the server.
-                    # That is a behaviour change with its own station check,
-                    # not part of deleting the engine.
-                    time.sleep(0.3)
+                    # Per-client pacing, as legacy had. It yields to the event
+                    # loop (C4a): a blocking sleep here froze every coroutine
+                    # on the server for 0.3 s per client per status.
+                    await asyncio.sleep(0.3)
 
                 # delete errored and finished statuses only after every
                 # subscriber has been sent them
