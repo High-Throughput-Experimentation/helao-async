@@ -133,8 +133,8 @@ DELIBERATELY_ABSENT: Final[frozenset[str]] = frozenset(
         "print_message",
         # Legacy lifecycle internal: OrchHost uses FastAPI's startup event.
         "myinit",
-        # Assigned by the DISPATCH RUNNER at runtime (orch_dispatch.py:1170),
-        # not by construction, on legacy Orch exactly as on OrchHost. A
+        # Assigned by the DISPATCH RUNNER at runtime
+        # (``DispatchRunner._upload_exp_meta_s3``), not by construction, on legacy Orch exactly as on OrchHost. A
         # static scan cannot see it on either, so tracking it as outstanding
         # work would keep this list permanently non-empty for something that
         # is already correct. (``seq_model`` is initialised to None at

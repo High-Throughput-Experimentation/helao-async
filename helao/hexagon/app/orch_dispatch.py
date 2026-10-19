@@ -58,10 +58,6 @@ from helao.helpers.premodels import Action, Experiment
 from helao.helpers.time_utils import gen_uuid
 from helao.helpers.zdeque import zdeque
 from helao.hexagon.app import orch_unpack
-
-LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-
-
 from helao.hexagon.domain.dispatch_policy import (
     DispatchPolicy,
     DrainForStop,
@@ -72,13 +68,15 @@ from helao.hexagon.domain.dispatch_policy import (
     WaitAllActions,
 )
 
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
 # ===========================================================================
 # 4. DispatchRunner (async effect shell)
 # ===========================================================================
 
 
 class DispatchRunner:
-    """Async shell that runs the dispatch FSM: owns the loop task + all effects.
+    """Dispatch helpers the reducer's effects call.
 
     Holds only the ``orch`` back-reference (never a cached attribute), per the
     call-time state resolution rule -- see module docstring. ``self.policy`` is

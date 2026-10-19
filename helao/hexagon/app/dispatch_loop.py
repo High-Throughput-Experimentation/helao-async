@@ -154,12 +154,12 @@ class HexDispatchLoop:
                 if exiting:
                     # that iterate ran the reducer's finalization
                     # (close-outs + stopped-unless-estopped + export) —
-                    # mirror of DispatchRunner.run's _finalize-then-return
+                    # mirror of the retired legacy loop's finalize-then-return
                     return
         except Exception:
             LOGGER.error("serious orch exception occurred")
             LOGGER.error("ERROR: ", exc_info=True)
-            try:  # T13: exception -> estop, like DispatchRunner.run
+            try:  # T13: exception -> estop, like the retired legacy loop
                 await self.runtime.handle(
                     UncaughtLoopException(
                         reason="dispatch loop exception", estop_gen=gen

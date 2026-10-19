@@ -1436,8 +1436,8 @@ class OrchHost(ActionHost):
         ActionHost's startup already ran by the time this fires (Starlette
         preserves registration order), so the live buffer, status log and
         regular updater are running. What legacy's ``myinit`` adds on an
-        orchestrator is ``subscribe_all`` and ``action_server_monitor``; the heartbeat
-        monitor is HexHealthMonitor's.
+        orchestrator is ``subscribe_all`` and ``action_server_monitor``; the
+        heartbeat monitor is HexHealthMonitor's.
         """
 
         @self.on_event("startup")
