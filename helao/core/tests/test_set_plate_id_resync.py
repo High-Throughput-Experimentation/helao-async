@@ -16,7 +16,6 @@ from pathlib import Path
 
 import pytest
 
-from helao.core.drivers.data import sync_driver as legacy_sync
 from helao.core.models.helaodirs import HelaoDirs
 from helao.core.tests.set_plate_id import main
 from helao.core.tests.test_set_plate_id import (
@@ -64,7 +63,7 @@ def _keys(s3: Path, prefix: str) -> set:
     }
 
 
-@pytest.mark.parametrize("mod", [legacy_sync, native_sync], ids=["core", "native"])
+@pytest.mark.parametrize("mod", [native_sync], ids=["native"])
 @pytest.mark.asyncio
 async def test_handback_then_finish_yml_uploads_the_corrected_bodies(
     tmp_path, monkeypatch, mod

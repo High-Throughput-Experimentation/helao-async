@@ -53,7 +53,6 @@ import copy
 
 import pytest
 
-import helao.core.drivers.data.sync_driver as legacy_mod
 import helao.hexagon.adapters.native.sync_driver as native_mod
 from helao.helpers import dispatcher as dispatcher_mod
 from helao.hexagon.tests.sync_fixtures import (
@@ -398,7 +397,7 @@ async def _drive(drv, ymls, uploads):
     return calls, steps
 
 
-@pytest.mark.parametrize("mod", [legacy_mod, native_mod])
+@pytest.mark.parametrize("mod", [native_mod])
 @pytest.mark.asyncio
 async def test_default_chain_golden(tmp_path, mod, monkeypatch):
     fake_hlo = lambda fp: ({"k": "v"}, {"t_s": [0.0], "value": [1.0]})  # noqa: E731
@@ -540,7 +539,7 @@ async def test_default_chain_golden(tmp_path, mod, monkeypatch):
         await teardown_driver(drv)
 
 
-@pytest.mark.parametrize("mod", [legacy_mod, native_mod])
+@pytest.mark.parametrize("mod", [native_mod])
 @pytest.mark.asyncio
 async def test_default_chain_without_auto_analysis_dispatches_nothing(
     tmp_path, mod, monkeypatch

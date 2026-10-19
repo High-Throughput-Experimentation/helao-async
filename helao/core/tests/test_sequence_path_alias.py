@@ -59,7 +59,6 @@ def test_the_syncer_dispatches_the_new_name():
 
     for src in (
         "helao/core/hooks/builtin/dispatch_analysis.py",
-        "helao/core/drivers/data/sync_driver.py",
         "helao/hexagon/adapters/native/sync_driver.py",
     ):
         text = (root / src).read_text(encoding="utf-8")

@@ -37,7 +37,7 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
-from helao.core.drivers.data.sync_driver import SyncDriver
+from helao.hexagon.adapters.native.sync_driver import SyncDriver
 from helao.core.models.helaodirs import HelaoDirs
 from helao.core.models.run_dir import RunDir
 from helao.core.tests._test_utils import TestReporter
@@ -132,7 +132,7 @@ async def _run_checks() -> dict:
             a0 = _make_action(exp_yml, 0, process_finish=False)
             a1 = _make_action(exp_yml, 1, process_finish=True)  # finisher
 
-            from helao.core.drivers.data.sync_driver import HelaoYml
+            from helao.hexagon.adapters.native.sync_driver import HelaoYml
 
             ep = drv.get_progress(exp_yml)
             out["legacy_flag"] = ep.dict["legacy_experiment"] is True
@@ -235,7 +235,7 @@ async def _run_checks() -> dict:
     with tempfile.TemporaryDirectory() as tmp_root:
         drv = _make_driver(tmp_root)
         try:
-            from helao.core.drivers.data.sync_driver import HelaoYml
+            from helao.hexagon.adapters.native.sync_driver import HelaoYml
 
             root = Path(tmp_root)
             exp_yml = _make_exp_tree(
@@ -337,7 +337,7 @@ async def _run_checks() -> dict:
     with tempfile.TemporaryDirectory() as tmp_root:
         drv = _make_driver(tmp_root)
         try:
-            from helao.core.drivers.data.sync_driver import HelaoYml
+            from helao.hexagon.adapters.native.sync_driver import HelaoYml
 
             root = Path(tmp_root)
             exp_yml = _make_exp_tree(

@@ -11,7 +11,6 @@ from pathlib import Path
 
 import pytest
 
-from helao.core.drivers.data.sync_driver import SyncDriver as LegacySyncDriver
 from helao.core.models.run_dir import RunDir
 from helao.hexagon.adapters.native.sync_driver import HelaoYml
 from helao.hexagon.adapters.native.sync_driver import SyncDriver as NativeSyncDriver
@@ -314,9 +313,7 @@ async def test_unrebuildable_group_parked_experiment_finishes(tmp_path):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "cls", [NativeSyncDriver, LegacySyncDriver], ids=["native", "legacy"]
-)
+@pytest.mark.parametrize("cls", [NativeSyncDriver], ids=["native"])
 async def test_late_action_reopens_pushed_group_for_repush(tmp_path, cls):
     """A --restore re-run (or errored retry) shares action_order with the attempt
     that already synced. Its fold must reopen the group so the next pass pushes a
@@ -368,9 +365,7 @@ async def test_late_action_reopens_pushed_group_for_repush(tmp_path, cls):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "cls", [NativeSyncDriver, LegacySyncDriver], ids=["native", "legacy"]
-)
+@pytest.mark.parametrize("cls", [NativeSyncDriver], ids=["native"])
 async def test_later_split_does_not_reopen_pushed_group(tmp_path, cls):
     """Splits share action_order and differ in action_split (and technique). A
     later split is not a re-attempt: the pushed group stays pushed, so there is

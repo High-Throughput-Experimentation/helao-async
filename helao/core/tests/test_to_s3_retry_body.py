@@ -8,7 +8,7 @@ body -- and returned True for it.
 import asyncio
 import json
 
-from helao.core.drivers.data.sync_driver import SyncDriver
+from helao.hexagon.adapters.native.sync_driver import SyncDriver
 from helao.hexagon.tests.sync_fixtures import make_sync_driver, teardown_driver
 
 MSG = {"payload": list(range(50))}

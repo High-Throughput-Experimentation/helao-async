@@ -1,16 +1,16 @@
 # STANDALONE sync_server canary config (P3a special-split, DB). Software-only
-# openapi-surface canary: sync_server wraps driver_classes=[HelaoSyncer]
-# (helao/core/drivers/data/sync_driver.py:2059) and exposes ONLY private/bare
+# openapi-surface canary: sync_server wraps driver_classes=[NativeSyncer]
+# (helao/hexagon/adapters/native/native_syncer.py) and exposes ONLY private/bare
 # endpoints (/finish_yml, /list_pending, /n_queue, /current_progress, ...) --
 # there is no `/{server_key}/{action}` action endpoint and no data-producing
 # action, so a runtime RUNS-tree golden diff is N/A for this server (unlike
 # galil/sample/gamry). The openapi surface (route table + schemas) is the
 # appropriate check here.
 #
-# Step-0 finding: HelaoSyncer.__init__ (sync_driver.py:690) only opens a real
+# Step-0 finding: the syncer's __init__ (SyncDriver) only opens a real
 # AWS session when the `AWS_CONFIG_PATH` env var is set (it is not, on this
 # Linux canary host), so `aws_profile`/`testing` below are inert on Linux --
-# but `self.bucket = self.config_dict["aws_bucket"]` (sync_driver.py:728) is a
+# but `self.bucket = self.config_dict["aws_bucket"]` (native/sync_driver.py) is a
 # REQUIRED key with no fallback and KeyErrors the FastAPI startup event
 # (uncaught in BaseAPI.driver_classes wiring) if absent. `aws_bucket` below is
 # a placeholder string; no real S3 call happens since /finish_yml is never

@@ -350,7 +350,7 @@ async def test_sync_exit_callback_keys_on_the_task_name_not_the_journal_key(
     creates it is ``syncer_loop__<i>``, which is not in ``running_tasks`` (keyed
     by process uuid), so the callback is inert on the live path -- the real clear
     is :meth:`journal_clear` from ``syncer``'s ``finally``. Handed a task named
-    for a process uuid, as :class:`HelaoSyncer` names them, it does clear.
+    for a process uuid, as :class:`SyncDriver` names them, it does clear.
     """
     journal = tmp_path / "ana_pending"
     syncer = _syncer(journal)

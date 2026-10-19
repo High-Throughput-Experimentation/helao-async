@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from helao.core.drivers.data.sync_driver import HelaoYml
+from helao.hexagon.adapters.native.sync_driver import HelaoYml
 from helao.helpers.file_utils import _relative_file_name
 
 

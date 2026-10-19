@@ -218,7 +218,7 @@ class ActionHost(HelaoFastAPI):
 
         self.actionservermodel = ActionServerModel(action_server=self.server)
         # Resolved output directories. In the frozen member surface and read by
-        # HelaoSyncer.__init__ (sync_driver.py:2203) among others -- its absence
+        # NativeSyncer.__init__ (via SyncDriver) among others -- its absence
         # is a startup crash for any driver that writes, not a lazy failure.
         self.helaodirs = helao_dirs(self.world_cfg, self.server.server_name)
         #: This server's append-only run-state journal (spec §4.1). Exactly one

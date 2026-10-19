@@ -27,26 +27,15 @@ requires-python = ">=3.14"
 # helao/). Keeping the target at py312 holds the formatting baseline steady
 # and keeps the source readable on older interpreters.
 target-version = ["py312"]
-# One native re-body module under helao/hexagon/adapters/native/ is a
-# VERBATIM, byte-identical copy of legacy code: sync_driver.py is the P2c
-# re-body of helao/core/drivers/data/sync_driver.py (D1), pinned per-method by
-# inspect.getsource source-parity tests (sync_fixtures.assert_source_parity).
-# The legacy side is NOT black-formatted at line-length 88, so running black
-# on either side of the pair would reformat it and break the byte-identity.
-# BOTH SIDES are excluded: the invariant is "never reformatted", not
-# "currently matches black's output", and a future black release can change
-# its mind about either file. Every other native adapter, including its
+# helao/hexagon/adapters/native/sync_driver.py is excluded: it is the exact
+# bytes the stations ran as the former core twin, and reformatting about 3000
+# lines in the same branch as the cutover would destroy the cheap diff that
+# proves it. A formatting-only follow-up commit drops this exclusion once the
+# cutover is verified on a station. Every other native adapter, including its
 # hand-written NativeSyncAdapter sibling (sync_adapter.py), is black-enforced
 # like the rest of the repo. (No other black config: line length stays the
 # default 88.)
 #
-# Until B7b this list also held four CARDS-P6 write collaborators
-# (meta_writer, data_file, data_stream, finalizer) and their legacy twins
-# under helao/core/servers/. B7b deleted the twins with the engine, and their
-# source-parity pins with them, so those four are black-formatted now.
-#
-# Import SORTING is a different matter and is deliberately NOT excluded:
-# `ruff check --select I` only moves import statements, which for this pair
-# sit above the pinned region. sync_fixtures' assert_region_holds_no_imports
-# fails loud if that stops being true.
-force-exclude = 'helao/(hexagon/adapters/native/sync_driver|core/drivers/data/sync_driver)\.py'
+# Import SORTING is not excluded: `ruff check --select I` only moves import
+# statements.
+force-exclude = 'helao/hexagon/adapters/native/sync_driver\.py'

@@ -605,7 +605,7 @@ Shared by every action server (`ActionHost`):
 | `enable_aligner` / `bokeh_port` | — / `port + 1000` | Motion servers: host the Bokeh plate aligner on a second port. Preflight reserves it; `validateConfig` does not. |
 | `positions` | — | Sample-archive positions. At most one server per config may declare it (see [Validation rules](#validation-rules)). |
 
-`SYNC` (`sync_server`, `HelaoSyncer`). An orchestrator or other host that
+`SYNC` (`sync_server`, `NativeSyncer`). An orchestrator or other host that
 builds a syncer without its own `aws_config_path` reads these from the `SYNC`
 entry:
 

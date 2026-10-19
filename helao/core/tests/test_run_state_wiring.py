@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from helao.core.drivers.data.sync_driver import SyncDriver
+from helao.hexagon.adapters.native.sync_driver import SyncDriver
 from helao.helpers.run_state import (
     ACTIVE,
     DONE,
@@ -213,7 +213,7 @@ def test_a_corrupt_journal_is_rebuilt_from_the_run_tree(tmp_path: Path):
 
 def test_a_degraded_rebuild_is_escalated(tmp_path: Path, monkeypatch):
     """Plan A8: an unreadable directory means records that will never sync."""
-    from helao.core.drivers.data import sync_driver
+    from helao.hexagon.adapters.native import sync_driver
 
     driver = _fake_syncer(tmp_path)
     journal_of(driver).states_root.mkdir(parents=True, exist_ok=True)

@@ -1,6 +1,6 @@
 """Unit test for the off-loop (``asyncio.to_thread``) sync I/O in sync_driver.
 
-``HelaoSyncer``/``SyncDriver`` run their ``syncer`` worker coroutines on the
+``SyncDriver`` runs its ``syncer`` worker coroutines on the
 hosting FastAPI server's event loop. The heavy steps in ``sync_yml`` --
 boto3 S3 uploads and ``read_hlo``/``hlo_to_parquet`` parsing -- are blocking;
 if they run inline they freeze the loop and the whole server (every endpoint)
@@ -33,7 +33,7 @@ import time
 import traceback
 from pathlib import Path
 
-from helao.core.drivers.data.sync_driver import SyncDriver
+from helao.hexagon.adapters.native.sync_driver import SyncDriver
 from helao.core.models.helaodirs import HelaoDirs
 from helao.core.models.run_dir import RunDir
 from helao.core.tests._test_utils import TestReporter

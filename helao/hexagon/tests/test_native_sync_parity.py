@@ -1,27 +1,26 @@
-"""P2c D3 gate: direct-drive on-tree parity, legacy vs native SyncDriver.
+"""P2c D3 gate: direct-drive on-tree parity of the native SyncDriver.
 
 Input: a pre-sync RUNS_FINISHED tree reconstructed from the GM-1 golden via
-the LEGACY reset_sync (the goldens are post-sync; reset_sync is the
-pipeline's own reversal, proven by the GM-5 flow). Both drivers consume
-byte-identical copies of that tree with a RecordingS3Client; outputs are
-compared with harness.parity.run_parity — THE golden gate comparator —
-asserting 0 diffs across the run tree, PROCESSES -prc.yml, S3_SIM payloads,
-and manifest.jsonl (internal_s3_checks additionally asserts the 2 intentional
-S3-vs-disk quirks on BOTH outputs).
+the native ``reset_sync`` (the goldens are post-sync; reset_sync is the
+pipeline's own reversal). Two copies of that tree are driven with a
+RecordingS3Client -- one through the raw driver, one through
+``NativeSyncAdapter`` -- and outputs are compared with harness.parity.run_parity
+-- THE golden gate comparator -- asserting 0 diffs across the run tree,
+PROCESSES -prc.yml, S3_SIM payloads, and manifest.jsonl.
 
 Since Task 10 the pipeline neither promotes nor zips (spec D9), so the
 post-sync tree compared here is the input tree plus its ``.prg`` receipts,
 not a RUNS_SYNCED zip. The GM-1 golden was captured under the old pipeline,
-so the F1a golden compare below necessarily lands in its artifact-bounded
-branch: legacy diverges from the golden and native must diverge by exactly
+so the golden compare lands in its artifact-bounded branch: the re-driven
+tree diverges from the golden, and a second re-drive must diverge by exactly
 the same amount.
 
-CONTROLLER F1 additions (strengthen the gate beyond legacy-vs-native, which
-is tautological since both drivers are byte-identical bodies):
-- F1a: compares a re-driven tree (native and legacy) against the immutable
-  committed GOLDEN itself, not just against each other.
-- F1b: drives one side through NativeSyncAdapter (not the raw driver), to
-  exercise the adapter's delegation surface in the gate."""
+The core twin this once ran against is deleted; the two sides here are both
+native, so the raw-versus-raw comparison is a determinism check, not an
+independent baseline. The independent baseline is the committed GOLDEN in the
+F1a section.
+
+Needs the GM-1 golden set (``HELAO_GOLDENS``); skipped where it is absent."""
 
 import glob as globmod
 import json
@@ -32,7 +31,6 @@ from pathlib import Path
 import pytest
 
 from harness.parity import run_parity
-from helao.core.drivers.data.sync_driver import SyncDriver as LegacySyncDriver
 from helao.core.models.helaodirs import HelaoDirs
 from helao.core.models.run_dir import RunDir
 from helao.deploy.test.servers.action.sim_db_server import RecordingS3Client
@@ -67,14 +65,14 @@ def _hd(root: Path) -> HelaoDirs:
 
 
 async def _reconstruct_input(tmp_path: Path) -> Path:
-    """Golden post-sync root -> pre-sync RUNS_FINISHED tree (legacy reset_sync)."""
+    """Golden post-sync root -> pre-sync RUNS_FINISHED tree (native reset_sync)."""
     stage = tmp_path / "stage"
     shutil.copytree(GOLDEN / "root", stage)
     zips = globmod.glob(
         str(stage / RunDir.SYNCED.value / "**" / "*.zip"), recursive=True
     )
     assert len(zips) == 1, f"expected exactly one synced sequence zip, got {zips}"
-    prep = LegacySyncDriver(CFG, _hd(stage))
+    prep = NativeSyncDriver(CFG, _hd(stage))
     try:
         assert prep.reset_sync(zips[0]) is True
     finally:
@@ -120,46 +118,46 @@ async def _drive(root: Path, driver_cls) -> None:
     ), f"{driver_cls.__module__}: unsynced ymls remain: {leftovers}"
 
 
-def _assert_zero_diffs(legacy_set: Path, native_root: Path, tag: str) -> None:
-    report = run_parity(legacy_set, native_root)
+def _assert_zero_diffs(raw_set: Path, native_root: Path, tag: str) -> None:
+    report = run_parity(raw_set, native_root)
     assert report["status"] == "pass" and report["n_diffs"] == 0, (
-        f"[{tag}] legacy-vs-native sync parity failed "
+        f"[{tag}] raw-vs-second-drive sync parity failed "
         f"(run {report['run_id']}):\n{json.dumps(report, indent=2, default=str)}"
     )
 
 
 async def _prepare_both_sides(tmp_path: Path):
     stage = await _reconstruct_input(tmp_path)
-    legacy_set = tmp_path / "legacy_set"
-    legacy_set.mkdir()
-    shutil.copytree(stage, legacy_set / "root")
-    shutil.copy(GOLDEN / "provenance.yml", legacy_set / "provenance.yml")
+    raw_set = tmp_path / "raw_set"
+    raw_set.mkdir()
+    shutil.copytree(stage, raw_set / "root")
+    shutil.copy(GOLDEN / "provenance.yml", raw_set / "provenance.yml")
     native_root = tmp_path / "native_root"
     shutil.copytree(stage, native_root)
-    await _drive(legacy_set / "root", LegacySyncDriver)
+    await _drive(raw_set / "root", NativeSyncDriver)
     await _drive(native_root, NativeSyncDriver)
-    return legacy_set, native_root
+    return raw_set, native_root
 
 
 @pytest.mark.asyncio
 async def test_direct_drive_tree_parity(tmp_path):
-    legacy_set, native_root = await _prepare_both_sides(tmp_path)
-    _assert_zero_diffs(legacy_set, native_root, "full-sync")
+    raw_set, native_root = await _prepare_both_sides(tmp_path)
+    _assert_zero_diffs(raw_set, native_root, "full-sync")
 
     # --- F1a: non-tautological immutable-golden check --------------------
-    # The legacy-vs-native compare above is tautological (byte-identical
+    # The raw-vs-second-drive compare above is tautological (byte-identical
     # driver bodies trivially match). Additionally compare each re-driven
     # side against the immutable committed GOLDEN itself. reset_sync then
     # re-sync is not guaranteed to be a perfect identity under the
-    # comparator, so gate the strong assertion on whether legacy itself
+    # comparator, so gate the strong assertion on whether the raw run itself
     # round-trips clean against the golden.
-    legacy_vs_golden = run_parity(GOLDEN, legacy_set / "root")
+    raw_vs_golden = run_parity(GOLDEN, raw_set / "root")
     native_vs_golden = run_parity(GOLDEN, native_root)
-    if legacy_vs_golden["n_diffs"] == 0:
+    if raw_vs_golden["n_diffs"] == 0:
         # Reconstruction is a clean round-trip -> native must reproduce the
         # immutable golden bytes exactly. This is the strong, non-tautological
         # gate: native output == the real captured GM-1 run, not just == a
-        # freshly-run legacy sibling.
+        # freshly-run raw sibling.
         assert native_vs_golden["n_diffs"] == 0, (
             "[golden] native failed to reproduce immutable GM-1 golden bytes "
             f"(run {native_vs_golden['run_id']}):\n"
@@ -167,18 +165,18 @@ async def test_direct_drive_tree_parity(tmp_path):
         )
     else:
         # reset_sync -> finish_pending round-trip is not a perfect identity
-        # under the comparator (legacy itself diverges from the golden), so
+        # under the comparator (the raw run itself diverges from the golden), so
         # the golden compare is artifact-bounded and can't cleanly isolate
         # native drift on its own. The primary byte-parity gate is the
-        # legacy-vs-native 0-diff assertion above; here we additionally
+        # raw-vs-second-drive 0-diff assertion above; here we additionally
         # require native to diverge from the golden by EXACTLY the same
-        # amount as legacy does (no additional native-introduced drift).
-        assert native_vs_golden["n_diffs"] == legacy_vs_golden["n_diffs"], (
+        # amount as the raw run does (no additional native-introduced drift).
+        assert native_vs_golden["n_diffs"] == raw_vs_golden["n_diffs"], (
             "[golden] native introduced additional drift vs golden beyond "
-            "legacy's own reset-round-trip artifacts "
-            f"(legacy={legacy_vs_golden['n_diffs']} diffs, "
+            "the raw run's own reset-round-trip artifacts "
+            f"(raw={raw_vs_golden['n_diffs']} diffs, "
             f"native={native_vs_golden['n_diffs']} diffs):\n"
-            f"legacy_vs_golden={json.dumps(legacy_vs_golden, indent=2, default=str)}\n"
+            f"raw_vs_golden={json.dumps(raw_vs_golden, indent=2, default=str)}\n"
             f"native_vs_golden={json.dumps(native_vs_golden, indent=2, default=str)}"
         )
 
@@ -195,9 +193,9 @@ async def test_a_second_finish_pending_is_a_no_op(tmp_path):
     drivers, and leave the tree byte-identical. Without the ``.prg`` filter
     in ``list_pending*`` (plan A1) every record would be re-enqueued here.
     """
-    legacy_set, native_root = await _prepare_both_sides(tmp_path)
+    raw_set, native_root = await _prepare_both_sides(tmp_path)
     for root, driver_cls in (
-        (legacy_set / "root", LegacySyncDriver),
+        (raw_set / "root", NativeSyncDriver),
         (native_root, NativeSyncDriver),
     ):
         drv = driver_cls(CFG, _hd(root))
@@ -209,24 +207,24 @@ async def test_a_second_finish_pending_is_a_no_op(tmp_path):
         finally:
             await teardown_driver(drv)
         assert _unsynced(root) == []
-    _assert_zero_diffs(legacy_set, native_root, "second-pass")
+    _assert_zero_diffs(raw_set, native_root, "second-pass")
 
 
 @pytest.mark.asyncio
 async def test_native_sync_adapter_drives_parity(tmp_path):
     """F1b: exercise NativeSyncAdapter's delegation surface (not just the raw
     NativeSyncDriver) in the gate. One side is driven through the adapter,
-    the other through the raw legacy driver; outputs must still show 0
+    the other through the raw driver; outputs must still show 0
     diffs under run_parity."""
     stage = await _reconstruct_input(tmp_path)
-    legacy_set = tmp_path / "legacy_set"
-    legacy_set.mkdir()
-    shutil.copytree(stage, legacy_set / "root")
-    shutil.copy(GOLDEN / "provenance.yml", legacy_set / "provenance.yml")
+    raw_set = tmp_path / "raw_set"
+    raw_set.mkdir()
+    shutil.copytree(stage, raw_set / "root")
+    shutil.copy(GOLDEN / "provenance.yml", raw_set / "provenance.yml")
     native_root = tmp_path / "native_root"
     shutil.copytree(stage, native_root)
 
-    await _drive(legacy_set / "root", LegacySyncDriver)
+    await _drive(raw_set / "root", NativeSyncDriver)
 
     adapter = NativeSyncAdapter(NativeSyncDriver(CFG, _hd(native_root)))
     adapter._syncer.s3 = RecordingS3Client(native_root / "S3_SIM")
@@ -238,4 +236,4 @@ async def test_native_sync_adapter_drives_parity(tmp_path):
     leftovers = _unsynced(native_root)
     assert leftovers == [], f"adapter-routed: unsynced ymls remain: {leftovers}"
 
-    _assert_zero_diffs(legacy_set, native_root, "adapter-routed")
+    _assert_zero_diffs(raw_set, native_root, "adapter-routed")

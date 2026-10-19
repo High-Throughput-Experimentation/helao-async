@@ -1,6 +1,6 @@
 """Port of unit_test_sync_to_thread.py onto the NATIVE SyncDriver (P2c T10).
 
-``HelaoSyncer``/``SyncDriver`` run their ``syncer`` worker coroutines on the
+``SyncDriver`` runs its ``syncer`` worker coroutines on the
 hosting FastAPI server's event loop. The heavy steps in ``sync_yml`` --
 boto3 S3 uploads and ``read_hlo``/``hlo_to_parquet`` parsing -- are blocking;
 if they run inline they freeze the loop and the whole server (every endpoint)

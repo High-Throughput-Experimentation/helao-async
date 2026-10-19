@@ -1,27 +1,21 @@
-"""Native sync pipeline (hexagon P2c).
+"""Native sync pipeline (hexagon P2c): the module helpers, ``AsyncRWLock``,
+``HelaoYml``, ``Progress`` and ``SyncDriver``, the only sync implementation.
 
-Verbatim re-body of the legacy sync driver
-(``helao/core/drivers/data/sync_driver.py``): the module helpers,
-``AsyncRWLock``, ``HelaoYml``, ``Progress``, and ``SyncDriver`` are
-byte-identical copies of legacy lines 62-2057, source-parity-pinned per
-member by ``test_native_sync_pins.py`` — including the 728a663c
-process-recovery surface (``update_process`` unified metas,
-``reconcile_processes`` cross-run replay, ``sync_process`` phantom-group
-drop, estopped-children-terminal gate in ``sync_yml``). Class names are NOT
-renamed: the copied bodies construct ``HelaoYml(...)`` / ``Progress(...)``
-by name, so renaming would break byte-identity (D1).
+This is the body the stations ran as the former core twin, carried over
+byte for byte, including the 728a663c process-recovery surface
+(``update_process`` unified metas, ``reconcile_processes`` cross-run replay,
+``sync_process`` phantom-group drop, estopped-children-terminal gate in
+``sync_yml``). Class names are NOT renamed: the bodies construct
+``HelaoYml(...)`` / ``Progress(...)`` by name.
 
-The ONLY legacy import dropped is ``helao.core.servers.base.Base`` (D2):
-the Base-coupled ``HelaoSyncer`` subclass is replaced by ``NativeSyncer``
-(in ``native_syncer.py``), which
-replicates its config resolution against the narrow ``SyncerHost``
-protocol — so this module imports only ``helao.helpers.*`` /
+The former Base-coupled syncer subclass is replaced by ``NativeSyncer``
+(in ``native_syncer.py``), which resolves its config against the narrow
+``SyncerHost`` protocol, so this module imports only ``helao.helpers.*`` /
 ``helao.core.models.*`` and passes the adapters/native boundary rule.
 
-Black-force-excluded (pyproject.toml): the legacy source is not black-clean
-at 88. Only this docstring, the pyright file-scope suppression, ``__all__``,
-two import-header lines (Base dropped, ``Protocol`` added to the typing
-import), and the native-only section differ from legacy.
+Black-force-excluded (pyproject.toml): these are the exact bytes the stations
+ran, and reformatting them would destroy the cheap diff that shows it. A
+formatting-only follow-up drops the exclusion.
 """
 
 # pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportCallIssue=false, reportOptionalMemberAccess=false, reportOptionalSubscript=false

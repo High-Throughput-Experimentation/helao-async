@@ -11,6 +11,8 @@ What each test can catch that the others cannot:
   ``app.driver`` exists, and their routes read the port at call time.
 """
 
+import ast
+import importlib.util
 import inspect
 from pathlib import Path
 from types import SimpleNamespace
@@ -359,3 +361,40 @@ def test_analysis_syncer_rides_native_to_s3():
 
     assert issubclass(AnalysisSyncer, NativeSyncer)
     assert AnalysisSyncer.to_s3 is SyncDriver.to_s3
+
+
+# --------------------------------------------------------------------------
+# single implementation: the core twin must not come back
+# --------------------------------------------------------------------------
+
+_OLD = "helao.core.drivers.data.sync_driver"
+_OLD_PKG = "helao.core.drivers.data"
+
+
+def _old_syncer_imports(root: Path) -> list:
+    hits = []
+    for top in ("helao", "harness"):
+        for path in (root / top).rglob("*.py"):
+            try:
+                tree = ast.parse(path.read_text(encoding="utf-8"))
+            except (SyntaxError, UnicodeDecodeError):
+                continue
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    bad = any(a.name == _OLD for a in node.names)
+                elif isinstance(node, ast.ImportFrom):
+                    bad = node.module == _OLD or (
+                        node.module == _OLD_PKG
+                        and any(a.name == "sync_driver" for a in node.names)
+                    )
+                else:
+                    continue
+                if bad:
+                    hits.append(f"{path.relative_to(root)}:{node.lineno}")
+    return hits
+
+
+def test_sync_single_implementation():
+    root = Path(__file__).resolve().parents[3]
+    assert importlib.util.find_spec(_OLD) is None
+    assert _old_syncer_imports(root) == []

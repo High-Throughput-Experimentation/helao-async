@@ -26,7 +26,7 @@ from uuid import UUID
 import pytest
 
 import helao.helpers.yml_tools as yml_tools_module
-from helao.core.drivers.data.sync_driver import HelaoYml, SyncDriver
+from helao.hexagon.adapters.native.sync_driver import HelaoYml, SyncDriver
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.machine import MachineModel
