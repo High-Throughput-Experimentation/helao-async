@@ -364,10 +364,6 @@
       "event": "put_lbuf"
     },
     {
-      "event": "intent_call",
-      "method": "intend_none"
-    },
-    {
       "event": "move_dir",
       "kind": "experiment"
     },

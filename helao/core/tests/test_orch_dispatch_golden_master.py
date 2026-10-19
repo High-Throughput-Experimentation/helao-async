@@ -9,8 +9,9 @@ state-machine instead of the PAL driver.
 
 What is REAL (driven, unmodified, the shipped orchestrator code):
 
-* ``OrchHost.dispatch_loop_task`` / ``loop_task_dispatch_sequence`` /
-  ``loop_task_dispatch_experiment`` / ``loop_task_dispatch_action`` /
+* The reducer runtime that production dispatches through:
+  ``HexRuntime.handle(StartRequested())`` then
+  ``HexDispatchLoop._run_started_phase`` and ``OrchCommandRunner``, plus
   ``wait_for_interrupt`` / the intent methods (``intend_skip`` /
   ``intend_stop`` / ``intend_estop`` / ``intend_none``) / the global-param
   fold-in and fold-out blocks / ``estop_loop`` / ``estop_actions`` /
@@ -20,9 +21,11 @@ What is REAL (driven, unmodified, the shipped orchestrator code):
 * ``OrchHost`` is constructed via ``OrchHost.__new__`` + a minimal attribute
   fixture that bypasses ``__init__`` entirely (no FastAPI app, no disk I/O
   paths, no NTP), then ``_init_orch_collaborators()`` and ``_build_reducer()``
-  over a ``PortWiring`` carrying ``LegacyLoggingAdapter`` and
-  ``LegacyHealthAdapter`` -- the same bypass strategy the PAL harness uses
-  for ``PAL``.
+  over a ``PortWiring`` carrying ``LegacyLoggingAdapter`` and a health stub
+  (``_OkHealth``: every endpoint reports available, because the stock
+  ``LegacyHealthAdapter`` HEAD-probes real servers that do not exist here and
+  the reducer would stop at once) -- the same bypass strategy the PAL harness
+  uses for ``PAL``.
 
 What is FAKED/STUBBED (the harness surface):
 
@@ -33,7 +36,7 @@ What is FAKED/STUBBED (the harness surface):
   successful blocking dispatch it also schedules a background "status ping"
   that drives the REAL ``OrchHost.update_status`` with a canned finished
   ``ActionServerModel`` a couple of event-loop ticks later -- this is what
-  unblocks ``dispatch_loop_task``'s own ``action_history`` wait-loop and the
+  unblocks the dispatch loop's own ``action_history`` wait-loop and the
   ``ActionStartCondition`` wait predicates using the REAL status-ingestion
   code, without any real network I/O or real wall-clock waiting.
 * ``async_private_dispatcher`` -- no-op recorder returning ``({}, none)``.
@@ -139,10 +142,10 @@ from helao.core.models.server import ActionServerModel, EndpointModel, GlobalSta
 from helao.helpers.dequedict import DequeDict
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.zdeque import zdeque
-from helao.hexagon.adapters.shared.health import LegacyHealthAdapter
 from helao.hexagon.adapters.shared.logging_adapter import LegacyLoggingAdapter
 from helao.hexagon.app.orch_host import OrchHost
 from helao.hexagon.app.wiring import PortWiring
+from helao.hexagon.domain.orchestration import StartRequested
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 # Scratch outputs of the default mode (gitignored).
@@ -181,6 +184,19 @@ def _json_safe(obj):
 # ---------------------------------------------------------------------------
 # OrchHost fixture construction (__init__ bypass, mirrors PAL's PAL.__new__)
 # ---------------------------------------------------------------------------
+
+
+class _OkHealth:
+    """Health port that reports every endpoint reachable (no real servers here)."""
+
+    async def endpoints_available(self, urls):
+        return [(u, True) for u in urls]
+
+    async def ping_action_servers(self):
+        return {}
+
+    def status_summary(self):
+        return {}
 
 
 def _make_orch(tmp_root: Path) -> OrchHost:
@@ -282,7 +298,7 @@ def _make_orch(tmp_root: Path) -> OrchHost:
 
     orch._init_orch_collaborators()
     orch.hexagon_wiring = PortWiring(
-        logging=LegacyLoggingAdapter(), health=LegacyHealthAdapter()
+        logging=LegacyLoggingAdapter(), health=_OkHealth()  # type: ignore[arg-type]
     )
     orch._build_reducer()
     assert type(orch) is OrchHost
@@ -633,7 +649,7 @@ def make_fake_action_dispatcher(
         # A finished/errored status ping is delivered regardless of whether
         # the RETURNED action carries an error_code -- a real action server
         # eventually reports a terminal status for every action it accepted
-        # (dispatch_loop_task's own action_history wait-loop, unconditional
+        # (the dispatch loop's own action_history wait-loop, unconditional
         # on any action_dq turn, would otherwise hang on `None`/an
         # unregistered uuid; see scenario 5/6/7 comments). Only an explicit
         # script directive suppresses it (used to keep a seeded occupancy
@@ -849,8 +865,9 @@ async def _run_all_ticks(n: int = 3) -> None:
 
 
 async def _drain(orch: OrchHost) -> None:
-    """Await dispatch_loop_task; also let any trailing background tasks flush."""
-    await orch.dispatch_loop_task()
+    """Run one reducer started-phase inline, which is what production runs."""
+    await orch._hex_runtime.handle(StartRequested())
+    await orch._hex_loop._run_started_phase()
     await _run_all_ticks(5)
 
 
@@ -1140,7 +1157,7 @@ async def _scenario_5(tmp_root: Path) -> dict:
     # first, so `last_dispatched_action_uuid` is already registered in
     # `action_history` by the time skip fires -- otherwise (a skip as the
     # very first thing an orchestrator does in its process lifetime, before
-    # ever dispatching anything) dispatch_loop_task's own post-dispatch wait
+    # ever dispatching anything) the dispatch loop's own post-dispatch wait
     # loop (`while last_dispatched_action_uuid not in action_history.keys()`)
     # spins forever on `None`, since skip never calls track_action_uuid. That
     # is a real, pre-existing property of the unmodified code (not something
@@ -1227,7 +1244,7 @@ async def _scenario_6(tmp_root: Path) -> dict:
     # a priming action dispatches+completes first for the same reason as
     # scenario 5 (see its comment): a dispatch-level failure never calls
     # track_action_uuid, so `last_dispatched_action_uuid` must already be a
-    # registered uuid or dispatch_loop_task's post-dispatch wait-loop hangs.
+    # registered uuid or the dispatch loop's post-dispatch wait-loop hangs.
     seq = _mk_sequence(
         [
             {
