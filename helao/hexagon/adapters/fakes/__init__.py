@@ -14,7 +14,6 @@ from typing import Optional
 
 from helao.hexagon.domain.models import (
     Action,
-    ActionServerModel,
     DataModel,
     ErrorCodes,
 )
@@ -105,7 +104,6 @@ class FakeArtifactStore:
     def __init__(self):
         _banner("FakeArtifactStore")
         self.writes: list[tuple[str, object]] = []
-        self.data_lines: list[tuple[object, object]] = []
         self.moved: list[object] = []
         self.finished: list[object] = []
 
@@ -117,18 +115,6 @@ class FakeArtifactStore:
 
     async def write_seq(self, sequence) -> None:
         self.writes.append(("seq", sequence))
-
-    async def write_data_line(self, action, file_conn_key, payload) -> None:
-        self.data_lines.append((file_conn_key, payload))
-
-    async def close_streams(self, action) -> None:
-        pass
-
-    async def write_one_shot(
-        self, action, output_str, file_type, filename, header
-    ) -> Optional[str]:
-        self.writes.append(("one_shot", filename))
-        return filename
 
     async def finish(self, action) -> None:
         self.finished.append(action)
@@ -223,7 +209,6 @@ class FakeStatusPush:
     def __init__(self):
         _banner("FakeStatusPush")
         self.clients: list[tuple[str, str, int]] = []
-        self.sent: list[ActionServerModel] = []
         self.nonblocking: list[tuple] = []
         self.published: list[tuple[str, dict]] = []
 
@@ -235,9 +220,6 @@ class FakeStatusPush:
 
     async def detach_client(self, client_servkey, client_host, client_port) -> None:
         self.clients.remove((client_servkey, client_host, client_port))
-
-    async def send_status(self, asm, retries: int = 5) -> None:
-        self.sent.append(asm)
 
     async def send_nonblocking_status(
         self,

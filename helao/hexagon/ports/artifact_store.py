@@ -1,7 +1,9 @@
 """ArtifactStore port (spec §4.3.3): meta ymls, HLO streams, promotion, zip.
 
 Abstracts MetaFileWriter + DataFileWriter/DataStreamer file side + move_dir +
-yml_finisher. ALL semantics below are parity-critical (spec §5):
+yml_finisher. ALL semantics below are parity-critical (spec §5). The streamed-hlo and
+one-shot bullets are carried out by the native data writers; this port keeps
+the meta, finish, promotion and zip members:
 
 - Atomic yml writes (temp file + os.replace), trailing newline,
   ``file_type:`` first key.
@@ -32,8 +34,7 @@ yml_finisher. ALL semantics below are parity-critical (spec §5):
 """
 
 from pathlib import Path
-from typing import Optional, Protocol, runtime_checkable
-from uuid import UUID
+from typing import Protocol, runtime_checkable
 
 from helao.hexagon.domain.models import Action, Experiment, Sequence
 
@@ -48,28 +49,6 @@ class ArtifactStorePort(Protocol):
     async def write_exp(self, experiment: Experiment) -> None: ...
 
     async def write_seq(self, sequence: Sequence) -> None: ...
-
-    # --- streamed hlo (lazy open contract in module docstring) ---
-    async def write_data_line(
-        self, action: Action, file_conn_key: UUID, payload: object
-    ) -> None:
-        """Open-on-first-call for this key; header + %% precede the row."""
-        ...
-
-    async def close_streams(self, action: Action) -> None:
-        """Close every open file handle for this action (finish step 3 /
-        substitute)."""
-        ...
-
-    # --- one-shot files ---
-    async def write_one_shot(
-        self,
-        action: Action,
-        output_str: str,
-        file_type: str,
-        filename: Optional[str],
-        header: Optional[str],
-    ) -> Optional[str]: ...
 
     # --- finish + promotion ---
     async def finish(self, action: Action) -> None:

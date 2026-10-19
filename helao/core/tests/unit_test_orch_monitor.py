@@ -14,14 +14,11 @@ network):
   2. ``ping_action_servers`` skips ``DB``/``ANA``/``ignore_heartbeats``/bokeh
      servers and classifies busy/idle/unreachable identically to the
      pre-extraction inline method.
-  3. ``active_action_monitor`` calls ``orch.stop()`` (and sets
-     ``current_stop_message``) when an active endpoint is unreachable, and is
-     a no-op when the loop isn't started / nothing is active.
-  4. ``action_server_monitor`` refreshes ``orch.status_summary`` via
+  3. ``action_server_monitor`` refreshes ``orch.status_summary`` via
      ``ping_action_servers``.
 
-Hermetic: the module-level ``async_private_dispatcher``/``endpoints_available``
-names ``orch_monitor`` imports are monkeypatched for the duration of each
+Hermetic: the module-level ``async_private_dispatcher``
+name ``orch_monitor`` imports is monkeypatched for the duration of each
 check; no network, no AWS/API configured.
 """
 
@@ -44,11 +41,6 @@ class _FakeGlobalStatusModel:
     def __init__(self, loop_state=LoopStatus.stopped, active_dict=None):
         self.loop_state = loop_state
         self.active_dict = active_dict or {}
-
-
-class _FakeActionModel:
-    def __init__(self, url):
-        self.url = url
 
 
 class _FakeServer:
@@ -182,37 +174,6 @@ async def _check_ping_action_servers() -> bool:
     )
 
 
-async def _check_active_action_monitor_stops_on_unreachable() -> bool:
-    orch = _FakeOrch({})
-    orch.globalstatusmodel = _FakeGlobalStatusModel(
-        loop_state=LoopStatus.started,
-        active_dict={"a1": _FakeActionModel("http://127.0.0.1:8001/SRV1/act")},
-    )
-
-    async def _fake_endpoints_available(urls):
-        return [], [(u, "down") for u in urls]
-
-    orig = om.endpoints_available
-    om.endpoints_available = _fake_endpoints_available
-    try:
-        monitor = om.ServerMonitor(orch)
-        await _run_one_iteration(monitor.active_action_monitor())
-    finally:
-        om.endpoints_available = orig
-
-    return orch.stop_calls == 1 and "SRV1/act" in orch.current_stop_message
-
-
-async def _check_active_action_monitor_idle_noop() -> bool:
-    orch = _FakeOrch({})
-    orch.globalstatusmodel = _FakeGlobalStatusModel(loop_state=LoopStatus.stopped)
-
-    monitor = om.ServerMonitor(orch)
-    await _run_one_iteration(monitor.active_action_monitor())
-
-    return orch.stop_calls == 0
-
-
 async def _check_action_server_monitor_refreshes_status() -> bool:
     orch = _FakeOrch({"SRV1": {"host": "127.0.0.1", "port": 8001}})
 
@@ -235,8 +196,6 @@ async def _run_checks() -> dict:
         "subscribe_all_all_succeed": await _check_subscribe_all_all_succeed(),
         "subscribe_all_partial_failure": await _check_subscribe_all_partial_failure(),
         "ping_action_servers": await _check_ping_action_servers(),
-        "active_action_monitor_stops": await _check_active_action_monitor_stops_on_unreachable(),
-        "active_action_monitor_idle_noop": await _check_active_action_monitor_idle_noop(),
         "action_server_monitor_refreshes": await _check_action_server_monitor_refreshes_status(),
     }
 
@@ -264,16 +223,6 @@ def orch_monitor_unit_test() -> bool:
     reporter.check(
         "skips DB/ANA/ignore_heartbeats/bokeh and classifies idle/unreachable",
         lambda: res["ping_action_servers"],
-    )
-
-    reporter.section("active_action_monitor")
-    reporter.check(
-        "stops orch and records message when active endpoint unreachable",
-        lambda: res["active_action_monitor_stops"],
-    )
-    reporter.check(
-        "no-op when loop not started / nothing active",
-        lambda: res["active_action_monitor_idle_noop"],
     )
 
     reporter.section("action_server_monitor")

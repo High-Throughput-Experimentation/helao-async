@@ -1,7 +1,6 @@
 """StatusPort adapter: wire-level status push over the legacy dispatcher.
 
-Wraps the SAME wire calls base_status's broadcaster makes: private
-/update_status (full ActionServerModel + regular_task flag) and
+Wraps the SAME wire call base_status's broadcaster makes: private
 /update_nonblocking (an actionmodel body + the reporting server's own
 host/port). Keeps its own client registry (attach/detach). The WS publish_*
 members are WIRED (P2b-2 — DD-7 discharged): they delegate to a
@@ -35,7 +34,7 @@ parameter to ``Optional[UUID]`` to accept that and passes it through as
 ``None`` in the actionmodel body when absent.
 
 Third drift (P1b2b Task 6, adapter-local fix): the real ``/update_nonblocking``
-endpoint's ``Orch.update_nonblocking`` (orch_status_sync.py) unconditionally
+endpoint's ``update_nonblocking`` (``HexStatusIngestion``) unconditionally
 f-string-formats ``actionmodel.action_timestamp`` with a ``%m-%d %H:%M:%S``
 format spec (``f"{actionmodel.action_timestamp: %m-%d %H:%M:%S}"``), which
 raises on ``None`` (``NoneType.__format__`` rejects a format spec). This
@@ -51,7 +50,6 @@ from uuid import UUID
 from helao.helpers.dispatcher import async_private_dispatcher
 from helao.hexagon.adapters.errors import UnwiredPortError
 from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
-from helao.hexagon.domain.models import ActionServerModel
 
 __all__ = ["DispatcherStatusAdapter"]
 
@@ -90,20 +88,6 @@ class DispatcherStatusAdapter:
             self.clients.remove((client_servkey, client_host, client_port))
         except ValueError:
             pass  # legacy detach tolerates unknown clients
-
-    async def send_status(self, asm: ActionServerModel, retries: int = 5) -> None:
-        for client_servkey, host, port in list(self.clients):
-            for _ in range(retries):
-                resp, _err = await async_private_dispatcher(
-                    client_servkey,
-                    host,
-                    port,
-                    "update_status",
-                    {},
-                    {"actionservermodel": asm.as_dict()},
-                )
-                if resp is not None:
-                    break
 
     async def send_nonblocking_status(
         self,

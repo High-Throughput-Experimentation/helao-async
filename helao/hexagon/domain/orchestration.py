@@ -137,7 +137,7 @@ class PlateGateFailed:
 
 @dataclass(frozen=True)
 class HeartbeatFailed:
-    """active_action_monitor probe failure (T12 + alert). P2a: carries the
+    """HexHealthMonitor probe failure (formerly active_action_monitor; T12 + alert). P2a: carries the
     dead server's active action uuids (stringified) so the reducer can order
     a PruneDeadActions — the pure-hexagon dead-peer exit (decision Q3)."""
 

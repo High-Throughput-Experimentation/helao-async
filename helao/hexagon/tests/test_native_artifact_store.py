@@ -61,26 +61,6 @@ async def test_meta_members_require_bound_base(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_stream_members_require_active_handle(tmp_path):
-    store = _store()
-    base = make_base(str(tmp_path / "RUNS_ACTIVE"))
-    active, dflt = mk_active(base)
-    with pytest.raises(UnwiredPortError):
-        await store.write_one_shot(active.action, "x", "t", "f.csv", None)
-    streamer, file_writer, finalizer = store.collaborators_for(active)
-    active.data_stream = streamer  # type: ignore[reportAttributeAccessIssue]
-    active.data_file_writer = file_writer  # type: ignore[reportAttributeAccessIssue]
-    active.action_finalizer = finalizer  # type: ignore[reportAttributeAccessIssue]
-    bound = store.for_action(active)
-    path = await bound.write_one_shot(active.action, "row", "aux__csv", "os.csv", "h")
-    assert path is not None and open(path, encoding="utf-8").read() == "h\n%%\nrow"
-    # write_data_line feeds the data_q (native enqueue re-body)
-    await bound.write_data_line(active.action, dflt, {"t_s": 1})
-    assert active.num_data_queued == 1
-    await bound.close_streams(active.action)  # substitute: no open files -> no-op
-
-
-@pytest.mark.asyncio
 async def test_move_dir_sentinel_mapping(tmp_path):
     from types import SimpleNamespace
 

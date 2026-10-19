@@ -1,8 +1,7 @@
 """ArtifactStorePort adapter over the NATIVE write bodies (P2b-1).
 
-The native counterpart of ``adapters/shared/artifact_store.py``: the same
-port surface and the same for_action/bound-handle pattern, but every write
-body is the hexagon-native re-body (meta_writer/data_file/data_stream/
+The port's native adapter, with the for_action/bound-handle pattern; every
+write body is the hexagon-native re-body (meta_writer/data_file/data_stream/
 finalizer modules in this package) instead of a wrap of live legacy
 collaborators. Constructible from ConfigPort+ClockPort at ``build_wiring``
 time — no live host exists yet; ``bind_base`` late-binds one (only tests
@@ -25,8 +24,6 @@ Q2 (binding): sample/status mutations are NOT here — see
 """
 
 from pathlib import Path
-from typing import Optional
-from uuid import UUID
 
 from helao.helpers.file_utils import zip_dir
 from helao.helpers.yml_tools import move_dir
@@ -35,7 +32,7 @@ from helao.hexagon.adapters.native.data_file import NativeDataFileWriter
 from helao.hexagon.adapters.native.data_stream import NativeDataStreamer
 from helao.hexagon.adapters.native.finalizer import NativeActionFinalizer
 from helao.hexagon.adapters.native.meta_writer import NativeMetaFileWriter
-from helao.hexagon.domain.models import Action, DataModel, Experiment, Sequence
+from helao.hexagon.domain.models import Action, Experiment, Sequence
 
 __all__ = ["NativeArtifactStoreAdapter"]
 
@@ -98,35 +95,6 @@ class NativeArtifactStoreAdapter:
 
     async def write_seq(self, sequence: Sequence) -> None:
         await self._require_base().write_seq(sequence)
-
-    # --- streamed hlo ---
-    async def write_data_line(
-        self, action: Action, file_conn_key: UUID, payload: object
-    ) -> None:
-        active = self._require_active()
-        # native enqueue re-body via the swapped collaborator: DataModel keyed
-        # by file_conn_key; the native log_data_task performs lazy open +
-        # header + %% + json line. payload is dict-per-row in every real
-        # caller (same cast rationale as the legacy adapter).
-        await NativeDataStreamer(active).enqueue_data(
-            DataModel(data={file_conn_key: payload}, errors=[]), action  # type: ignore[dict-item]
-        )
-
-    async def close_streams(self, action: Action) -> None:
-        await NativeActionFinalizer(self._require_active()).substitute()
-
-    # --- one-shot ---
-    async def write_one_shot(
-        self,
-        action: Action,
-        output_str: str,
-        file_type: str,
-        filename: Optional[str],
-        header: Optional[str],
-    ) -> Optional[str]:
-        return await NativeDataFileWriter(self._require_active()).write_file(
-            output_str, file_type, filename, header=header, action=action
-        )
 
     # --- finish + promotion ---
     async def finish(self, action: Action) -> None:

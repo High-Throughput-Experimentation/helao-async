@@ -19,9 +19,9 @@ reassigning the deques) is always observed. ``loop_state``/``loop_intent`` stay
 Lock/queue ownership (rule 4) -- full map (also duplicated verbatim in
 ``orch_status_sync.py``, the other lock owner):
 
-- ``aiolock`` -- acquired by ``StatusIngester`` (status ingestion) and
+- ``aiolock`` -- acquired by ``HexStatusIngestion`` (status ingestion) and
   ``DispatchRunner`` (the dispatch critical section).
-- ``interrupt_q`` -- written by ``StatusIngester`` / ``ServerMonitor`` /
+- ``interrupt_q`` -- written by ``HexStatusIngestion`` / ``ServerMonitor`` /
   e-stop; read by the dispatch loop.
 
 ``DispatchRunner`` acquires ``aiolock`` for the dispatch critical section as

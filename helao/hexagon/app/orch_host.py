@@ -983,11 +983,6 @@ class OrchHost(ActionHost):
         """Subscribe to every action server's status stream."""
         return await self.server_monitor.subscribe_all(retry_limit=retry_limit)
 
-    async def active_action_monitor(self):
-        """Legacy heartbeat monitor. Superseded by HexHealthMonitor when the
-        reducer runs, exactly as the graft superseded it."""
-        return await self.server_monitor.active_action_monitor()
-
     async def action_server_monitor(self):
         """Poll every action server's driver health."""
         return await self.server_monitor.action_server_monitor()
@@ -1444,9 +1439,8 @@ class OrchHost(ActionHost):
         ActionHost's startup already ran by the time this fires (Starlette
         preserves registration order), so the live buffer, status log and
         regular updater are running. What legacy's ``myinit`` adds on an
-        orchestrator is these four, and the reducer replaces one of them:
-        ``active_action_monitor`` is superseded by HexHealthMonitor exactly
-        as the graft superseded it.
+        orchestrator is ``subscribe_all`` and ``action_server_monitor``; the heartbeat
+        monitor is HexHealthMonitor's.
         """
 
         @self.on_event("startup")

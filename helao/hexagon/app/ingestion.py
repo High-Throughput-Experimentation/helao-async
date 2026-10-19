@@ -1,5 +1,5 @@
-"""Hexagon status ingestion (P2a): native replacement for the legacy
-``StatusIngester`` short-circuit (helao/hexagon/app/orch_status_sync.py).
+"""Hexagon status ingestion (P2a): native replacement for the former
+legacy ``StatusIngester`` bodies (their copies in orch_status_sync.py are deleted).
 
 ``HexStatusIngestion.update_status``/``update_nonblocking`` own the endpoint
 bodies: ``OrchHost``'s ``/update_status`` and ``/update_nonblocking`` routes
@@ -21,7 +21,7 @@ lock exactly where the legacy inline block ran, so the interleaving
 guarantees (and the estop cascade running under the lock, as legacy
 ``estop_loop`` did) are unchanged. ``interrupt_q`` is written here (the
 unconditional trailing ``globalstatusmodel`` put) and by the health monitor.
-``clear_nonblocking`` stays on ``StatusIngester``; its wire behavior is
+``clear_nonblocking`` stays on ``StatusIngester`` (orch_status_sync.py); its wire behavior is
 untouched.
 
 Wire quirks reproduced, not fixed (spec §7.4): ``update_nonblocking``'s
@@ -103,7 +103,7 @@ class HexStatusIngestion:
     async def update_nonblocking(
         self, actionmodel, server_host: str, server_port: int
     ) -> dict:
-        """Verbatim port of StatusIngester.update_nonblocking (no aiolock,
+        """Verbatim port of the former StatusIngester.update_nonblocking (no aiolock,
         same as legacy): register the uuid, append/remove the executor
         registry entry (ValueError quirk propagates), wake the loop."""
         orch = self.orch

@@ -95,10 +95,7 @@ PORT_MODULES.update(
         "helao.hexagon.ports.sample_state": ["SampleStatePort"],
         "helao.hexagon.ports.auxiliary": [
             "StatePersistencePort",
-            "PlateInfoPort",
-            "LibraryPort",
             "HealthPort",
-            "NotifyPort",
         ],
     }
 )

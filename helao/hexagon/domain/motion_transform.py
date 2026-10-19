@@ -247,13 +247,6 @@ class TransformXY:
         # LOGGER.info(" ... Mz")
         return Mz
 
-    def Mplatewarp(self, platexy):
-        """Return the z-correction matrix for a single plate xy point.
-
-        Currently a stub that returns the identity matrix.
-        """
-        return np.asmatrix(np.identity(4))  # TODO, just returns identity matrix for now
-
     def update_Msystem(self):
         """Recompute `Minstr`, `M`, and their inverses from the current `seq` and angles.
 
