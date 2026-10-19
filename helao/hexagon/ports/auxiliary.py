@@ -1,6 +1,5 @@
 """Auxiliary ports (spec §4.3.12)."""
 
-from pathlib import Path
 from typing import Optional, Protocol, runtime_checkable
 
 __all__ = [
@@ -11,13 +10,29 @@ __all__ = [
 
 @runtime_checkable
 class StatePersistencePort(Protocol):
-    """queues.pck export/import. Pickle shape per core-01 §2 including
+    """The queues.pck file contract: where it lives, how it is written, read,
+    quarantined and archived. Pickle shape per core-01 §2 including
     globalstatusmodel (runtime FSM state persists across restore — a parity
-    behavior). Import archives the consumed pck (queues_imported_<ts>.pck)."""
+    behavior). Building the payload, the schema check and applying it stay with
+    ``QueuePersister``. All paths are ``os.path`` strings: ``/export_queues`` and
+    ``/import_queues`` return them on the wire.
 
-    def export_queues(self, payload: dict, timestamp_pck: bool = False) -> Path: ...
+    - ``export_queues`` writes ``STATES/queues.pck`` (or the timestamped
+      ``queues_<ts>.pck``, pruning that series) and returns its path.
+    - ``load_queues`` returns ``(path, payload)``; ``payload`` is ``None`` when
+      the file is missing, or unreadable (the file is first moved to
+      ``queues_unreadable_<ts>.pck``).
+    - ``archive_consumed`` renames a restored file to ``queues_imported_<ts>.pck``
+      so a later unconditional ``--restore`` cannot replay it.
+    """
 
-    def import_queues(self) -> Optional[dict]: ...
+    def export_queues(self, payload: dict, timestamp_pck: bool = False) -> str: ...
+
+    def load_queues(
+        self, pck_path: Optional[str] = None
+    ) -> tuple[str, Optional[dict]]: ...
+
+    def archive_consumed(self, path: str) -> Optional[str]: ...
 
 
 @runtime_checkable

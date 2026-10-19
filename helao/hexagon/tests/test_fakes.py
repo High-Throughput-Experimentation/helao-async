@@ -68,6 +68,8 @@ def test_fake_artifact_store_records_writes():
 def test_fake_state_persistence_round_trip(tmp_path):
     sp = fakes.FakeStatePersistence()
     sp.export_queues({"seq": [1, 2]}, timestamp_pck=False)
-    assert sp.import_queues() == {"seq": [1, 2]}
-    # import consumes (queues_imported_<ts> archival semantics)
-    assert sp.import_queues() is None
+    path, payload = sp.load_queues()
+    assert payload == {"seq": [1, 2]}
+    # archiving consumes (queues_imported_<ts> archival semantics)
+    sp.archive_consumed(path)
+    assert sp.load_queues()[1] is None

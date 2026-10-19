@@ -1,5 +1,6 @@
 """StatePersistence / Status / Hardware / SampleState adapters."""
 
+import os
 import pickle
 
 import pytest
@@ -23,21 +24,24 @@ def test_queue_pck_roundtrip_and_consume_archive(tmp_path):
     assert isinstance(store, StatePersistencePort)
     payload = {"seq": [1], "exp": [], "act": [], "globalstatusmodel": None}
     p = store.export_queues(payload)
-    assert p == tmp_path / "STATES" / "queues.pck"
+    assert p == os.path.join(str(tmp_path), "STATES", "queues.pck")
     assert pickle.load(open(p, "rb")) == payload
-    out = store.import_queues()
-    assert out == payload
-    # consumed pck archived, not replayable (core-01 §2 rule)
-    assert not p.exists()
+    path, out = store.load_queues()
+    assert (path, out) == (p, payload)
+    # loading does not consume; archiving does (core-01 §2 rule)
+    assert os.path.exists(p)
+    archived = store.archive_consumed(path)
+    assert archived is not None and not os.path.exists(p)
     assert list((tmp_path / "STATES").glob("queues_imported_*.pck"))
-    assert store.import_queues() is None
+    assert store.load_queues() == (p, None)
 
 
 def test_queue_pck_timestamped_export(tmp_path):
     (tmp_path / "STATES").mkdir()
     p = QueuePckStore(str(tmp_path)).export_queues({"a": 1}, timestamp_pck=True)
-    assert p.name.startswith("queues_") and p.name.endswith(".pck")
-    assert p.name != "queues.pck"
+    name = os.path.basename(p)
+    assert name.startswith("queues_") and name.endswith(".pck")
+    assert name != "queues.pck"
 
 
 # --- Status: wire-level push (publish_* fail loud until the bridge binds) -----

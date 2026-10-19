@@ -249,13 +249,16 @@ class FakeStatePersistence:
         _banner("FakeStatePersistence")
         self._stored: Optional[dict] = None
 
-    def export_queues(self, payload: dict, timestamp_pck: bool = False) -> Path:
+    def export_queues(self, payload: dict, timestamp_pck: bool = False) -> str:
         self._stored = payload
-        return Path("STATES/queues.pck")
+        return "STATES/queues.pck"
 
-    def import_queues(self) -> Optional[dict]:
-        payload, self._stored = self._stored, None  # consume-and-archive
-        return payload
+    def load_queues(self, pck_path: Optional[str] = None) -> tuple[str, Optional[dict]]:
+        return "STATES/queues.pck", self._stored
+
+    def archive_consumed(self, path: str) -> Optional[str]:
+        self._stored = None  # consume-and-archive
+        return path + ".imported"
 
 
 class FakeTableCatalog:

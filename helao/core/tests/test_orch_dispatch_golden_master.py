@@ -143,6 +143,7 @@ from helao.helpers.dequedict import DequeDict
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.zdeque import zdeque
 from helao.hexagon.adapters.shared.logging_adapter import LegacyLoggingAdapter
+from helao.hexagon.adapters.shared.state_persistence import QueuePckStore
 from helao.hexagon.app.orch_host import OrchHost
 from helao.hexagon.app.wiring import PortWiring
 from helao.hexagon.domain.orchestration import StartRequested
@@ -300,6 +301,7 @@ def _make_orch(tmp_root: Path) -> OrchHost:
         logging=LegacyLoggingAdapter(),
         health=_OkHealth(),  # type: ignore[arg-type]
         sync=SimpleNamespace(to_s3=_make_fake_to_s3()),  # type: ignore[arg-type]
+        state_persistence=QueuePckStore(str(tmp_root)),
     )
     orch._build_reducer()
     assert type(orch) is OrchHost
