@@ -209,6 +209,10 @@ class GamryComAdapter(HelaoDriver):
     ``measure_a``) so no COM call ever escapes the owning thread.
     """
 
+    connect_on_startup = (
+        True  # the host connects after _base_hook, before dyn_endpoints
+    )
+
     #: strategy currently occupying the pstat, so stop/cleanup dispatch cleanly
     #: (replaces the driver's implicit readz-vs-dtaqsink branch): one of
     #: ``"dc"``, ``"eis"``, ``"idle"``, or ``None``.
@@ -293,7 +297,9 @@ class GamryComAdapter(HelaoDriver):
             self._thread = self._thread_factory(coinit_flags=self._coinit_flags)
             self._thread.start()
         self._driver = self._thread.call(self._driver_factory, self._config)
-        # GamryDriver.__init__ already runs connect(); return its live status.
+        # GamryDriver.__init__ no longer connects: open the device here, on the
+        # same COM thread that built the driver, exactly once.
+        self._thread.call(self._driver.connect)
         return self._thread.call(self._driver.get_status)
 
     def get_status(self):

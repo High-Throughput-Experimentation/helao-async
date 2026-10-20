@@ -54,12 +54,16 @@ class GamryDriver(HelaoDriver):
         model: ``GamryPstat`` descriptor selected based on ``device_name``.
     """
 
+    connect_on_startup = (
+        True  # the host connects after _base_hook, before dyn_endpoints
+    )
+
     dtaqsink: GamryDtaqSink
     device_name: str
     model: GamryPstat
 
     def __init__(self, config: dict = {}):
-        """Initialize the driver and open the GamryCOM connection.
+        """Initialize the driver; the host opens the GamryCOM connection via :meth:`connect`.
 
         Args:
             config: Driver configuration. Recognized keys are ``dev_id``
@@ -85,8 +89,6 @@ class GamryDriver(HelaoDriver):
         self.grounded = int(self.config.get("grounded", True))
         self.connection_raised = False
         self.stopping = False
-        self.connect()
-        LOGGER.debug(f"connected to {self.device_name} on device_id {self.device_id}")
 
     def _create_and_open_pstat(self, client) -> None:
         """Load the type library, enumerate the device, create + Open the pstat.

@@ -656,11 +656,10 @@ async def gamry_dyn_endpoints(app: ActionHost):
     server_key = app.server.server_name
     app.server_params["allow_concurrent_actions"] = False
 
-    # P3a gamry COM cut-over: GamryComAdapter is disconnected-construct (the COM
-    # thread + wrapped driver are built here, not in __init__), so connect at
-    # startup before reading ready/model.
-    app.driver.connect()
-
+    # The host connects the driver before this runs (``connect_on_startup``;
+    # GamryComAdapter.connect() builds and connects the COM driver on its thread).
+    # A failed or raising connect leaves ``ready`` unset and this parked, as after
+    # a failed connect today, so no action routes register.
     while not app.driver.ready:
         LOGGER.info("waiting for gamry init")
         await asyncio.sleep(1)

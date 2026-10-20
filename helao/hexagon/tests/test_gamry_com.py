@@ -163,11 +163,13 @@ class _InlineThread(GamryComThread):
         self.coinit_flags = coinit_flags
         self._running = False
         self.stopped = False
+        self.called: list = []  # fn names, in call order
 
     def start(self):
         self._running = True
 
     def call(self, fn, *args, **kwargs):
+        self.called.append(getattr(fn, "__name__", repr(fn)))
         return fn(*args, **kwargs)
 
     def submit(self, fn, *args, **kwargs):  # unused by adapter verbs but part of API
@@ -208,6 +210,7 @@ class _FakeGamry:
     def __init__(self, config):
         self.config = config
         self.calls = []
+        self.connect_calls = 0
         # drain surface (single-pump get_data reads these; never calls get_data)
         self.counter = 0
         self.dtaqsink = _FakeSink()
@@ -217,6 +220,11 @@ class _FakeGamry:
         self.model = types.SimpleNamespace(ierange="IERANGE_ENUM")
         self.pstat = "PSTAT_COM"
         self.GamryCOM = "GAMRYCOM_LIB"
+
+    def connect(self):
+        # kept off ``calls``: tests pin the verb sequence exactly
+        self.connect_calls += 1
+        return "CONNECTED"
 
     def get_status(self):
         self.calls.append("get_status")
@@ -309,6 +317,15 @@ def test_connect_starts_thread_and_builds_driver_on_it():
     assert made["thread"].running is True
     assert a.driver is made["driver"]
     assert status == "STATUS"
+
+
+def test_connect_calls_the_drivers_connect_once_on_the_com_thread():
+    """``GamryDriver.__init__`` no longer connects, so the adapter must."""
+    a, made = _adapter()
+    a.connect()
+    assert made["driver"].connect_calls == 1
+    # the driver is built on the thread, then connected on it, then read
+    assert made["thread"].called == ["driver_factory", "connect", "get_status"]
 
 
 def test_verbs_delegate_and_track_strategy():

@@ -47,7 +47,6 @@ IMPORT_ALLOWLIST: Final[tuple[str, ...]] = ("test_station/leancat/",)
 # Drivers whose __init__ still connects, keyed by module.qualname.
 CONSTRUCTOR_CONNECT_PENDING: Final[frozenset[str]] = frozenset(
     {
-        "pstat.gamry.driver.GamryDriver",  # I7
         # no hte station; not flipped by this plan, see amendment 3
         "test_station.leancat.driver.LeancatDriver",
     }
@@ -59,9 +58,11 @@ CONNECT_ON_STARTUP: Final[frozenset[str]] = frozenset(
         "sensor.sprintir_driver.SprintIR",  # I1
         "mfc.alicat_driver.AliCatMFC",  # I4
         "motion.kinesis_driver.KinesisMotor",  # I5
+        "gamry_com.GamryComAdapter",  # I7
         "io.galil_io_driver.Galil",  # I6c
         "io.nidaqmx_driver.cNIMAX",  # I6e
         "pstat.biologic.driver.BiologicDriver",  # I6d
+        "pstat.gamry.driver.GamryDriver",  # I7
         "pstat.biologic_eclib2.driver.BiologicEclib2Driver",  # I6d
         "pstat.biologic_ole.driver.BiologicOleDriver",  # I6d
         "spec.andor.calibrated.AndorCalibratedDriver",  # I6b
@@ -383,10 +384,45 @@ def test_construct_is_disconnected(world) -> None:
 
 
 def test_pending_importable_drivers_do_hit(world) -> None:
+    """Whatever is still pending and importable must record a hit.
+
+    The ratchet ends with one pending class that cannot be imported here, so this
+    can be vacuous; ``test_tripwire_sees_module_level_vendor_names`` is what keeps
+    the tripwire honest.
+    """
     importable = {k for k in CONSTRUCTOR_CONNECT_PENDING if k in world.results}
-    assert importable, "no pending driver was importable: the tripwire proves nothing"
     silent = sorted(k for k in importable if not world.results[k][0])
     assert not silent, f"tripwire saw nothing for {silent}"
+
+
+def test_tripwire_sees_module_level_vendor_names(world) -> None:
+    """Scratch constructor-connecting drivers hit the module-bound vendor names.
+
+    ``Thorlabs`` (kinesis) and ``MeCom`` (mecom) are names bound at import, which a
+    ``sys.modules`` sentinel cannot reach: only the module-level patching sees them.
+    """
+    from helao.deploy.hte.drivers.motion.kinesis_driver import KinesisMotor
+    from helao.deploy.hte.drivers.temperature_control.mecom_driver import (
+        MeerstetterTEC,
+    )
+
+    class _Kinesis(KinesisMotor):
+        def __init__(self, config: dict = {}):
+            super().__init__(config=config)
+            self.connect()
+
+    class _Tec(MeerstetterTEC):
+        def __init__(self, config: dict = {}):
+            super().__init__(config=config)
+            self.connect()
+
+    axis = {"serial_no": "1", "pos_scale": 1.0, "vel_scale": 1.0, "acc_scale": 1.0}
+    hits, _ = world.armed.classify(_Kinesis, {"axes": {"x": axis}})
+    assert any("Thorlabs" in h for h in hits), hits
+    hits, _ = world.armed.classify(
+        _Tec, {"channel": 1, "port": str(world.tmp / "tec_port")}
+    )
+    assert any("MeCom" in h for h in hits), hits
 
 
 def test_only_leancat_is_not_importable(world) -> None:
