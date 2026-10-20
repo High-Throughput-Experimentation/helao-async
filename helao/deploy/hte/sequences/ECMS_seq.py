@@ -223,7 +223,7 @@ def ECMS_initiation_ECSA(
     liquid_backward_time: float = 80,
     vacuum_time: float = 15,
     CO2equilibrium_duration: float = 30,
-    flowrate_sccm: float = 3.0,
+    flowrate_sccm: float = 10.0,
     flow_ramp_sccm: float = 0,
     MS_baseline_duration_1: float = 120,
     MS_baseline_duration_2: float = 90,
@@ -233,6 +233,7 @@ def ECMS_initiation_ECSA(
     WE_potential_apex1__V: float = -0.2,
     WE_potential_apex2__V: float = 0,
     WE_potential_final__V: float = 0,
+    WE_versus: str = "ocv",
     ScanRate_V_s_1: list[float] = [0.02, 0.05, 0.1],
     SampleRate: float = 0.1,
     Cycles: int = 1,
@@ -316,7 +317,7 @@ def ECMS_initiation_ECSA(
         epm.add(
             "ECMS_sub_CV",
             {
-                "WE_versus": "OCV",
+                "WE_versus": WE_versus,
                 "WE_potential_init__V": WE_potential_init__V,
                 "WE_potential_apex1__V": WE_potential_apex1__V,
                 "WE_potential_apex2__V": WE_potential_apex2__V,
