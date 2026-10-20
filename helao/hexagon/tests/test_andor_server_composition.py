@@ -13,6 +13,7 @@ filename and the calibration file is not written cwd-relative.
 """
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -161,6 +162,35 @@ async def test_calibration_file_resolves_under_the_configured_states_root(
     assert hispec_andor_alt_key in calib_path.name
 
 
+# --- the host supplies the key before connect() -----------------------------
+
+
+def test_connect_takes_the_key_from_the_host(tmp_path):
+    """The host connects before ``dyn_endpoints`` can assign ``server_key``.
+
+    So ``connect()`` reads the key off the host itself: the calibrated variant's
+    ``connect()`` builds ``calibration_file()``, which names the file after it.
+    """
+    import types
+
+    drv = AndorCalibratedDriver(config={})  # no server_key argument: default "ANDOR"
+    assert drv.server_key == "ANDOR"
+    host: Any = types.SimpleNamespace(
+        server_key="ANDOR_ALT",
+        helaodirs=types.SimpleNamespace(states_root=str(tmp_path)),
+    )
+    drv._base_hook = host
+    drv.connect()  # fails harmlessly on Linux: its body catches broadly
+    assert drv.server_key == "ANDOR_ALT"
+    assert "ANDOR_ALT" in drv.calibration_file().name
+
+
+def test_connect_without_a_host_keeps_the_constructor_key():
+    drv = AndorCalibratedDriver(config={}, server_key="MINE")
+    drv.connect()
+    assert drv.server_key == "MINE"
+
+
 # --- Route surface: the frozen record is untouched, the addition is listed --
 
 
@@ -205,3 +235,27 @@ def test_hispec_still_selects_the_spectrograph_driver(monkeypatch):
     load_global_config("hispec", set_global=True)
     monkeypatch.setattr(config_loader, "CONFIG", config_loader.CONFIG)
     assert andor_server._driver_class("ANDOR") is AndorSpectrographDriver
+
+
+# --- a raising host connect keeps the server up ------------------------------
+
+
+def test_a_raising_connect_keeps_the_andor_server_up(monkeypatch, tmp_path, caplog):
+    from helao.deploy.hte.drivers.spec.andor.driver import AndorDriver
+    from helao.hexagon.tests.hosted_server import start_with_raising_connect
+
+    out = start_with_raising_connect(
+        monkeypatch,
+        tmp_path,
+        caplog,
+        module="andor_server",
+        prefix="hispec",
+        server_key="ANDOR",
+        driver_class=AndorDriver,
+        ready=lambda app: any(
+            getattr(r, "path", "").endswith("/acquire") for r in app.routes
+        ),
+    )
+    assert len(out.startup_errors) == 1
+    assert out.get_status_code == 200
+    assert any(p.endswith("/acquire") for p in out.route_paths if p)

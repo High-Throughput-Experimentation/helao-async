@@ -322,21 +322,11 @@ async def andor_dyn_endpoints(app: ActionHost):
     server_key = app.server.server_name
     app.server_params["allow_concurrent_actions"] = False
 
-    # ActionHost constructs the driver as driver_class(config=server_params)
-    # (action_host.py's startup handler), which passes it neither the
-    # server's real key nor anything that knows where the station's STATES
-    # directory is -- app.driver does not exist until that handler runs, so
-    # this cannot be wired any earlier than here. Without it, the wavelength
-    # calibration is written to a cwd-relative path and every andor server on
-    # a host shares one filename. Must run before connect(): the calibrated
-    # variant's connect() reads calibration_file() to load the lamp fit.
+    # The host constructs the driver as driver_class(config=server_params), which
+    # passes it no server key, and connects it before this runs (the driver reads
+    # its key off the host for the calibration file name). Kept so the driver
+    # carries the real key afterwards, whatever its constructor was given.
     app.driver.server_key = server_key
-
-    # P3a-2 constructor-connect fix: AndorDriver.__init__ no longer opens the
-    # camera (disconnected construct); open it here at startup before any
-    # acquire request reads app.driver.wl_arr.
-    connect_resp = app.driver.connect()
-    LOGGER.info(f"Andor connect() returned status={connect_resp.status}")
 
     @app.action()
     @action_version(2)
