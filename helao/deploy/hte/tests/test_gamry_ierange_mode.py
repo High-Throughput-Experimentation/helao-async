@@ -72,7 +72,7 @@ MODELS = sorted(GAMRY_DEVICES.items())
 def test_model_flags_restore_the_legacy_calls():
     for name, model in GAMRY_DEVICES.items():
         if model is IFC1010:
-            assert (model.set_sensemode, model.set_rangemode) == (None, None), name
+            assert (model.set_sensemode, model.set_rangemode) == (None, True), name
         elif model is REF30K:
             assert (model.set_sensemode, model.set_rangemode) == (False, False)
         else:
@@ -143,3 +143,22 @@ def test_a_failing_readback_does_not_fail_setup(log):
 
     d.pstat.IERangeMode = boom  # type: ignore[attr-defined]
     _setup(d, _fixed(model))
+
+
+def test_ifc1010_auto_run_after_a_cp_run_turns_auto_ranging_back_on(log):
+    """CP/LSA leave SetIERangeMode(False) on the open pstat; auto must undo it."""
+    from helao.deploy.hte.drivers.pstat.gamry.technique import TECH_CP
+
+    d = _driver(IFC1010, log)
+    d.dtaqsink = DUMMY_SINK  # type: ignore  # driver annotates GamryDtaqSink only
+    cp = {"Ival__A": 1e-3, "Tval__s": 1.0, "AcqInterval__s": 0.1}
+    sp = {
+        k: v
+        for k, v in cp.items()
+        if k in TECH_CP.signal.param_keys + TECH_CP.signal.init_keys
+    }
+    assert d.setup(TECH_CP, sp, {}, cp)  # default IErange is auto.response == "success"
+    assert _calls(log, "SetIERangeMode")[-1] == (False,)
+    d.technique = None
+    _setup(d, "auto")
+    assert _calls(log, "SetIERangeMode")[-1] == (True,)

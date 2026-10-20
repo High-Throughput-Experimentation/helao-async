@@ -51,11 +51,12 @@ class GamryPstat:
             IErange; a fixed IErange passes ``False``. ``None`` makes no call
             for either.
 
-    ``None`` on the IFC1010 restores the legacy driver (2022), which skipped
-    both calls on that model; the 2024 refactor passed ``False`` instead,
-    which switched auto-ranging off on every ``auto`` run. REF30K postdates
-    the legacy driver and keeps its own ``False``/``False`` ("does not
-    support range mode", 0930d78d).
+    The IFC1010 makes no ``SetSenseSpeedMode`` call, as in the legacy driver
+    (2022). Its range mode is set on every run: with ``None`` an ``auto`` run
+    kept whatever mode the last CP/LSA/EIS run left (off), and the 2024
+    refactor's ``False`` switched auto-ranging off on every ``auto`` run.
+    REF30K postdates the legacy driver and keeps its own ``False``/``False``
+    ("does not support range mode", 0930d78d).
     """
 
     device: str
@@ -68,7 +69,8 @@ IFC1010 = GamryPstat(
     device="GamryCOM.GamryPC6Pstat",
     ierange=Gamry_IErange_IFC1010,
     set_sensemode=None,
-    set_rangemode=None,
+    # accepts SetIERangeMode: CP/LSA and EIS already send it False on this model
+    set_rangemode=True,
 )
 
 REF600 = GamryPstat(
