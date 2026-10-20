@@ -403,3 +403,24 @@ def test_a_raising_connect_keeps_galil_io_up_with_no_gated_routes(
     assert out.get_status_code == 200
     # galil_enabled is never set True, so the gated action routes do not register
     assert not any(p.endswith("/get_digital_in") for p in out.route_paths if p)
+
+
+def test_a_raising_connect_keeps_nidaqmx_up(monkeypatch, tmp_path, caplog):
+    from helao.deploy.hte.drivers.io.nidaqmx_driver import cNIMAX
+    from helao.hexagon.tests.hosted_server import start_with_raising_connect
+
+    out = start_with_raising_connect(
+        monkeypatch,
+        tmp_path,
+        caplog,
+        module="nidaqmx_server",
+        prefix="adss3",
+        server_key="NI",
+        driver_class=cNIMAX,
+        ready=lambda app: hasattr(app, "unified_db"),  # dyn_endpoints has run
+        probe=lambda app: hasattr(app, "unified_db"),
+    )
+    assert len(out.startup_errors) == 1
+    assert "cNIMAX" in out.startup_errors[0].getMessage()
+    assert out.get_status_code == 200
+    assert out.probe is True

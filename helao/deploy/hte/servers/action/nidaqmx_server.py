@@ -154,19 +154,15 @@ def build_do_port_map(server_params: dict) -> tuple[dict, dict]:
 
 
 async def nidaqmx_dyn_endpoints(app: ActionHost):
-    """Open the NI-DAQ connection and wire the seams the driver needs from the server.
+    """Build the shared ``UnifiedSampleDataAPI`` the ``cellIV`` endpoint validates against.
 
-    Called once at startup (after the driver is constructed): opens the
-    thermocouple monitor task and NEGATE3 scale via `connect()` (not in
-    `__init__`, per the HelaoDriver ABC's no-device-I/O-at-construction
-    rule) (the host has already set `_base_hook`, which the NI-DAQmx hardware
-    callback uses for its synchronous estop/live-buffer reads), and constructs the single shared
-    `UnifiedSampleDataAPI` instance the `cellIV` endpoint validates samples
-    against (mirrors the pre-migration one-instance-per-server pattern).
+    Called once at startup, after the host has constructed and connected the driver
+    (``connect_on_startup``: the thermocouple monitor task and NEGATE3 scale open in
+    ``connect()``, and the host has set ``_base_hook``, which the NI-DAQmx hardware
+    callback uses for its synchronous estop/live-buffer reads). The one shared
+    sample-DB instance mirrors the pre-migration one-instance-per-server pattern.
     """
     app.driver: cNIMAX
-    connect_resp = app.driver.connect()
-    LOGGER.info(f"NI-MAX connect() returned status={connect_resp.status}")
 
     app.unified_db = UnifiedSampleDataAPI(app.base)
     await app.unified_db.init_db()

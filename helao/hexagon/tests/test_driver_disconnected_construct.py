@@ -60,6 +60,7 @@ CONNECT_ON_STARTUP: Final[frozenset[str]] = frozenset(
         "mfc.alicat_driver.AliCatMFC",  # I4
         "motion.kinesis_driver.KinesisMotor",  # I5
         "io.galil_io_driver.Galil",  # I6c
+        "io.nidaqmx_driver.cNIMAX",  # I6e
         "pstat.biologic.driver.BiologicDriver",  # I6d
         "pstat.biologic_eclib2.driver.BiologicEclib2Driver",  # I6d
         "pstat.biologic_ole.driver.BiologicOleDriver",  # I6d

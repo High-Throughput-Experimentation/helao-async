@@ -76,8 +76,8 @@ class cNIMAX(HelaoDriver):
     Reads device maps (`dev_pump`, `dev_gasvalve`, `dev_liquidvalve`,
     `dev_heat`, `dev_led`, `dev_ttl`, `dev_monitor`, `dev_cellcurrent`,
     `dev_cellvoltage`) from `config`. NI resources (the custom current scale
-    and the thermocouple monitor task) are opened in :meth:`connect`, not at
-    construction. Always-on thermocouple polling is handled by the paired
+    and the thermocouple monitor task) are opened in :meth:`connect`, which the host
+    calls at startup (``connect_on_startup``), not at construction. Always-on thermocouple polling is handled by the paired
     :class:`cNIMAXPoller`, wired in as the server's ``poller_class``.
     Multi-cell IV measurements are armed via :meth:`arm_cell_iv` (called from
     :class:`CellIVExec`, which owns the ``Active`` action).
@@ -94,6 +94,10 @@ class cNIMAX(HelaoDriver):
         ``allow_no_sample``: permit a cell-IV measurement with no validated
             samples.
     """
+
+    connect_on_startup = (
+        True  # the host connects after _base_hook, before dyn_endpoints
+    )
 
     def __init__(self, config: dict = {}):
         """Store config and build the dynamic IO enums; no device I/O here.

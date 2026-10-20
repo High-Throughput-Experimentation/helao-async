@@ -35,6 +35,7 @@ exactly as legacy.
 # pyright: reportArgumentType=false, reportOptionalMemberAccess=false
 
 import asyncio
+import collections
 import traceback
 from typing import Any, Optional
 from uuid import UUID
@@ -75,6 +76,10 @@ class NativeDataStreamer:
         # uuid lists stay on ``Active``/``Base``
         self._drain_waiters: dict = {}  # id(marker) -> (marker, event), per call
         self._consumed = 0
+        # (package, has_data) rows a foreign thread produced, in production order,
+        # waiting for the loop to put them (see :meth:`enqueue_data_nowait`)
+        self._xthread: collections.deque = collections.deque()
+        self._closed_warned = False
 
     async def get_realtime(
         self, epoch_ns: Optional[int] = None, offset: Optional[float] = None
@@ -124,8 +129,20 @@ class NativeDataStreamer:
             datamodel.data
         )
 
+    def _put_queued(self, msg: Any, has_data: bool) -> None:
+        """Put one built package on the data queue (loop thread only)."""
+        self.active.base.data_q.put_nowait(msg)
+        if has_data:
+            self.active.num_data_queued += 1
+
+    def _flush_xthread(self) -> None:
+        """Put every pending foreign-thread row, FIFO by production order (loop thread)."""
+        while self._xthread:
+            self._put_queued(*self._xthread.popleft())
+
     async def enqueue_data(self, datamodel: DataModel, action: Optional[Action] = None):
         """Publish ``datamodel`` onto the data queue and bump the queued counter if it had data."""
+        self._flush_xthread()
         msg, has_data = self.active._build_data_package(datamodel, action)
         await self.active.base.data_q.put(msg)
         if has_data:
@@ -134,11 +151,41 @@ class NativeDataStreamer:
     def enqueue_data_nowait(
         self, datamodel: DataModel, action: Optional[Action] = None
     ):
-        """Non-awaiting variant of :meth:`enqueue_data`."""
+        """Non-awaiting variant of :meth:`enqueue_data`; safe from a foreign thread.
+
+        The package is built on the calling thread, so a row keeps the action that
+        was current when the hardware produced it. The put runs on ``host.aloop``:
+        a foreign thread appends the row to a thread-safe deque and schedules a
+        flush with ``call_soon_threadsafe``, which also wakes the selector. Every
+        on-loop enqueue and :meth:`drain` flush the deque first, so rows reach the
+        queue in the order they were produced. "Foreign" means the running loop on
+        this thread is not ``host.aloop`` (or there is none).
+        """
         msg, has_data = self.active._build_data_package(datamodel, action)
-        self.active.base.data_q.put_nowait(msg)
-        if has_data:
-            self.active.num_data_queued += 1
+        aloop = getattr(self.active.base, "aloop", None)
+        try:
+            running = asyncio.get_running_loop()
+        except RuntimeError:
+            running = None
+        if aloop is not None and running is not aloop:  # foreign thread
+            # a closed loop will never flush: drop the row, do not grow the deque
+            if aloop.is_closed():
+                self._warn_closed()
+                return
+            self._xthread.append((msg, has_data))  # deque.append is thread-safe
+            try:
+                aloop.call_soon_threadsafe(self._flush_xthread)
+            except RuntimeError:  # closed between the check and the call
+                self._xthread.clear()
+                self._warn_closed()
+            return
+        self._flush_xthread()
+        self._put_queued(msg, has_data)
+
+    def _warn_closed(self) -> None:
+        if not self._closed_warned:
+            self._closed_warned = True
+            LOGGER.warning("enqueue_data_nowait after the loop closed; rows dropped")
 
     def assemble_data_msg(
         self, datamodel: DataModel, action: Optional[Action] = None
@@ -175,6 +222,10 @@ class NativeDataStreamer:
         action's ``data_stream_status`` is active and nothing is queued unwritten.
         A non-streaming action publishes no data-less ``finished`` packet.
         """
+        # First, before any guard or marker: a cross-thread row still waiting in the
+        # deque has not bumped ``num_data_queued``, so the guard below would skip
+        # the drain and lose it, and the marker must not overtake it.
+        self._flush_xthread()
         logger: Any = self.active.data_logger
         base: Any = self.active.base
         if logger is None or logger.done():

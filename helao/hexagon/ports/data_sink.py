@@ -5,10 +5,9 @@ get_realtime_nowait, finish_hlo_header) — the best-in-tree pattern. Replaces
 the ``active.base.app.driver...`` object-graph handouts and the PAL per-job
 injected Active.
 
-Thread-safe members: ``enqueue_data_nowait`` (made true in I6e; until then the
-put runs on the calling thread), ``get_realtime_nowait`` and
-``finish_hlo_header``. Everything else is loop-affine; the ``_nowait`` suffix on
-``write_file_nowait`` is historical.
+Thread-safe members: ``enqueue_data_nowait`` (the put is marshalled onto the host
+loop), ``get_realtime_nowait`` and ``finish_hlo_header``. Everything else is
+loop-affine; the ``_nowait`` suffix on ``write_file_nowait`` is historical.
 
 ``ActionSession`` satisfies this port structurally; there is no adapter.
 """
