@@ -31,8 +31,8 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 class CM0134(HelaoDriver):
     """Modbus-RTU HelaoDriver for the CM-0134 oxygen sensor.
 
-    The Modbus serial connection is opened at construction, through
-    :meth:`connect`; always-on O2 ppm polling is handled by the paired
+    The Modbus serial connection is opened by :meth:`connect`, which the host
+    calls at startup (``connect_on_startup``); always-on O2 ppm polling is handled by the paired
     :class:`CM0134Poller`, wired in as the server's ``poller_class``.
 
     Server config parameters:
@@ -44,8 +44,10 @@ class CM0134(HelaoDriver):
         ``allow_no_sample``: Whether actions can run without samples.
     """
 
+    connect_on_startup = True  # the host connects after _base_hook, before the poller
+
     def __init__(self, config: dict = {}):
-        """Store config and open the Modbus connection via :meth:`connect`.
+        """Store config; the Modbus connection is opened by :meth:`connect`.
 
         Args:
             config: Driver configuration (the server's ``params`` dict).
@@ -59,9 +61,6 @@ class CM0134(HelaoDriver):
         self.recording_duration = 0
         self.recording_rate = 0.1  # seconds per acquisition
         self.allow_no_sample = self.config_dict.get("allow_no_sample", True)
-        # Open the port here, not lazily: ActionHost never calls connect(),
-        # and the poller starts polling as soon as it is built.
-        self.connect()
 
     def connect(self) -> DriverResponse:
         """Open the Modbus serial connection to the sensor.

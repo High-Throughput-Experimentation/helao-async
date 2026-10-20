@@ -52,6 +52,8 @@ class SprintIR(HelaoDriver):
             downstream Executors).
     """
 
+    connect_on_startup = True  # the host connects after _base_hook, before the poller
+
     def __init__(self, config: dict = {}):
         """Store config; the serial connection is opened in :meth:`connect`.
 
@@ -67,15 +69,6 @@ class SprintIR(HelaoDriver):
         self.last_rec_time = 0
         self.recording_duration = 0
         self.recording_rate = 0.1  # seconds per acquisition
-        # Open the serial port at construction. ActionHost builds the
-        # DriverPoller (SprintIRPoller) immediately after the driver and the
-        # poller AUTO-STARTS its poll loop in __init__ -- but ActionHost never
-        # calls connect(), so
-        # deferring the serial open left self.com=None and the poller spammed
-        # "'NoneType' object has no attribute 'flush'" every cycle. Connecting
-        # here (like the biologic/andor drivers) opens the port before the first
-        # poll; a bad/absent port logs a clear "connect failed" instead.
-        self.connect()
 
     def connect(self) -> DriverResponse:
         """Open the serial port, set polling mode, and read firmware scaling.
