@@ -340,3 +340,30 @@ async def test_a_failing_drain_still_closes_out_the_action(tmp_path):
         with open(act_yml, encoding="utf-8") as f:
             assert "finished" in f.read()
     assert len(_rows(tmp_path)) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_timed_out_drain_leaves_an_overlapping_one_registered():
+    """The short drain gives up while the long one is still waiting on its own
+    marker: giving up must unregister only itself."""
+    rig = _Rig(write_delay=0.1)
+    rig.start_logger()
+    await asyncio.sleep(0.02)
+    n = 15  # ~1.5 s of backlog ahead of both markers
+    for t in range(n):
+        await rig.q.put(rig.packet(t))
+        rig.active.num_data_queued += 1
+    loop = asyncio.get_running_loop()
+    t0 = loop.time()
+    short = asyncio.create_task(rig.s.drain(0.5))
+    long_ = asyncio.create_task(rig.s.drain(10.0))
+    try:
+        assert await asyncio.wait_for(short, 3.0) is False
+        assert await asyncio.wait_for(long_, 4.0) is True
+        assert loop.time() - t0 < 3.0
+        assert rig.active.num_data_written == n
+    finally:
+        await rig.stop()
+        for task in (short, long_):
+            task.cancel()
+        await asyncio.gather(short, long_, return_exceptions=True)
