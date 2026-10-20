@@ -1660,10 +1660,23 @@ class ActionHost(HelaoFastAPI):
         retvals: dict = {}
         shutdown = getattr(self.driver, "shutdown", None)
         async_shutdown = getattr(self.driver, "async_shutdown", None)
-        retvals["shutdown"] = shutdown() if callable(shutdown) else None
-        retvals["async_shutdown"] = (
-            await async_shutdown() if callable(async_shutdown) else None
-        )
+        # A raising hook must not abort teardown: a driver whose startup connect
+        # raised is still hosted, and its hooks may fail on the closed device.
+        # The remaining hook and the fault-file close below always run.
+        retvals["shutdown"] = None
+        if callable(shutdown):
+            try:
+                retvals["shutdown"] = shutdown()
+            except Exception:
+                LOGGER.error("driver shutdown() raised; continuing", exc_info=True)
+        retvals["async_shutdown"] = None
+        if callable(async_shutdown):
+            try:
+                retvals["async_shutdown"] = await async_shutdown()
+            except Exception:
+                LOGGER.error(
+                    "driver async_shutdown() raised; continuing", exc_info=True
+                )
 
         if self.fault_file is not None:
             faulthandler.disable()
