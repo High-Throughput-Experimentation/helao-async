@@ -65,8 +65,9 @@ issue it found:
   `host:port` collisions, including a Reflex server's `port + 1` and a plate
   aligner's port;
 - module resolution: every `fast:`/`bokeh:` module exists in a deployment the
-  launcher searches; the retired `legacy_module:` and `deployment: hexagon`
-  keys, a `fast:`/`bokeh:` value of `graft`, and a blank `deployment:` are
+  launcher searches; the two retired hexagon-routing keys (the legacy-module
+  key and a `deployment:` naming the hexagon shim), a `fast:`/`bokeh:` value of
+  `graft`, and a blank `deployment:` are
   reported;
 - an `hte` action module whose endpoint checklist was frozen at B7c still has
   it (any other missing checklist prints as a note and does not fail);

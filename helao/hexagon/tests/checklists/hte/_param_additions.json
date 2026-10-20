@@ -90,5 +90,18 @@
     },
     "date": "2026-10-14",
     "why": "versus_OCV applies the RCA signal array relative to a pre-measured OCV, as run_PEIS does. Defaults to the previous behaviour."
+  },
+  {
+    "module": "sample_server.py",
+    "path": "/SAMPLE/archive_custom_add_liquid",
+    "method": "post",
+    "params": {
+      "allow_empty": {
+        "annotation": "bool",
+        "default": "False"
+      }
+    },
+    "date": "2026-10-20",
+    "why": "allow_empty lets a liquid-only sample be added to an untouched empty custom position (ANEC flush-fill, a9337d5f). Defaults to the previous behaviour, which keeps the NoneSample guard."
   }
 ]
