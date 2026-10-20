@@ -73,8 +73,7 @@ class NativeDataStreamer:
         self.active = active
         # drain bookkeeping only (see :meth:`drain`); the queue, counters and
         # uuid lists stay on ``Active``/``Base``
-        self._drain_marker = None
-        self._drain_event = None
+        self._drain_waiters: dict = {}  # id(marker) -> (marker, event), per call
         self._consumed = 0
 
     async def get_realtime(
@@ -162,32 +161,45 @@ class NativeDataStreamer:
         """Return once everything queued before this call is written (FIFO marker).
 
         Puts one data-less ``finished`` package, the marker, on ``data_q``; the
-        logger sets an event when it consumes that exact object. Each subscriber
-        queue is FIFO, so every package queued before the marker has been written
-        by then. Re-puts the marker only if the logger consumed nothing since the
-        last check (a logger that subscribed late), so a busy one is not buried
-        under markers. Returns ``False`` after logging a WARNING on timeout; data
-        that arrives after the marker is still dropped, as before.
+        logger sets this call's event when it consumes that exact object. Each
+        subscriber queue is FIFO, so every package queued before the marker has
+        been written by then. Marker and event are per call, because two finishes
+        of one session can overlap (``/estop`` finishing it while the stopped
+        executor finishes it too). Re-puts the marker only if the logger consumed
+        nothing since the last check (a logger that subscribed late), so a busy
+        one is not buried under markers. Returns ``False`` after logging a
+        WARNING on timeout; data that arrives after the marker is still dropped,
+        as before.
+
+        Returns at once, without a marker, when the session never streamed: no
+        action's ``data_stream_status`` is active and nothing is queued unwritten.
+        A non-streaming action publishes no data-less ``finished`` packet.
         """
         logger: Any = self.active.data_logger
         base: Any = self.active.base
         if logger is None or logger.done():
             return True
+        streamed = any(
+            a.data_stream_status == HloStatus.active for a in self.active.action_list
+        )
+        if not streamed and self.active.num_data_queued <= self.active.num_data_written:
+            return True
         loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout_s
-        self._drain_marker = self.active.assemble_data_msg(
+        marker = self.active.assemble_data_msg(
             DataModel(data={}, errors=[], status=HloStatus.finished)
         )
-        self._drain_event = asyncio.Event()
+        event = asyncio.Event()
+        self._drain_waiters[id(marker)] = (marker, event)
         try:
-            await base.data_q.put(self._drain_marker)
+            await base.data_q.put(marker)
             seen = self._consumed
             while True:
                 if logger.done():
                     # the logger exited mid-drain; nothing is left to wait for
                     return True
                 try:
-                    await asyncio.wait_for(self._drain_event.wait(), 0.1)
+                    await asyncio.wait_for(event.wait(), 0.1)
                     return True
                 except asyncio.TimeoutError:
                     if loop.time() >= deadline:
@@ -200,11 +212,10 @@ class NativeDataStreamer:
                         return False
                     if self._consumed == seen:
                         # nothing moved: the marker may have been missed
-                        await base.data_q.put(self._drain_marker)
+                        await base.data_q.put(marker)
                     seen = self._consumed
         finally:
-            self._drain_marker = None
-            self._drain_event = None
+            self._drain_waiters.pop(id(marker), None)
 
     async def log_data_task(self):
         """Subscribe to the data queue and write matching packets to the active's HLO files.
@@ -235,8 +246,9 @@ class NativeDataStreamer:
                 data_dict = data_msg.datamodel.data
 
                 self.active.action.data_stream_status = data_status
-                if data_msg is self._drain_marker and self._drain_event is not None:
-                    self._drain_event.set()
+                waiter = self._drain_waiters.get(id(data_msg))
+                if waiter is not None and waiter[0] is data_msg:
+                    waiter[1].set()
 
                 if data_status not in (None, HloStatus.active):
                     LOGGER.debug(

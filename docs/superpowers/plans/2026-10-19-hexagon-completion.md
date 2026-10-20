@@ -41,7 +41,7 @@ its evidence.
   - The parent repo is `/mnt/STORAGE/repos/helao/helao-async`.
   - The private deployments are separate nested git repos under `helao/deploy/`.
   - A subagent's cwd resets between calls, so use absolute paths.
-- **Never touch `/mnt/wd4`, `/mnt/st2`, `/mnt/k`, `/mnt/j` or `/mnt/i`.** Nothing here needs them.
+- **Never touch the production network mounts (`/mnt/wd4` and its siblings).** Nothing here needs them.
   - Some tests would fall back to a production root. For example, `sources_root()` defaults to `/mnt/wd4/SOURCES` when
     `HELAO_SOURCES_ROOT` is unset.
   - Run them with `HELAO_SOURCES_ROOT=/tmp/claude-1000/hexplan/sources` exported. The environment block below sets it.
@@ -324,6 +324,19 @@ read task state.
 - **Timeout and late data.**
   - A timeout logs a WARNING with the queued and written counts.
   - Data that arrives after the marker is still dropped, exactly as §5.4 says.
+- **Overlapping drains (final review).** Marker and event are per call, registered in `NativeDataStreamer._drain_waiters`
+  by `id(marker)`; the logger sets only the matching event and each call removes only its own entry. Two finishes of one
+  session can overlap (`/estop` finishing it while the stopped executor finishes it too), and shared state made one of
+  them raise.
+- **Close-out always runs (final review).** `finalizer` wraps `drain_data` in `try/except Exception` with an `error` log,
+  so the file close, logger cancel, `write_act` and the last status run whatever the drain did.
+- **Non-streaming sessions publish nothing (final review).** `drain` returns at once, without a marker, when no action
+  in the session has `data_stream_status == active` and nothing is queued unwritten. That keeps the old behaviour: a
+  non-streaming action puts no data-less `finished` packet on `data_q`, so `/ws_data` subscribers see none.
+- **The one remaining wire-visible change.** A streaming action whose logger is stuck re-sends the marker every 0.1 s
+  while it consumes nothing, up to the bound (10 s, or 1 s on an E-STOP path). Each marker is a data-less `finished`
+  package on `data_q`/`/ws_data`. Before, the retry loops sent at most about 10 such packets. A healthy logger consumes
+  the first marker and nothing is re-sent.
 - **Effect.**
   - A slow logger no longer loses anything queued before finish, up to 10 s, or 1 s on E-STOP.
   - With a fast logger, the drain takes ≤0.1 s instead of up to 1.0 s.
@@ -1472,13 +1485,15 @@ native module`. Run black on the two `.py` files first.
 
 1. **PRE.**
    - In the parent repo, check out `unstable` at the merge base: `git -C <repo> merge-base unstable feat/hexagon-completion`.
-   - Check out each nested repo at its Task 0 head, from `$SCR/F0/nested_heads.txt`.
+   - Check out each nested repo at its Task 0 head. Deployment-C is on `main` at `435e137`. The others stay as they
+     are: this branch changes nothing in them.
    - Launch, and run the station smoke sequence: one CV or other streaming action, plus one non-blocking action if the
      station has one.
    - Let it drain, and let SYNC go idle.
    - Run `helao\hexagon\tests\smoke\eche10_golden_diff.bat capture pre <SEQNAME>`.
 2. **POST.**
-   - Check out the branch, and Deployment-C at its Task 2a commit.
+   - Check out the branch, and Deployment-C on its `feat/hexagon-completion` branch at `fb79839` (plus any later commit
+     on that branch). The parent branch and the Deployment-C branch merge together.
    - Launch, and run the same sequence on the same hardware. Drain and sync.
    - Run `... capture post <SEQNAME>`.
 3. **DIFF.**
@@ -1504,13 +1519,24 @@ native module`. Run black on the two `.py` files first.
    - The action server's log shows its sessions finalized, with any drain warning reading `after 1.0s`, never `10.0s`.
    - The orchestrator log shows no `estop for <server> timed out after 10.0s` line.
    - The whole E-STOP fan-out completes in under 3 s, measured from the orchestrator log timestamps.
+   - Press E-STOP again while a streaming action is still finishing. `estopped_actions` lists every live action uuid.
+     The action server log shows no `error finalizing an active action during estop` and no `AttributeError`.
+   - After a non-streaming action on a server that also streams, the Bokeh or Reflex visualizer keeps its last trace:
+     no data-less `finished` packet reaches `/ws_data` for a non-streaming action.
 7. **SYNC.**
    - The sequence reaches synced.
    - The SYNC server's `/loaded_modules` lists `hexagon/adapters/native/sync_driver.py`, and does not list
      `core/drivers/data/sync_driver.py`.
-   - `/tasks` answers with `quarantined: []`, or with the same list as PRE.
-8. **Restore (optional, recommended).**
+   - `/tasks` answers with `quarantined: []`, or with the same list as PRE, and `last_startup_sweep` is non-null.
+   - `POST /n_queue`, `/list_pending` and `/list_exceptions` all answer (no `AttributeError` on a `None` port).
+   - `POST /hotreload_busy` answers `{"busy": false}` when SYNC is idle, and `{"busy": true}` while a sync is running.
+   - The ORCH log shows `initializing SyncDriver` once, the initial active experiment and sequence S3 upload lines, and
+     no `Error uploading initial active`.
+   - Optional: run one analysis that uploads through `AnalysisSyncer`, and check that the upload lands.
+8. **Restore (optional, recommended; required on Windows).**
    - Queue a 2-experiment sequence and start it. Press CTRL-x mid-run. `STATES\queues.pck` exists.
+   - **On Windows this step is required, not optional** (the C2 path change). `/export_queues` must return a backslash
+     path, `C:\...\STATES\queues.pck`.
    - Relaunch with `--restore`. Check that:
      - `queues_imported_<ts>.pck` exists;
      - the in-flight action re-runs under a new uuid;

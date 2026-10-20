@@ -398,3 +398,27 @@ def test_sync_single_implementation():
     root = Path(__file__).resolve().parents[3]
     assert importlib.util.find_spec(_OLD) is None
     assert _old_syncer_imports(root) == []
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_does_not_bind_the_port_without_a_sync_server(monkeypatch):
+    """An orchestrator whose config names no SYNC server runs without a syncer."""
+    from helao.hexagon.tests.test_orch_host_surface import _host
+
+    host = _host()
+    assert host.use_sync is False
+
+    async def _noop(*a, **k):
+        return None
+
+    monkeypatch.setattr(host, "subscribe_all", _noop)
+    monkeypatch.setattr(host, "action_server_monitor", _noop)
+    monkeypatch.setattr(host._hex_health, "start", lambda: None)
+    monkeypatch.setattr(host._hex_loop, "start", lambda: None)
+    startup = next(h for h in host.router.on_startup if h.__name__ == "_orch_startup")
+
+    await startup()
+    for task in (host.status_subscriber, host.driver_monitor):
+        await task  # type: ignore[misc]
+
+    assert host.hexagon_wiring.sync is None

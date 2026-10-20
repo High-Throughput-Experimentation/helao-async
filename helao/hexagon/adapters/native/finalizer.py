@@ -341,7 +341,12 @@ class NativeActionFinalizer:
                 ESTOP_FINISH_DRAIN_TIMEOUT_S if estopped else FINISH_DRAIN_TIMEOUT_S
             )
             LOGGER.info(f"finish active: draining the data logger (bound {timeout_s}s)")
-            await self.active.drain_data(timeout_s)
+            try:
+                await self.active.drain_data(timeout_s)
+            except Exception:
+                # close-out below (file close, logger cancel, write_act, the
+                # last status) must run whatever the drain did
+                LOGGER.error("Failed to drain the data logger", exc_info=True)
 
             try:
                 # self.action_list[-1] is the very first action

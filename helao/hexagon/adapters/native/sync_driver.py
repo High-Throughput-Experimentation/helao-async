@@ -38,7 +38,7 @@ from copy import copy
 from datetime import datetime, timedelta
 from glob import glob
 from pathlib import Path, PurePosixPath
-from typing import Optional, Protocol, Union
+from typing import Optional, Union
 from zipfile import ZipFile
 
 import boto3

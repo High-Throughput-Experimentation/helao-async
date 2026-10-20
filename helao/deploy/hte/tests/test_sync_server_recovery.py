@@ -8,9 +8,8 @@ queue in memory, action servers get no ``--restore``, and nothing ever called
 ``finish_pending`` on its own. These tests pin the sweep's contract:
 
 * it composes the driver's existing ``finish_pending(actions_first=True)``
-  rather than reimplementing discovery (the driver is byte-pinned against its
-  hexagon-native twin by ``helao/hexagon/tests/test_native_sync_pins.py``, so
-  the logic had to live in the server);
+  rather than reimplementing discovery (the sweep is server lifecycle, so it
+  lives in the server rather than in the driver);
 * it is suppressible, skippable and failure-tolerant without ever raising into
   the startup path;
 * its summary survives ``json.dumps``, because it is served over HTTP on
