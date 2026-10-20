@@ -1,4 +1,4 @@
-"""Port of unit_test_sync_to_thread.py onto the NATIVE SyncDriver (P2c T10).
+"""Off-loop (``asyncio.to_thread``) sync I/O on the NATIVE SyncDriver.
 
 ``SyncDriver`` runs its ``syncer`` worker coroutines on the
 hosting FastAPI server's event loop. The heavy steps in ``sync_yml`` --
@@ -19,11 +19,7 @@ worst loop-stall:
   * ``to_s3`` with a deliberately blocking boto3-style client must offload
     the upload (heartbeat keeps ticking while the upload sleeps),
   * ``to_s3`` with S3 disabled (``s3 is None``) is a no-op returning ``True``.
-
-The legacy test file is NOT modified and NOT imported for logic (mirrored
-only). Mechanical translation: legacy `_make_driver` -> `make_sync_driver(...,
-NativeSyncDriver)`, legacy `tempfile.TemporaryDirectory()` -> pytest
-`tmp_path`, legacy `out["key"] = expr` -> `assert expr, "key"`."""
+"""
 
 import asyncio
 import time
@@ -111,6 +107,9 @@ async def test_to_s3_offloads_blocking_upload(tmp_path):
         drv.bucket = "test-bucket"
         hb = _HeartBeat()
         hb_task = asyncio.create_task(hb.run())
+        await asyncio.sleep(
+            0
+        )  # let the heartbeat start, else inline blocking is unseen
         t0 = time.perf_counter()
         ok = await drv.to_s3({"payload": list(range(1000))}, "meta/blob.json")
         elapsed = time.perf_counter() - t0

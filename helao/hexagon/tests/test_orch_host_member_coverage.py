@@ -239,15 +239,6 @@ def test_no_new_gap_has_opened_in_the_host() -> None:
     )
 
 
-def test_the_known_missing_list_has_not_silently_grown() -> None:
-    missing = orch_contract() - _host_members()
-    already_done = sorted(NOT_YET_PORTED - missing)
-    assert already_done == [], (
-        f"on NOT_YET_PORTED but OrchHost already has them: {already_done}\n"
-        "Delete them from the list."
-    )
-
-
 def test_deliberate_exclusions_are_actually_absent() -> None:
     missing = orch_contract() - _host_members()
     stale = sorted(DELIBERATELY_ABSENT - missing)

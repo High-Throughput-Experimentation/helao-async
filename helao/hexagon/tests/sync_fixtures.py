@@ -1,8 +1,7 @@
 """Shared fixtures for the native-sync tests.
 
 Bare ``SyncDriver`` on tempdir trees; hermetic -- no AWS/API. Tree builders
-mirror the proven fixture shape of
-helao/core/tests/unit_test_sync_process_recovery.py.
+are shared by the native-sync process tests.
 
 Tests layer -- may import anything (boundary rule)."""
 
@@ -60,7 +59,7 @@ async def drain(drv, timeout: float = 120.0) -> None:
         await asyncio.sleep(0.1)
 
 
-# --- tree builders (mirror unit_test_sync_process_recovery.py:39-117) ------
+# --- tree builders ---------------------------------------------------------
 
 
 def write_yml(path: Path, meta: dict) -> None:

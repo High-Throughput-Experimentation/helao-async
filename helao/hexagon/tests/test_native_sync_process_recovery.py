@@ -1,11 +1,6 @@
-"""Port of unit_test_sync_process_recovery.py (6 scenarios) onto the NATIVE
-SyncDriver (P2c T9). Mechanical translation: legacy `_make_driver` ->
-`make_sync_driver(..., NativeSyncDriver)`, legacy `tempfile.TemporaryDirectory()`
--> pytest `tmp_path`, legacy `out["key"] = expr` -> `assert expr, "key"`. Proves
-the native re-body reproduces the legacy process-recovery behavior
-byte-for-byte (mirrors helao/core/tests/unit_test_sync_process_recovery.py).
-
-The legacy test file is NOT modified and NOT imported for logic (mirrored only)."""
+"""Process-recovery / race-hardening scenarios on the NATIVE SyncDriver:
+legacy-experiment metas, cross-run reconcile, phantom and unrebuildable group
+parking, splits, overlapping groups, and late-action reopen."""
 
 from pathlib import Path
 

@@ -169,21 +169,6 @@ def test_no_new_gap_has_opened_in_the_host() -> None:
     )
 
 
-def test_the_known_missing_list_has_not_silently_grown() -> None:
-    """Every entry in NOT_YET_PORTED must still actually be missing.
-
-    Without this, a member could be ported and left on the list, and the list
-    would slowly stop meaning anything. Porting one requires deleting it here,
-    which is the edit that makes progress visible.
-    """
-    missing = _base_public_members() - _host_members()
-    already_done = sorted(NOT_YET_PORTED - missing)
-    assert already_done == [], (
-        f"these are on NOT_YET_PORTED but ActionHost already has them: "
-        f"{already_done}\nDelete them from the list."
-    )
-
-
 def test_deliberate_exclusions_are_actually_absent() -> None:
     """An exclusion that is no longer absent is a stale justification."""
     missing = _base_public_members() - _host_members()

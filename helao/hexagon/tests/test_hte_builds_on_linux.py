@@ -67,12 +67,6 @@ BUILDS: list[tuple[str, str, str]] = [
 WINDOWS_ONLY: dict[str, str] = {}
 
 
-def _not_yet_ported() -> frozenset[str]:
-    from helao.hexagon.tests.test_hte_is_native import NOT_YET_PORTED
-
-    return NOT_YET_PORTED
-
-
 @pytest.mark.parametrize("module,config,server_key", BUILDS, ids=[b[0] for b in BUILDS])
 def test_module_builds_under_its_station_config(
     module: str, config: str, server_key: str
@@ -91,12 +85,10 @@ def test_module_builds_under_its_station_config(
     assert isinstance(app, HelaoFastAPI), f"{module} built a {type(app).__name__}"
     assert app.title == server_key
 
-    # Before this module's port the app is a legacy BaseAPI, and the ratchet is
-    # what says which of the two to expect. After it, the host type IS the
-    # assertion -- a port that left a BaseAPI behind would still pass the
-    # checklist gate, which reads decorators rather than the constructor.
-    if module not in _not_yet_ported():
-        assert isinstance(app, ActionHost), f"{module} did not build an ActionHost"
+    # The host type IS the assertion -- a port that left a BaseAPI behind would
+    # still pass the checklist gate, which reads decorators rather than the
+    # constructor.
+    assert isinstance(app, ActionHost), f"{module} did not build an ActionHost"
 
 
 @pytest.mark.parametrize("module,expected", sorted(WINDOWS_ONLY.items()))

@@ -4,11 +4,8 @@ import asyncio
 from datetime import datetime
 
 from helao.hexagon.adapters import fakes
-from helao.hexagon.domain.models import Action, DataModel, ErrorCodes
-from helao.hexagon.ports.artifact_store import ArtifactStorePort
-from helao.hexagon.ports.auxiliary import StatePersistencePort
+from helao.hexagon.domain.models import Action, ErrorCodes
 from helao.hexagon.ports.clock import ClockPort
-from helao.hexagon.ports.data_sink import DataSinkPort
 from helao.hexagon.ports.status import StatusPort
 from helao.hexagon.ports.transport import TransportPort
 
@@ -16,10 +13,7 @@ from helao.hexagon.ports.transport import TransportPort
 def test_fakes_satisfy_protocols():
     assert isinstance(fakes.FakeClock(), ClockPort)
     assert isinstance(fakes.FakeTransport(), TransportPort)
-    assert isinstance(fakes.FakeArtifactStore(), ArtifactStorePort)
-    assert isinstance(fakes.FakeDataSink(), DataSinkPort)
     assert isinstance(fakes.FakeStatusPush(), StatusPort)
-    assert isinstance(fakes.FakeStatePersistence(), StatePersistencePort)
 
 
 def test_fake_clock_is_deterministic():
@@ -47,29 +41,3 @@ def test_fake_transport_scripted_failure():
     act.action_server.server_name = "SIM"
     resp, err = asyncio.run(tr.dispatch_action(act))
     assert resp is None and err == ErrorCodes.http
-
-
-def test_fake_data_sink_records_enqueues_thread_safely():
-    sink = fakes.FakeDataSink()
-    dm = DataModel(data={}, errors=[])
-    sink.enqueue_data_nowait(dm)
-    assert sink.enqueued == [dm]
-    assert isinstance(sink.get_realtime_nowait(), int)
-
-
-def test_fake_artifact_store_records_writes():
-    store = fakes.FakeArtifactStore()
-    act = Action(action_name="acquire")
-    act.init_act()
-    asyncio.run(store.write_act(act))
-    assert [k for k, _ in store.writes] == ["act"]
-
-
-def test_fake_state_persistence_round_trip(tmp_path):
-    sp = fakes.FakeStatePersistence()
-    sp.export_queues({"seq": [1, 2]}, timestamp_pck=False)
-    path, payload = sp.load_queues()
-    assert payload == {"seq": [1, 2]}
-    # archiving consumes (queues_imported_<ts> archival semantics)
-    sp.archive_consumed(path)
-    assert sp.load_queues()[1] is None

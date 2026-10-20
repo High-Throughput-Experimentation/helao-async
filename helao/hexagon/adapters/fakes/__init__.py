@@ -9,12 +9,10 @@ ports and never defaults to these.
 import logging
 import time
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
 from helao.hexagon.domain.models import (
     Action,
-    DataModel,
     ErrorCodes,
 )
 
@@ -100,98 +98,6 @@ class FakeTransport:
         return self._fail_with is None
 
 
-class FakeArtifactStore:
-    def __init__(self):
-        _banner("FakeArtifactStore")
-        self.writes: list[tuple[str, object]] = []
-        self.moved: list[object] = []
-        self.finished: list[object] = []
-
-    async def write_act(self, action: Action) -> None:
-        self.writes.append(("act", action))
-
-    async def write_exp(self, experiment) -> None:
-        self.writes.append(("exp", experiment))
-
-    async def write_seq(self, sequence) -> None:
-        self.writes.append(("seq", sequence))
-
-    async def finish(self, action) -> None:
-        self.finished.append(action)
-
-    async def move_dir(self, hobj) -> bool:
-        self.moved.append(hobj)
-        return True
-
-    async def zip_dir(self, dir_path: Path) -> Path:
-        return dir_path.with_suffix(".zip")
-
-
-class FakeDataSink:
-    """Thread-safe recorder for the DataSink surface (list.append is atomic)."""
-
-    def __init__(self):
-        _banner("FakeDataSink")
-        self.enqueued: list[DataModel] = []
-        self.files: list[tuple[str, str]] = []
-        self.samples: list[tuple[str, list]] = []
-        self.estopped = False
-
-    async def enqueue_data(self, datamodel, action=None) -> None:
-        self.enqueued.append(datamodel)
-
-    def enqueue_data_nowait(self, datamodel, action=None) -> None:
-        self.enqueued.append(datamodel)
-
-    def get_realtime_nowait(self, epoch_ns=None, offset=None) -> int:
-        return time.time_ns()
-
-    def finish_hlo_header(self, file_conn_keys=None, realtime=None) -> None:
-        pass
-
-    async def write_file(
-        self,
-        output_str,
-        file_type,
-        filename=None,
-        file_group=None,
-        header=None,
-        sample_str=None,
-        file_sample_label=None,
-        json_data_keys=None,
-        action=None,
-    ):
-        self.files.append((file_type, filename or ""))
-        return filename
-
-    def write_file_nowait(
-        self,
-        output_str,
-        file_type,
-        filename=None,
-        file_group=None,
-        header=None,
-        sample_str=None,
-        file_sample_label=None,
-        json_data_keys=None,
-        action=None,
-    ):
-        self.files.append((file_type, filename or ""))
-        return filename
-
-    async def track_file(self, file_type, file_path, samples, action=None) -> None:
-        self.files.append((file_type, file_path))
-
-    async def append_sample(self, samples, IO, action=None) -> None:
-        self.samples.append((IO, list(samples)))
-
-    async def split(self, uuid_list=None, new_fileconnparams=None) -> list:
-        return []
-
-    def set_estop(self, action=None) -> None:
-        self.estopped = True
-
-
 class FakeStatusPush:
     def __init__(self):
         _banner("FakeStatusPush")
@@ -229,23 +135,6 @@ class FakeStatusPush:
 
     async def publish_live(self, payload: dict) -> None:
         self.published.append(("live", payload))
-
-
-class FakeStatePersistence:
-    def __init__(self):
-        _banner("FakeStatePersistence")
-        self._stored: Optional[dict] = None
-
-    def export_queues(self, payload: dict, timestamp_pck: bool = False) -> str:
-        self._stored = payload
-        return "STATES/queues.pck"
-
-    def load_queues(self, pck_path: Optional[str] = None) -> tuple[str, Optional[dict]]:
-        return "STATES/queues.pck", self._stored
-
-    def archive_consumed(self, path: str) -> Optional[str]:
-        self._stored = None  # consume-and-archive
-        return path + ".imported"
 
 
 class FakeTableCatalog:

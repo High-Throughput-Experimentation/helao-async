@@ -1,6 +1,6 @@
 """Native SyncDriver core behavior (P2c T4): hermetic construction (s3/api
 None, worker tasks spawned), enqueue dedup, and the rank floor. Mirrors the
-construction contract proven by unit_test_sync_to_thread.py:87-95."""
+construction contract exercised by test_native_sync_to_thread.py."""
 
 from pathlib import Path
 

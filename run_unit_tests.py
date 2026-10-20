@@ -36,9 +36,6 @@ from helao.core.tests.unit_test_helao_driver import helao_driver_unit_test
 from helao.core.tests.unit_test_helaodict import helaodict_unit_test
 from helao.core.tests.unit_test_logging import logging_unit_test
 from helao.core.tests.unit_test_micro_orch import micro_orch_unit_test
-from helao.core.tests.unit_test_orch_dispatch_policy import (
-    orch_dispatch_policy_unit_test,
-)
 from helao.core.tests.unit_test_orch_lifecycle import orch_lifecycle_unit_test
 from helao.core.tests.unit_test_orch_monitor import orch_monitor_unit_test
 from helao.core.tests.unit_test_orch_queues import orch_queues_unit_test
@@ -49,13 +46,12 @@ from helao.core.tests.unit_test_server_keys import run_all as server_keys_unit_t
 from helao.core.tests.unit_test_sample_models import sample_model_unit_test
 from helao.core.tests.unit_test_sample_status import sample_status_unit_test
 from helao.core.tests.unit_test_sample_union import sample_union_unit_test
-from helao.core.tests.unit_test_sync_process_recovery import (
-    sync_process_recovery_unit_test,
-)
 from helao.core.tests.unit_test_sync_relative_paths import (
     sync_relative_path_unit_test,
 )
-from helao.core.tests.unit_test_sync_to_thread import sync_to_thread_unit_test
+from helao.core.tests.unit_test_status_transitions import (
+    status_transitions_unit_test,
+)
 from helao.core.tests.unit_test_version import version_unit_test
 from helao.deploy.test.tests.unit_test_oersim_params import oersim_params_unit_test
 
@@ -75,17 +71,15 @@ TESTS = [
     ("extra_models", extra_models_unit_test),
     ("helao_driver", helao_driver_unit_test),
     ("micro_orch", micro_orch_unit_test),
-    ("sync_to_thread", sync_to_thread_unit_test),
-    ("sync_process_recovery", sync_process_recovery_unit_test),
     ("estop_sync", estop_sync_unit_test),
     ("sample_status", sample_status_unit_test),
     ("sample_union", sample_union_unit_test),
+    ("status_transitions", status_transitions_unit_test),
     ("orch_monitor", orch_monitor_unit_test),
     ("orch_status_sync", orch_status_sync_unit_test),
     ("orch_queues", orch_queues_unit_test),
     ("orch_unpack", orch_unpack_unit_test),
     ("orch_lifecycle", orch_lifecycle_unit_test),
-    ("orch_dispatch_policy", orch_dispatch_policy_unit_test),
     ("base_live_buffer", base_live_buffer_unit_test),
     ("base_status", base_status_unit_test),
     ("echem_params", echem_params_unit_test),

@@ -50,9 +50,7 @@ from bokeh.models import ColumnDataSource
 from harness import ws_frames as wf
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-GRAFT_CONFIG = (
-    REPO_ROOT / "helao" / "deploy" / "test" / "configs" / "goldenhexgraft.yml"
-)
+VIS_CONFIG = REPO_ROOT / "helao" / "deploy" / "test" / "configs" / "goldenhexvis.yml"
 VIS_MODULE = "helao.deploy.hte.servers.visualizer.live_visualizer"
 
 
@@ -341,7 +339,7 @@ def real_config(tmp_path, monkeypatch):
     from helao.helpers import config_loader
     from helao.helpers.config_loader import read_config
 
-    cfg = copy.deepcopy(read_config(str(GRAFT_CONFIG)))
+    cfg = copy.deepcopy(read_config(str(VIS_CONFIG)))
     cfg["root"] = str(tmp_path)
     monkeypatch.setattr(config_loader, "CONFIG", cfg)
     return cfg
@@ -433,7 +431,7 @@ async def test_hexagon_hosted_document_panel_consumes_hexagon_frames(
     assert first != second, "the two frames are identical; ordering proves nothing"
 
     async with wf.replay_server({"ws_live": [first, second]}) as (host, port):
-        # SIM is the only server in goldenhexgraft.yml declaring `live_vis`, so
+        # SIM is the only server in goldenhexvis.yml declaring `live_vis`, so
         # this is the socket the mounted panel will subscribe to. Rewritten
         # BEFORE the document builds, because VisSubscriber resolves host/port at
         # construction time.
@@ -445,7 +443,7 @@ async def test_hexagon_hosted_document_panel_consumes_hexagon_frames(
         doc = Document()
         out = vis.makeBokehApp(
             doc,
-            confPrefix="goldenhexgraft",
+            confPrefix="goldenhexvis",
             server_key="LIVE",
             helao_repo_root=str(REPO_ROOT),
         )
@@ -489,7 +487,7 @@ async def test_standalone_operator_document_mounts_the_operator(real_config):
     try:
         out = operator.makeBokehApp(
             doc,
-            confPrefix="goldenhexgraft",
+            confPrefix="goldenhexvis",
             server_key="OPERATOR",
             helao_repo_root=str(REPO_ROOT),
         )
@@ -521,7 +519,7 @@ async def test_hexagon_hosted_document_ingest_can_fail(real_config, tmp_path):
         doc = Document()
         vis.makeBokehApp(
             doc,
-            confPrefix="goldenhexgraft",
+            confPrefix="goldenhexvis",
             server_key="LIVE",
             helao_repo_root=str(REPO_ROOT),
         )
