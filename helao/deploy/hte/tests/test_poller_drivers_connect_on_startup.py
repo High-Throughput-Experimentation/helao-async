@@ -4,12 +4,16 @@ The host calls ``connect()`` at startup (``connect_on_startup``), after setting
 ``_base_hook`` and before the paired ``DriverPoller`` exists, so the port is open
 before the first poll. A failed connect leaves the driver disconnected under a
 running poller; the poller's ``get_data()`` must tolerate that (CM0134, SprintIR).
-MeerstetterTEC still opens at construction until its own increment; see
-test_simdos_connect_in_init.py for the station instance.
+MeerstetterTEC is the one exception: its ``get_data()`` re-attempts the MeCom open
+and raises while disconnected, so its poller survives by ``DriverPoller``'s own
+error handling. See test_simdos_connect_in_init.py for the station instance.
 """
 
+import asyncio
 import sys
 import types
+
+import pytest
 
 from helao.core.drivers.helao_driver import DriverResponse
 import helao.deploy.hte.drivers.sensor.cm0134_driver as cm0134
@@ -80,9 +84,11 @@ class _Session:
         return 1
 
 
-def test_tec_opens_at_construction(monkeypatch):
+def test_tec_opens_on_connect(monkeypatch):
     monkeypatch.setattr(mecom_driver, "MeCom", _Session)
     drv = mecom_driver.MeerstetterTEC(config={"channel": 1, "port": "COM3"})
+    assert drv._session is None  # construction opens nothing
+    drv.connect()
     assert drv._session is not None and drv.address == 1
 
 
@@ -95,5 +101,128 @@ def test_tec_with_a_missing_port_fails_once_without_raising(monkeypatch):
 
     monkeypatch.setattr(mecom_driver, "MeCom", refuse)
     drv = mecom_driver.MeerstetterTEC(config={"channel": 1, "port": "COM3"})
+    assert calls == []  # construction opens nothing
+    drv.connect()
     assert drv._session is None
     assert len(calls) == 1
+
+
+def test_the_host_connects_the_tec():
+    assert mecom_driver.MeerstetterTEC.connect_on_startup is True
+
+
+@pytest.mark.asyncio
+async def test_tec_poller_raises_while_disconnected_and_the_loop_survives(
+    monkeypatch, caplog
+):
+    """Pre-settled exception: ``get_data()`` re-attempts the open and raises.
+
+    That is today's behaviour. ``DriverPoller`` logs the first failure with a
+    traceback and then every 100th, so three cycles log one line and the loop
+    keeps running.
+    """
+    from helao.core.drivers import helao_driver
+
+    def refuse(serialport, timeout):
+        raise OSError("could not open port")
+
+    monkeypatch.setattr(mecom_driver, "MeCom", refuse)
+    drv = mecom_driver.MeerstetterTEC(config={"channel": 1, "port": "COM3"})
+    drv.connect()  # fails, logged, never raises
+    bare = mecom_driver.MeerstetterTECPoller.__new__(mecom_driver.MeerstetterTECPoller)
+    bare.driver = drv
+    with pytest.raises(OSError):
+        bare.get_data()
+    helao_driver.LOGGER.addHandler(caplog.handler)
+    try:
+        poller = mecom_driver.MeerstetterTECPoller(drv, 0.01)
+        for _ in range(100):
+            if any("get_data() raised" in r.getMessage() for r in caplog.records):
+                await asyncio.sleep(0.15)
+                break
+            await asyncio.sleep(0.02)
+        assert not poller.polling_task.done()  # the loop survived
+        await poller.stop()
+    finally:
+        helao_driver.LOGGER.removeHandler(caplog.handler)
+    failures = [r for r in caplog.records if "get_data() raised" in r.getMessage()]
+    assert len(failures) == 1, f"expected one logged traceback, got {len(failures)}"
+
+
+def test_tec_host_starts_and_shuts_down_after_a_raising_connect(
+    monkeypatch, tmp_path, caplog
+):
+    """The one host-level proof that a formerly constructor-connect driver tears down.
+
+    ``tec_server`` has no station, so this is its only end-to-end check. The host
+    catches the raising ``connect()``, starts anyway, and shutdown must run on a
+    driver that never connected.
+    """
+    import logging
+    import time
+
+    from fastapi.testclient import TestClient
+
+    from helao.deploy.hte.servers.action import tec_server
+    from helao.helpers import config_loader
+    from helao.hexagon.app import action_host
+
+    monkeypatch.setattr(
+        config_loader,
+        "CONFIG",
+        {
+            "root": str(tmp_path),
+            "dummy": True,
+            "simulation": True,
+            "servers": {
+                "TEC": {
+                    "host": "127.0.0.1",
+                    "port": 8008,
+                    "group": "action",
+                    "fast": "tec_server",
+                    "params": {"channel": 1, "port": "COM3"},
+                }
+            },
+        },
+    )
+    (tmp_path / "LOGS").mkdir()
+    opens = []
+
+    def refuse(serialport, timeout):
+        opens.append(serialport)
+        raise OSError("could not open port")
+
+    monkeypatch.setattr(mecom_driver, "MeCom", refuse)
+
+    def connect_raises(self):
+        raise OSError("no device")
+
+    monkeypatch.setattr(mecom_driver.MeerstetterTEC, "connect", connect_raises)
+    app = tec_server.makeApp("TEC")
+    lg = action_host.LOGGER
+    old_level = lg.level
+    lg.setLevel(logging.DEBUG)
+    lg.addHandler(caplog.handler)
+    try:
+        with TestClient(app) as client:
+            end = time.time() + 3
+            while len(opens) < 2 and time.time() < end:
+                time.sleep(0.05)
+            status = client.post("/get_status")
+            poller = app.poller
+    finally:
+        lg.removeHandler(caplog.handler)
+        lg.setLevel(old_level)
+    errors = [
+        r
+        for r in caplog.records
+        if "connect() at startup raised" in r.getMessage()
+        and r.levelno == logging.ERROR
+    ]
+    assert len(errors) == 1 and "MeerstetterTEC" in errors[0].getMessage()
+    assert status.status_code == 200
+    assert len(opens) >= 2  # the poller ran at least two cycles
+    assert poller is not None and poller.polling_task.done()
+    assert app._shutdown_task is not None
+    retvals = app._shutdown_task.result()
+    assert "shutdown" in retvals and "async_shutdown" in retvals

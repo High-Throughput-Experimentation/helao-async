@@ -52,7 +52,6 @@ CONSTRUCTOR_CONNECT_PENDING: Final[frozenset[str]] = frozenset(
         "pstat.gamry.driver.GamryDriver",  # I7
         "pump.legato_driver.KDS100",  # I3
         "pump.simdos_driver.SIMDOS",  # I3
-        "temperature_control.mecom_driver.MeerstetterTEC",  # I2
         # no hte station; not flipped by this plan, see amendment 3
         "test_station.leancat.driver.LeancatDriver",
     }
@@ -62,6 +61,7 @@ CONNECT_ON_STARTUP: Final[frozenset[str]] = frozenset(
     {
         "sensor.cm0134_driver.CM0134",  # I1
         "sensor.sprintir_driver.SprintIR",  # I1
+        "temperature_control.mecom_driver.MeerstetterTEC",  # I2
     }
 )
 
