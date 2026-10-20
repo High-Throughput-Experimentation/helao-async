@@ -105,13 +105,15 @@ class KDS100(HelaoDriver):
     """HELAO ``HelaoDriver`` wrapper for KD Scientific Legato 100 syringe pump(s) on an RS-232 chain.
 
     The serial port specified in ``config['port']`` is opened by :meth:`connect`,
-    not by construction. Always-on per-pump status polling is handled by the
+    which the host calls at startup (``connect_on_startup``), not by construction. Always-on per-pump status polling is handled by the
     paired :class:`KDS100Poller`, wired in as the server's ``poller_class``.
 
     Server config parameters:
         ``port``: Serial port for the daisy-chained pump(s).
         ``pumps``: dict of ``{pump_name: {"address": ..., "diameter": ...}}``.
     """
+
+    connect_on_startup = True  # the host connects after _base_hook, before the poller
 
     def __init__(self, config: dict = {}):
         """Store config; the serial connection is opened in :meth:`connect`.
@@ -128,14 +130,6 @@ class KDS100(HelaoDriver):
         self.polling = True
         self.present_volume_ul = 0.0
         self.last_state = "unknown"
-
-        # Open the serial connection now. ActionHost never calls connect(), and
-        # KDS100Poller begins polling as soon as it is constructed, so a present
-        # pump must be connected here to be readable on the first poll. An
-        # absent COM port leaves self.sio = None (connect() logs the failure);
-        # the poll and shutdown paths tolerate that (get_data short-circuits,
-        # safe_state no-ops).
-        self.connect()
 
     def connect(self) -> DriverResponse:
         """Open the serial connection to the daisy-chained pump(s).

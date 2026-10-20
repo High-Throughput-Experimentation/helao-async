@@ -6,7 +6,7 @@ before the first poll. A failed connect leaves the driver disconnected under a
 running poller; the poller's ``get_data()`` must tolerate that (CM0134, SprintIR).
 MeerstetterTEC is the one exception: its ``get_data()`` re-attempts the MeCom open
 and raises while disconnected, so its poller survives by ``DriverPoller``'s own
-error handling. See test_simdos_connect_in_init.py for the station instance.
+error handling. See test_simdos_connect_on_startup.py for the station instance.
 """
 
 import asyncio

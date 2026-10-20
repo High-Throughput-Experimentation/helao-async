@@ -134,8 +134,8 @@ def str2bin(val: str) -> list:
 class SIMDOS(HelaoDriver):
     """``HelaoDriver`` wrapper for the KNF SIMDOS RC-P diaphragm pump over RS-485.
 
-    The serial port specified in ``config['port']`` is opened at construction,
-    through :meth:`connect`. Always-on status polling (operation/system/run/
+    The serial port specified in ``config['port']`` is opened by :meth:`connect`,
+    which the host calls at startup (``connect_on_startup``). Always-on status polling (operation/system/run/
     dispense/fault registers) is handled by the paired :class:`SIMDOSPoller`,
     wired in as the server's ``poller_class``.
 
@@ -144,8 +144,10 @@ class SIMDOS(HelaoDriver):
         ``address``: Pump's RS-485 device address.
     """
 
+    connect_on_startup = True  # the host connects after _base_hook, before the poller
+
     def __init__(self, config: dict = {}):
-        """Store config and open the serial connection via :meth:`connect`.
+        """Store config; the serial connection is opened by :meth:`connect`.
 
         Args:
             config: Driver configuration (the server's ``params`` dict).
@@ -156,10 +158,6 @@ class SIMDOS(HelaoDriver):
         self.com = None
         self.polling = True
         self.last_state = "unknown"
-        # Open the port here, not lazily: ActionHost never calls connect(), and
-        # SIMDOSPoller starts polling as soon as it is built. Deferring the open
-        # (6d42909c) left self.com None for the life of the server.
-        self.connect()
 
     def connect(self) -> DriverResponse:
         """Open the serial connection to the pump.
