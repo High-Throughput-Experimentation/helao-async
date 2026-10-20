@@ -67,7 +67,7 @@ class Galil(HelaoDriver):
     Reads its `config` dict from the action server's ``params`` block:
     `galil_ip_str`, `dev_ai`/`dev_ao`/`dev_di`/`dev_do` port maps, and the
     `monitor_ai` scaling dict. The `gclib.py()` connection is opened by
-    :meth:`connect`, not by construction; always-on analog-input polling is
+    :meth:`connect`, which the host calls at startup (``connect_on_startup``); always-on analog-input polling is
     handled by the paired :class:`GalilPoller`, wired in as the server's
     ``poller_class``. Public coroutines mirror digital and analog IO
     operations and (`set_digital_cycle`) upload a DMC program to the
@@ -79,6 +79,10 @@ class Galil(HelaoDriver):
         ``dev_ai``/``dev_ao``/``dev_di``/``dev_do``: port-name maps.
         ``monitor_ai``: dict of ``{ai_name: scaling}`` for the poller.
     """
+
+    connect_on_startup = (
+        True  # the host connects after _base_hook, before dyn_endpoints
+    )
 
     def __init__(self, config: dict = {}):
         """Store config and build the dynamic IO enums; no device I/O here.

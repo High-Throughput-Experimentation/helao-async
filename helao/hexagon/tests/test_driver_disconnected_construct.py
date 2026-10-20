@@ -59,6 +59,7 @@ CONNECT_ON_STARTUP: Final[frozenset[str]] = frozenset(
         "sensor.sprintir_driver.SprintIR",  # I1
         "mfc.alicat_driver.AliCatMFC",  # I4
         "motion.kinesis_driver.KinesisMotor",  # I5
+        "io.galil_io_driver.Galil",  # I6c
         "spec.andor.calibrated.AndorCalibratedDriver",  # I6b
         "spec.andor.spectrograph.AndorSpectrographDriver",  # I6b
         "spec.spectral_products_driver.SM303",  # I6a
