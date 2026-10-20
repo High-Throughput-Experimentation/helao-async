@@ -90,7 +90,7 @@ Action servers, experiments, and sequences are written as importable Python; the
 Server output is rooted at the YAML's `root:` key (e.g. `C:\INST_hlo`):
 - `LOGS/<server_name>/` — rotating text logs; `launch.py` zips old `*.txt` logs at startup using a timestamp parsed from the first log line.
 - `STATES/` — pickled PID files and other runtime state.
-- `RUNS` (or `DIAG` for manual/diagnostic runs) — the single per-run output tree consumed by `NativeSyncer`. Records are written there once and never move; lifecycle state lives in the per-server journals. `RUNS_*` (e.g. `RUNS_SYNCED`) is legacy read-only vocabulary for existing archives; see `helao/core/models/run_dir.py`.
+- `RUNS` — the single per-run output tree consumed by `NativeSyncer`. Manual/diagnostic runs go to `DIAG` instead, which is **never synced**: `move_dir` skips the syncer handoff for a manual record, so a DIAG run has no `.prg` and no upload. Records are written there once and never move; lifecycle state lives in the per-server journals. `RUNS_*` (e.g. `RUNS_SYNCED`) is legacy read-only vocabulary for existing archives; see `helao/core/models/run_dir.py`.
 
 **What the syncer uploads to `raw_data/` is decided by a directory glob, not by `Action.files`.** The consequences that have bitten in production — transient staging files getting shipped, the `staging_path` length rule, and the once-unbounded push loop — are in `helao/hexagon/adapters/native/CLAUDE.md`.
 
