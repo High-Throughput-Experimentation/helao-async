@@ -85,6 +85,10 @@ class SM303(HelaoDriver):
     externally-triggered acquisition.
     """
 
+    connect_on_startup = (
+        True  # the host connects after _base_hook, before dyn_endpoints
+    )
+
     def __init__(self, config: dict = {}):
         """Store config; no device I/O here (see :meth:`connect`).
 
