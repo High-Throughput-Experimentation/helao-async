@@ -169,24 +169,16 @@ def _dispatch_panel_move(coro, axis: str, value: float, units: str):
 
 
 async def galil_dyn_endpoints(app: ActionHost):
-    """Open the Galil connection, construct
-    the shared sample-DB handle, and register motion endpoints once the
+    """Construct the shared sample-DB handle and register motion endpoints once the
     driver reports itself enabled.
 
-    the host's own startup handler only constructs the
-    driver with ``config=server_params``; it never assigns a live ``Base``
-    reference nor opens the gclib connection (K1/K2/K4/K8). Unlike
-    ``thorlabs_kinesis.py`` (whose sibling server registers all endpoints
-    unconditionally, gated only on static config), this server's endpoints
-    are gated on ``app.driver.galil_enabled`` -- a value only known *after*
-    ``connect()`` runs. So ``connect()`` is done here (the host has already
-    set ``_base_hook``), at the top of this ``dyn_endpoints`` callback, mirroring
-    ``nidaqmx_server.py``'s ``nidaqmx_dyn_endpoints`` (the codebase's other
-    driver with a connection-gated dynamic endpoint set) rather than a
-    separate ``@app.on_event("startup")`` hook -- this callback is itself
-    invoked synchronously from ``Base.dyn_endpoints_init()``, which runs
-    inside the *same* startup event that constructs the driver, guaranteeing
-    ``connect()`` completes before the ``galil_enabled`` gate below is read.
+    The host constructs the driver with ``config=server_params``, sets its
+    ``_base_hook`` (so ``connect()`` can read ``helaodirs``) and connects it before
+    this callback runs, so ``galil_enabled`` is final when the gate below reads it.
+    Unlike ``thorlabs_kinesis.py`` (whose sibling server registers all endpoints
+    unconditionally, gated only on static config), this server's endpoints are
+    gated on ``app.driver.galil_enabled``. A failed or raising connect leaves it
+    falsy and no motion routes register.
 
     Args:
         app: The :class:`ActionHost` instance being constructed by ``makeApp``.
@@ -196,8 +188,6 @@ async def galil_dyn_endpoints(app: ActionHost):
     # K7/sm: the sample DB is server/app-level state (mirrors
     # `nidaqmx_server.py`'s `app.unified_db`), never driver state.
     app.unified_db = UnifiedSampleDataAPI(app.base)
-    connect_resp = app.driver.connect()
-    LOGGER.info(f"Galil connect() returned status={connect_resp.status}")
 
     if app.driver.galil_enabled is True:
 

@@ -60,6 +60,7 @@ CONNECT_ON_STARTUP: Final[frozenset[str]] = frozenset(
         "motion.kinesis_driver.KinesisMotor",  # I5
         "gamry_com.GamryComAdapter",  # I7
         "io.galil_io_driver.Galil",  # I6c
+        "galil_motion_native.NativeGalilMotion",  # I6f
         "io.nidaqmx_driver.cNIMAX",  # I6e
         "pstat.biologic.driver.BiologicDriver",  # I6d
         "pstat.gamry.driver.GamryDriver",  # I7

@@ -83,6 +83,10 @@ class NativeGalilMotion(HelaoDriver):
     injected (tests inject a fake).
     """
 
+    connect_on_startup = (
+        True  # the host connects after _base_hook, before dyn_endpoints
+    )
+
     def __init__(
         self,
         config: Optional[dict] = None,
