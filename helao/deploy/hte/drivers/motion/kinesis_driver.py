@@ -71,8 +71,10 @@ class KinesisMotor(HelaoDriver):
     endpoints.
     """
 
+    connect_on_startup = True  # the host connects after _base_hook, before the poller
+
     def __init__(self, config: dict = {}):
-        """Initialize the driver state and immediately attempt to connect.
+        """Initialize the driver state; the host calls :meth:`connect` at startup.
 
         Args:
             config: Driver configuration containing an `axes` dict.
@@ -84,7 +86,6 @@ class KinesisMotor(HelaoDriver):
         self.dev_kinesis = make_str_enum(
             "dev_kinesis", {key: key for key in self.config.get("axes", {})}
         )
-        self.connect()
 
     def connect(self) -> DriverResponse:
         """Open a `KinesisMotor` instance for every configured axis."""

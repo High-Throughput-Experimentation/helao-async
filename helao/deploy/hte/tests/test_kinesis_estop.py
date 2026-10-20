@@ -50,7 +50,9 @@ class FakeMotor:
 @pytest.fixture
 def driver(monkeypatch):
     monkeypatch.setattr(kd.Thorlabs, "KinesisMotor", FakeMotor)
-    return KinesisMotor(config=_CFG)
+    drv = KinesisMotor(config=_CFG)
+    drv.connect()  # the host connects after construction
+    return drv
 
 
 _STOP = ("stop", (), {"immediate": True, "sync": False})

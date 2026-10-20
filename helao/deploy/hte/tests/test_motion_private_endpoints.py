@@ -869,6 +869,7 @@ def make_kinesis_app(monkeypatch):
     def _make(config=None, busy_on=(), position=0, status=()):
         config = config or _kinesis_cfg()
         driver = KinesisMotor(config=config)
+        driver.connect()  # the host connects after construction
         for motor in driver.motors.values():
             motor.position = position
             motor._status = list(status)

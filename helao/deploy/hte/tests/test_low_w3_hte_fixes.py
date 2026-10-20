@@ -148,6 +148,7 @@ def test_kinesis_dev_enum_exists_when_an_axis_fails_to_open(monkeypatch):
             }
         }
     )
+    drv.connect()  # the host connects after construction; "bad" fails to open
     assert sorted(e.value for e in drv.dev_kinesis) == ["x", "y"]
 
 
