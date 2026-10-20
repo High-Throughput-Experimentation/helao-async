@@ -85,21 +85,21 @@ def test_a_server_key_absent_from_config_yields_the_default(with_config):
 
 
 @pytest.fixture
-def hispec_andor_alt_key(monkeypatch):
+def hispec_andor_alt_key(monkeypatch, tmp_path):
     """A second andor server key cloned from hispec's ANDOR entry.
 
     Deliberately NOT "ANDOR": server_key defaults to "ANDOR" on the driver
     (driver.py's __init__ signature), so asserting against "ANDOR" would pass
     on the broken default and prove nothing about the wiring fix. Cloning
     hispec's real entry (rather than hand-rolling one) keeps `host`/`port`
-    valid for `build_wiring`.
+    valid for `build_wiring`. ``root`` is pointed at ``tmp_path``: the real
+    config's root is a station path, and these tests run real startup.
     """
-    from helao.helpers.config_loader import load_global_config
-
-    load_global_config("hispec", set_global=True)
-    servers = config_loader.CONFIG["servers"]
-    servers["ANDOR_ALT"] = dict(servers["ANDOR"])
-    monkeypatch.setattr(config_loader, "CONFIG", config_loader.CONFIG)
+    config = config_loader.read_config("hispec")
+    config["root"] = str(tmp_path)
+    (tmp_path / "LOGS").mkdir()
+    config["servers"]["ANDOR_ALT"] = dict(config["servers"]["ANDOR"])
+    monkeypatch.setattr(config_loader, "CONFIG", config)
     return "ANDOR_ALT"
 
 
@@ -107,17 +107,18 @@ async def _started_app(server_key: str):
     """Build the andor host and run its startup handlers.
 
     ``httpx.ASGITransport`` does not run lifespan events, and the startup
-    handler is what constructs ``app.driver`` and calls ``connect()`` (via
-    ``andor_dyn_endpoints``) -- without it the wiring under test has not
-    happened yet. ``connect()`` fails harmlessly with no vendor SDK on Linux
-    (caught broadly in ``AndorDriver.connect``); it is the wiring beforehand,
-    not the connect outcome, that these tests check.
+    handler is what constructs ``app.driver``, sets its ``_base_hook`` and calls
+    ``connect()`` (the host does this, since ``connect_on_startup``) -- without
+    it the wiring under test has not happened yet. ``connect()`` fails
+    harmlessly with no vendor SDK on Linux (caught broadly in
+    ``AndorDriver.connect``); it is the wiring beforehand, not the connect
+    outcome, that these tests check.
 
     ``startup_event`` (the sync handler below) fires ``dyn_endpoints_init``
     via a bare ``asyncio.gather(...)`` -- fire-and-forget, not awaited -- so
     that Task's completion relative to anything after ``handler()`` returns
     is not guaranteed. Awaiting ``init_endpoint_status`` directly here, with
-    ``app._dyn_endpoints`` passed explicitly, makes the wiring + connect()
+    ``app._dyn_endpoints`` passed explicitly, makes the endpoint wiring
     complete deterministically before this returns (the abandoned gather
     Task then runs ``andor_dyn_endpoints`` a harmless second time, or not at
     all if the loop closes first).

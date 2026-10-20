@@ -23,8 +23,8 @@ production caller. The hardware contract is the `HelaoDriver` ABC plus one new c
 attribute, `connect_on_startup: ClassVar[bool] = False`. Bus exclusivity stays inside each
 driver.
 
-A driver must not do device I/O in `__init__`. Nine hte drivers still do; each wiring
-increment moves its classes out of that set (§5).
+A driver must not do device I/O in `__init__`. One class, which no hte station uses, still does;
+every other driver now connects through the host (§5).
 
 ## 2. §4.3.2 — `DataSinkPort` is ten members, with no adapter
 

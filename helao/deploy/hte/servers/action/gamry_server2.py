@@ -658,8 +658,12 @@ async def gamry_dyn_endpoints(app: ActionHost):
 
     # The host connects the driver before this runs (``connect_on_startup``;
     # GamryComAdapter.connect() builds and connects the COM driver on its thread).
-    # A failed or raising connect leaves ``ready`` unset and this parked, as after
-    # a failed connect today, so no action routes register.
+    # After a failed but non-raising connect the wrapped GamryDriver exists and
+    # ``GamryDriver.__init__`` has already set ``ready = True``, so this does NOT
+    # park: the next line raises AttributeError on ``app.driver.model`` (None) and
+    # the host logs "endpoint status init failed" with no routes registered, as
+    # before. If connect() raises, the adapter never builds a driver and ``ready``
+    # stays False, so this waits.
     while not app.driver.ready:
         LOGGER.info("waiting for gamry init")
         await asyncio.sleep(1)

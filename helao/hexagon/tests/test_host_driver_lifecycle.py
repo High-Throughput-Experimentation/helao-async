@@ -81,7 +81,7 @@ def _host(record: list, **kw):
     driver, poller, dyn = _make(record, **kw)
     cfg = {
         "root": tempfile.mkdtemp(prefix="helao_host_lifecycle_"),
-        "servers": {"SIM": {"host": "127.0.0.1", "port": 8002, "params": {}}},
+        "servers": {"SIM": {"host": "127.0.0.1", "port": 8761, "params": {}}},
     }
 
     class _Stub:

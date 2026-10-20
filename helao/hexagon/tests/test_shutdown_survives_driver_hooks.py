@@ -44,7 +44,7 @@ def _host():
 
     cfg = {
         "root": tempfile.mkdtemp(prefix="helao_shutdown_hooks_"),
-        "servers": {"SIM": {"host": "127.0.0.1", "port": 8002, "params": {}}},
+        "servers": {"SIM": {"host": "127.0.0.1", "port": 8762, "params": {}}},
     }
 
     class _Stub:

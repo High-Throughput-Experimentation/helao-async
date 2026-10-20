@@ -1,9 +1,9 @@
 """Disconnected construction is a ratchet, and the host connects drivers at startup.
 
-A ``HelaoDriver`` must not do device I/O in ``__init__``. Nine hte drivers still
-do (``CONSTRUCTOR_CONNECT_PENDING``); each increment of the hardware wiring moves
-its classes out of that set and into ``CONNECT_ON_STARTUP``, so forgetting either
-half goes red. The pending set is checked by AST (a ``connect`` call on ``self``
+A ``HelaoDriver`` must not do device I/O in ``__init__``. Only one class, which no
+hte station uses, still does (``CONSTRUCTOR_CONNECT_PENDING``); every other driver
+moved out of that set and into ``CONNECT_ON_STARTUP`` (the host connects it), so
+forgetting either half goes red. The pending set is checked by AST (a ``connect`` call on ``self``
 inside ``__init__``), which also covers a class whose module cannot be imported
 here. A runtime tripwire judges the other direction: every importable class not in
 the pending set constructs with zero recorded vendor/I/O hits.
@@ -434,6 +434,16 @@ def test_only_leancat_is_not_importable(world) -> None:
 def test_connect_on_startup_set_is_exact(world) -> None:
     flagged = {k for k, c in world.classes.items() if c.connect_on_startup}
     assert flagged == CONNECT_ON_STARTUP
+
+
+def test_no_connect_on_startup_driver_has_an_async_connect(world) -> None:
+    """The host calls ``connect()`` synchronously; an ``async def`` would never run."""
+    bad = sorted(
+        k
+        for k, c in world.classes.items()
+        if c.connect_on_startup and inspect.iscoroutinefunction(c.connect)
+    )
+    assert not bad, bad
 
 
 def test_nothing_written_outside_tmp(world) -> None:

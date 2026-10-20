@@ -76,7 +76,7 @@ def test_gamry_driver_host_starts_without_comtypes(caplog):
         wiring=wiring,
         helao_cfg={
             "root": tempfile.mkdtemp(prefix="helao_gamry_host_"),
-            "servers": {"PSTAT": {"host": "127.0.0.1", "port": 8004, "params": {}}},
+            "servers": {"PSTAT": {"host": "127.0.0.1", "port": 8763, "params": {}}},
         },
     )
     lg = action_host.LOGGER

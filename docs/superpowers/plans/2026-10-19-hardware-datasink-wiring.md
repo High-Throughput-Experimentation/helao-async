@@ -1283,8 +1283,16 @@ Anyone who greps station logs for the old text must switch to the new one.
    Two differences from PRE are expected:
    - formerly constructor-connect drivers (I1–I5, and `GamryDriver` hosts) used to fail at launch when `connect()`
      raised; now they come up disconnected;
-   - an I6/I7 server whose PRE connect *raised* came up without its late routes; POST has them, unless it waits on
-     `ready` (Gamry, BioLogic), in which case it keeps logging "waiting for ... init" as PRE did after a failed connect.
+   - an I6/I7 server whose PRE connect *raised* came up without its late routes; POST has them, except where a
+     gate or a wait applies:
+     - `galil_io` and `galil_motion` register their routes only when `galil_enabled` is true, so after a raising or
+       failed connect they have none;
+     - BioLogic waits on `ready`, which a failed connect never sets, so it keeps logging "waiting for ... init" as PRE
+       did after a failed connect and has no action routes;
+     - Gamry (hte's `gamry_server2`): after a failed *non-raising* connect, `GamryDriver.__init__` has already set
+       `ready = True`, so `dyn_endpoints` does **not** park. It raises `AttributeError` on `app.driver.model` (`None`),
+       the log shows "endpoint status init failed", and no routes register. That is identical to PRE. After a
+       *raising* connect the adapter never builds a driver, `ready` stays false, and it waits.
 
    Record every difference, with the log excerpt.
 8. On-station golden diff of the smoke sequence against PRE, with no control panel operated. Filter `body.ch_*`,
@@ -1304,8 +1312,8 @@ Anyone who greps station logs for the old text must switch to the new one.
 | 8 | I6c galil_io | `anec`, `eche10`, `hispec` IO | the same route set appears (compare `/docs` or the openapi snapshot to PRE); also Deployment-C/E configs |
 | 9 | I6d BioLogic | `hispec` PSTAT (eclib), `biologiceclib2`, `biologicole` | `ready` reached; one CV per backend; also the Deployment-E bench |
 | 10 | I6f galil_motion | `anec`, `eche10` MOTOR | aligner opens (if `enable_aligner`), plate calibration loads from `STATES`; also Deployment-C/E configs |
-| 11 | I6e NI-DAQmx | `adss3` or `anec` NI | ≥60 s cellIV: row count equal or higher than PRE; `t_s` strictly monotonic in the `.hlo`; the last row's `t_s` is within one buffer-callback period of the action's end (no lost tail, M19b); no `finish drain timed out` |
-| 12 | I7 Gamry | `eche10` PSTAT first, then `adss3`, `anec`, `clad`, `ecms3` | one connect line per launch; one CV; also the Deployment-A potentiostat server and the Deployment-B configs that resolve to hte's `gamry_server2` (rule R4) |
+| 11 | I6e NI-DAQmx | `adss3` or `anec` NI; also the Deployment-A `io_server`, which wraps `nidaqmx_server.makeApp` | ≥60 s cellIV: row count equal or higher than PRE; `t_s` strictly monotonic in the `.hlo`; the last row's `t_s` is within one buffer-callback period of the action's end (no lost tail, M19b); no `finish drain timed out` |
+| 12 | I7 Gamry | `eche10` PSTAT first, then `adss3`, `anec`, `clad`, `ecms3` | one connect line per launch, naming `GamryDriver` on the hosts that use it directly; one CV; also the Deployment-A potentiostat server and the Deployment-B configs that resolve to hte's `gamry_server2` (rule R4). The Deployment-A potentiostat server opened the pstat **twice** PRE (constructor, then `dyn_endpoints`) and opens it **once** POST: record any open or "in use" difference |
 
 ---
 
