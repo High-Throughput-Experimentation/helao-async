@@ -219,3 +219,27 @@ async def test_closed_loop_drops_and_warns_once(tmp_path, caplog) -> None:
         assert len(_put_threads(base)) == puts_before
         assert not active.data_stream._xthread
         await active.finish()
+
+
+@pytest.mark.asyncio
+async def test_thread_with_its_own_loop_is_marshalled(tmp_path) -> None:
+    """A vendor thread that runs its own event loop is still foreign.
+
+    ``running is None`` would treat it as on-loop; the test is "the running loop is
+    not ``host.aloop``".
+    """
+    with _PatchedBaseGlobals([]):
+        base, active, _ = await _open(tmp_path, "t6")
+        dflt = base.dflt_file_conn_key()
+
+        async def other_loop() -> None:
+            active.enqueue_data_nowait(_row(dflt, 1))
+
+        th = threading.Thread(target=lambda: asyncio.run(other_loop()))
+        th.start()
+        th.join()
+        await _ticks()
+        tid = threading.get_ident()
+        assert _put_threads(base) and all(t == tid for t in _put_threads(base))
+        await _drain_data(active)
+        await active.finish()

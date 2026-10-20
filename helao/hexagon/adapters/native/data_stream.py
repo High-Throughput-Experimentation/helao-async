@@ -159,7 +159,9 @@ class NativeDataStreamer:
         flush with ``call_soon_threadsafe``, which also wakes the selector. Every
         on-loop enqueue and :meth:`drain` flush the deque first, so rows reach the
         queue in the order they were produced. "Foreign" means the running loop on
-        this thread is not ``host.aloop`` (or there is none).
+        this thread is not ``host.aloop`` (or there is none). The put is marshalled
+        only when ``host.aloop`` is set; a host with no loop yet (unit tests) puts
+        directly.
         """
         msg, has_data = self.active._build_data_package(datamodel, action)
         aloop = getattr(self.active.base, "aloop", None)
