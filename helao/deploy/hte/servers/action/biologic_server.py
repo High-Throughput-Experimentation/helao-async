@@ -373,12 +373,10 @@ async def biologic_dyn_endpoints(app: ActionHost):
     server_key = app.server.server_name
     app.server_params["allow_concurrent_actions"] = False
 
-    # P3a-2 constructor-connect fix: BiologicDriver.__init__ no longer opens the
-    # instrument (disconnected construct); connect here at startup. connect()
-    # sets app.driver.ready on success, satisfying the wait below.
-    connect_resp = app.driver.connect()
-    LOGGER.info(f"Biologic connect() returned status={connect_resp.status}")
-
+    # The host connects the driver before this runs (``connect_on_startup``);
+    # a successful connect() sets app.driver.ready, satisfying the wait below. A
+    # failed or raising connect leaves it unset and this stays parked, as after
+    # a failed connect today, so no action routes register.
     while not app.driver.ready:
         LOGGER.info("waiting for biologic init")
         await asyncio.sleep(1)

@@ -25,6 +25,7 @@ class Started:
     get_status_code: Optional[int] = None
     route_paths: set = field(default_factory=set)
     app: object = None
+    probe: Any = None
 
 
 def start_with_raising_connect(
@@ -37,12 +38,14 @@ def start_with_raising_connect(
     server_key: str,
     driver_class: type,
     ready: Optional[Callable[[Any], bool]] = None,
+    probe: Optional[Callable[[Any], Any]] = None,
     wait_s: float = 5.0,
 ) -> Started:
     """Run startup with ``driver_class.connect`` raising; return what was observed.
 
     ``ready(app)`` says when the late routes are in; the default waits for the first
-    route added after construction, so ``dyn_endpoints`` has run.
+    route added after construction, so ``dyn_endpoints`` has run. ``probe(app)`` is
+    evaluated once, before shutdown, and returned as ``Started.probe``.
     """
     from helao.hexagon.app import action_host
 
@@ -74,6 +77,8 @@ def start_with_raising_connect(
                 time.sleep(0.05)
             out.get_status_code = client.post("/get_status").status_code
             out.route_paths = {getattr(r, "path", None) for r in app.routes}
+            if probe is not None:
+                out.probe = probe(app)  # while the app is still running
     finally:
         lg.removeHandler(caplog.handler)
         lg.setLevel(old_level)

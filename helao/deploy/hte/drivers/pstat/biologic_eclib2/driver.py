@@ -78,6 +78,10 @@ class BiologicEclib2Driver(HelaoDriver):
         ready: Whether a connection has been established.
     """
 
+    connect_on_startup = (
+        True  # the host connects after _base_hook, before dyn_endpoints
+    )
+
     def __init__(self, config: dict = {}):
         """Set up driver state. Performs no device I/O.
 
