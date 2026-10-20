@@ -98,7 +98,7 @@ Server output is rooted at the YAML's `root:` key (e.g. `C:\INST_hlo`):
 The orchestrator is the long-lived queue-and-dispatch service used in production. `helao/core/runners/` provides an alternative "micro-orchestrator" pattern (`action_runner`, `experiment_runner`, `sequence_runner`, `micro_client`) for callers that want a short-lived runner with no backend service. See `helao/core/runners/runner.md`. Several of those files are currently stubs.
 
 ## Conventions worth knowing
-- Drivers must implement the `HelaoDriver` ABC (`connect`/`get_status`/`stop`/`reset`/`disconnect`) and return `DriverResponse` objects; pollers extend `DriverPoller` with `get_data`.
+- Drivers must implement the `HelaoDriver` ABC (`connect`/`get_status`/`stop`/`reset`/`disconnect`) and return `DriverResponse` objects; pollers extend `DriverPoller` with `get_data`. No device I/O in `__init__`; set `connect_on_startup = True` to have the host connect at startup (after `_base_hook`, before the poller).
 - Action server modules expose a `makeApp(server_key) -> HelaoFastAPI` factory; Bokeh modules expose `makeBokehApp(...)`. The launchers find these by import path, so module/file names in `servers/<group>/` must match the `fast:` / `bokeh:` value in the config.
 - Configs may be `.yml` (loaded via `yml_load`) or `.py` (which must define a top-level `config` dict). `read_config` accepts either a full path or a bare prefix and globs `helao/deploy/*/configs/<prefix>.*`.
 - The `dummy: true` / `simulation: true` keys at the top of a config govern banner color and whether simulated drivers are used.

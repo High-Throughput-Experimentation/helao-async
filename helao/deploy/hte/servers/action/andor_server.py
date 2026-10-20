@@ -331,7 +331,6 @@ async def andor_dyn_endpoints(app: ActionHost):
     # a host shares one filename. Must run before connect(): the calibrated
     # variant's connect() reads calibration_file() to load the lamp fit.
     app.driver.server_key = server_key
-    app.driver._base_hook = app
 
     # P3a-2 constructor-connect fix: AndorDriver.__init__ no longer opens the
     # camera (disconnected construct); open it here at startup before any

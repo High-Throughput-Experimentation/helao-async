@@ -34,6 +34,7 @@ import time
 import traceback
 from copy import deepcopy
 from socket import gethostname
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 
@@ -46,6 +47,9 @@ from helao.core.drivers.helao_driver import (
     DriverStatus,
     HelaoDriver,
 )
+
+if TYPE_CHECKING:
+    from helao.hexagon.ports.hardware import DriverHostPort
 from helao.core.error import ErrorCodes
 from helao.core.models.sample import SolidSample
 from helao.hexagon.adapters.shared.calibration_store import JsonFileCalibrationStore
@@ -97,7 +101,7 @@ class Galil(HelaoDriver):
         # `_base_hook` pattern) so `connect()` can read `helaodirs`/`server_cfg`
         # (K2/K4) without this driver ever holding a live `Base` reference at
         # construction time.
-        self._base_hook = None
+        self._base_hook: "Optional[DriverHostPort]" = None
 
         self.dflt_matrix = np.matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
 

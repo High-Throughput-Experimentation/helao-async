@@ -169,7 +169,7 @@ def _dispatch_panel_move(coro, axis: str, value: float, units: str):
 
 
 async def galil_dyn_endpoints(app: ActionHost):
-    """Wire the driver's ``_base_hook``, open the Galil connection, construct
+    """Open the Galil connection, construct
     the shared sample-DB handle, and register motion endpoints once the
     driver reports itself enabled.
 
@@ -179,8 +179,8 @@ async def galil_dyn_endpoints(app: ActionHost):
     ``thorlabs_kinesis.py`` (whose sibling server registers all endpoints
     unconditionally, gated only on static config), this server's endpoints
     are gated on ``app.driver.galil_enabled`` -- a value only known *after*
-    ``connect()`` runs. So ``_base_hook`` assignment and ``connect()`` are
-    done here, at the top of this ``dyn_endpoints`` callback, mirroring
+    ``connect()`` runs. So ``connect()`` is done here (the host has already
+    set ``_base_hook``), at the top of this ``dyn_endpoints`` callback, mirroring
     ``nidaqmx_server.py``'s ``nidaqmx_dyn_endpoints`` (the codebase's other
     driver with a connection-gated dynamic endpoint set) rather than a
     separate ``@app.on_event("startup")`` hook -- this callback is itself
@@ -193,7 +193,6 @@ async def galil_dyn_endpoints(app: ActionHost):
     """
     server_key = app.server.server_name
 
-    app.driver._base_hook = app.base
     # K7/sm: the sample DB is server/app-level state (mirrors
     # `nidaqmx_server.py`'s `app.unified_db`), never driver state.
     app.unified_db = UnifiedSampleDataAPI(app.base)

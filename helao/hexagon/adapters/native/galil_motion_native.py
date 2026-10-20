@@ -29,7 +29,7 @@ import time
 import traceback
 from copy import deepcopy
 from socket import gethostname
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
 
@@ -39,6 +39,9 @@ from helao.core.drivers.helao_driver import (
     DriverStatus,
     HelaoDriver,
 )
+
+if TYPE_CHECKING:
+    from helao.hexagon.ports.hardware import DriverHostPort
 from helao.core.error import ErrorCodes
 from helao.core.models.sample import SolidSample
 from helao.deploy.hte.drivers.motion.enum import MoveModes, TransformationModes
@@ -100,7 +103,7 @@ class NativeGalilMotion(HelaoDriver):
 
             channel = GclibCommandChannel()
         self._channel: GalilCommandChannel = channel
-        self._base_hook = base_hook
+        self._base_hook: "Optional[DriverHostPort]" = base_hook
         # Optional aligner position-notify queue (object with async `put`);
         # preserves the legacy query -> update_aligner feed. None = no feed.
         self._position_sink = position_sink

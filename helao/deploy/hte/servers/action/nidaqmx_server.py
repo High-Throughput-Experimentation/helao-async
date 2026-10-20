@@ -159,15 +159,14 @@ async def nidaqmx_dyn_endpoints(app: ActionHost):
     Called once at startup (after the driver is constructed): opens the
     thermocouple monitor task and NEGATE3 scale via `connect()` (not in
     `__init__`, per the HelaoDriver ABC's no-device-I/O-at-construction
-    rule), wires `_base_hook` so the NI-DAQmx hardware callback can do its
-    synchronous estop/live-buffer reads, and constructs the single shared
+    rule) (the host has already set `_base_hook`, which the NI-DAQmx hardware
+    callback uses for its synchronous estop/live-buffer reads), and constructs the single shared
     `UnifiedSampleDataAPI` instance the `cellIV` endpoint validates samples
     against (mirrors the pre-migration one-instance-per-server pattern).
     """
     app.driver: cNIMAX
     connect_resp = app.driver.connect()
     LOGGER.info(f"NI-MAX connect() returned status={connect_resp.status}")
-    app.driver._base_hook = app.base
 
     app.unified_db = UnifiedSampleDataAPI(app.base)
     await app.unified_db.init_db()

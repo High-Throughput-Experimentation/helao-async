@@ -23,7 +23,7 @@ import asyncio
 import time
 import traceback
 from collections.abc import Callable
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from helao.core.drivers.helao_driver import (
     DriverPoller,
@@ -32,6 +32,9 @@ from helao.core.drivers.helao_driver import (
     DriverStatus,
     HelaoDriver,
 )
+
+if TYPE_CHECKING:
+    from helao.hexagon.ports.hardware import DriverHostPort
 from helao.core.error import ErrorCodes
 from helao.core.models.data import DataModel
 from helao.core.models.file import FileConnParams, HloHeaderModel
@@ -107,7 +110,7 @@ class cNIMAX(HelaoDriver):
         # needs (that callback fires on a nidaqmx-internal thread, so it
         # cannot await anything -- see streamIV_callback). Always accessed
         # via safe getattr so construction/unit tests work without a server.
-        self._base_hook = None
+        self._base_hook: "Optional[DriverHostPort]" = None
 
         self.dev_pump = self.config_dict.get("dev_pump", {})
         self.dev_pumpitems = make_str_enum(

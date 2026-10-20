@@ -182,7 +182,9 @@ class ActionHost(HelaoFastAPI):
         self._poller_class = poller_class
         self._dyn_endpoints = dyn_endpoints
 
-        self.world_cfg = self.helao_cfg
+        # HelaoFastAPI indexes helao_cfg in its __init__, so it is never None here
+        assert self.helao_cfg is not None
+        self.world_cfg: dict = self.helao_cfg
         self.root_dir = self.helao_cfg.get("root", None)
         self.fault_dir: Optional[str] = None
         self.fault_file = None
@@ -1541,6 +1543,29 @@ class ActionHost(HelaoFastAPI):
                     # so this is not a migration stopgap.
                     if issubclass(driver_class, HelaoDriver):
                         inst = driver_class(config=self.server_params)
+                        inst._base_hook = self
+                        if driver_class.connect_on_startup:
+                            name = driver_class.__name__
+                            try:
+                                resp = inst.connect()
+                            except (
+                                Exception
+                            ) as exc:  # start with the driver disconnected
+                                LOGGER.error(
+                                    f"{name}.connect() at startup raised; "
+                                    "continuing with the driver disconnected",
+                                    exc_info=True,
+                                )
+                                LOGGER.alert(
+                                    f"{self.server_key}: {name}.connect() at startup "
+                                    f"raised {exc!r}"
+                                )
+                            else:
+                                LOGGER.info(
+                                    f"{name}.connect() at startup: "
+                                    f"response={getattr(resp, 'response', None)} "
+                                    f"status={getattr(resp, 'status', None)}"
+                                )
                         if i == 0 and self._poller_class is not None:
                             self.poller = self._poller_class(
                                 inst, self.server_cfg.get("polling_time", 0.1)

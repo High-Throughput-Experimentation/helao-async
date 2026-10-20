@@ -12,9 +12,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, ClassVar, Optional
 
 from helao.helpers import helao_logging as logging
+
+if TYPE_CHECKING:
+    from helao.hexagon.ports.hardware import DriverHostPort
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -98,6 +101,12 @@ class HelaoDriver(ABC):
 
     timestamp: datetime
     config: dict
+    # ``True`` means the host calls ``connect()`` once at startup, after setting
+    # ``_base_hook`` and before building the poller. A driver must not do
+    # device I/O in ``__init__``.
+    connect_on_startup: ClassVar[bool] = False
+    # set by the host right after construction
+    _base_hook: "Optional[DriverHostPort]"
 
     def __init__(self, config: dict = {}):
         """Record the creation timestamp and store the driver config.
@@ -163,9 +172,9 @@ class DriverPoller:
     polling: bool
     poll_signal_task: "asyncio.Task[None]"
     polling_task: "asyncio.Task[None]"
-    # the owning host (ActionHost sets it after construction); Any avoids a
-    # core->hexagon import cycle and keeps `await _base_hook.put_lbuf(...)` typed
-    _base_hook: Any
+    # the owning host (ActionHost sets it after construction); the port is
+    # imported under TYPE_CHECKING only, so there is no core->hexagon import cycle
+    _base_hook: "Optional[DriverHostPort]"
 
     def __init__(self, driver: HelaoDriver, wait_time: float = 0.05) -> None:
         """Bind to ``driver`` and start the signal and polling background tasks.

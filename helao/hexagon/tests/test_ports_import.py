@@ -74,6 +74,7 @@ def test_domain_models_all_matches():
 
 
 PORT_MODULES = {
+    "helao.hexagon.ports.hardware": ["DriverHostPort"],
     "helao.hexagon.ports.data_sink": ["DataSinkPort"],
     "helao.hexagon.ports.artifact_store": ["ArtifactStorePort"],
     "helao.hexagon.ports.sync": ["SyncPort"],
