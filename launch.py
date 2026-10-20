@@ -1559,6 +1559,7 @@ def launch_server_groups(
     pidd.orchServs = []
     for group in LAUNCH_ORDER:
         LAUNCH_LOGGER.info(f"Launching {group} group.")
+        launched_fast, launched_other = [], []
         if group in pidd.servers.keys():
             G = pidd.servers[group]
             for server in G.keys():
@@ -1650,10 +1651,58 @@ def launch_server_groups(
                         continue
                     pidd.store_pid(server, servHost, servPort, ppid)
                     pidd.procs[server] = p
+                    if codeKey == "fast":
+                        launched_fast.append((server, servHost, servPort, p))
+                    else:
+                        launched_other.append(server)
                     time.sleep(0.5)
         if group != LAUNCH_ORDER[-1]:
-            time.sleep(3)
+            wait_group_ready(group, launched_fast, launched_other)
     return pidd
+
+
+#: Upper bound on how long one launched FastAPI server may take to answer
+#: ``/get_status`` before the next group starts anyway (with a warning).
+GROUP_READY_TIMEOUT_S = 60.0
+
+
+def wait_group_ready(
+    group, launched_fast, launched_other, sleep=time.sleep, now=time.time
+):
+    """Hold the next launch group until this group's servers answer.
+
+    A fixed pause used to sit here, but the orchestrator's ``subscribe_all``
+    gives each action server only ~30 s of retries; on a slow machine, with
+    every server of a group booting at once, an action server could come up
+    after that and leave the orchestrator unable to run experiments. So each
+    FastAPI server launched in the group is polled on ``/get_status`` (it
+    serves only after its startup, driver connect included, has finished).
+    A server whose process has already exited is not waited on; the
+    early-exit supervision reports it. Bokeh/Reflex servers have no
+    ``/get_status``: a group that launched only those keeps the old pause.
+    """
+    if not launched_fast:
+        if launched_other:
+            sleep(3)
+        return
+    LAUNCH_LOGGER.info(
+        f"Waiting for {len(launched_fast)} {group} server(s) to answer before "
+        "the next group."
+    )
+    for server, host, port, proc in launched_fast:
+        deadline = now() + GROUP_READY_TIMEOUT_S
+        while not wait_for_server_ready(host, port, timeout=2.0):
+            if proc.poll() is not None:
+                LAUNCH_LOGGER.warning(f"{server} exited before answering; not waiting.")
+                break
+            if now() > deadline:
+                LAUNCH_LOGGER.warning(
+                    f"{server} not answering after {GROUP_READY_TIMEOUT_S:.0f} s; "
+                    "starting the next group anyway."
+                )
+                break
+        else:
+            LAUNCH_LOGGER.info(f"{server} is up.")
 
 
 # ---------------------------------------------------------------------------

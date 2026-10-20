@@ -155,7 +155,8 @@ class SampleModelAPI:
         while file_in_use(self._db):
             LOGGER.info("db already in use, waiting")
             await asyncio.sleep(1)
-        self._con = sqlite3.connect(self._db)
+        # other servers on this host open the same file; wait out their locks
+        self._con = sqlite3.connect(self._db, timeout=30)
         self._cur = self._con.cursor()
         LOGGER.info(f"opened db: {self._db}")
 
@@ -250,7 +251,9 @@ class SampleModelAPI:
 
     def _create_init_db(self):
         """Create the sample table with an autoincrementing ``idx`` PK."""
-        self._cur.execute(f"""CREATE TABLE {self._sample_type}(
+        # IF NOT EXISTS: several servers per host run init_db on the same file,
+        # and the table check above is not atomic across processes
+        self._cur.execute(f"""CREATE TABLE IF NOT EXISTS {self._sample_type}(
               idx INTEGER PRIMARY KEY AUTOINCREMENT,
               {self.columns}
               );""")
