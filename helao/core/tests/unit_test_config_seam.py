@@ -71,7 +71,6 @@ def _wiring() -> PortWiring:
         status=_stub(),
         health=_stub(),
         artifact_store=_stub(),
-        data_sink=_stub(),
     )
 
 

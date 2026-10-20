@@ -44,7 +44,6 @@ def _host():
             status=_Stub(),
             health=_Stub(),
             artifact_store=_Stub(),
-            data_sink=_Stub(),
         ),
         helao_cfg={
             "root": tempfile.mkdtemp(prefix="helao_route_test_"),

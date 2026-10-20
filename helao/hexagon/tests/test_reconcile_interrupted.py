@@ -73,7 +73,6 @@ def _host(sync_port=None, key="SIM", root=None):
             status=_Stub(),
             health=_Stub(),
             artifact_store=NativeArtifactStoreAdapter(config=_Stub(), clock=_Clock()),
-            data_sink=_Stub(),
         ),
         helao_cfg={
             "root": root or tempfile.mkdtemp(prefix="helao_reconcile_"),

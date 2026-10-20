@@ -1,18 +1,15 @@
-"""StatePersistence / Status / Hardware / SampleState adapters."""
+"""StatePersistence / Status / SampleState adapters."""
 
 import os
 import pickle
 
 import pytest
 
-from helao.core.drivers.helao_driver import DriverResponse, HelaoDriver
 from helao.hexagon.adapters.errors import UnwiredPortError
-from helao.hexagon.adapters.shared.hardware import LegacyDriverHardwareAdapter
 from helao.hexagon.adapters.shared.sample_state import SampleShimAdapter
 from helao.hexagon.adapters.shared.state_persistence import QueuePckStore
 from helao.hexagon.adapters.shared.status import DispatcherStatusAdapter
 from helao.hexagon.ports.auxiliary import StatePersistencePort
-from helao.hexagon.ports.hardware import HardwarePort
 from helao.hexagon.ports.sample_state import SampleStatePort
 from helao.hexagon.ports.status import StatusPort
 
@@ -107,48 +104,6 @@ async def test_status_attach_and_send_record_clients(monkeypatch):
     assert sent[0][3] == "update_nonblocking"
     await a.detach_client("ORCH", "127.0.0.1", 8001)
     assert a.clients == []
-
-
-# --- Hardware: HelaoDriver passthrough + disconnected construct ---------------
-class _SimDriver(HelaoDriver):
-    def __init__(self, config: dict = {}):
-        super().__init__(config=config)
-        self.calls = []
-
-    def connect(self) -> DriverResponse:
-        self.calls.append("connect")
-        return DriverResponse()
-
-    def get_status(self) -> DriverResponse:
-        self.calls.append("get_status")
-        return DriverResponse()
-
-    def stop(self) -> DriverResponse:
-        self.calls.append("stop")
-        return DriverResponse()
-
-    def reset(self) -> DriverResponse:
-        self.calls.append("reset")
-        return DriverResponse()
-
-    def disconnect(self) -> DriverResponse:
-        self.calls.append("disconnect")
-        return DriverResponse()
-
-
-@pytest.mark.asyncio
-async def test_hardware_passthrough_and_mapping():
-    drv = _SimDriver(config={})  # disconnected construct: no I/O in __init__
-    a = LegacyDriverHardwareAdapter(drv)
-    assert isinstance(a, HardwarePort)
-    await a.connect()
-    await a.get_status()
-    await a.abort()  # -> legacy ABC stop()
-    await a.reset()
-    await a.disconnect()
-    assert drv.calls == ["connect", "get_status", "stop", "reset", "disconnect"]
-    with pytest.raises(AttributeError):
-        await a.arm()  # _SimDriver has no setup(); fail loud, no silent no-op
 
 
 # --- SampleState: flattening facade over the shim ------------------------------

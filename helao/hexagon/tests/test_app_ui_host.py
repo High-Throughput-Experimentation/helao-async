@@ -45,15 +45,3 @@ def test_start_serves_a_document_and_stop_cleans_up():
         sock.close()
     finally:
         host.stop(handle)
-
-
-def test_build_ui_app_is_deferred_to_p7f():
-    from helao.hexagon.adapters.errors import HexagonDeferred
-
-    host = BokehServerUiHost()
-    try:
-        host.build_ui_app({})
-        raised = False
-    except HexagonDeferred:
-        raised = True
-    assert raised, "build_ui_app must raise HexagonDeferred until P7f wires Reflex"

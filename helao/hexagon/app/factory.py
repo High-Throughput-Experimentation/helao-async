@@ -13,7 +13,6 @@ from helao.hexagon.adapters.shared.state_persistence import QueuePckStore
 from helao.hexagon.adapters.shared.status import DispatcherStatusAdapter
 from helao.hexagon.adapters.shared.transport import LegacyTransportAdapter
 from helao.hexagon.adapters.native.artifact_store import NativeArtifactStoreAdapter
-from helao.hexagon.adapters.native.data_sink import NativeDataSinkAdapter
 from helao.hexagon.app.wiring import PortWiring
 
 __all__ = ["build_wiring"]
@@ -40,5 +39,4 @@ def build_wiring(server_key: str) -> PortWiring:
         # P2b-1 native write runtime; ActionHost binds itself to it
         # (artifact_store.meta_writer_for(host)) when it is constructed.
         artifact_store=NativeArtifactStoreAdapter(config=config, clock=clock),
-        data_sink=NativeDataSinkAdapter(),
     )

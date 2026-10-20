@@ -128,11 +128,8 @@ class _palcmd(BaseModel):
 
 class _PALActiveContext(DataSinkPort, Protocol):
     """``DataSinkPort`` plus the residual ``Active`` surface PAL's job-loop
-    still reaches directly: the mutable ``.action`` context object, the
-    non-``_nowait`` ``get_realtime()``, and ``finish_hlo_header`` called
-    without an ``await`` (the real ``Active.finish_hlo_header`` is
-    synchronous despite the port's async declaration -- a pre-existing
-    port/adapter signature gap, not something this slice changes).
+    still reaches directly: the mutable ``.action`` context object and the
+    non-``_nowait`` ``get_realtime()``.
 
     PAL's `_sendcommand_main` still reads/mutates ``.action`` directly for
     job-lifecycle bookkeeping that is permanently engine-owned, not
@@ -157,8 +154,6 @@ class _PALActiveContext(DataSinkPort, Protocol):
     action: Any
 
     async def get_realtime(self) -> int: ...
-
-    def finish_hlo_header(self, file_conn_keys=None, realtime=None) -> None: ...
 
 
 @dataclass

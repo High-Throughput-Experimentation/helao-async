@@ -43,7 +43,6 @@ def _host():
         status=stub,
         health=stub,
         artifact_store=stub,
-        data_sink=stub,
     )
     return ActionHost(
         server_key="SIM",

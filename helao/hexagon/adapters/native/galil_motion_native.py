@@ -1,7 +1,7 @@
 """Native Galil motion driver over the command-channel port (P3a galil-3, native-1).
 
-Unlike the slice-3 ``GalilMotionHardwareAdapter`` (which delegated every call to
-the legacy ``Galil``), ``NativeGalilMotion`` OWNS the motion logic: it issues
+Unlike a delegating wrapper over the legacy ``Galil``, ``NativeGalilMotion`` OWNS
+the motion logic: it issues
 Galil command strings through a
 :class:`~helao.hexagon.ports.galil_command_channel.GalilCommandChannel` and does
 the coordinate/parse math itself, reusing the slice-1 ``TransformXY`` and slice-2

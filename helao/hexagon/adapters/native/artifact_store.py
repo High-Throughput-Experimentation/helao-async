@@ -20,7 +20,7 @@ covers both success and silent retry-exhaustion, so "recognized object
 type" (``result != {}``) is the most accurate bool the return carries.
 
 Q2 (binding): sample/status mutations are NOT here — see
-``native/data_sink.py``.
+``ActionSession`` (``app/action_session.py``).
 """
 
 from pathlib import Path

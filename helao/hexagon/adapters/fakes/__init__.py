@@ -135,7 +135,6 @@ class FakeDataSink:
         self.enqueued: list[DataModel] = []
         self.files: list[tuple[str, str]] = []
         self.samples: list[tuple[str, list]] = []
-        self.lbuf: dict = {}
         self.estopped = False
 
     async def enqueue_data(self, datamodel, action=None) -> None:
@@ -144,13 +143,10 @@ class FakeDataSink:
     def enqueue_data_nowait(self, datamodel, action=None) -> None:
         self.enqueued.append(datamodel)
 
-    async def enqueue_data_dflt(self, datadict: dict) -> None:
-        self.enqueued.append(DataModel(data={}, errors=[]))
-
     def get_realtime_nowait(self, epoch_ns=None, offset=None) -> int:
         return time.time_ns()
 
-    async def finish_hlo_header(self, file_conn_keys=None, realtime=None) -> None:
+    def finish_hlo_header(self, file_conn_keys=None, realtime=None) -> None:
         pass
 
     async def write_file(
@@ -194,15 +190,6 @@ class FakeDataSink:
 
     def set_estop(self, action=None) -> None:
         self.estopped = True
-
-    async def put_lbuf(self, payload: dict) -> None:
-        self.lbuf.update(payload)
-
-    def put_lbuf_nowait(self, payload: dict) -> None:
-        self.lbuf.update(payload)
-
-    def get_lbuf(self, key: str) -> tuple:
-        return (self.lbuf.get(key), time.time())
 
 
 class FakeStatusPush:
