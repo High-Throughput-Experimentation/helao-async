@@ -162,3 +162,28 @@ def test_ifc1010_auto_run_after_a_cp_run_turns_auto_ranging_back_on(log):
     d.technique = None
     _setup(d, "auto")
     assert _calls(log, "SetIERangeMode")[-1] == (True,)
+
+
+def test_ref30k_offers_only_the_booster_ranges():
+    from helao.deploy.hte.drivers.pstat.gamry.range import (
+        Gamry_IErange_REF30K as enum,
+        get_range,
+    )
+
+    assert REF30K.ierange is enum
+    assert [n for n in enum.__members__ if n != "auto"] == [
+        "mode10",
+        "mode11",
+        "mode12",
+        "mode13",
+    ]
+    assert (
+        get_range("1mA", REF30K.ierange).name == "mode10"
+    )  # below 30 mA: lowest range
+    assert get_range("30A", REF30K.ierange).name == "mode13"
+
+
+def test_ref30k_auto_sets_the_30ma_range_with_auto_ranging_off(log):
+    _setup(_driver(REF30K, log), "auto")
+    assert _calls(log, "SetIERange") == [(0.03,)]
+    assert _calls(log, "SetIERangeMode") == [(False,)]
