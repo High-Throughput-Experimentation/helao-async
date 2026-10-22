@@ -381,7 +381,12 @@ class NativeActionFinalizer:
                 server=self.active.base,
             )
             try:
-                l10 = self.active.base.actives.pop(self.active.active_uuid, None)
+                # Only this session's own entry: a stale session finishing late
+                # must not pop the re-run that replaced it under the same uuid.
+                actives = self.active.base.actives
+                l10 = None
+                if actives.get(self.active.active_uuid) is self.active:
+                    l10 = actives.pop(self.active.active_uuid)
                 if l10 is not None:
                     self.active.base.history[l10.action.action_uuid] = copy(l10.action)
             except Exception:

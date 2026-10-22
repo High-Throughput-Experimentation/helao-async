@@ -57,6 +57,9 @@ class RPCRequest(msgspec.Struct, omit_defaults=True):
     id: int
     method: str
     args: dict[str, Any] = {}
+    #: Identifies one dispatch across its RPC and HTTP copies (see
+    #: ``async_action_dispatcher``). Absent from clients that predate it.
+    dispatch_id: Optional[str] = None
 
 
 class RPCResponse(msgspec.Struct, omit_defaults=True):
@@ -66,10 +69,18 @@ class RPCResponse(msgspec.Struct, omit_defaults=True):
     ok: bool
     result: Any = None
     error: str = ""
+    #: True when a registered method was found and failed on the server (it
+    #: may have run). Absent from an unknown-method or decode failure, and from
+    #: replies by servers that predate the flag.
+    handler_error: bool = False
 
 
 class RPCError(RuntimeError):
     """Raised on the client side when the server replied with ``ok=False``."""
+
+
+class RPCHandlerError(RPCError):
+    """The server found the method and it failed; re-sending may repeat it."""
 
 
 def _msgpack_enc_hook(obj: Any) -> Any:
@@ -298,6 +309,19 @@ class RPCDispatcher:
         self._socket: Optional[zmq.asyncio.Socket] = None
         self._task: Optional[asyncio.Task] = None
         self._endpoint: Optional[str] = None
+        #: Optional ``async admit(method, args, dispatch_id) -> result | None`` run before a
+        #: registered handler. A non-None result is replied as the call's
+        #: result and the handler is skipped; None lets it run. The host sets
+        #: this to share its HTTP middleware's action admission.
+        self.admit: Optional[Callable[[str, dict, Optional[str]], Awaitable[Any]]] = (
+            None
+        )
+        #: Optional ``resolve(method, args, result)`` called with the jsonable
+        #: result of an admitted handler that returned.
+        self.resolve: Optional[Callable[[str, dict, Any], None]] = None
+        #: Optional ``forget(method, args)`` called when an admitted handler
+        #: raised, so the host can drop what ``admit`` recorded for it.
+        self.forget: Optional[Callable[..., None]] = None
 
     def register(self, name: str, fn: Callable[..., Any]) -> None:
         """Add ``fn`` to the dispatch table under ``name`` (last writer wins).
@@ -379,6 +403,7 @@ class RPCDispatcher:
     async def _handle(self, envelope: list, payload: bytes) -> None:
         """Decode one request, invoke the registered method, and send the reply."""
         req_id = 0
+        handler_error = False
         try:
             req = _REQ_DECODER.decode(payload)
             req_id = req.id
@@ -388,15 +413,43 @@ class RPCDispatcher:
                     id=req_id, ok=False, error=f"unknown method {req.method!r}"
                 )
             else:
-                coerced = _coerce_args(fn, req.args)
-                if asyncio.iscoroutinefunction(fn):
-                    result = await fn(**coerced)
+                handler_error = True
+                method = req.method.lstrip("/")
+                held = None
+                if self.admit is not None:
+                    held = await self.admit(method, req.args, req.dispatch_id)
+                if held is not None:
+                    resp = RPCResponse(id=req_id, ok=True, result=_to_jsonable(held))
                 else:
-                    result = fn(**coerced)
-                resp = RPCResponse(id=req_id, ok=True, result=_to_jsonable(result))
+                    try:
+                        try:
+                            coerced = _coerce_args(fn, req.args)
+                            inspect.signature(fn).bind(**coerced)
+                        except Exception:
+                            # Failed before the handler body: HTTP may retry.
+                            handler_error = False
+                            raise
+                        if asyncio.iscoroutinefunction(fn):
+                            result = await fn(**coerced)
+                        else:
+                            result = fn(**coerced)
+                        resp = RPCResponse(
+                            id=req_id, ok=True, result=_to_jsonable(result)
+                        )
+                    except BaseException:
+                        if self.admit is not None and self.forget is not None:
+                            self.forget(method, req.args, release=not handler_error)
+                        raise
+                    if self.admit is not None and self.resolve is not None:
+                        self.resolve(method, req.args, resp.result)
         except Exception as e:  # noqa: BLE001
             LOGGER.exception(f"RPC dispatch error for method (id={req_id})")
-            resp = RPCResponse(id=req_id, ok=False, error=f"{type(e).__name__}: {e}")
+            resp = RPCResponse(
+                id=req_id,
+                ok=False,
+                error=f"{type(e).__name__}: {e}",
+                handler_error=handler_error,
+            )
         try:
             assert self._socket is not None
             await self._socket.send_multipart(envelope + [_RESP_ENCODER.encode(resp)])
@@ -490,6 +543,7 @@ class RPCClient:
         method: str,
         timeout: Optional[float] = None,
         args: Optional[dict[str, Any]] = None,
+        dispatch_id: Optional[str] = None,
         **kwargs: Any,
     ) -> Any:
         """Invoke ``method`` on the remote dispatcher and return its result.
@@ -497,6 +551,7 @@ class RPCClient:
         Args:
             method: Remote method name.
             timeout: Override for the per-call wait, in seconds.
+            dispatch_id: Sent on the envelope, not in the handler's kwargs.
             args: Payload dict forwarded to the remote method. Use this rather
                 than ``**kwargs`` when a forwarded parameter name could shadow
                 one of this method's own parameters (``method``/``timeout``/
@@ -521,7 +576,9 @@ class RPCClient:
         try:
             payload = dict(args or {})
             payload.update(kwargs)
-            req = RPCRequest(id=req_id, method=method, args=payload)
+            req = RPCRequest(
+                id=req_id, method=method, args=payload, dispatch_id=dispatch_id
+            )
             await self._socket.send(_REQ_ENCODER.encode(req))
             wait = timeout if timeout is not None else self.default_timeout
             resp: RPCResponse = await asyncio.wait_for(fut, timeout=wait)
@@ -532,7 +589,7 @@ class RPCClient:
             self._pending.pop(req_id, None)
             raise
         if not resp.ok:
-            raise RPCError(resp.error)
+            raise (RPCHandlerError if resp.handler_error else RPCError)(resp.error)
         return resp.result
 
     async def close(self) -> None:
@@ -641,7 +698,7 @@ class RPCSyncClient:
         payload = sock.recv()
         resp = _RESP_DECODER.decode(payload)
         if not resp.ok:
-            raise RPCError(resp.error)
+            raise (RPCHandlerError if resp.handler_error else RPCError)(resp.error)
         return resp.result
 
     def close(self) -> None:

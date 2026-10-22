@@ -69,6 +69,7 @@ from helao.helpers.ws_utils import WsPublisher
 from helao.helpers.zdeque import zdeque
 from helao.hexagon.adapters.shared.status import DispatcherStatusAdapter
 from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
+from helao.hexagon.app.action_admission import ActionAdmission, ActionFailed
 from helao.hexagon.app.wiring import ACTION_REQUIRED, PortWiring
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -883,50 +884,57 @@ class ActionHost(HelaoFastAPI):
         execution both return 200; only the interleaving differs, and on a
         station that difference is two actions driving one instrument at once.
 
-        Three ways through, in the order legacy checks them:
+        The decision itself lives in :class:`ActionAdmission`, shared with the
+        RPC fast path (``rpc_dispatcher.admit``) so the two transports cannot
+        disagree. In the order legacy checks them:
 
-        1. the endpoint is idle, or the caller said ``no_wait``, or this is
+        1. a uuid this server already took -- answer with its existing record, or,
+           if the original is still running, wait for it and answer with its
+           result (a failed original re-runs, see :class:`ActionAdmission`);
+        2. the endpoint is idle, or the caller said ``no_wait``, or this is
            already a requeued launch -- run it;
-        2. the server disallows concurrency and *any* endpoint is busy -- park
+        3. the server disallows concurrency and *any* endpoint is busy -- park
            it on the unified queue;
-        3. this endpoint is busy -- park it on that endpoint's queue.
+        4. this endpoint is busy -- park it on that endpoint's queue.
 
         A parked action is answered 200 with its own action dict, not held
         open: the caller gets a real action uuid to track, and
         ``process_endpoint_queue`` redispatches it when the endpoint frees.
         """
-        from socket import gethostname
-
+        from fastapi.encoders import jsonable_encoder
         from starlette.requests import Request
         from starlette.responses import JSONResponse, Response
 
-        from helao.core.models.action_start_condition import ActionStartCondition as ASC
-        from helao.core.models.machine import MachineModel
-        from helao.helpers.eval import eval_val
-        from helao.helpers.time_utils import gen_uuid
-
         server_key = self.server_key
+        self.admission = ActionAdmission(self)
 
-        def _park(action_dict, request, queue, why: str):
-            """Build the queued action, announce it, and park it on *queue*."""
-            action_dict["action_params"] = action_dict.get("action_params", {})
-            action_dict["action_params"]["queued_on_actserv"] = True
-            extra_params = {}
-            action = Action.model_validate(action_dict)
-            action.action_uuid = gen_uuid()
-            for d in (request.query_params, request.path_params):
-                for k, v in d.items():
-                    if k in ACTION_PARAM_KEYS:
-                        extra_params[k] = eval_val(v)
-                    else:
-                        action.action_params[k] = eval_val(v)
-            action.action_name = request.url.path.strip("/").split("/")[-1]
-            action.action_server = MachineModel(
-                server_name=server_key, machine_name=gethostname().lower()
+        async def _rpc_admit(
+            method: str, args: dict, dispatch_id: Optional[str] = None
+        ):
+            if not method.startswith(f"{server_key}/"):
+                return None
+            action_dict = args.get("action")
+            return await self.admission.admit(
+                method.split("/")[-1],
+                action_dict if isinstance(action_dict, dict) else {},
+                {k: v for k, v in args.items() if k != "action"},
+                "rpc",
+                dispatch_id,
             )
-            LOGGER.info(f"{why}, queuing action {action.action_uuid}")
-            queue.append((action, extra_params))
-            return action
+
+        def _rpc_forget(method: str, args: dict, release: bool = False) -> None:
+            action_dict = args.get("action")
+            if method.startswith(f"{server_key}/") and isinstance(action_dict, dict):
+                self.admission.forget(action_dict, release=release)
+
+        def _rpc_resolve(method: str, args: dict, result) -> None:
+            action_dict = args.get("action")
+            if method.startswith(f"{server_key}/") and isinstance(action_dict, dict):
+                self.admission.resolve(action_dict, result)
+
+        self.rpc_dispatcher.admit = _rpc_admit
+        self.rpc_dispatcher.resolve = _rpc_resolve
+        self.rpc_dispatcher.forget = _rpc_forget
 
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
@@ -949,42 +957,42 @@ class ActionHost(HelaoFastAPI):
             # Bodyless POSTs (``/estop`` takes only a query param) are valid.
             body_dict = json.loads(await request.body() or b"{}")
             action_dict = body_dict.get("action", {})
-            start_cond = action_dict.get("start_condition", ASC.wait_for_all)
-            ep_model = self.actionservermodel.endpoints.get(endpoint)
-            busy = bool(ep_model.active_dict) if ep_model is not None else False
-
-            if (
-                not busy
-                or start_cond == ASC.no_wait
-                or action_dict.get("action_params", {}).get("queued_launch", False)
-            ):
-                return await call_next(request)
-
-            if not self.server_params.get("allow_concurrent_actions", True):
-                active_endpoints = [
-                    ep
-                    for ep, em in self.actionservermodel.endpoints.items()
-                    if em.active_dict
-                ]
-                if not active_endpoints:
-                    return await call_next(request)
-                action = _park(
+            try:
+                held = await self.admission.admit(
+                    endpoint,
                     action_dict,
-                    request,
-                    self.local_action_queue,
-                    "action server is busy and does not allow concurrency",
+                    {**request.query_params, **request.path_params},
+                    "http",
+                    request.headers.get("x-helao-dispatch-id"),
                 )
-                await self.status_q.put(action.get_act())
-                return JSONResponse(action.as_dict())
-
-            action = _park(
-                action_dict,
-                request,
-                self.endpoint_queues[endpoint],
-                "simultaneous action requests received",
+            except ActionFailed as e:
+                return Response(str(e), status_code=500)
+            if held is not None:
+                # An RPC original's result may hold UUIDs, datetimes, Paths.
+                return JSONResponse(jsonable_encoder(held))
+            try:
+                response = await call_next(request)
+                if response.status_code >= 400:
+                    self.admission.forget(action_dict)
+                    return response
+                if not action_dict.get("action_uuid"):
+                    return response
+                # Repeats of this uuid wait on the handler's result, so read
+                # the body once and rebuild the response from it.
+                body = b"".join([c async for c in response.body_iterator])  # type: ignore[attr-defined]
+            except BaseException:
+                self.admission.forget(action_dict)
+                raise
+            try:
+                self.admission.resolve(action_dict, json.loads(body))
+            except ValueError:
+                self.admission.resolve(action_dict, body.decode(errors="replace"))
+            return Response(
+                body,
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                media_type=response.media_type,
             )
-            await self.status_q.put(action.get_act())
-            return JSONResponse(action.as_dict())
 
     def _register_exception_handler(self) -> None:
         """E-stop in-flight work when an action route raises.
