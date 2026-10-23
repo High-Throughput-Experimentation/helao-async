@@ -979,7 +979,7 @@ def ANEC_sub_HeatCA(
     )
 
 
-@experiment(version=2)
+@experiment(version=3)
 def ANEC_sub_OCV(
     Tval__s: float = 900.0,
     IErange: str = "auto",
@@ -997,7 +997,7 @@ def ANEC_sub_OCV(
         ActionPlanMaker(),
         "run_OCV",
         {"Tval__s": Tval__s, "AcqInterval__s": 0.05, "IErange": IErange},
-        "CP",
+        "OCV",
     )
 
 
