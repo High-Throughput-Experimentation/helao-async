@@ -271,6 +271,8 @@ def read_hlo_via(
     cache: dict[str, bytes] = {}
 
     def probe(n: str) -> bool:
+        if n in cache:
+            return True
         try:
             cache[n] = get_bytes(n)
         except (FileNotFoundError, KeyError):
@@ -289,11 +291,8 @@ def read_hlo_via(
     if phys.endswith(".hlo.json"):
         return _read_s3_shape(fetch(phys), keep_keys, omit_keys)
     if phys.endswith((DATA_SUFFIX, HEADER_SUFFIX)):
-        header, rows = data_sibling(phys, HEADER_SUFFIX), data_sibling(
-            phys, DATA_SUFFIX
-        )
-        if not exists(rows):
-            raise FileNotFoundError(rows)
+        # phys is the rows file (R-4a: a header never resolves to itself), so it exists
+        header, rows = data_sibling(phys, HEADER_SUFFIX), phys
         meta_bytes = fetch(header) if exists(header) else None
         return read_hlo_pair_bytes(meta_bytes, fetch(rows), keep_keys, omit_keys)
     return read_hlo_bytes(fetch(phys), keep_keys=keep_keys, omit_keys=omit_keys)

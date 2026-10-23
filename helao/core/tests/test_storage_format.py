@@ -1,5 +1,6 @@
 """JSON storage format: meta_io and hlo_data dual-format behaviour (spec §5)."""
 
+import io
 import json
 import zipfile
 from pathlib import Path
@@ -13,6 +14,7 @@ from helao.helpers.hlo_data import (
     read_hlo,
     read_hlo_header,
     read_hlo_pair_bytes,
+    read_hlo_stream,
     read_hlo_via,
     resolve_data_file,
 )
@@ -177,6 +179,9 @@ def test_jsonl_first_line_is_never_a_header(tmp_path):
     p.write_text('oops: 1\n{"a": 1}\n', encoding="utf-8")
     meta, data = read_hlo(p)
     assert meta == {} and dict(data) == {"a": [1]}
+    # read_hlo drops the stream meta for .jsonl, so pin has_header=False directly
+    meta, data = read_hlo_stream(io.BytesIO(p.read_bytes()), has_header=False)
+    assert meta == {} and dict(data) == {"a": [1]}
 
 
 def test_keep_keys_filters_on_every_shape(tmp_path):
@@ -250,6 +255,21 @@ def test_read_hlo_via_where_none_probes_the_getter(tmp_path):
     assert (meta, dict(data)) == (HEADER, DATA)
     with pytest.raises(FileNotFoundError):
         read_hlo_via(None, blobs.__getitem__, "act/nope__0.hlo.json")
+
+
+def test_read_hlo_via_where_none_fetches_each_name_at_most_once():
+    blobs = {
+        "act/N__0.meta.json": dumps_meta(HEADER).encode(),
+        "act/N__0.jsonl": b'{"t_s": 0.0, "v": 1.0}\n{"t_s": 0.1, "v": [2.0, 3.0]}\n',
+    }
+    calls: dict[str, int] = {}
+
+    def get(n):
+        calls[n] = calls.get(n, 0) + 1
+        return blobs[n]
+
+    read_hlo_via(None, get, "act/N__0.hlo.json")
+    assert max(calls.values()) == 1, calls
 
 
 def test_read_hlo_pair_bytes_header_optional():
