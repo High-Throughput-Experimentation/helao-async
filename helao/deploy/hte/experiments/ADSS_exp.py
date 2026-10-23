@@ -1999,11 +1999,13 @@ def ADSS_sub_cellfill_flush(
     return apm.planned_actions
 
 
-@experiment(version=3)
+@experiment(version=4)
 def ADSS_sub_drain_cell(
     DrainWait_s: float = 60,
     ReturnLineReverseWait_s: float = 5,
     #    ResidualWait_s: float = 15,
+    unload_first: bool = False,
+    N2flow: Optional[bool] = None,
 ) -> list:
     """Drain the cell: reverse the return line, switch to drain valve, gas purge.
 
@@ -2011,11 +2013,18 @@ def ADSS_sub_drain_cell(
         DrainWait_s: Total drain time, split before/after gas inlet purge (s).
         ReturnLineReverseWait_s: Time to run the pump in reverse to clear the
             return line (s).
+        unload_first: Prepend ``ADSS_sub_unloadall_customs`` (folded experiment).
+        N2flow: When not None, prepend the O2/N2 selector valve toggle
+            (``ADSS_sub_gasvalve_N2flow(open=N2flow)``); precedes the unload.
 
     Returns:
         List of planned actions for the orchestrator.
     """
     apm = ActionPlanMaker()
+    if N2flow is not None:
+        apm.add_actions(ADSS_sub_gasvalve_N2flow(open=N2flow))
+    if unload_first:
+        apm.add_actions(ADSS_sub_unloadall_customs())
     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 0})
     apm.add(NI_server, "pump", {"pump": "direction", "on": 1})
@@ -2341,21 +2350,26 @@ def ADSS_sub_sample_aliquot(
     return apm.planned_actions  # returns complete action list to orch
 
 
-@experiment(version=2)
+@experiment(version=3)
 def ADSS_sub_recirculate(
     direction_forward_or_reverse: str = "forward",
     wait_time_s: float = 10,
+    N2flow: Optional[bool] = None,
 ) -> list:
     """Open the gas inlet and run the peristaltic pump for a fixed duration.
 
     Args:
         direction_forward_or_reverse: ``"forward"`` (0) or any other value (1).
         wait_time_s: Recirculation duration (s).
+        N2flow: When not None, prepend the O2/N2 selector valve toggle
+            (``ADSS_sub_gasvalve_N2flow(open=N2flow)``) (folded experiment).
 
     Returns:
         List of planned actions for the orchestrator.
     """
     apm = ActionPlanMaker()
+    if N2flow is not None:
+        apm.add_actions(ADSS_sub_gasvalve_N2flow(open=N2flow))
     if direction_forward_or_reverse == "forward":
         dir = 0
     else:

@@ -12,7 +12,7 @@ from helao.helpers.lib_decorators import sequence
 from helao.helpers.premodels import ExperimentPlanMaker
 
 
-@sequence(version=2)
+@sequence(version=3)
 def HISPEC_CV(
     plate_id: int = 1,  # @Dan - what is this? -- plate_id is the ID of the material library in our database. it's first assigned to a substrate after which we can use this ID to track the library's deposition, annealing, and experiment history
     plate_sample_no_list: list = [
@@ -255,19 +255,20 @@ def HISPEC_CV(
             },
         )  # temporarily commented this out to test a fixed V2
 
-    epm.add("ECHE_sub_unloadall_customs", {})
-
     if use_z_motor:
-        # leave cell sealed w/solution for storage
+        # unload, then leave cell sealed w/solution for storage
         epm.add(
             "ECHEUVIS_sub_engage",
             {
+                "unload_first": True,
                 "flow_we": False,
                 "flow_ce": False,
                 "z_height": cell_engaged_z,
                 "fill_wait": cell_fill_wait,
             },
         )
+    else:
+        epm.add("ECHE_sub_unloadall_customs", {})
     # epm.add(
     #     "UVIS_calc_abs",
     #     {
@@ -285,7 +286,7 @@ def HISPEC_CV(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=2)
+@sequence(version=3)
 def HISPEC_EIS_only(
     plate_id: int = 1,  # @Dan - what is this? -- plate_id is the ID of the material library in our database. it's first assigned to a substrate after which we can use this ID to track the library's deposition, annealing, and experiment history
     plate_sample_no_list: list = [
@@ -460,19 +461,20 @@ def HISPEC_EIS_only(
             from_global_exp_params={"Ewe_V__mean_final": "Vinit__V"},
         )
 
-    epm.add("ECHE_sub_unloadall_customs", {})
-
     if use_z_motor:
-        # leave cell sealed w/solution for storage
+        # unload, then leave cell sealed w/solution for storage
         epm.add(
             "ECHEUVIS_sub_engage",
             {
+                "unload_first": True,
                 "flow_we": False,
                 "flow_ce": False,
                 "z_height": cell_engaged_z,
                 "fill_wait": cell_fill_wait,
             },
         )
+    else:
+        epm.add("ECHE_sub_unloadall_customs", {})
 
     epm.add("HISPEC_sub_shutdown", {})
 

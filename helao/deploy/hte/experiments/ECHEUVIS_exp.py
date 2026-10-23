@@ -709,7 +709,7 @@ def ECHEUVIS_sub_disengage(
     return apm.planned_actions  # returns complete action list to orch
 
 
-@experiment(version=1)
+@experiment(version=2)
 def ECHEUVIS_sub_engage(
     flow_we: bool = True,
     flow_ce: bool = True,
@@ -718,6 +718,7 @@ def ECHEUVIS_sub_engage(
     calibrate_intensity: bool = False,
     max_integration_time: int = 150,
     illumination_source: str = "doric_wled",
+    unload_first: bool = False,
 ) -> list:
     """Raise Z to engage, pull electrolyte through WE/CE chambers, optionally calibrate the spec.
 
@@ -729,12 +730,15 @@ def ECHEUVIS_sub_engage(
         calibrate_intensity: Run a spec intensity calibration when True.
         max_integration_time: Maximum integration time for the calibration (ms).
         illumination_source: IO output name driving the LED during calibration.
+        unload_first: Prepend the PAL custom-position unloadall (folded ``ECHE_sub_unloadall_customs``).
 
     Returns:
         List of planned actions for the orchestrator.
     """
     # raise z (engage)
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    if unload_first:
+        apm.add(SAMPLE_server, "archive_custom_unloadall", {"destroy_liquid": True})
     apm.add(KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": z_height})
     # close vent valves
     for item in ("we_vent", "ce_vent"):

@@ -3,9 +3,12 @@
 Each test fails if the merge it guards is undone or made inexact.
 """
 
+import inspect
+
 import pytest
 
 from helao.deploy.hte.experiments import (
+    ADSS_exp,
     ANEC_exp,
     ECHE_exp,
     ECHEUVIS_exp,
@@ -13,9 +16,12 @@ from helao.deploy.hte.experiments import (
     UVIS_exp,
 )
 from helao.deploy.hte.sequences import (
+    ADSS_seq,
     ANEC_seq,
     ECHE_seq,
     ECMS_seq,
+    HISPEC_seq,
+    ECHEUVIS_seq,
     UVIS_DR_seq,
     UVIS_T_seq,
     UVIS_TR_seq,
@@ -147,3 +153,86 @@ def test_anec_ocv_records_ocv_technique():
     acts = _run(ANEC_exp.ANEC_sub_OCV)
     pstat = [a for a in acts if a.action_server.server_name == "PSTAT"]
     assert [a.technique_name for a in pstat] == ["OCV"]
+
+
+# ---- tier 3: optional leading knobs on the target experiment ----
+
+
+def test_drain_cell_unload_first_is_unloadall_then_drain():
+    kw = {"DrainWait_s": 12, "ReturnLineReverseWait_s": 3}
+    got = _flat(_run(ADSS_exp.ADSS_sub_drain_cell, unload_first=True, **kw))
+    want = _flat(_run(ADSS_exp.ADSS_sub_unloadall_customs)) + _flat(
+        _run(ADSS_exp.ADSS_sub_drain_cell, **kw)
+    )
+    assert got == want
+    assert got[0]["action_name"] == "archive_custom_unloadall"
+
+
+@pytest.mark.parametrize("n2", [True, False])
+def test_drain_cell_n2flow_precedes_unload(n2):
+    got = _flat(_run(ADSS_exp.ADSS_sub_drain_cell, N2flow=n2, unload_first=True))
+    want = (
+        _flat(_run(ADSS_exp.ADSS_sub_gasvalve_N2flow, open=n2))
+        + _flat(_run(ADSS_exp.ADSS_sub_unloadall_customs))
+        + _flat(_run(ADSS_exp.ADSS_sub_drain_cell))
+    )
+    assert got == want
+
+
+@pytest.mark.parametrize("n2", [True, False])
+def test_recirculate_n2flow_is_valve_then_recirculate(n2):
+    kw = {"wait_time_s": 7}
+    got = _flat(_run(ADSS_exp.ADSS_sub_recirculate, N2flow=n2, **kw))
+    want = _flat(_run(ADSS_exp.ADSS_sub_gasvalve_N2flow, open=n2)) + _flat(
+        _run(ADSS_exp.ADSS_sub_recirculate, **kw)
+    )
+    assert got == want
+
+
+def test_adss_knobs_unset_add_nothing():
+    # defaults keep the targets as they were: first action is their own
+    assert _flat(_run(ADSS_exp.ADSS_sub_drain_cell))[0]["action_name"] == "pump"
+    assert _flat(_run(ADSS_exp.ADSS_sub_recirculate))[0]["action_name"] == "gasvalve"
+    assert len(_flat(_run(ADSS_exp.ADSS_sub_recirculate))) == 4
+    assert len(_flat(_run(ADSS_exp.ADSS_sub_drain_cell))) == 15
+
+
+def test_engage_unload_first_is_unloadall_then_engage():
+    kw = {"flow_we": False, "flow_ce": False, "z_height": 2.0}
+    got = _flat(_run(ECHEUVIS_exp.ECHEUVIS_sub_engage, unload_first=True, **kw))
+    want = _flat(_run(ECHE_exp.ECHE_sub_unloadall_customs)) + _flat(
+        _run(ECHEUVIS_exp.ECHEUVIS_sub_engage, **kw)
+    )
+    assert got == want
+    assert _flat(_run(ECHEUVIS_exp.ECHEUVIS_sub_engage))[0]["action_name"] == "kmove"
+
+
+def _all_names(mod, **kw):
+    """Plans of every sequence at defaults (plus ``kw`` where the sequence accepts it)."""
+    out = []
+    for name in mod.SEQUENCES:
+        fn = getattr(mod, name)
+        accepted = inspect.signature(fn).parameters
+        out.append((name, _names(fn, **{k: v for k, v in kw.items() if k in accepted})))
+    assert out
+    return out
+
+
+@pytest.mark.parametrize(
+    "mod,first,second",
+    [
+        (ADSS_seq, "ADSS_sub_unloadall_customs", "ADSS_sub_drain_cell"),
+        (ADSS_seq, "ADSS_sub_gasvalve_N2flow", "ADSS_sub_recirculate"),
+        (ADSS_seq, "ADSS_sub_gasvalve_N2flow", "ADSS_sub_drain_cell"),
+        (HISPEC_seq, "ECHE_sub_unloadall_customs", "ECHEUVIS_sub_engage"),
+        (ECHEUVIS_seq, "ECHE_sub_unloadall_customs", "ECHEUVIS_sub_engage"),
+    ],
+)
+def test_tier3_pairs_are_folded(mod, first, second):
+    # use_z_motor=True is the branch that engages the cell (not the default)
+    seen = False
+    for kw in ({}, {"use_z_motor": True}):
+        for name, names in _all_names(mod, **kw):
+            _assert_no_pair(names, first, second)
+            seen = seen or second in names
+    assert seen, f"{second} appears in no {mod.__name__} plan"

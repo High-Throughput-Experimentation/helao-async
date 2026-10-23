@@ -56,16 +56,29 @@ def _adss_fill_recirculate_refill(
     fill_recirculate_reverse_wait_time_sec,
     use_current_electrolyte,
     liquid_sample_volume_ul,
+    n2flow=None,
 ):
-    """Queue ADSS_sub_recirculate, ADSS_sub_recirculate, ADSS_sub_recirculate, ADSS_sub_refill_syringe."""
-    epm.add(
-        "ADSS_sub_recirculate",
-        {
-            "direction_forward_or_reverse": "forward",
-            "wait_time_s": fill_recirculate_wait_time_sec,
-        },
-    )
+    """Queue ADSS_sub_recirculate, ADSS_sub_recirculate, ADSS_sub_recirculate, ADSS_sub_refill_syringe.
 
+    n2flow not None folds the O2/N2 valve toggle into the first recirculate.
+    """
+    if n2flow is None:
+        epm.add(
+            "ADSS_sub_recirculate",
+            {
+                "direction_forward_or_reverse": "forward",
+                "wait_time_s": fill_recirculate_wait_time_sec,
+            },
+        )
+    else:
+        epm.add(
+            "ADSS_sub_recirculate",
+            {
+                "direction_forward_or_reverse": "forward",
+                "wait_time_s": fill_recirculate_wait_time_sec,
+                "N2flow": n2flow,
+            },
+        )
     # pump recirculate reverse (for bubbles)
     if pump_reversal_during_filling:
         epm.add(
@@ -131,13 +144,12 @@ def _adss_electrolyte_rinse_recirculate_drain_refill(
 
 
 def _adss_unload_customs_drain_cell(epm, cell_draintime_sec, ReturnLineReverseWait_sec):
-    """Queue ADSS_sub_unloadall_customs, ADSS_sub_drain_cell."""
-    epm.add("ADSS_sub_unloadall_customs", {})
-
+    """Queue ADSS_sub_drain_cell with the unload of all customs folded in."""
     # drain cell
     epm.add(
         "ADSS_sub_drain_cell",
         {
+            "unload_first": True,
             "DrainWait_s": cell_draintime_sec,
             "ReturnLineReverseWait_s": ReturnLineReverseWait_sec,
             #    "ResidualWait_s": ResidualWait_s,
@@ -167,8 +179,14 @@ def _adss_switch_gas_to_o2(
     )
 
 
-def _adss_prefill_set_n2(epm, liquid_sample_volume_ul, Syringe_rate_ulsec):
-    """Queue ADSS_sub_cellfill_prefilled, ADSS_sub_gasvalve_N2flow."""
+def _adss_prefill_set_n2(
+    epm, liquid_sample_volume_ul, Syringe_rate_ulsec, set_valve=True
+):
+    """Queue ADSS_sub_cellfill_prefilled, ADSS_sub_gasvalve_N2flow.
+
+    set_valve=False omits the valve; the caller folds it into the next
+    ADSS_sub_recirculate (n2flow=True of _adss_fill_recirculate_refill).
+    """
     epm.add(
         "ADSS_sub_cellfill_prefilled",
         {
@@ -178,12 +196,13 @@ def _adss_prefill_set_n2(epm, liquid_sample_volume_ul, Syringe_rate_ulsec):
     )
 
     # set initial gas to N2
-    epm.add(
-        "ADSS_sub_gasvalve_N2flow",
-        {
-            "open": True,
-        },
-    )
+    if set_valve:
+        epm.add(
+            "ADSS_sub_gasvalve_N2flow",
+            {
+                "open": True,
+            },
+        )
 
 
 def _adss_load_n2_gas(
@@ -268,11 +287,11 @@ def _adss_prefill_recirculate(
 
 
 def _adss_unload_customs_drain_cell_s(epm, Cell_draintime_s, ReturnLineReverseWait_s):
-    """Queue ADSS_sub_unloadall_customs, ADSS_sub_drain_cell."""
-    epm.add("ADSS_sub_unloadall_customs", {})
+    """Queue ADSS_sub_drain_cell with the unload of all customs folded in."""
     epm.add(
         "ADSS_sub_drain_cell",
         {
+            "unload_first": True,
             "DrainWait_s": Cell_draintime_s,
             "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
             #    "ResidualWait_s": ResidualWait_s,
@@ -1050,7 +1069,7 @@ def ADSS_PA_CVs_CAs_cell(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=9)
+@sequence(version=10)
 def ADSS_PA_CVs_CAs_CVs_cell_simple(
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
@@ -1361,7 +1380,7 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ADSS_PA_CVs_testing(
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 6307,
@@ -1737,7 +1756,7 @@ def ADSS_PA_CVs_testing(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ADSS_PA_CVs_CAs_CVs_autogasswitching(
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 6307,
@@ -1938,14 +1957,9 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
         )
     # N2 gas for initial cleaning
     epm.add(
-        "ADSS_sub_gasvalve_N2flow",
-        {
-            "open": True,
-        },
-    )
-    epm.add(
         "ADSS_sub_recirculate",
         {
+            "N2flow": True,
             "wait_time_s": recirculate_wait_time_m * 60,
         },
     )
@@ -1977,14 +1991,9 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
     )
     # switch back to oxygen
     epm.add(
-        "ADSS_sub_gasvalve_N2flow",
-        {
-            "open": False,
-        },
-    )
-    epm.add(
         "ADSS_sub_recirculate",
         {
+            "N2flow": False,
             "wait_time_s": postN2_recirculate_wait_time_m * 60,
         },
     )
@@ -2105,7 +2114,7 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=5)
+@sequence(version=6)
 def ADSS_PA_CV_TRI(
     # note: str = "need as many samples as you expect combinations of UPL and LPL",
     # sample info
@@ -2372,9 +2381,11 @@ def ADSS_PA_CV_TRI(
             )
 
         # electrolyte filling for experiment
-        _adss_prefill_set_n2(epm, liquid_sample_volume_ul, Syringe_rate_ulsec)
+        _adss_prefill_set_n2(
+            epm, liquid_sample_volume_ul, Syringe_rate_ulsec, set_valve=False
+        )
 
-        # pump recirculate forward
+        # pump recirculate forward (N2 valve folded into the first recirculate)
         _adss_fill_recirculate_refill(
             epm,
             fill_recirculate_wait_time_sec,
@@ -2382,6 +2393,7 @@ def ADSS_PA_CV_TRI(
             fill_recirculate_reverse_wait_time_sec,
             use_current_electrolyte,
             liquid_sample_volume_ul,
+            n2flow=True,
         )
 
         # check for bubbles that could interfere with echem measurments with OCV
@@ -2520,16 +2532,15 @@ def ADSS_PA_CV_TRI(
             )
 
         # switch from O2 to N2 and saturate
+        # (valve toggle folded into the drain experiment, which unloads first)
         epm.add(
-            "ADSS_sub_gasvalve_N2flow",
+            "ADSS_sub_drain_cell",
             {
-                "open": True,
+                "N2flow": True,
+                "unload_first": True,
+                "DrainWait_s": cell_draintime_sec,
+                "ReturnLineReverseWait_s": ReturnLineReverseWait_sec,
             },
-        )
-
-        # unload sample
-        _adss_unload_customs_drain_cell(
-            epm, cell_draintime_sec, ReturnLineReverseWait_sec
         )
 
         # clean cell
@@ -2627,15 +2638,7 @@ def ADSS_PA_CV_TRI(
                 },
             )
 
-        # set initial gas to N2
-        epm.add(
-            "ADSS_sub_gasvalve_N2flow",
-            {
-                "open": True,
-            },
-        )
-
-        # pump recirculate forward
+        # set initial gas to N2 (valve folded into the first recirculate)
         _adss_fill_recirculate_refill(
             epm,
             fill_recirculate_wait_time_sec,
@@ -2643,6 +2646,7 @@ def ADSS_PA_CV_TRI(
             fill_recirculate_reverse_wait_time_sec,
             use_current_electrolyte,
             liquid_sample_volume_ul,
+            n2flow=True,
         )
 
         washmod = 0
@@ -2980,9 +2984,11 @@ def ADSS_PA_CV_TRI(
             )
 
         # electrolyte filling for experiment
-        _adss_prefill_set_n2(epm, liquid_sample_volume_ul, Syringe_rate_ulsec)
+        _adss_prefill_set_n2(
+            epm, liquid_sample_volume_ul, Syringe_rate_ulsec, set_valve=False
+        )
 
-        # pump recirculate forward
+        # pump recirculate forward (N2 valve folded into the first recirculate)
         _adss_fill_recirculate_refill(
             epm,
             fill_recirculate_wait_time_sec,
@@ -2990,6 +2996,7 @@ def ADSS_PA_CV_TRI(
             fill_recirculate_reverse_wait_time_sec,
             use_current_electrolyte,
             liquid_sample_volume_ul,
+            n2flow=True,
         )
 
         # check for bubbles that could interfere with echem measurments with OCV
@@ -3128,16 +3135,15 @@ def ADSS_PA_CV_TRI(
             )
 
         # switch from O2 to N2 and saturate
+        # (valve toggle folded into the drain experiment, which unloads first)
         epm.add(
-            "ADSS_sub_gasvalve_N2flow",
+            "ADSS_sub_drain_cell",
             {
-                "open": True,
+                "N2flow": True,
+                "unload_first": True,
+                "DrainWait_s": cell_draintime_sec,
+                "ReturnLineReverseWait_s": ReturnLineReverseWait_sec,
             },
-        )
-
-        # unload sample
-        _adss_unload_customs_drain_cell(
-            epm, cell_draintime_sec, ReturnLineReverseWait_sec
         )
 
         # clean cell
@@ -3170,7 +3176,7 @@ def ADSS_PA_CV_TRI(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=9)
+@sequence(version=10)
 def ADSS_PA_CV_TRI_new(
     # note: str = "need as many samples as you expect combinations of UPL and LPL",
     # sample info
@@ -4353,16 +4359,15 @@ def ADSS_PA_CV_TRI_new(
             )
 
         # switch from O2 to N2 and saturate
+        # (valve toggle folded into the drain experiment, which unloads first)
         epm.add(
-            "ADSS_sub_gasvalve_N2flow",
+            "ADSS_sub_drain_cell",
             {
-                "open": True,
+                "N2flow": True,
+                "unload_first": True,
+                "DrainWait_s": cell_draintime_sec,
+                "ReturnLineReverseWait_s": ReturnLineReverseWait_sec,
             },
-        )
-
-        # unload sample
-        _adss_unload_customs_drain_cell(
-            epm, cell_draintime_sec, ReturnLineReverseWait_sec
         )
 
         # clean cell
@@ -4418,7 +4423,7 @@ def ADSS_PA_CV_TRI_new(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ADSS_PA_CV_single(
     # sample info
     plate_id: int = 6307,

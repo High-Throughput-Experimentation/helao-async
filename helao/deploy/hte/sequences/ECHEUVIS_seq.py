@@ -770,7 +770,7 @@ def ECHEUVIS_diagnostic_CV(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=5)
+@sequence(version=6)
 def ECHEUVIS_multiCA_led(
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -1005,18 +1005,20 @@ def ECHEUVIS_multiCA_led(
                 from_global_exp_params={"calibrated_int_time_ms": "spec_int_time_ms"},
             )
 
-    epm.add("ECHE_sub_unloadall_customs", {})
     if use_z_motor:
-        # leave cell sealed w/solution for storage
+        # unload, then leave cell sealed w/solution for storage
         epm.add(
             "ECHEUVIS_sub_engage",
             {
+                "unload_first": True,
                 "flow_we": False,
                 "flow_ce": False,
                 "z_height": cell_engaged_z,
                 "fill_wait": cell_fill_wait,
             },
         )
+    else:
+        epm.add("ECHE_sub_unloadall_customs", {})
     # epm.add(
     #     "UVIS_calc_abs",
     #     {
