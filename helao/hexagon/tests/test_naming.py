@@ -94,6 +94,7 @@ def test_meta_kind(path, kind):
         ("CA-3.0.0.1__0.hlo.json", "CA-3.0.0.1__0"),
         ("sub/dir/ms_recording.jsonl", "ms_recording"),
         ("notes.csv", "notes.csv"),
+        ("C:\\r\\X__0.jsonl", "X__0"),
     ],
 )
 def test_data_stem(path, stem):
