@@ -29,6 +29,7 @@ EXPERIMENTS = [
     "ECMS_sub_load_gas",
     "ECMS_sub_load_liquid",
     "ECMS_sub_load_solid",
+    "ECMS_sub_load_solid_only",
     "ECMS_sub_normal_state",
     "ECMS_sub_preCA_CO2flow",
     "ECMS_sub_prevacuum_cell",
@@ -126,6 +127,30 @@ def ECMS_sub_load_solid(
         },
     )
 
+    return apm.planned_actions
+
+
+@experiment(version=1)
+def ECMS_sub_load_solid_only(
+    solid_plate_id: int = 4534,
+    solid_sample_no: int = 1,
+) -> list:
+    """Unload the cell and load a legacy solid plate sample into ``cell1_we``.
+
+    Args:
+        solid_plate_id: Plate identifier of the legacy solid sample.
+        solid_sample_no: Sample index on the plate.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
+    apm = ActionPlanMaker()
+    apm.add_actions(ECMS_sub_unload_cell())
+    apm.add_actions(
+        ECMS_sub_load_solid(
+            solid_plate_id=solid_plate_id, solid_sample_no=solid_sample_no
+        )
+    )
     return apm.planned_actions
 
 

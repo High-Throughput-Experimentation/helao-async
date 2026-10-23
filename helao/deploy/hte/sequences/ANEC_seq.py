@@ -84,9 +84,8 @@ def _anec_seq_cell(
         epm.add("ANEC_sub_cleanup", {"reservoir_liquid_sample_no": 1})
 
     # housekeeping
-    epm.add("ANEC_sub_unload_cell", {})
     epm.add(
-        "ANEC_sub_load_solid",
+        "ANEC_sub_load_solid_only",
         {"solid_plate_id": p["plate_id"], "solid_sample_no": p["solid_sample_no"]},
     )
 
@@ -307,9 +306,8 @@ def _anec_seq_ferricyanide(simple, **p):
     epm = ExperimentPlanMaker()
 
     # housekeeping
-    epm.add("ANEC_sub_unload_cell", {})
     epm.add(
-        "ANEC_sub_load_solid",
+        "ANEC_sub_load_solid_only",
         {"solid_plate_id": p["plate_id"], "solid_sample_no": p["solid_sample_no"]},
     )
 
@@ -368,7 +366,7 @@ def _anec_seq_ferricyanide(simple, **p):
     return epm.planned_experiments
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ANEC_sample_ready(
     num_repeats: int = 1,
     plate_id: int = 4534,
@@ -417,7 +415,7 @@ def ANEC_sample_ready(
     )
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ANEC_series_CA(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -480,7 +478,7 @@ def ANEC_series_CA(
     )
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ANEC_series_CAliquidOnly(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -537,7 +535,7 @@ def ANEC_series_CAliquidOnly(
     )
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ANEC_OCV(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -576,7 +574,7 @@ def ANEC_OCV(
     return _anec_seq_cell(**locals(), tech="OCV", loop="once", sampling="liquidarchive")
 
 
-@sequence(version=3)
+@sequence(version=4)
 def ANEC_photo_CA(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -659,7 +657,7 @@ def ANEC_photo_CA(
     )
 
 
-@sequence(version=3)
+@sequence(version=4)
 def ANEC_photo_CAgasonly(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -734,7 +732,7 @@ def ANEC_photo_CAgasonly(
     )
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ANEC_photo_CV(
     WE_versus: str = "ref",
     ref_type: str = "leakless",
@@ -831,7 +829,7 @@ def ANEC_cleanup_disengage() -> list:
     return epm.planned_experiments
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ANEC_CA_pretreat(
     num_repeats: int = 1,
     plate_id: int = 4534,
@@ -876,7 +874,7 @@ def ANEC_CA_pretreat(
     return _anec_seq_cell(**locals(), tech="CA", loop="repeat")
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ANEC_CA_DOE_demo(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -931,7 +929,7 @@ def ANEC_CA_DOE_demo(
     )
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ANEC_CA_DOE_demo_headspace(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -978,7 +976,7 @@ def ANEC_CA_DOE_demo_headspace(
     )
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ANEC_repeat_CA(
     num_repeats: int = 1,
     plate_id: int = 4534,
@@ -1041,7 +1039,7 @@ def ANEC_repeat_CA(
     )
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ANEC_repeat_TentHeatCAgasonly(
     num_repeats: int = 1,
     plate_id: int = 6284,
@@ -1099,7 +1097,7 @@ def ANEC_repeat_TentHeatCAgasonly(
     )
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ANEC_heatOCV(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -1134,7 +1132,7 @@ def ANEC_heatOCV(
     )
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ANEC_repeat_TentHeatCA(
     num_repeats: int = 1,
     plate_id: int = 6284,
@@ -1204,7 +1202,7 @@ def ANEC_repeat_TentHeatCA(
     )
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ANEC_repeat_HeatCA(
     num_repeats: int = 1,
     plate_id: int = 4534,
@@ -1267,7 +1265,7 @@ def ANEC_repeat_HeatCA(
     return _anec_seq_cell(**locals(), tech="HeatCA", loop="repeat", sampling="aliquot")
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ANEC_gasonly_CA(
     num_repeats: int = 1,
     plate_id: int = 4534,
@@ -1318,7 +1316,7 @@ def ANEC_gasonly_CA(
     )
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ANEC_repeat_CV(
     WE_versus: str = "ref",
     ref_type: str = "leakless",
@@ -1369,7 +1367,7 @@ def ANEC_repeat_CV(
     return _anec_seq_cell(**locals(), tech="CV", loop="repeat")
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ANEC_ferricyanide_simpleprotocol(
     num_repeats: int = 1,
     plate_id: int = 5740,
@@ -1426,7 +1424,7 @@ def ANEC_ferricyanide_simpleprotocol(
     return _anec_seq_ferricyanide(**locals(), simple=True)
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ANEC_ferricyanide_protocol(
     plate_id: int = 5740,
     solid_sample_no: int = 1,

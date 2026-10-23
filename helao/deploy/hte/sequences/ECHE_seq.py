@@ -252,7 +252,6 @@ def _eche_steps(p, steps, startup=_eche_startup):
     allowlists stay in their wrapper as lambdas, so the guard still names them.
     """
     epm = ExperimentPlanMaker()
-    epm.add("ECHE_sub_unloadall_customs", {})
     for plate_sample in p["plate_sample_no_list"]:
         startup(epm, p, plate_sample)
         for fn, *args in steps:
@@ -326,7 +325,7 @@ def ECHE_move(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=5)
+@sequence(version=6)
 def ECHE_4CA_led_1CV_led(
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -455,7 +454,7 @@ def ECHE_4CA_led_1CV_led(
     )
 
 
-@sequence(version=4)
+@sequence(version=5)
 def ECHE_CV_CA_CV(
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -553,7 +552,7 @@ def ECHE_CV_CA_CV(
     )
 
 
-@sequence(version=4)
+@sequence(version=5)
 def ECHE_CV(
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -606,7 +605,7 @@ def ECHE_CV(
     return _eche_steps(locals(), ((_eche_precv, "CV1"), (_eche_cv, "CV1")))
 
 
-@sequence(version=4)
+@sequence(version=5)
 def ECHE_CA(
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -651,7 +650,7 @@ def ECHE_CA(
     return _eche_steps(locals(), ((_eche_ocv,), (_eche_ca, "CA")))
 
 
-@sequence(version=4)
+@sequence(version=5)
 def ECHE_CA_led(
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -720,7 +719,7 @@ def ECHE_CA_led(
     return _eche_steps(locals(), ((_eche_ocv,), (_eche_ca, "CA", "LG")))
 
 
-@sequence(version=4)
+@sequence(version=5)
 def ECHE_CV_led(
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -797,7 +796,7 @@ def ECHE_CV_led(
     return _eche_steps(locals(), ((_eche_precv, "CV"), (_eche_cv, "CV", "LG")))
 
 
-@sequence(version=3)
+@sequence(version=4)
 def ECHE_CP(
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -863,7 +862,7 @@ def ECHE_CP(
     )
 
 
-@sequence(version=3)
+@sequence(version=4)
 def ECHE_CP_led(
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -968,7 +967,7 @@ def ECHE_CP_led(
     )
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ECHE_CVs_CAs(
     plate_id: int = 6307,
     plate_sample_no_list: list = [2],
@@ -1083,7 +1082,7 @@ def ECHE_CVs_CAs(
     )
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ECHE_cleanCVs_regCVs_CAs(
     plate_id: int = 6307,
     plate_sample_no_list: list = [2],

@@ -36,9 +36,8 @@ from helao.helpers.premodels import ExperimentPlanMaker
 def _ecms_seq_load(p):
     """New plan with the housekeeping prologue (unload cell, load solid)."""
     epm = ExperimentPlanMaker()
-    epm.add("ECMS_sub_unload_cell", {})
     epm.add(
-        "ECMS_sub_load_solid",
+        "ECMS_sub_load_solid_only",
         {"solid_plate_id": p["plate_id"], "solid_sample_no": p["solid_sample_no"]},
     )
     return epm
@@ -341,7 +340,7 @@ def _ecms_seq_MS_calibration(recirc, second=False, **p):
     return epm.planned_experiments
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ECMS_initiation(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -381,7 +380,7 @@ def ECMS_initiation(
     return _ecms_seq_initiation(**locals(), recirc=False)
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ECMS_initiation_recirculation(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -424,7 +423,7 @@ def ECMS_initiation_recirculation(
     return _ecms_seq_initiation(**locals(), recirc=True)
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ECMS_initiation_ECSA(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -481,7 +480,7 @@ def ECMS_initiation_ECSA(
     return _ecms_seq_initiation(**locals(), recirc=True, ecsa=True)
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ECMS_initiation_recirculation_mixedreactant(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -526,7 +525,7 @@ def ECMS_initiation_recirculation_mixedreactant(
     return _ecms_seq_initiation(**locals(), recirc=True, cali=True)
 
 
-@sequence(version=3)
+@sequence(version=4)
 def ECMS_repeat_CV(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -598,7 +597,7 @@ def ECMS_repeat_CV(
 
 
 # =============================================================================
-@sequence(version=3)
+@sequence(version=4)
 def ECMS_repeat_CV_recirculation(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -676,7 +675,7 @@ def ECMS_repeat_CV_recirculation(
     return _ecms_seq_repeat_CV(**locals(), recirc=True)
 
 
-@sequence(version=3)
+@sequence(version=4)
 def ECMS_repeat_CV_recirculation_mixedreactant(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -756,7 +755,7 @@ def ECMS_repeat_CV_recirculation_mixedreactant(
     return _ecms_seq_repeat_CV(**locals(), recirc=True, cali=True)
 
 
-@sequence(version=4)
+@sequence(version=5)
 def ECMS_CV_recirculation_mixedreactant(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -840,7 +839,7 @@ def ECMS_CV_recirculation_mixedreactant(
     return epm.planned_experiments
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ECMS_series_CA(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -899,7 +898,7 @@ def ECMS_series_CA(
     return _ecms_seq_series_CA(**locals(), recirc=False)
 
 
-@sequence(version=3)
+@sequence(version=4)
 def ECMS_series_CA_recirculation(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -965,7 +964,7 @@ def ECMS_series_CA_recirculation(
     return _ecms_seq_series_CA(**locals(), recirc=True)
 
 
-@sequence(version=3)
+@sequence(version=4)
 def ECMS_series_CA_recirculation_mixedreactant(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -1033,7 +1032,7 @@ def ECMS_series_CA_recirculation_mixedreactant(
     return _ecms_seq_series_CA(**locals(), recirc=True, cali=True)
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ECMS_series_CA_recirculation_mixedgas_comp(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -1117,7 +1116,7 @@ def ECMS_series_CA_recirculation_mixedgas_comp(
     return epm.planned_experiments
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ECMS_series_CA_recirculation_mixedthreereactant(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -1202,7 +1201,7 @@ def ECMS_series_CA_recirculation_mixedthreereactant(
     return epm.planned_experiments
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ECMS_series_pulseCA(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -1493,7 +1492,7 @@ def ECMS_MS_pulsecalibration(
     return epm.planned_experiments
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ECMS_series_CA_change_gasflow(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -1566,9 +1565,8 @@ def ECMS_series_CA_change_gasflow(
     epm = ExperimentPlanMaker()
 
     # housekeeping
-    epm.add("ECMS_sub_unload_cell", {})
     epm.add(
-        "ECMS_sub_load_solid",
+        "ECMS_sub_load_solid_only",
         {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
     )
     # epm.add("ECMS_sub_prevacuum_cell",{"vacuum_time": vacuum_time})
@@ -1663,7 +1661,7 @@ def ECMS_series_CA_change_gasflow(
     return epm.planned_experiments
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ECMS_transition_clean(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -1705,9 +1703,8 @@ def ECMS_transition_clean(
     epm = ExperimentPlanMaker()
 
     # drain tubing for previous electrolyte
-    epm.add("ECMS_sub_unload_cell", {})
     epm.add(
-        "ECMS_sub_load_solid",
+        "ECMS_sub_load_solid_only",
         {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
     )
     epm.add(
@@ -1735,9 +1732,8 @@ def ECMS_transition_clean(
     # cleaning tubing
 
     for number_clean in range(cleaning_times):
-        epm.add("ECMS_sub_unload_cell", {})
         epm.add(
-            "ECMS_sub_load_solid",
+            "ECMS_sub_load_solid_only",
             {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
         )
         epm.add(

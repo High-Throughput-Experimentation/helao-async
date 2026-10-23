@@ -7,7 +7,7 @@ from helao.helpers.lib_decorators import sequence
 from helao.helpers.premodels import ExperimentPlanMaker
 
 
-@sequence(version=3)
+@sequence(version=4)
 def UVIS_TR(
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -120,7 +120,6 @@ def UVIS_TR(
         )
 
     for plate_sample in plate_sample_no_list:
-        epm.add("UVIS_sub_unloadall_customs", {})
         epm.add(
             "UVIS_sub_startup",  # move to solid sample, assign to cell position
             {
