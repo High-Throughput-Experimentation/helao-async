@@ -113,22 +113,6 @@ ALLOWED = {
         "CCSI_sub_n2flush",
         "drain_recirculation_duration",
     ),
-    # Surfaced by checking duplicated experiment names against every copy:
-    # CCSI_sub_n2rinse in CSIL_exp lacks these params (CCSI_exp declares them).
-    # Which copy runs depends on the station config; owner decides.
-    *{
-        (
-            "CCSI_seq.py",
-            "CCSI_Solution_co2maintainconcentration",
-            "CCSI_sub_n2rinse",
-            k,
-        )
-        for k in (
-            "secondary_prerinse_cycles",
-            "secondliquid_sample_no",
-            "secondliquid_volume",
-        )
-    },
     # Other undeclared keys (owner decides: add the param or drop the key).
     ("ECHE_seq.py", "ECHE_CV_CA_CV", "ECHE_sub_startup", "reservoir_electrolyte"),
     ("ECHE_seq.py", "ECHE_CVs_CAs", "ECHE_sub_startup", "reservoir_electrolyte"),
@@ -165,9 +149,8 @@ def _experiment_signatures():
 
     orch_dispatch keeps only ``getfullargspec(exp).args`` (no kwonly, no
     **kwargs). Which library a sequence meets is decided by the station config,
-    not the sequence module, so a duplicated name (e.g. CCSI_sub_n2drain in
-    CCSI_exp and CSIL_exp) is checked against every copy: a key must be valid
-    in all of them.
+    not the sequence module, so a name defined in more than one library is
+    checked against every copy: a key must be valid in all of them.
     """
     sigs = {}
     for f in (HTE / "experiments").glob("*.py"):
