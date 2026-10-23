@@ -9,6 +9,13 @@ from pathlib import Path
 import orjson
 import pytest
 
+from helao.core.drivers.data.process_locator import find_process_ymls, process_uuid_of
+from helao.helpers.run_state import (
+    identify_record,
+    rebuild_from_tree,
+    top_level_pair,
+)
+from helao.ui.shared import retire
 from helao.core.drivers.data.loaders.localfs import LocalLoader
 from helao.helpers.file_mapper import FileMapper
 from helao.helpers.helao_data import HelaoData
@@ -497,3 +504,61 @@ def test_helao_data_finds_children_of_a_bracketed_runs_sequence(tmp_path):
     )
     hd = HelaoData(str(seq / "250716.131415123456-seq.json"))
     assert len(hd.exp) == 1
+
+
+@pytest.mark.parametrize(
+    "line, is_json, pair",
+    [
+        ("action_uuid: abc", False, ("action_uuid", "abc")),
+        ('  "action_uuid": "abc",', True, ("action_uuid", "abc")),
+        ('  "action_order": 3,', True, ("action_order", "3")),
+        ('  "x": null', True, ("x", "None")),
+        ('    "nested": "no",', True, (None, None)),
+        ('  "params": {', True, (None, None)),
+        ('  "list": [],', True, (None, None)),
+        ("{", True, (None, None)),
+    ],
+)
+def test_top_level_pair(line, is_json, pair):
+    assert top_level_pair(line, is_json) == pair
+
+
+def test_identify_record_reads_a_json_record_with_a_huge_head(tmp_path):
+    """The uuid sits past the head window, as in a plate-sized -seq."""
+    p = write_meta(
+        tmp_path / "250716.131415123456-seq.json",
+        {"sequence_params": {"big": ["x" * 80] * 2000}, "sequence_uuid": U_SEQ},
+    )
+    assert identify_record(p) == (U_SEQ, "sequence", None)
+
+
+def test_rebuild_from_tree_counts_json_records(tmp_path):
+    t = _new_tree(tmp_path)
+    j = rebuild_from_tree(tmp_path / "RUNS_FINISHED", tmp_path / "STATES", "SYNC")
+    assert sorted(r["kind"] for r in j.working_set().values()) == [
+        "action",
+        "experiment",
+        "sequence",
+    ]
+    assert U_ACT in j.working_set()
+
+
+def test_retire_locates_and_scans_json_records(tmp_path):
+    t = _new_tree(tmp_path)
+    (loc,) = retire.locate(str(tmp_path), U_SEQ)
+    local, files = retire._scan_local([loc])
+    assert files == 2 and local["EXPERIMENT"] == {U_EXP} and local["ACTION"] == {U_ACT}
+
+
+def test_process_locator_finds_json_and_yml_processes(tmp_path):
+    t = _new_tree(tmp_path)
+    write_meta(t["exp"] / f"0__{U_EXP}__CV-prc.json", {"process_uuid": U_EXP})
+    (t["exp"] / f"1__{U_ACT}__CA-prc.yml").write_text(
+        "process_uuid: x\n", encoding="utf-8"
+    )
+    found = find_process_ymls(t["exp"] / "250716.131420123456-exp.json")
+    assert [p.name for p in found] == [
+        f"0__{U_EXP}__CV-prc.json",
+        f"1__{U_ACT}__CA-prc.yml",
+    ]
+    assert [process_uuid_of(p) for p in found] == [U_EXP, U_ACT]

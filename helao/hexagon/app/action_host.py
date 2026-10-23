@@ -39,7 +39,6 @@ import time
 import traceback
 from collections import namedtuple
 from datetime import datetime
-from glob import glob
 from pathlib import Path
 from typing import Annotated, Any, Callable, Optional
 
@@ -62,7 +61,8 @@ from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.run_state import ACTIVE, RunStateJournal
 from helao.helpers.time_utils import read_saved_offset, set_time
 from helao.helpers.file_utils import _relative_file_name
-from helao.helpers.yml_tools import move_dir, yml_load
+from helao.helpers.meta_io import meta_glob, read_meta
+from helao.helpers.yml_tools import move_dir
 from helao.helpers.premodels import Action
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.ws_utils import WsPublisher
@@ -1423,15 +1423,15 @@ class ActionHost(HelaoFastAPI):
         """Reconcile one stale journal entry; see :meth:`reconcile_interrupted`."""
         act_dir = os.path.join(str(self.helaodirs.root), rec["path"])
         action = None
-        for yml in sorted(glob(os.path.join(act_dir, "*-act.yml"))):
-            candidate = Action.model_validate(yml_load(yml))
+        for yml in meta_glob(act_dir, "act"):
+            candidate = Action.model_validate(read_meta(yml))
             if str(candidate.action_uuid) == uuid:
                 action = candidate
                 break
         assert self.run_journal is not None
         if action is None:
             LOGGER.warning(
-                f"Interrupted action {uuid}: no -act.yml in {act_dir}; "
+                f"Interrupted action {uuid}: no -act record in {act_dir}; "
                 "evicting its journal entry."
             )
             self.run_journal.append(uuid, "action", "done", rec["path"])

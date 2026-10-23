@@ -37,6 +37,7 @@ from helao.hexagon.adapters.native.native_syncer import NativeSyncer
 from helao.hexagon.adapters.native.sync_adapter import NativeSyncAdapter
 from helao.hexagon.app.action_context import ActionContext
 from helao.hexagon.app.action_host import ActionHost
+from helao.hexagon.domain.naming import meta_kind
 
 
 class RecordingS3Client:
@@ -107,16 +108,9 @@ def makeApp(server_key) -> ActionHost:
 
     @app.post("/finish_yml", tags=["private"])
     async def finish_yml(yml_path: str) -> str:
-        """Enqueue a finished YAML for sync (rank by -seq/-exp/-act suffix)."""
+        """Enqueue a finished YAML for sync (rank by -seq/-exp/-act suffix, ``.json`` or legacy ``.yml``)."""
         clean_path = yml_path.strip('"').strip("'")
-        if clean_path.endswith("-seq.yml"):
-            rank = 2
-        elif clean_path.endswith("-exp.yml"):
-            rank = 1
-        elif clean_path.endswith("-act.yml"):
-            rank = 0
-        else:
-            rank = -1
+        rank = {"seq": 2, "exp": 1, "act": 0}.get(meta_kind(clean_path) or "", -1)
         await app.hexagon_wiring.sync.enqueue_yml(clean_path, rank)  # type: ignore[union-attr]
         return yml_path
 

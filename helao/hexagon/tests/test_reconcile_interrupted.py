@@ -185,7 +185,7 @@ async def test_interrupted_actions_are_finished_and_handed_off(
     assert _statuses(c) == ["finished", "errored"]
     # (d) missing directory evicted with a warning, not a crash
     assert str(d_act.action_uuid) in done
-    assert any("no -act.yml" in m for m in warnings)
+    assert any("no -act record" in m for m in warnings)
 
 
 @pytest.mark.asyncio

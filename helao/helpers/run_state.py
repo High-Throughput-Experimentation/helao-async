@@ -239,7 +239,7 @@ _UUID_KEY = {
 }
 _PARENT_KIND = {"action": "experiment", "experiment": "sequence"}
 
-#: A record yml is read only at its two ends, and both ends are needed. An
+#: A record (yml or json) is read only at its two ends, and both ends are needed. An
 #: action carries its own uuid on line 3 and its parent's on line 19, but a
 #: sequence's own uuid sits seven lines from the *end* of a file measured in
 #: hundreds of thousands of lines -- ``sequence_params`` and
@@ -249,6 +249,31 @@ _PARENT_KIND = {"action": "experiment", "experiment": "sequence"}
 #: 427k-560k lines: a head-only read would recover no sequence uuid at all.
 _HEAD_BYTES = 4096
 _TAIL_BYTES = 8192
+
+
+def top_level_pair(line: str, is_json: bool) -> tuple:
+    """``(key, value)`` of one top-level scalar line, else ``(None, None)``.
+
+    YAML: ``key: value``. JSON as ``dumps_meta`` writes it (two-space indent):
+    ``  "key": value,`` with a scalar value -- an opening ``{``/``[`` or a
+    deeper indent is not top level. Values come back as strings, ``null`` as
+    ``"None"``.
+    """
+    if not is_json:
+        key, sep, value = line.partition(": ")
+        return (key, value.strip()) if sep else (None, None)
+    if not line.startswith('  "') or line.startswith("   "):
+        return None, None
+    key, sep, value = line[2:].partition(": ")
+    if not sep:
+        return None, None
+    try:
+        key, value = json.loads(key), json.loads(value.rstrip().rstrip(","))
+    except ValueError:
+        return None, None
+    if isinstance(value, (dict, list)):
+        return None, None
+    return key, str(value)
 
 
 def _prg_is_complete(prg_path: Path) -> bool:
@@ -326,19 +351,20 @@ def _scan_top_level(path: Path, keys: set) -> dict:
     tail_lines = tail.decode("utf-8", "replace").splitlines()
     lines += tail_lines[1:] if size > _TAIL_BYTES else tail_lines
     found: dict = {}
+    is_json = path.name.endswith(".json")
     for line in lines:
-        key, sep, value = line.partition(": ")
-        if sep and key in keys:
-            found.setdefault(key, value.strip())
+        key, value = top_level_pair(line, is_json)
+        if key in keys:
+            found.setdefault(key, value)
     if found.keys() < keys and size > _HEAD_BYTES + _TAIL_BYTES:
         # A large sequence_params (a plate preset) pushes sequence_uuid past
         # the head window. Stream the middle, stopping once every key is found.
         try:
             with path.open("r", encoding="utf-8", errors="replace") as f:
                 for line in f:
-                    key, sep, value = line.rstrip("\n").partition(": ")
-                    if sep and key in keys:
-                        found.setdefault(key, value.strip())
+                    key, value = top_level_pair(line.rstrip("\n"), is_json)
+                    if key in keys:
+                        found.setdefault(key, value)
                         if found.keys() >= keys:
                             break
         except OSError:
@@ -435,7 +461,7 @@ def rebuild_from_tree(runs_root, states_root, server_key: str) -> "RunStateJourn
     for dirpath, dirnames, filenames in os.walk(runs_root, onerror=errors.append):
         dirnames.sort()  # deterministic journal order across filesystems
         for name in sorted(filenames):
-            if not name.endswith(".yml"):
+            if not name.endswith((".json", ".yml")):
                 continue
             yml = Path(dirpath) / name
             kind = _KIND_BY_SUFFIX.get(yml.stem[-4:])

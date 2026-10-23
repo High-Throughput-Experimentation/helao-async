@@ -22,6 +22,7 @@ from helao.hexagon.adapters.native.native_syncer import NativeSyncer
 from helao.hexagon.adapters.native.sync_adapter import NativeSyncAdapter
 from helao.hexagon.app.action_context import ActionContext
 from helao.hexagon.app.action_host import ActionHost
+from helao.hexagon.domain.naming import meta_kind
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -210,18 +211,11 @@ def makeApp(server_key) -> ActionHost:
     async def finish_yml(yml_path: str) -> str:
         """Enqueue a finished YAML for upload, releasing it from sync quarantine.
 
-        Determines the rank from the file suffix (``-seq.yml``, ``-exp.yml``,
-        ``-act.yml``) and forwards to the port's ``enqueue_yml``.
+        Determines the rank from the file suffix (``-seq``/``-exp``/``-act``,
+        ``.json`` or legacy ``.yml``) and forwards to the port's ``enqueue_yml``.
         """
         clean_path = yml_path.strip('"').strip("'")
-        if clean_path.endswith("-seq.yml"):
-            rank = 2
-        elif clean_path.endswith("-exp.yml"):
-            rank = 1
-        elif clean_path.endswith("-act.yml"):
-            rank = 0
-        else:
-            rank = -1
+        rank = {"seq": 2, "exp": 1, "act": 0}.get(meta_kind(clean_path) or "", -1)
         # Sync quarantine: a hand-POSTed path is the operator's re-queue, so it
         # releases the record first; enqueue_yml would otherwise skip it.
         sync = app.hexagon_wiring.sync

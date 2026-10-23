@@ -636,3 +636,36 @@ async def test_list_exceptions_does_not_raise_on_a_running_task(installed_config
     finally:
         running.cancel()
     assert out == {"bad": repr(ValueError("boom"))}
+
+
+@pytest.mark.asyncio
+async def test_finish_yml_ranks_json_records(installed_config):
+    app = _make_app(installed_config)
+    drv = _QuarantineDriver(quarantined=False)
+    _prime(app, drv)
+    for path, rank in (
+        ("/x/a-seq.json", 2),
+        ("/x/b-exp.json", 1),
+        ("/x/c-act.json", 0),
+    ):
+        await _route(app, "/finish_yml")(yml_path=path)
+        assert drv.calls[-1] == ("enqueue", path, rank)
+
+
+@pytest.mark.asyncio
+async def test_sim_db_server_ranks_json_like_its_yml_twin(installed_config):
+    from helao.deploy.test.servers.action import sim_db_server
+
+    installed_config()
+    app: Any = sim_db_server.makeApp("DB")
+    calls = []
+
+    class _Sync:
+        async def enqueue_yml(self, path, rank):
+            calls.append((path, rank))
+
+    app.hexagon_wiring.sync = _Sync()
+    for kind, rank in (("seq", 2), ("exp", 1), ("act", 0)):
+        for ext in ("yml", "json"):
+            await _route(app, "/finish_yml")(yml_path=f"/x/a-{kind}.{ext}")
+            assert calls[-1] == (f"/x/a-{kind}.{ext}", rank)
