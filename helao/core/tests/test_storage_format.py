@@ -5,6 +5,7 @@ import json
 import os
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import orjson
 import pytest
@@ -39,6 +40,7 @@ from helao.helpers.meta_io import (
     resolve_meta_path,
     write_meta,
 )
+import helao.hexagon.adapters.native.sync_driver as sd
 from helao.helpers.premodels import Experiment
 from helao.helpers.to_json import hlo_json_dumps
 from helao.helpers.yml_tools import yml_dumps
@@ -562,3 +564,50 @@ def test_process_locator_finds_json_and_yml_processes(tmp_path):
         f"1__{U_ACT}__CA-prc.yml",
     ]
     assert [process_uuid_of(p) for p in found] == [U_EXP, U_ACT]
+
+
+def test_progress_from_json_exp_has_int_group_keys(tmp_path):
+    """Review Focus 4: JSON object keys are strings; .prg bookkeeping is int."""
+    exp = write_meta(
+        tmp_path
+        / "RUNS"
+        / "2026"
+        / "1023"
+        / "seq"
+        / "exp"
+        / "261023.120000000000-exp.json",
+        {
+            "experiment_uuid": U_EXP,
+            "experiment_name": "e",
+            "process_order_groups": {0: [0, 1], 1: [2]},
+        },
+    )
+    assert sd.Progress(exp).dict["process_groups"] == {0: [0, 1], 1: [2]}
+    assert sd.Progress(exp).dict["process_groups"] == {0: [0, 1], 1: [2]}  # from .prg
+
+
+def test_helao_yml_walks_a_mixed_json_tree(tmp_path):
+    seq = tmp_path / "RUNS" / "2026" / "1023" / "120000__s__l"
+    s = seq / "261023.120000000000-seq.yml"
+    s.parent.mkdir(parents=True)
+    s.write_text("sequence_uuid: x\nsequence_status: [finished]\n", encoding="utf-8")
+    e = write_meta(
+        seq / "261023.120001__e" / "261023.120001000000-exp.json",
+        {"experiment_status": ["finished"]},
+    )
+    a = write_meta(
+        e.parent / "0__0__S__a" / "261023.120002000000-act.json",
+        {"action_status": ["finished"]},
+    )
+    write_meta(e.parent / "0__u__T-prc.json", {"process_uuid": "u"})
+    assert sd.HelaoYml(seq).target == s
+    assert [c.target for c in sd.HelaoYml(s).children] == [e]
+    assert [c.target for c in sd.HelaoYml(e).children] == [a]
+    assert sd.HelaoYml(a).parent_yml == e
+    assert sd.HelaoYml(e).parent_yml == s
+    assert [p.name for p in sd.HelaoYml(e).process_ymls] == ["0__u__T-prc.json"]
+    drv = sd.SyncDriver.__new__(sd.SyncDriver)
+    drv.helaodirs = SimpleNamespace(save_root=tmp_path / "RUNS")  # type: ignore[assignment]
+    assert [Path(p) for p in drv.list_pending()] == [s]
+    assert [Path(p) for p in drv.list_pending_exps()] == [e]
+    assert [Path(p) for p in drv.list_pending_acts()] == [a]

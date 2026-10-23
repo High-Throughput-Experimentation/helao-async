@@ -517,7 +517,7 @@ async def test_default_chain_golden(tmp_path, mod, monkeypatch):
             _exp_prg_expected(str(exp_yml)),
             path="exp.prg",
         )
-        assert list(exp_yml.parent.glob("*-prc.yml")), "no local -prc.yml written"
+        assert list(exp_yml.parent.glob("*-prc.json")), "no local -prc.json written"
         seq_view = _legacy_view(mod.Progress(seq_yml).dict)
         assert seq_view == {"yml": str(seq_yml), "api": True, "s3": True}
 

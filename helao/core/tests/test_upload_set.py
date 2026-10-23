@@ -4,6 +4,7 @@ from pathlib import Path
 
 from helao.hexagon.adapters.native.sync_driver import HelaoYml
 from helao.helpers.file_utils import _relative_file_name
+from helao.helpers.meta_io import write_meta
 
 
 def test_file_in_record_root_is_a_bare_name(tmp_path: Path):
@@ -169,3 +170,44 @@ def test_a_withheld_file_is_not_reported_as_unregistered(tmp_path: Path):
     yml = HelaoYml(act_yml)
     assert yml.upload_files == []
     assert yml.warn_unregistered_files() == []
+
+
+def _json_action_tree(tmp_path: Path, files: list) -> Path:
+    act_dir = (
+        tmp_path
+        / "RUNS"
+        / "2026"
+        / "1023"
+        / "seqdir"
+        / "expdir"
+        / "0__0__SIM__do_thing"
+    )
+    return write_meta(
+        act_dir / "261023.120000000000-act.json",
+        {
+            "action_name": "do_thing",
+            "action_uuid": "11111111-1111-1111-1111-111111111111",
+            "action_status": ["finished"],
+            "files": files,
+        },
+    )
+
+
+def test_json_record_ships_the_jsonl_and_never_the_header(tmp_path: Path):
+    act = _json_action_tree(
+        tmp_path, [{"file_name": "CA-0.0.0.0__0.jsonl", "file_type": "helao__file"}]
+    )
+    (act.parent / "CA-0.0.0.0__0.jsonl").write_text('{"a":1}\n', encoding="utf-8")
+    (act.parent / "CA-0.0.0.0__0.meta.json").write_text("{}\n", encoding="utf-8")
+    yml = HelaoYml(act)
+    assert yml.type == "action"
+    assert [p.name for p in yml.upload_files] == ["CA-0.0.0.0__0.jsonl"]
+    assert yml.warn_unregistered_files() == []
+
+
+def test_an_orphan_header_is_still_reported(tmp_path: Path):
+    act = _json_action_tree(tmp_path, [])
+    (act.parent / "CA-0.0.0.0__0.meta.json").write_text("{}\n", encoding="utf-8")
+    assert [p.name for p in HelaoYml(act).warn_unregistered_files()] == [
+        "CA-0.0.0.0__0.meta.json"
+    ]

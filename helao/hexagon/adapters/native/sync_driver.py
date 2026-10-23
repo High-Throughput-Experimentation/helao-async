@@ -71,7 +71,15 @@ from helao.helpers.run_state import (
     root_relative,
 )
 from helao.helpers.time_utils import gen_uuid
+from helao.helpers.meta_io import dumps_meta, meta_glob, read_meta, write_meta
 from helao.helpers.yml_tools import yml_dumps, yml_load
+from helao.hexagon.domain.naming import (
+    DATA_SUFFIX,
+    HEADER_SUFFIX,
+    RECORD_KINDS,
+    data_sibling,
+    meta_kind,
+)
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 ABR_MAP = {
@@ -208,7 +216,7 @@ class HelaoYml:
         # round-trip containers -- and those containers are what made syncing a
         # yml holding a long list quadratic (their __deepcopy__ is O(n^2), and
         # HelaoDict.as_dict used to copy them).
-        self.meta = yml_load(self.target, fast=True)
+        self.meta = read_meta(self.target)
 
     @property
     def parts(self) -> list:
@@ -219,8 +227,8 @@ class HelaoYml:
         """Resolve ``self.target`` to an existing yml file and set ``targetdir``.
 
         If ``target`` doesn't exist, the active/finished/synced variants are
-        probed in turn. If ``target`` is a directory, the single ``*-seq.yml``
-        / ``*-exp.yml`` / ``*-act.yml`` inside is selected. The resolved
+        probed in turn. If ``target`` is a directory, the single ``*-seq`` /
+        ``*-exp`` / ``*-act`` record (``.json`` or legacy ``.yml``) inside is selected. The resolved
         directory must live under a ``RUNS_*`` parent.
 
         Raises:
@@ -236,13 +244,7 @@ class HelaoYml:
                 LOGGER.info(f"{self.target} does not exist")
         if self.target.is_dir():
             self.targetdir = self.target
-            possible_ymls = [
-                x
-                for x in list(self.targetdir.glob("*.yml"))
-                if x.stem.endswith("-seq")
-                or x.stem.endswith("-exp")
-                or x.stem.endswith("-act")
-            ]
+            possible_ymls = meta_glob(self.targetdir, RECORD_KINDS)
             if len(possible_ymls) > 1:
                 raise ValueError(
                     f"{self.targetdir} contains multiple .yml files and is not a valid Helao directory"
@@ -465,11 +467,7 @@ class HelaoYml:
         # Record suffixes only. A colocated ``-prc.yml`` is a process artifact
         # sitting beside its experiment, not a child record, and wrapping one
         # in HelaoYml would put a process into the sync hierarchy.
-        paths = [
-            p
-            for p in yml_path.parent.glob("*/*.yml")
-            if p.stem.endswith(("-seq", "-exp", "-act"))
-        ]
+        paths = meta_glob(yml_path.parent, RECORD_KINDS, "*/*")
         hpaths = [HelaoYml(x) for x in paths]
         return sorted(hpaths, key=lambda x: x.timestamp)
 
@@ -634,7 +632,14 @@ class HelaoYml:
             # from the first run.
             if p.suffix in (".prg", ".lock"):
                 continue
-            if p.relative_to(self.targetdir).as_posix() in named:
+            # The record's own metadata, and a data header whose .jsonl partner
+            # is registered (the header travels by stem, spec §4).
+            if meta_kind(p) is not None:
+                continue
+            rel = p.relative_to(self.targetdir).as_posix()
+            if rel.endswith(HEADER_SUFFIX) and data_sibling(rel, DATA_SUFFIX) in named:
+                continue
+            if rel in named:
                 continue
             unregistered.append(p)
         for p in unregistered:
@@ -667,7 +672,7 @@ class HelaoYml:
 
     @property
     def process_ymls(self) -> list[Path]:
-        """``*-prc.yml`` files in the immediate target directory.
+        """``*-prc`` records (``.json`` or legacy ``.yml``) in the immediate target directory.
 
         A process artifact is colocated with the ``-exp.yml`` it belongs to, so
         it is in neither :attr:`misc_files` (which excludes ``.yml``) nor
@@ -675,11 +680,7 @@ class HelaoYml:
         that moves to ``RUNS_SYNCED``; left behind, it both orphans the process
         and keeps :meth:`cleanup` reporting the directory as not empty forever.
         """
-        return [
-            x
-            for x in self.targetdir.glob("*-prc.yml")
-            if x.is_file()
-        ]
+        return [x for x in meta_glob(self.targetdir, "prc") if x.is_file()]
 
     @property
     def parent_yml(self) -> Optional[Path]:
@@ -699,11 +700,7 @@ class HelaoYml:
         if self.type == "sequence":
             return self.target
         for x in (self.active_path, self.finished_path, self.synced_path):
-            found = [
-                p
-                for p in x.parent.parent.glob("*.yml")
-                if p.stem.endswith(("-seq", "-exp", "-act"))
-            ]
+            found = meta_glob(x.parent.parent, RECORD_KINDS)
             if found:
                 return found[0]
         return None
@@ -820,17 +817,17 @@ class Progress:
         """
 
         if isinstance(path, Path):
-            if path.suffix == ".yml":
+            if path.suffix in (".json", ".yml"):
                 self.ymlpath = path
             elif path.suffix == ".prg":
                 self.prg = path
         else:
-            if path.endswith(".yml"):
+            if path.endswith((".json", ".yml")):
                 self.ymlpath = Path(path)
             elif path.endswith(".prg"):
                 self.prg = Path(path)
             else:
-                raise ValueError(f"{path} is not a valid Helao .yml or .prg file")
+                raise ValueError(f"{path} is not a valid Helao record (.json/.yml) or .prg file")
 
         # if not hasattr(self, "yml"):
         #     self.read_dict()
@@ -865,7 +862,14 @@ class Progress:
                 }
                 self.dict.update(act_dict)
             if self.yml.type == "experiment":
-                process_groups = self.yml.meta.get("process_order_groups", {})
+                # JSON object keys are strings; the .prg bookkeeping, action
+                # orders and written-off groups are all compared as ints.
+                process_groups = {
+                    int(k): v
+                    for k, v in (
+                        self.yml.meta.get("process_order_groups") or {}
+                    ).items()
+                }
                 exp_dict = {
                     "process_actions_done": {},  # {action submit order: yml.target.name}
                     "process_groups": process_groups,  # {process_idx: contributor action indices}
@@ -1084,7 +1088,7 @@ class Progress:
             # case exits above without touching it.
             declared = {
                 str(f.get("file_name"))
-                for f in (yml_load(self.yml.target, fast=True).get("files") or [])
+                for f in (read_meta(self.yml.target).get("files") or [])
                 if f.get("file_name")
             }
             dropped = [
@@ -1545,7 +1549,7 @@ class SyncDriver:
         prg = yml_path.with_suffix(".prg")
         root = Path(str(self.helaodirs.root)).resolve()
         if (
-            not yml_path.name.endswith("-exp.yml")
+            meta_kind(yml_path) != "exp"
             or not yml_path.is_file()
             or not yml_path.resolve().is_relative_to(root)
             or not prg.exists()
@@ -1660,13 +1664,13 @@ class SyncDriver:
         """
         if self.run_journal is None:
             return []
-        suffix = {"action": "-act.yml", "experiment": "-exp.yml", "sequence": "-seq.yml"}
+        kind_abbr = {"action": "act", "experiment": "exp", "sequence": "seq"}
         out = []
         for rec in self.run_journal.working_set().values():
             if rec.get("state") != QUARANTINED:
                 continue
             rec_dir = Path(str(self.helaodirs.root)) / rec["path"]
-            ymls = sorted(rec_dir.glob(f"*{suffix.get(rec['kind'], '.yml')}"))
+            ymls = meta_glob(rec_dir, kind_abbr.get(rec["kind"], RECORD_KINDS))
             entry = {
                 "uuid": rec["uuid"],
                 "kind": rec["kind"],
@@ -1923,7 +1927,7 @@ class SyncDriver:
                 prevent runaway re-queuing.
         """
         yml_path = Path(upath) if isinstance(upath, str) else upath
-        if yml_path.name.endswith("-prc.yml"):
+        if meta_kind(yml_path) == "prc":
             # A process is an artifact of an experiment's sync, never a record
             # that syncs on its own. It reaches here only by mistake -- most
             # plausibly a hand-POSTed /finish_yml, which ranks an unrecognised
@@ -2001,7 +2005,7 @@ class SyncDriver:
             shipped state; ``True`` if there was nothing to sync; ``False``
             when the yml could not be synced this pass.
         """
-        if yml_path.name.endswith("-prc.yml"):
+        if meta_kind(yml_path) == "prc":
             # Authoritative backstop to enqueue_yml's guard: syncer() calls this
             # directly off the queue, so anything queued before the guard
             # existed would otherwise run. Returning True retires it without a
@@ -2025,12 +2029,12 @@ class SyncDriver:
         # Re-queue it one rank lower, as the full child check below would, but
         # without parsing it: a 296-experiment -seq.yml (9.7 MB, ~4 s a parse)
         # re-entered every ~15 s and starved the event loop for minutes.
-        if not yml_path.name.endswith("-act.yml"):
+        if meta_kind(yml_path) != "act":
             # A shipped child re-posted to the queue is not one to wait for:
             # it returns at once without re-queuing this parent, which would
             # then be dropped below rank_limit and lost until a restart.
             children = await asyncio.to_thread(
-                lambda: list(yml_path.parent.glob("*/*.yml"))
+                lambda: meta_glob(yml_path.parent, ("exp", "act"), "*/*")
             )
             busy = [
                 c.name
@@ -2517,7 +2521,7 @@ class SyncDriver:
 
         For each process group not yet flagged in ``process_s3`` /
         ``process_api`` and whose contributing actions are complete (or when
-        ``force`` is true), writes a local ``*-prc.yml``, uploads the JSON to
+        ``force`` is true), writes a local ``*-prc.json``, uploads the JSON to
         S3, and registers it with the API.
 
         Args:
@@ -2632,12 +2636,13 @@ class SyncDriver:
                 # every repair tool had to consult a parallel tree that might
                 # no longer be beside the zip it was repairing.
                 save_dir = str(exp_prog.yml.target.parent)
-                save_yml_path = os.path.join(
-                    save_dir, f"{pidx}__{uuid_key}__{meta['technique_name']}-prc.yml"
+                write_meta(
+                    os.path.join(
+                        save_dir,
+                        f"{pidx}__{uuid_key}__{meta['technique_name']}-prc.json",
+                    ),
+                    model,
                 )
-                os.makedirs(save_dir, exist_ok=True)
-                with open(save_yml_path, "w", encoding="utf-8") as f:
-                    f.write(yml_dumps(model))
                 # sync to s3
                 meta_s3_key = f"process/{uuid_key}.json"
                 s3_success = await self.to_s3(model, meta_s3_key)
@@ -2742,7 +2747,7 @@ class SyncDriver:
             return False
 
     def list_pending(self, omit_manual_exps: bool = True) -> list:
-        """Return ``*-seq.yml`` paths that have not shipped yet.
+        """Return ``*-seq`` record (``.json`` or legacy ``.yml``) paths that have not shipped yet.
 
         Args:
             omit_manual_exps: Skip files containing ``manual_orch_seq``.
@@ -2753,7 +2758,7 @@ class SyncDriver:
         finished_dir = str(self.helaodirs.save_root).replace(
             RunDir.ACTIVE.value, RunDir.FINISHED.value
         )
-        pending = glob(os.path.join(finished_dir, "*", "*", "*", "*-seq.yml"))
+        pending = [str(p) for p in meta_glob(finished_dir, "seq", "*/*/*/*")]
         if omit_manual_exps:
             pending = [x for x in pending if "manual_orch_seq" not in x]
         pending = _pending_only(pending)
@@ -2761,7 +2766,7 @@ class SyncDriver:
         return pending
 
     def list_pending_acts(self, omit_manual_exps: bool = True) -> list:
-        """Return ``*-act.yml`` paths that have not shipped yet.
+        """Return ``*-act`` record (``.json`` or legacy ``.yml``) paths that have not shipped yet.
 
         Args:
             omit_manual_exps: Skip files containing ``manual_orch_seq``.
@@ -2772,7 +2777,7 @@ class SyncDriver:
         finished_dir = str(self.helaodirs.save_root).replace(
             RunDir.ACTIVE.value, RunDir.FINISHED.value
         )
-        pending = glob(os.path.join(finished_dir, "*", "*", "*", "*", "*", "*-act.yml"))
+        pending = [str(p) for p in meta_glob(finished_dir, "act", "*/*/*/*/*/*")]
         if omit_manual_exps:
             pending = [x for x in pending if "manual_orch_seq" not in x]
         pending = _pending_only(pending)
@@ -2780,7 +2785,7 @@ class SyncDriver:
         return pending
 
     def list_pending_exps(self, omit_manual_exps: bool = True) -> list:
-        """Return ``*-exp.yml`` paths that have not shipped yet.
+        """Return ``*-exp`` record (``.json`` or legacy ``.yml``) paths that have not shipped yet.
 
         Args:
             omit_manual_exps: Skip files containing ``manual_orch_seq``.
@@ -2791,7 +2796,7 @@ class SyncDriver:
         finished_dir = str(self.helaodirs.save_root).replace(
             RunDir.ACTIVE.value, RunDir.FINISHED.value
         )
-        pending = glob(os.path.join(finished_dir, "*", "*", "*", "*", "*-exp.yml"))
+        pending = [str(p) for p in meta_glob(finished_dir, "exp", "*/*/*/*/*")]
         if omit_manual_exps:
             pending = [x for x in pending if "manual_orch_seq" not in x]
         pending = _pending_only(pending)

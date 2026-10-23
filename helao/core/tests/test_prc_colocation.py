@@ -206,10 +206,10 @@ def test_sync_process_writes_beside_the_exp_yml(tmp_path):
 
     asyncio.run(_run())
 
-    written = list(exp_yml.parent.glob("*-prc.yml"))
+    written = list(exp_yml.parent.glob("*-prc.json"))
     assert len(written) == 1, f"expected one prc beside the exp yml, got {written}"
     assert not list(
-        (tmp_path / "PROCESSES").rglob("*-prc.yml")
+        (tmp_path / "PROCESSES").rglob("*-prc.*")
     ), "nothing may be written under process_root"
 
 
@@ -250,7 +250,7 @@ def test_the_prc_stays_beside_its_experiment_through_a_sync(tmp_path):
             # the precondition that the prc exists beside the exp yml before
             # anything moves it.
             await driver.sync_yml(yml_path=act_yml)
-            written.extend(exp_yml.parent.glob("*-prc.yml"))
+            written.extend(exp_yml.parent.glob("*-prc.json"))
 
             await driver.sync_yml(yml_path=exp_yml)
         finally:
@@ -260,7 +260,7 @@ def test_the_prc_stays_beside_its_experiment_through_a_sync(tmp_path):
 
     assert len(written) == 1
 
-    in_place = list(exp_yml.parent.glob("*-prc.yml"))
+    in_place = list(exp_yml.parent.glob("*-prc.json"))
     assert in_place == written, f"the prc did not stay beside its exp yml: {in_place}"
     assert not (
         tmp_path / RunDir.SYNCED.value

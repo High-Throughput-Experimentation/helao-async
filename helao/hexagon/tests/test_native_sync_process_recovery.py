@@ -329,7 +329,7 @@ async def test_late_action_reopens_pushed_group_for_repush(tmp_path, cls):
         # the group is pushed with only the old attempt
         ep = await drv.sync_process(ep)
         assert ep.list_unfinished_procs() == ([], [])
-        (prc,) = list(exp_yml.parent.glob("0__*-prc.yml"))
+        (prc,) = list(exp_yml.parent.glob("0__*-prc.json"))
         assert mk_uuid(500) not in prc.read_text(encoding="utf-8")
 
         # the re-run: same action_order, new uuid, its own contribution
@@ -385,12 +385,12 @@ async def test_later_split_does_not_reopen_pushed_group(tmp_path, cls):
         ep = drv.update_process(HelaoYml(act), split0)
         ep = await drv.sync_process(ep)
         assert ep.list_unfinished_procs() == ([], [])
-        (prc,) = list(exp_yml.parent.glob("0__*-prc.yml"))
+        (prc,) = list(exp_yml.parent.glob("0__*-prc.json"))
         assert "tech_s0" in prc.name
 
         ep = drv.update_process(HelaoYml(act), split1)
         assert ep.list_unfinished_procs() == ([], []), "a later split must not reopen"
         ep = await drv.sync_process(ep)
-        assert [p.name for p in exp_yml.parent.glob("0__*-prc.yml")] == [prc.name]
+        assert [p.name for p in exp_yml.parent.glob("0__*-prc.json")] == [prc.name]
     finally:
         await teardown_driver(drv)

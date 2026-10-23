@@ -92,7 +92,7 @@ Server output is rooted at the YAML's `root:` key (e.g. `C:\INST_hlo`):
 - `STATES/` — pickled PID files and other runtime state.
 - `RUNS` — the single per-run output tree consumed by `NativeSyncer`. Manual/diagnostic runs go to `DIAG` instead, which is **never synced**: `move_dir` skips the syncer handoff for a manual record, so a DIAG run has no `.prg` and no upload. Records are written there once and never move; lifecycle state lives in the per-server journals. `RUNS_*` (e.g. `RUNS_SYNCED`) is legacy read-only vocabulary for existing archives; see `helao/core/models/run_dir.py`.
 
-**What the syncer uploads to `raw_data/` is decided by a directory glob, not by `Action.files`.** The consequences that have bitten in production — transient staging files getting shipped, the `staging_path` length rule, and the once-unbounded push loop — are in `helao/hexagon/adapters/native/CLAUDE.md`.
+**What the syncer uploads to `raw_data/` is the record's own `files` list (`HelaoYml.upload_files`, minus nosync entries), not a directory glob.** The consequences that have bitten in production — transient staging files getting shipped, the `staging_path` length rule, and the once-unbounded push loop — are in `helao/hexagon/adapters/native/CLAUDE.md`.
 
 ### Two execution models: Orchestrator vs Runners
 The orchestrator is the long-lived queue-and-dispatch service used in production. `helao/core/runners/` provides an alternative "micro-orchestrator" pattern (`action_runner`, `experiment_runner`, `sequence_runner`, `micro_client`) for callers that want a short-lived runner with no backend service. See `helao/core/runners/runner.md`. Several of those files are currently stubs.

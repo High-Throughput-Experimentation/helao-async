@@ -11,6 +11,7 @@ from helao.core.models.helaodirs import HelaoDirs
 from helao.core.models.process import ProcessModel
 from helao.core.models.run_dir import RunDir
 from helao.helpers.run_state import _prg_is_complete, _prg_is_quarantined
+from helao.helpers.meta_io import read_meta
 from helao.helpers.yml_tools import yml_load
 from helao.hexagon.tests.sync_fixtures import (
     drain,
@@ -147,8 +148,8 @@ async def test_write_off_block_stops_f3_and_marks_only_its_group(
         assert isinstance(result, dict)
 
         by_group = {}
-        for p in exp_yml.parent.glob("*-prc.yml"):
-            by_group[int(p.name.split("__")[0])] = mod.yml_load(p, fast=True)
+        for p in exp_yml.parent.glob("*-prc.json"):
+            by_group[int(p.name.split("__")[0])] = read_meta(p)
         assert by_group[1]["missing_action_orders"] == [2]
         assert "missing_action_orders" not in by_group[0]
         assert any(b.get("missing_action_orders") == [2] for b in bodies)
@@ -259,8 +260,8 @@ async def test_write_off_marks_the_pushed_process(tmp_path, mod, monkeypatch):
         await drain(drv, timeout=15)
         assert _prg_is_complete(exp_yml.with_suffix(".prg"))
         by_group = {}
-        for p in exp_yml.parent.glob("*-prc.yml"):
-            by_group[int(p.name.split("__")[0])] = yml_load(p, fast=True)
+        for p in exp_yml.parent.glob("*-prc.json"):
+            by_group[int(p.name.split("__")[0])] = read_meta(p)
         assert by_group[1]["missing_action_orders"] == [2]
         assert "missing_action_orders" not in by_group[0]
         # the ledger line is JSON, so its keys are strings; the .prg keys are not
