@@ -129,6 +129,7 @@ def _ecms_seq_CA(epm, p, potential, time):
         {
             "WE_potential__V": potential,
             "WE_versus": p["WE_versus"],
+            "OCV_duration__s": p["OCV_duration__s"],
             "ref_type": p["ref_type"],
             "pH": p["pH"],
             "ref_offset__V": p["ref_offset__V"],
@@ -145,6 +146,7 @@ def _ecms_seq_CV(epm, p, scanrate):
         "ECMS_sub_CV",
         {
             "WE_versus": p["WE_versus"],
+            "OCV_duration__s": p["OCV_duration__s"],
             "ref_type": p["ref_type"],
             "ref_offset__V": p["ref_offset"],
             "pH": p["pH"],
@@ -525,7 +527,7 @@ def ECMS_initiation_recirculation_mixedreactant(
     return _ecms_seq_initiation(**locals(), recirc=True, cali=True)
 
 
-@sequence(version=4)
+@sequence(version=5)
 def ECMS_repeat_CV(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -557,6 +559,7 @@ def ECMS_repeat_CV(
     liquid_drain_time: float = 60.0,
     # electrolyte_recirculation: str = "on",
     # liquid_cleancell_time: float = 120,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Repeat CV sweeps at two scan rates with CO2 baselines per cycle.
 
@@ -589,6 +592,7 @@ def ECMS_repeat_CV(
         ref_offset: Reference-electrode potential offset (V).
         MS_equilibrium_time: Mass-spec equilibration time (s).
         liquid_drain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -597,7 +601,7 @@ def ECMS_repeat_CV(
 
 
 # =============================================================================
-@sequence(version=4)
+@sequence(version=5)
 def ECMS_repeat_CV_recirculation(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -632,6 +636,7 @@ def ECMS_repeat_CV_recirculation(
     tube_clear_delaytime: float = 40.0,
     liquid_drain_time: float = 80.0,
     # liquid_cleancell_time: float = 120,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Recirculating-cell variant of :func:`ECMS_repeat_CV` with cleaning cycles.
 
@@ -668,6 +673,7 @@ def ECMS_repeat_CV_recirculation(
         tube_clear_time: Duration to clear the tube (s).
         tube_clear_delaytime: Delay before clearing the tube (s).
         liquid_drain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -675,7 +681,7 @@ def ECMS_repeat_CV_recirculation(
     return _ecms_seq_repeat_CV(**locals(), recirc=True)
 
 
-@sequence(version=4)
+@sequence(version=5)
 def ECMS_repeat_CV_recirculation_mixedreactant(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -711,6 +717,7 @@ def ECMS_repeat_CV_recirculation_mixedreactant(
     tube_clear_delaytime: float = 40.0,
     liquid_drain_time: float = 80.0,
     # liquid_cleancell_time: float = 120,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Recirculating CV protocol using a mixed-reactant calibration baseline.
 
@@ -748,6 +755,7 @@ def ECMS_repeat_CV_recirculation_mixedreactant(
         tube_clear_time: Duration to clear the tube (s).
         tube_clear_delaytime: Delay before clearing the tube (s).
         liquid_drain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -755,7 +763,7 @@ def ECMS_repeat_CV_recirculation_mixedreactant(
     return _ecms_seq_repeat_CV(**locals(), recirc=True, cali=True)
 
 
-@sequence(version=5)
+@sequence(version=6)
 def ECMS_CV_recirculation_mixedreactant(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -789,6 +797,7 @@ def ECMS_CV_recirculation_mixedreactant(
     tube_clear_delaytime: float = 40.0,
     liquid_drain_time: float = 170.0,
     # liquid_cleancell_time: float = 120,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Single CV pass with mixed-reactant calibration baseline (recirculating cell).
 
@@ -824,6 +833,7 @@ def ECMS_CV_recirculation_mixedreactant(
         tube_clear_time: Duration to clear the tube (s).
         tube_clear_delaytime: Delay before clearing the tube (s).
         liquid_drain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -839,7 +849,7 @@ def ECMS_CV_recirculation_mixedreactant(
     return epm.planned_experiments
 
 
-@sequence(version=3)
+@sequence(version=4)
 def ECMS_series_CA(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -865,6 +875,7 @@ def ECMS_series_CA(
     liquid_drain_time: float = 60.0,
     # electrolyte_recirculation: str = "on",
     # liquid_cleancell_time: float = 120,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Run a CA series sweeping through ``WE_potential__V`` values.
 
@@ -891,6 +902,7 @@ def ECMS_series_CA(
         ref_offset__V: Reference-electrode potential offset (V).
         MS_equilibrium_time: Mass-spec equilibration time (s).
         liquid_drain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -898,7 +910,7 @@ def ECMS_series_CA(
     return _ecms_seq_series_CA(**locals(), recirc=False)
 
 
-@sequence(version=4)
+@sequence(version=5)
 def ECMS_series_CA_recirculation(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -927,6 +939,7 @@ def ECMS_series_CA_recirculation(
     tube_clear_time: float = 20,
     tube_clear_delaytime: float = 40.0,
     # liquid_cleancell_time: float = 120,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Recirculating-cell variant of :func:`ECMS_series_CA`.
 
@@ -957,6 +970,7 @@ def ECMS_series_CA_recirculation(
         liquid_drain_time: Duration of the liquid drain (s).
         tube_clear_time: Duration to clear the tube (s).
         tube_clear_delaytime: Delay before clearing the tube (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -964,7 +978,7 @@ def ECMS_series_CA_recirculation(
     return _ecms_seq_series_CA(**locals(), recirc=True)
 
 
-@sequence(version=4)
+@sequence(version=5)
 def ECMS_series_CA_recirculation_mixedreactant(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -994,6 +1008,7 @@ def ECMS_series_CA_recirculation_mixedreactant(
     tube_clear_time: float = 20,
     tube_clear_delaytime: float = 40.0,
     # liquid_cleancell_time: float = 120,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Recirculating CA series with mixed-reactant calibration baselines.
 
@@ -1025,6 +1040,7 @@ def ECMS_series_CA_recirculation_mixedreactant(
         liquid_drain_time: Duration of the liquid drain (s).
         tube_clear_time: Duration to clear the tube (s).
         tube_clear_delaytime: Delay before clearing the tube (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -1032,7 +1048,7 @@ def ECMS_series_CA_recirculation_mixedreactant(
     return _ecms_seq_series_CA(**locals(), recirc=True, cali=True)
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ECMS_series_CA_recirculation_mixedgas_comp(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -1062,6 +1078,7 @@ def ECMS_series_CA_recirculation_mixedgas_comp(
     tube_clear_time: float = 9,
     tube_clear_delaytime: float = 40.0,
     # liquid_cleancell_time: float = 120,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Recirculating CA series with mixed-reactant calibration baselines.
 
@@ -1093,6 +1110,7 @@ def ECMS_series_CA_recirculation_mixedgas_comp(
         liquid_drain_time: Duration of the liquid drain (s).
         tube_clear_time: Duration to clear the tube (s).
         tube_clear_delaytime: Delay before clearing the tube (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -1116,7 +1134,7 @@ def ECMS_series_CA_recirculation_mixedgas_comp(
     return epm.planned_experiments
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ECMS_series_CA_recirculation_mixedthreereactant(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -1147,6 +1165,7 @@ def ECMS_series_CA_recirculation_mixedthreereactant(
     tube_clear_time: float = 10,
     tube_clear_delaytime: float = 40.0,
     # liquid_cleancell_time: float = 120,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Recirculating CA series with a three-reactant calibration baseline.
 
@@ -1177,6 +1196,7 @@ def ECMS_series_CA_recirculation_mixedthreereactant(
         liquid_drain_time: Duration of the liquid drain (s).
         tube_clear_time: Duration to clear the tube (s).
         tube_clear_delaytime: Delay before clearing the tube (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -1492,7 +1512,7 @@ def ECMS_MS_pulsecalibration(
     return epm.planned_experiments
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ECMS_series_CA_change_gasflow(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -1531,6 +1551,7 @@ def ECMS_series_CA_change_gasflow(
     PreExp_Califlowrate2_sccm: list[float] = [10.0, 0.0],
     # MSsignal_quilibrium_time_initial: float = 480,
     PreExp_MSsignal_quilibrium_time: float = 100,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Run a CA series while stepping through CO2 flow rates.
 
@@ -1557,6 +1578,7 @@ def ECMS_series_CA_change_gasflow(
         PreExp_CO2flowrate_sccm: Pre-experiment CO2 flow rate (sccm).
         PreExp_Califlowrate2_sccm: Pre-experiment secondary calibration flow rate (sccm).
         PreExp_MSsignal_quilibrium_time: Pre-experiment mass-spec signal equilibration time (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -1631,6 +1653,7 @@ def ECMS_series_CA_change_gasflow(
             {
                 "WE_potential__V": potential,
                 "WE_versus": WE_versus,
+                "OCV_duration__s": OCV_duration__s,
                 "ref_type": ref_type,
                 "pH": pH,
                 "ref_offset__V": ref_offset__V,

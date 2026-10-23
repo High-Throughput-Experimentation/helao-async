@@ -183,20 +183,27 @@ def _ecms_mfc(
     apm.add(_ECMS_MFC[device], then, {"device_name": device}, asc.no_wait)
 
 
-def _ecms_vs_ref(V, WE_versus, ref_offset__V, pH, ref_type, allow_ocv=False):
-    """Convert a WE potential to volts vs the reference electrode (arithmetic verbatim)."""
+def _ecms_vs_ref(V, WE_versus, ref_offset__V, pH, ref_type):
+    """Convert a WE potential to volts vs the reference electrode (arithmetic verbatim).
+
+    ``"ocv"`` passes the potential through: the Gamry endpoint applies it relative
+    to a measured OCV (see :func:`_ecms_ocv_params`).
+    """
     WE_versus = resolve_we_versus(WE_versus)
     if WE_versus == "ref":
         return V - 1.0 * ref_offset__V
-    if WE_versus == "ocv" and allow_ocv:
-        return V
     if WE_versus == "rhe":
         return V - 1.0 * ref_offset__V - 0.059 * pH - ref_offset(ref_type)
-    # legacy: CA/CA_CO2flow never handled 'ocv' and read an unbound local; keep that
-    # exact failure (Phase 3 decides the fix)
-    raise UnboundLocalError(
-        "cannot access local variable 'potential_vsRef' where it is not associated with a value"
-    )
+    if WE_versus == "ocv":
+        return V
+    raise ValueError(f"WE_versus must be one of ref, rhe, ocv; got {WE_versus!r}")
+
+
+def _ecms_ocv_params(WE_versus, OCV_duration__s):
+    """PSTAT params that make the endpoint measure OCV first (empty unless ``"ocv"``)."""
+    if resolve_we_versus(WE_versus) == "ocv":
+        return {"versus_OCV": True, "OCV_duration__s": OCV_duration__s}
+    return {}
 
 
 def _ecms_pstat(apm, endpoint, params, technique):
@@ -575,7 +582,7 @@ def ECMS_sub_electrolyte_recirculation_off() -> list:
     return apm.planned_actions
 
 
-@experiment(version=1)
+@experiment(version=2)
 def ECMS_sub_CA(
     WE_potential__V: float = 0.0,
     WE_versus: str = "ref",
@@ -586,12 +593,13 @@ def ECMS_sub_CA(
     ref_type: str = "leakless",
     pH: float = 6.8,
     MS_equilibrium_time: float = 90.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Run a CA experiment then wait for the MS signal to equilibrate.
 
     Args:
         WE_potential__V: Working-electrode potential (V).
-        WE_versus: ``"ref"`` or ``"rhe"``.
+        WE_versus: ``"ref"``, ``"rhe"`` or ``"ocv"``.
         CA_duration_sec: CA duration (s).
         SampleRate: Acquisition interval (s).
         IErange: Gamry current-range setting.
@@ -599,9 +607,10 @@ def ECMS_sub_CA(
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH (used in RHE conversion).
         MS_equilibrium_time: Post-CA wait for the MS signal to settle (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Raises:
-        ValueError: If ``WE_versus`` is not ``"ref"`` or ``"rhe"``.
+        ValueError: If ``WE_versus`` is not ``"ref"``, ``"rhe"`` or ``"ocv"``.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -617,6 +626,7 @@ def ECMS_sub_CA(
             "Tval__s": CA_duration_sec,
             "AcqInterval__s": SampleRate,
             "IErange": IErange,
+            **_ecms_ocv_params(WE_versus, OCV_duration__s),
         },
         "CA",
     )
@@ -756,7 +766,7 @@ def ECMS_sub_pulseCA(
     return apm.planned_actions
 
 
-@experiment(version=2)
+@experiment(version=3)
 def ECMS_sub_CV(
     WE_versus: str = "ref",
     ref_type: str = "leakless",
@@ -779,9 +789,13 @@ def ECMS_sub_CV(
     """Run a CV experiment then wait for the MS signal to equilibrate.
 
     Args:
-        WE_versus: ``"ref"`` or ``"rhe"``.
+        WE_versus: ``"ref"``, ``"rhe"`` or ``"ocv"``. ``"ocv"`` passes the
+            potentials through and measures OCV first: the effective
+            ``versus_OCV`` is ``versus_OCV or WE_versus == "ocv"``.
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH (used in RHE conversion).
+        versus_OCV: Measure OCV first and apply potentials relative to it.
+        OCV_duration__s: OCV measurement time (s); used only when versus_OCV.
         WE_potential_init__V: Initial potential (V).
         WE_potential_apex1__V: Apex 1 potential (V).
         WE_potential_apex2__V: Apex 2 potential (V).
@@ -794,7 +808,7 @@ def ECMS_sub_CV(
         MS_equilibrium_time: Post-CV wait for the MS signal to settle (s).
 
     Raises:
-        ValueError: If ``WE_versus`` is not ``"ref"`` or ``"rhe"``.
+        ValueError: If ``WE_versus`` is not ``"ref"``, ``"rhe"`` or ``"ocv"``.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -802,7 +816,7 @@ def ECMS_sub_CV(
     apm = ActionPlanMaker()
     params = {
         "Vinit__V": _ecms_vs_ref(
-            WE_potential_init__V, WE_versus, ref_offset__V, pH, ref_type, allow_ocv=True
+            WE_potential_init__V, WE_versus, ref_offset__V, pH, ref_type
         ),
         "Vapex1__V": _ecms_vs_ref(
             WE_potential_apex1__V,
@@ -810,7 +824,6 @@ def ECMS_sub_CV(
             ref_offset__V,
             pH,
             ref_type,
-            allow_ocv=True,
         ),
         "Vapex2__V": _ecms_vs_ref(
             WE_potential_apex2__V,
@@ -818,7 +831,6 @@ def ECMS_sub_CV(
             ref_offset__V,
             pH,
             ref_type,
-            allow_ocv=True,
         ),
         "Vfinal__V": _ecms_vs_ref(
             WE_potential_final__V,
@@ -826,14 +838,13 @@ def ECMS_sub_CV(
             ref_offset__V,
             pH,
             ref_type,
-            allow_ocv=True,
         ),
         "ScanRate__V_s": ScanRate_V_s,
         "Cycles": Cycles,
         "AcqInterval__s": SampleRate,
         "IErange": IErange,
         "SamplingMode": SamplingMode,
-        "versus_OCV": versus_OCV,
+        "versus_OCV": versus_OCV or resolve_we_versus(WE_versus) == "ocv",
         "OCV_duration__s": OCV_duration__s,
         "OCV_acquisition_period__s": OCV_acquisition_period__s,
     }
@@ -1177,7 +1188,7 @@ def ECMS_sub_preCA_CO2flow(
     return apm.planned_actions
 
 
-@experiment(version=1)
+@experiment(version=2)
 def ECMS_sub_CA_CO2flow(
     WE_potential__V: float = 0.0,
     WE_versus: str = "ref",
@@ -1192,6 +1203,7 @@ def ECMS_sub_CA_CO2flow(
     flow_change_duration_sec: list[float] = [60.0, 60.0, 60.0],
     CO2_flow_rate_sccm: list[float] = [0.0, 10.0, 0.0],
     # inert_gas_flow_rate_sccm: list[float] = [10.0,0.0,10.0]
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Run a CA experiment in parallel with a stepped CO2/inert-gas flow profile.
 
@@ -1201,7 +1213,7 @@ def ECMS_sub_CA_CO2flow(
 
     Args:
         WE_potential__V: Working-electrode potential (V).
-        WE_versus: ``"ref"`` or ``"rhe"``.
+        WE_versus: ``"ref"``, ``"rhe"`` or ``"ocv"``.
         CA_duration_sec: CA duration (s).
         SampleRate: Acquisition interval (s).
         IErange: Gamry current-range setting.
@@ -1212,9 +1224,10 @@ def ECMS_sub_CA_CO2flow(
         total_MFC_flow_rate_sccm: Combined CO2 + inert MFC budget (sccm).
         flow_change_duration_sec: Step durations (s).
         CO2_flow_rate_sccm: CO2 flow rates per step (sccm).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Raises:
-        ValueError: If ``WE_versus`` is not ``"ref"`` or ``"rhe"``.
+        ValueError: If ``WE_versus`` is not ``"ref"``, ``"rhe"`` or ``"ocv"``.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -1230,6 +1243,7 @@ def ECMS_sub_CA_CO2flow(
             "Tval__s": CA_duration_sec,
             "AcqInterval__s": SampleRate,
             "IErange": IErange,
+            **_ecms_ocv_params(WE_versus, OCV_duration__s),
         },
         "CA",
     )

@@ -782,20 +782,27 @@ _ANEC_CONTRIB = [
 ]
 
 
-def _anec_vs_ref(
-    V, WE_versus, ref_offset__V, pH, ref_type, unbound_name="potential_vsRef"
-):
-    """Convert a WE potential to volts vs the reference electrode (arithmetic verbatim)."""
+def _anec_vs_ref(V, WE_versus, ref_offset__V, pH, ref_type):
+    """Convert a WE potential to volts vs the reference electrode (arithmetic verbatim).
+
+    ``"ocv"`` passes the potential through: the Gamry endpoint applies it relative
+    to a measured OCV (see :func:`_anec_ocv_params`).
+    """
     WE_versus = resolve_we_versus(WE_versus)
     if WE_versus == "ref":
         return V - 1.0 * ref_offset__V
     if WE_versus == "rhe":
         return V - 1.0 * ref_offset__V - 0.059 * pH - ref_offset(ref_type)
-    # legacy: 'ocv' was never handled and the inlined originals read an unbound
-    # local; keep that exact failure (Phase 3 decides the fix)
-    raise UnboundLocalError(
-        f"cannot access local variable '{unbound_name}' where it is not associated with a value"
-    )
+    if WE_versus == "ocv":
+        return V
+    raise ValueError(f"WE_versus must be one of ref, rhe, ocv; got {WE_versus!r}")
+
+
+def _anec_ocv_params(WE_versus, OCV_duration__s):
+    """PSTAT params that make the endpoint measure OCV first (empty unless ``"ocv"``)."""
+    if resolve_we_versus(WE_versus) == "ocv":
+        return {"versus_OCV": True, "OCV_duration__s": OCV_duration__s}
+    return {}
 
 
 def _anec_run(apm, endpoint, params, technique, toggle=None, heat_degc=None):
@@ -889,7 +896,7 @@ def ANEC_sub_CP(
     )
 
 
-@experiment(version=1)
+@experiment(version=2)
 def ANEC_sub_CA(
     WE_potential__V: float = 0.0,
     WE_versus: str = "ref",
@@ -899,21 +906,23 @@ def ANEC_sub_CA(
     ref_offset__V: float = 0.0,
     ref_type: str = "leakless",
     pH: float = 6.8,
+    OCV_duration__s: float = 2.0,
 ) -> list:
-    """Run a chronoamperometry (CA) experiment versus REF or RHE.
+    """Run a chronoamperometry (CA) experiment versus REF, RHE or OCV.
 
     Args:
         WE_potential__V: Working-electrode potential (V).
-        WE_versus: ``"ref"`` or ``"rhe"``.
+        WE_versus: ``"ref"``, ``"rhe"`` or ``"ocv"``.
         CA_duration_sec: CA duration (s).
         SampleRate: Acquisition interval (s).
         IErange: Gamry current-range setting.
         ref_offset__V: Reference offset (V).
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH (used in RHE conversion).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Raises:
-        ValueError: If ``WE_versus`` is not ``"ref"`` or ``"rhe"``.
+        ValueError: If ``WE_versus`` is not ``"ref"``, ``"rhe"`` or ``"ocv"``.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -928,12 +937,13 @@ def ANEC_sub_CA(
             "Tval__s": CA_duration_sec,
             "AcqInterval__s": SampleRate,
             "IErange": IErange,
+            **_anec_ocv_params(WE_versus, OCV_duration__s),
         },
         "CA",
     )
 
 
-@experiment(version=2)
+@experiment(version=3)
 def ANEC_sub_HeatCA(
     WE_potential__V: float = 0.0,
     WE_versus: str = "ref",
@@ -944,12 +954,13 @@ def ANEC_sub_HeatCA(
     ref_type: str = "leakless",
     pH: float = 6.8,
     target_temperature_degc: float = 25.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Stabilize TEC at a target temperature then run a CA experiment.
 
     Args:
         WE_potential__V: Working-electrode potential (V).
-        WE_versus: ``"ref"`` or ``"rhe"``.
+        WE_versus: ``"ref"``, ``"rhe"`` or ``"ocv"``.
         CA_duration_sec: CA duration (s).
         SampleRate: Acquisition interval (s).
         IErange: Gamry current-range setting.
@@ -957,9 +968,10 @@ def ANEC_sub_HeatCA(
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH (used in RHE conversion).
         target_temperature_degc: TEC setpoint (deg C).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Raises:
-        ValueError: If ``WE_versus`` is not ``"ref"`` or ``"rhe"``.
+        ValueError: If ``WE_versus`` is not ``"ref"``, ``"rhe"`` or ``"ocv"``.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -974,6 +986,7 @@ def ANEC_sub_HeatCA(
             "Tval__s": CA_duration_sec,
             "AcqInterval__s": SampleRate,
             "IErange": IErange,
+            **_anec_ocv_params(WE_versus, OCV_duration__s),
         },
         "CA",
         heat_degc=target_temperature_degc,
@@ -1002,7 +1015,7 @@ def ANEC_sub_OCV(
     )
 
 
-@experiment(version=2)
+@experiment(version=3)
 def ANEC_sub_photo_CA(
     WE_potential__V: float = 0.0,
     WE_versus: str = "ref",
@@ -1023,6 +1036,7 @@ def ANEC_sub_photo_CA(
     toggle_illum_duty: float = 0.5,
     toggle_illum_period: float = 2.0,
     toggle_illum_time: float = -1,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Run a CA experiment with hardware-triggered LED toggling via the Galil IO.
 
@@ -1032,7 +1046,7 @@ def ANEC_sub_photo_CA(
 
     Args:
         WE_potential__V: Working-electrode potential (V).
-        WE_versus: ``"ref"`` or ``"rhe"``.
+        WE_versus: ``"ref"``, ``"rhe"`` or ``"ocv"``.
         CA_duration_sec: CA duration (s).
         SampleRate: Acquisition interval (s).
         IErange: Gamry current-range setting.
@@ -1050,9 +1064,10 @@ def ANEC_sub_photo_CA(
         toggle_illum_duty: Illumination duty cycle.
         toggle_illum_period: Toggle period (s).
         toggle_illum_time: Total toggle duration (s); ``-1`` matches CA.
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Raises:
-        ValueError: If ``WE_versus`` is not ``"ref"`` or ``"rhe"``.
+        ValueError: If ``WE_versus`` is not ``"ref"``, ``"rhe"`` or ``"ocv"``.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -1072,6 +1087,7 @@ def ANEC_sub_photo_CA(
             "TTLwait": gamrychannelwait,
             "TTLsend": gamrychannelsend,
             "IErange": IErange,
+            **_anec_ocv_params(WE_versus, OCV_duration__s),
         },
         "CA",
         toggle=(
@@ -1084,7 +1100,7 @@ def ANEC_sub_photo_CA(
     )
 
 
-@experiment(version=1)
+@experiment(version=2)
 def ANEC_sub_CV(
     WE_versus: str = "ref",
     ref_type: str = "leakless",
@@ -1098,11 +1114,12 @@ def ANEC_sub_CV(
     SampleRate: float = 0.01,
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
-    """Run a cyclic voltammetry (CV) experiment versus REF or RHE.
+    """Run a cyclic voltammetry (CV) experiment versus REF, RHE or OCV.
 
     Args:
-        WE_versus: ``"ref"`` or ``"rhe"``.
+        WE_versus: ``"ref"``, ``"rhe"`` or ``"ocv"``.
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH (used in RHE conversion).
         WE_potential_init__V: Initial potential (V).
@@ -1114,9 +1131,10 @@ def ANEC_sub_CV(
         SampleRate: Acquisition interval (s).
         IErange: Gamry current-range setting.
         ref_offset__V: Reference offset (V).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Raises:
-        ValueError: If ``WE_versus`` is not ``"ref"`` or ``"rhe"``.
+        ValueError: If ``WE_versus`` is not ``"ref"``, ``"rhe"`` or ``"ocv"``.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -1131,7 +1149,6 @@ def ANEC_sub_CV(
                 ref_offset__V,
                 pH,
                 ref_type,
-                "potential_init_vsRef",
             ),
             "Vapex1__V": _anec_vs_ref(
                 WE_potential_apex1__V, WE_versus, ref_offset__V, pH, ref_type
@@ -1146,12 +1163,13 @@ def ANEC_sub_CV(
             "Cycles": Cycles,
             "AcqInterval__s": SampleRate,
             "IErange": IErange,
+            **_anec_ocv_params(WE_versus, OCV_duration__s),
         },
         ["CV"],
     )
 
 
-@experiment(version=2)
+@experiment(version=3)
 def ANEC_sub_HeatCV(
     WE_versus: str = "ref",
     ref_type: str = "leakless",
@@ -1166,11 +1184,12 @@ def ANEC_sub_HeatCV(
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
     target_temperature_degc: float = 25.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Stabilize TEC at a target temperature then run a CV experiment.
 
     Args:
-        WE_versus: ``"ref"`` or ``"rhe"``.
+        WE_versus: ``"ref"``, ``"rhe"`` or ``"ocv"``.
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH (used in RHE conversion).
         WE_potential_init__V: Initial potential (V).
@@ -1183,9 +1202,10 @@ def ANEC_sub_HeatCV(
         IErange: Gamry current-range setting.
         ref_offset__V: Reference offset (V).
         target_temperature_degc: TEC setpoint (deg C).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Raises:
-        ValueError: If ``WE_versus`` is not ``"ref"`` or ``"rhe"``.
+        ValueError: If ``WE_versus`` is not ``"ref"``, ``"rhe"`` or ``"ocv"``.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -1200,7 +1220,6 @@ def ANEC_sub_HeatCV(
                 ref_offset__V,
                 pH,
                 ref_type,
-                "potential_init_vsRef",
             ),
             "Vapex1__V": _anec_vs_ref(
                 WE_potential_apex1__V, WE_versus, ref_offset__V, pH, ref_type
@@ -1215,13 +1234,14 @@ def ANEC_sub_HeatCV(
             "Cycles": Cycles,
             "AcqInterval__s": SampleRate,
             "IErange": IErange,
+            **_anec_ocv_params(WE_versus, OCV_duration__s),
         },
         ["CV"],
         heat_degc=target_temperature_degc,
     )
 
 
-@experiment(version=1)
+@experiment(version=2)
 def ANEC_sub_photo_CV(
     WE_versus: str = "ref",
     ref_type: str = "leakless",
@@ -1246,6 +1266,7 @@ def ANEC_sub_photo_CV(
     toggle_illum_duty: float = 0.5,
     toggle_illum_period: float = 2.0,
     toggle_illum_time: float = -1,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Run a CV experiment with hardware-triggered LED toggling via the Galil IO.
 
@@ -1254,7 +1275,7 @@ def ANEC_sub_photo_CV(
     digital cycle, runs CV with TTL handshake, then stops the digital cycle.
 
     Args:
-        WE_versus: ``"ref"`` or ``"rhe"``.
+        WE_versus: ``"ref"``, ``"rhe"`` or ``"ocv"``.
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH.
         WE_potential_init__V: Initial potential (V).
@@ -1277,9 +1298,10 @@ def ANEC_sub_photo_CV(
         toggle_illum_duty: Illumination duty cycle.
         toggle_illum_period: Toggle period (s).
         toggle_illum_time: Total toggle duration (s); ``-1`` matches the CV.
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Raises:
-        ValueError: If ``WE_versus`` is not ``"ref"`` or ``"rhe"``.
+        ValueError: If ``WE_versus`` is not ``"ref"``, ``"rhe"`` or ``"ocv"``.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -1308,7 +1330,6 @@ def ANEC_sub_photo_CV(
                 ref_offset__V,
                 pH,
                 ref_type,
-                "potential_init_vsRef",
             ),
             "Vapex1__V": _anec_vs_ref(
                 WE_potential_apex1__V, WE_versus, ref_offset__V, pH, ref_type
@@ -1325,6 +1346,7 @@ def ANEC_sub_photo_CV(
             "TTLwait": gamrychannelwait,
             "TTLsend": gamrychannelsend,
             "IErange": IErange,
+            **_anec_ocv_params(WE_versus, OCV_duration__s),
         },
         "CV",
         toggle=(
@@ -1465,7 +1487,7 @@ def ANEC_sub_HPLCLiquid_analysis(
     return apm.planned_actions
 
 
-@experiment(version=1)
+@experiment(version=2)
 def ANEC_sub_photo_LSV(
     WE_versus: str = "ref",
     ref_type: str = "leakless",
@@ -1487,6 +1509,7 @@ def ANEC_sub_photo_LSV(
     toggle_illum_duty: float = 0.5,
     toggle_illum_period: float = 2.0,
     toggle_illum_time: float = -1,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Run a linear sweep voltammetry (LSV) experiment with hardware-triggered LED toggling.
 
@@ -1496,7 +1519,7 @@ def ANEC_sub_photo_LSV(
     digital cycle.
 
     Args:
-        WE_versus: ``"ref"`` or ``"rhe"``.
+        WE_versus: ``"ref"``, ``"rhe"`` or ``"ocv"``.
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH.
         WE_potential_init__V: Initial potential (V).
@@ -1516,9 +1539,10 @@ def ANEC_sub_photo_LSV(
         toggle_illum_duty: Illumination duty cycle.
         toggle_illum_period: Toggle period (s).
         toggle_illum_time: Total toggle duration (s); ``-1`` matches the sweep.
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Raises:
-        ValueError: If ``WE_versus`` is not ``"ref"`` or ``"rhe"``.
+        ValueError: If ``WE_versus`` is not ``"ref"``, ``"rhe"`` or ``"ocv"``.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -1534,7 +1558,6 @@ def ANEC_sub_photo_LSV(
             ref_offset__V,
             pH,
             ref_type,
-            "potential_init_vsRef",
         ),
         "Vfinal__V": _anec_vs_ref(
             WE_potential_apex1__V, WE_versus, ref_offset__V, pH, ref_type
@@ -1544,6 +1567,7 @@ def ANEC_sub_photo_LSV(
         "TTLwait": gamrychannelwait,
         "TTLsend": gamrychannelsend,
         "IErange": IErange,
+        **_anec_ocv_params(WE_versus, OCV_duration__s),
     }
     return _anec_run(
         apm,

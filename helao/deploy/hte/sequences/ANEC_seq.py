@@ -128,6 +128,7 @@ def _anec_seq_cell(
                 {
                     "WE_potential__V": potential,
                     "WE_versus": p["WE_versus"],
+                    "OCV_duration__s": p["OCV_duration__s"],
                     "ref_type": p["ref_type"],
                     "pH": p["pH"],
                     "ref_offset__V": p["ref_offset__V"],
@@ -142,6 +143,7 @@ def _anec_seq_cell(
                 {
                     "WE_potential__V": potential,
                     "WE_versus": p["WE_versus"],
+                    "OCV_duration__s": p["OCV_duration__s"],
                     "ref_type": p["ref_type"],
                     "pH": p["pH"],
                     "ref_offset__V": p["ref_offset__V"],
@@ -157,6 +159,7 @@ def _anec_seq_cell(
                 {
                     "WE_potential__V": potential,
                     "WE_versus": p["WE_versus"],
+                    "OCV_duration__s": p["OCV_duration__s"],
                     "ref_type": p["ref_type"],
                     "pH": p["pH"],
                     "ref_offset__V": p["ref_offset__V"],
@@ -186,6 +189,7 @@ def _anec_seq_cell(
                 "ANEC_sub_CV",
                 {
                     "WE_versus": p["WE_versus"],
+                    "OCV_duration__s": p["OCV_duration__s"],
                     "ref_type": p["ref_type"],
                     "ref_offset__V": p["ref_offset"],
                     "pH": p["pH"],
@@ -204,6 +208,7 @@ def _anec_seq_cell(
                 "ANEC_sub_photo_CV",
                 {
                     "WE_versus": p["WE_versus"],
+                    "OCV_duration__s": p["OCV_duration__s"],
                     "ref_type": p["ref_type"],
                     "ref_offset__V": p["ref_offset"],
                     "pH": p["pH"],
@@ -329,6 +334,7 @@ def _anec_seq_ferricyanide(simple, **p):
             "ANEC_sub_HeatCV",
             {
                 "WE_versus": p["WE_versus"],
+                "OCV_duration__s": p["OCV_duration__s"],
                 "ref_type": p["ref_type"],
                 "pH": p["pH"],
                 "WE_potential_init__V": p["WE_potential_init__V"],
@@ -348,6 +354,7 @@ def _anec_seq_ferricyanide(simple, **p):
                 {
                     "WE_potential__V": p["WE_potential__V"],
                     "WE_versus": p["WE_versus"],
+                    "OCV_duration__s": p["OCV_duration__s"],
                     "ref_type": p["ref_type"],
                     "pH": p["pH"],
                     "ref_offset__V": p["ref_offset__V"],
@@ -364,7 +371,7 @@ def _anec_seq_ferricyanide(simple, **p):
     return epm.planned_experiments
 
 
-@sequence(version=3)
+@sequence(version=4)
 def ANEC_sample_ready(
     num_repeats: int = 1,
     plate_id: int = 4534,
@@ -381,6 +388,7 @@ def ANEC_sample_ready(
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
     liquidDrain_time: float = 80.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Sample-ready sequence: startup, clean cell, then loop fill/CA/drain.
 
@@ -404,6 +412,7 @@ def ANEC_sample_ready(
         IErange: Gamry current range string.
         ref_offset__V: Reference electrode offset (V).
         liquidDrain_time: Drain duration (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -413,7 +422,7 @@ def ANEC_sample_ready(
     )
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ANEC_series_CA(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -436,6 +445,7 @@ def ANEC_series_CA(
     wash2: bool = True,
     wash3: bool = True,
     wash4: bool = False,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """CA series at each potential in ``WE_potential__V`` with GC+archive aliquots.
 
@@ -467,6 +477,7 @@ def ANEC_series_CA(
         wash2: Enable wash position 2.
         wash3: Enable wash position 3.
         wash4: Enable wash position 4.
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -476,7 +487,7 @@ def ANEC_series_CA(
     )
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ANEC_series_CAliquidOnly(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -497,6 +508,7 @@ def ANEC_series_CAliquidOnly(
     wash2: bool = True,
     wash3: bool = True,
     wash4: bool = False,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """CA series with liquid-only archive aliquots (no GC).
 
@@ -524,6 +536,7 @@ def ANEC_series_CAliquidOnly(
         wash2: Enable wash position 2.
         wash3: Enable wash position 3.
         wash4: Enable wash position 4.
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -572,7 +585,7 @@ def ANEC_OCV(
     return _anec_seq_cell(**locals(), tech="OCV", loop="once", sampling="liquidarchive")
 
 
-@sequence(version=4)
+@sequence(version=5)
 def ANEC_photo_CA(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -607,6 +620,7 @@ def ANEC_photo_CA(
     wash4: bool = False,
     liquid_flush_time: float = 60.0,
     liquidDrain_time: float = 80.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Photo-CA series: load sample, fill, run photo-CA at each potential with aliquots, then drain.
 
@@ -646,6 +660,7 @@ def ANEC_photo_CA(
         wash4: Whether to run wash step 4.
         liquid_flush_time: Duration of the liquid flush (s).
         liquidDrain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -655,7 +670,7 @@ def ANEC_photo_CA(
     )
 
 
-@sequence(version=4)
+@sequence(version=5)
 def ANEC_photo_CAgasonly(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -684,6 +699,7 @@ def ANEC_photo_CAgasonly(
     volume_ul_GC: int = 300,
     liquid_flush_time: float = 60.0,
     liquidDrain_time: float = 80.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Photo-CA series taking only the GC (headspace) aliquot per cycle.
 
@@ -717,6 +733,7 @@ def ANEC_photo_CAgasonly(
         volume_ul_GC: Volume sampled for gas chromatography (µL).
         liquid_flush_time: Duration of the liquid flush (s).
         liquidDrain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -730,7 +747,7 @@ def ANEC_photo_CAgasonly(
     )
 
 
-@sequence(version=3)
+@sequence(version=4)
 def ANEC_photo_CV(
     WE_versus: str = "ref",
     ref_type: str = "leakless",
@@ -762,6 +779,7 @@ def ANEC_photo_CV(
     toggleCA_illum_time: float = -1,
     liquid_flush_time: float = 60.0,
     liquidDrain_time: float = 80.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Photo-CV at the cell1_we position with optional LED toggle.
 
@@ -798,6 +816,7 @@ def ANEC_photo_CV(
         toggleCA_illum_time: Toggled chronoamperometry illumination time.
         liquid_flush_time: Duration of the liquid flush (s).
         liquidDrain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -827,7 +846,7 @@ def ANEC_cleanup_disengage() -> list:
     return epm.planned_experiments
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ANEC_CA_pretreat(
     num_repeats: int = 1,
     plate_id: int = 4534,
@@ -844,6 +863,7 @@ def ANEC_CA_pretreat(
     ref_offset__V: float = 0.0,
     liquid_flush_time: float = 70.0,
     liquidDrain_time: float = 50.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Pre-treat the cell at a single CA potential then drain.
 
@@ -865,6 +885,7 @@ def ANEC_CA_pretreat(
         ref_offset__V: Reference-electrode potential offset (V).
         liquid_flush_time: Duration of the liquid flush (s).
         liquidDrain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -872,7 +893,7 @@ def ANEC_CA_pretreat(
     return _anec_seq_cell(**locals(), tech="CA", loop="repeat")
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ANEC_CA_DOE_demo(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -893,6 +914,7 @@ def ANEC_CA_DOE_demo(
     wash3: bool = True,
     wash4: bool = False,
     liquidDrain_time: float = 60.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """DOE-style CA at a single point with optional headspace and archive aliquots.
 
@@ -918,6 +940,7 @@ def ANEC_CA_DOE_demo(
         wash3: Whether to run wash step 3.
         wash4: Whether to run wash step 4.
         liquidDrain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -927,7 +950,7 @@ def ANEC_CA_DOE_demo(
     )
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ANEC_CA_DOE_demo_headspace(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -942,6 +965,7 @@ def ANEC_CA_DOE_demo_headspace(
     toolGC: str = "HS 2",
     volume_ul_GC: int = 300,
     liquidDrain_time: float = 60.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """DOE-style CA producing only a GC headspace aliquot.
 
@@ -961,6 +985,7 @@ def ANEC_CA_DOE_demo_headspace(
         toolGC: PAL tool used for gas-chromatograph sampling.
         volume_ul_GC: Volume sampled for gas chromatography (µL).
         liquidDrain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -974,7 +999,7 @@ def ANEC_CA_DOE_demo_headspace(
     )
 
 
-@sequence(version=3)
+@sequence(version=4)
 def ANEC_repeat_CA(
     num_repeats: int = 1,
     plate_id: int = 4534,
@@ -999,6 +1024,7 @@ def ANEC_repeat_CA(
     wash4: bool = False,
     liquid_flush_time: float = 70.0,
     liquidDrain_time: float = 60.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Repeat a single-potential CA followed by aliquot+drain.
 
@@ -1028,6 +1054,7 @@ def ANEC_repeat_CA(
         wash4: Whether to run wash step 4.
         liquid_flush_time: Duration of the liquid flush (s).
         liquidDrain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -1035,7 +1062,7 @@ def ANEC_repeat_CA(
     return _anec_seq_cell(**locals(), tech="CA", loop="repeat", sampling="aliquot")
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ANEC_repeat_TentHeatCAgasonly(
     num_repeats: int = 1,
     plate_id: int = 6284,
@@ -1055,6 +1082,7 @@ def ANEC_repeat_TentHeatCAgasonly(
     liquid_flush_time: float = 70.0,
     liquidDrain_time: float = 60.0,
     target_temperature_degc: float = 25.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Repeated tent-heated CA with GC headspace aliquots.
 
@@ -1079,6 +1107,7 @@ def ANEC_repeat_TentHeatCAgasonly(
         liquid_flush_time: Duration of the liquid flush (s).
         liquidDrain_time: Duration of the liquid drain (s).
         target_temperature_degc: Target temperature (°C).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -1128,7 +1157,7 @@ def ANEC_heatOCV(
     )
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ANEC_repeat_TentHeatCA(
     num_repeats: int = 1,
     plate_id: int = 6284,
@@ -1154,6 +1183,7 @@ def ANEC_repeat_TentHeatCA(
     liquid_flush_time: float = 70.0,
     liquidDrain_time: float = 80.0,
     target_temperature_degc: float = 25.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Repeated tent-heated CA with combined GC+archive aliquots.
 
@@ -1184,6 +1214,7 @@ def ANEC_repeat_TentHeatCA(
         liquid_flush_time: Duration of the liquid flush (s).
         liquidDrain_time: Duration of the liquid drain (s).
         target_temperature_degc: Target temperature (°C).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -1198,7 +1229,7 @@ def ANEC_repeat_TentHeatCA(
     )
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ANEC_repeat_HeatCA(
     num_repeats: int = 1,
     plate_id: int = 4534,
@@ -1224,6 +1255,7 @@ def ANEC_repeat_HeatCA(
     liquid_flush_time: float = 70.0,
     liquidDrain_time: float = 80.0,
     target_temperature_degc: float = 25.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Repeated heated CA without the tent step.
 
@@ -1254,6 +1286,7 @@ def ANEC_repeat_HeatCA(
         liquid_flush_time: Duration of the liquid flush (s).
         liquidDrain_time: Duration of the liquid drain (s).
         target_temperature_degc: Target temperature (°C).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -1261,7 +1294,7 @@ def ANEC_repeat_HeatCA(
     return _anec_seq_cell(**locals(), tech="HeatCA", loop="repeat", sampling="aliquot")
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ANEC_gasonly_CA(
     num_repeats: int = 1,
     plate_id: int = 4534,
@@ -1280,6 +1313,7 @@ def ANEC_gasonly_CA(
     volume_ul_GC: int = 300,
     liquid_flush_time: float = 70.0,
     liquidDrain_time: float = 60.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Single CA producing only a gas-phase (GC) aliquot.
 
@@ -1303,6 +1337,7 @@ def ANEC_gasonly_CA(
         volume_ul_GC: Volume sampled for gas chromatography (µL).
         liquid_flush_time: Duration of the liquid flush (s).
         liquidDrain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -1312,7 +1347,7 @@ def ANEC_gasonly_CA(
     )
 
 
-@sequence(version=3)
+@sequence(version=4)
 def ANEC_repeat_CV(
     WE_versus: str = "ref",
     ref_type: str = "leakless",
@@ -1332,6 +1367,7 @@ def ANEC_repeat_CV(
     IErange: str = "auto",
     ref_offset: float = 0.0,
     liquidDrain_time: float = 80.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Repeated CV scans with optional aliquots between repeats.
 
@@ -1356,6 +1392,7 @@ def ANEC_repeat_CV(
         IErange: Potentiostat current (I/E) range setting.
         ref_offset: Reference-electrode potential offset (V).
         liquidDrain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -1363,7 +1400,7 @@ def ANEC_repeat_CV(
     return _anec_seq_cell(**locals(), tech="CV", loop="repeat")
 
 
-@sequence(version=3)
+@sequence(version=4)
 def ANEC_ferricyanide_simpleprotocol(
     num_repeats: int = 1,
     plate_id: int = 5740,
@@ -1386,6 +1423,7 @@ def ANEC_ferricyanide_simpleprotocol(
     Cycles: int = 1,
     SampleRate_CV: float = 0.1,
     target_temperature_degc: float = 25.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Simple ferricyanide diagnostic protocol.
 
@@ -1413,6 +1451,7 @@ def ANEC_ferricyanide_simpleprotocol(
         Cycles: Number of cycles to repeat.
         SampleRate_CV: Cyclic-voltammetry data acquisition sample rate.
         target_temperature_degc: Target temperature (°C).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
@@ -1420,7 +1459,7 @@ def ANEC_ferricyanide_simpleprotocol(
     return _anec_seq_ferricyanide(**locals(), simple=True)
 
 
-@sequence(version=3)
+@sequence(version=4)
 def ANEC_ferricyanide_protocol(
     plate_id: int = 5740,
     solid_sample_no: int = 1,
@@ -1444,6 +1483,7 @@ def ANEC_ferricyanide_protocol(
     liquidDrain_time: float = 80.0,
     target_temperature_degc: list[float] = [25.0],
     CV_only: str = "yes",
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Full ferricyanide validation protocol with multi-step CA/CV.
 
@@ -1472,6 +1512,7 @@ def ANEC_ferricyanide_protocol(
         liquidDrain_time: Duration of the liquid drain (s).
         target_temperature_degc: Target temperature (°C).
         CV_only: Whether to run only the cyclic-voltammetry step.
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
