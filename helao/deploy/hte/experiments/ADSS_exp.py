@@ -9,7 +9,6 @@ Action targets are referenced by ``server_key`` strings (``PSTAT``,
 """
 
 EXPERIMENTS = [
-    #    "ADSS_sub_abs_move",
     "ADSS_sub_add_liquid",
     "ADSS_sub_CA",  # latest
     "ADSS_sub_CA_photo",
@@ -45,12 +44,9 @@ EXPERIMENTS = [
     "ADSS_sub_PAL_tray_to_tray",
     "ADSS_sub_recirculate",
     "ADSS_sub_refill_syringe",
-    #    "ADSS_sub_rel_move",
     "ADSS_sub_remove_bubble",
     "ADSS_sub_sample_aliquot",
-    #    "ADSS_sub_sample_start",
     "ADSS_sub_shutdown",
-    #    "ADSS_sub_stopheat",
     "ADSS_sub_transfer_liquid_in",
     "ADSS_sub_tray_icpms_export",
     "ADSS_sub_tray_unload",
@@ -570,57 +566,6 @@ def ADSS_sub_move_to_sample(
     apm.add(MOTOR_server, "z_move", {"z_position": "seal"})
 
     return apm.planned_actions  # returns complete action list to orch
-
-
-@experiment(version=4)
-def ADSS_sub_sample_start(
-    solid_custom_position: str = "cell1_we",
-    solid_plate_id: int = 4534,
-    solid_sample_no: int = 1,
-    #    x_mm: float = 0.0,
-    #    y_mm: float = 0.0,
-    previous_liquid: bool = False,
-    liquid_custom_position: str = "cell1_we",
-    liquid_sample_no: int = 1,
-    liquid_sample_volume_ul: float = 4000,
-) -> list:
-    """Full sample start: unload, load solid+liquid, move to position, seal cell.
-
-    Wraps ``ADSS_sub_load`` then turns the pump off (forward direction), lifts
-    Z to load, moves to the plate XY for the sample, and lowers to seal.
-
-    Args:
-        solid_custom_position: PAL custom position for the solid.
-        solid_plate_id: Plate identifier of the legacy solid sample.
-        solid_sample_no: Sample index on the plate.
-        previous_liquid: Reuse the previously unloaded liquid if True.
-        liquid_custom_position: Target PAL custom position for the liquid.
-        liquid_sample_no: Liquid sample number on this host.
-        liquid_sample_volume_ul: Liquid volume to add in microliters.
-
-    Returns:
-        List of planned actions for the orchestrator.
-    """
-    apm = ActionPlanMaker()
-    apm.add_actions(
-        ADSS_sub_load(
-            solid_custom_position=solid_custom_position,
-            solid_plate_id=solid_plate_id,
-            solid_sample_no=solid_sample_no,
-            previous_liquid=previous_liquid,
-            liquid_custom_position=liquid_custom_position,
-            liquid_sample_no=liquid_sample_no,
-            liquid_sample_volume_ul=liquid_sample_volume_ul,
-        )
-    )
-    apm.add_actions(
-        ADSS_sub_move_to_sample(
-            solid_custom_position=solid_custom_position,
-            solid_plate_id=solid_plate_id,
-            solid_sample_no=solid_sample_no,
-        )
-    )
-    return apm.planned_actions
 
 
 @experiment(version=1)
@@ -1838,78 +1783,6 @@ def ADSS_sub_z_move(
 
 
 @experiment(version=1)
-def ADSS_sub_rel_move(
-    offset_x_mm: float = 1.0,
-    offset_y_mm: float = 1.0,
-    offset_z_mm: float = 0.0,
-) -> list:
-    """Move the motor X/Y/Z axes by relative offsets (platexy transformation).
-
-    Args:
-        offset_x_mm: Relative X displacement (mm).
-        offset_y_mm: Relative Y displacement (mm).
-        offset_z_mm: Relative Z displacement (mm).
-
-    Returns:
-        List of planned actions for the orchestrator.
-    """
-
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
-    # move to position
-    apm.add(
-        MOTOR_server,
-        "move",
-        {
-            "d_mm": [offset_x_mm, offset_y_mm, offset_z_mm],
-            "axis": ["x", "y", "z"],
-            "mode": MoveModes.relative,
-            "transformation": TransformationModes.platexy,
-        },
-        #            "from_global_act_params": {"_platexy": "d_mm"},
-        start_condition=ActionStartCondition.wait_for_all,
-    )
-
-    return apm.planned_actions  # returns complete action list to orch
-
-
-@experiment(version=1)
-def ADSS_sub_abs_move(
-    x_mm: float = 80.0,
-    y_mm: float = 50.0,
-    #    offset_z_mm: float = 0.0,
-) -> list:
-    """Lift Z to load and move X/Y to an absolute position (platexy frame).
-
-    Args:
-        x_mm: Absolute X position (mm).
-        y_mm: Absolute Y position (mm).
-
-    Returns:
-        List of planned actions for the orchestrator.
-    """
-
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
-    apm.add(MOTOR_server, "z_move", {"z_position": "load"})
-    # move to position
-    apm.add(
-        MOTOR_server,
-        "move",
-        {
-            "d_mm": [x_mm, y_mm],
-            "axis": ["x", "y"],
-            "mode": MoveModes.absolute,
-            "transformation": TransformationModes.platexy,
-        },
-        #            "from_global_act_params": {"_platexy": "d_mm"},
-        start_condition=ActionStartCondition.wait_for_all,
-    )
-
-    return apm.planned_actions  # returns complete action list to orch
-
-
-@experiment(version=1)
 def ADSS_sub_heat(
     duration_hrs: float = 2.0,
     celltemp_min_C: float = 74.5,
@@ -1951,29 +1824,6 @@ def ADSS_sub_heat(
         process_contrib=[
             ProcessContrib.files,
         ],
-    )
-    return apm.planned_actions  # returns complete action list to orch
-
-
-@experiment(version=1)
-def ADSS_sub_stopheat() -> list:
-    """Stop the heat loop and the monitoring loop.
-
-    Returns:
-        List of planned actions for the orchestrator.
-    """
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
-    apm.add(
-        NI_server,
-        "heatloopstop",
-        {},
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-    )
-    apm.add(
-        NI_server,
-        "monloopstop",
-        {},
     )
     return apm.planned_actions  # returns complete action list to orch
 
@@ -2905,46 +2755,6 @@ def ADSS_sub_PAL_tray_to_tray(
             "wash2": rinse_2,
             "wash3": rinse_3,
             "wash4": rinse_4,
-        },
-    )
-
-    return apm.planned_actions  # returns complete action list to orch
-
-
-@experiment(version=1)
-def ADSS_sub_PAL_export_icpms(
-    tray: int = 2,
-    slot: int = 1,
-    survey_runs: int = 1,
-    main_runs: int = 3,
-    rack: int = 2,
-    dilution_factor: float = 10,
-) -> list:
-    """Export a PAL tray slot to ICPMS without unloading it.
-
-    Args:
-        tray: PAL tray index.
-        slot: PAL slot index.
-        survey_runs: ICPMS rough sweep count.
-        main_runs: ICPMS centered sweeps count.
-        rack: ICPMS rack position.
-        dilution_factor: Sample dilution factor.
-
-    Returns:
-        List of planned actions for the orchestrator.
-    """
-    apm = ActionPlanMaker()
-
-    apm.add(
-        SAMPLE_server,
-        "archive_tray_export_icpms",
-        {
-            "tray": tray,
-            "slot": slot,
-            "survey_runs": survey_runs,
-            "main_runs": main_runs,
-            "rack": rack,
-            "dilution_factor": dilution_factor,
         },
     )
 

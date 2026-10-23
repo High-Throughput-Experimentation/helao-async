@@ -438,7 +438,7 @@ def _adss_move_clean_cell_prefill_nosampleload(
     )
 
 
-@sequence(version=9)
+@sequence(version=10)
 def ADSS_CA_cell_1potential(
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
@@ -770,10 +770,18 @@ def ADSS_CA_cell_1potential(
         )
     if refill:
         epm.add(
-            "ADSS_sub_refill_syringes",
+            "ADSS_sub_refill_syringe",
             {
-                "Waterclean_volume_ul": water_refill_volume_ul,
-                "Solution_volume_ul": refill_volume_ul,
+                "syringe": "waterclean",
+                "fill_volume_ul": water_refill_volume_ul,
+                "Syringe_rate_ulsec": 300,
+            },
+        )
+        epm.add(
+            "ADSS_sub_refill_syringe",
+            {
+                "syringe": "electrolyte",
+                "fill_volume_ul": refill_volume_ul,
                 "Syringe_rate_ulsec": 300,
             },
         )
@@ -785,7 +793,7 @@ def ADSS_CA_cell_1potential(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=6)
+@sequence(version=7)
 def ADSS_PA_CVs_CAs_cell(
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
@@ -1019,10 +1027,18 @@ def ADSS_PA_CVs_CAs_cell(
         )
     if refill:
         epm.add(
-            "ADSS_sub_refill_syringes",
+            "ADSS_sub_refill_syringe",
             {
-                "Waterclean_volume_ul": water_refill_volume_ul,
-                "Solution_volume_ul": refill_volume_ul,
+                "syringe": "waterclean",
+                "fill_volume_ul": water_refill_volume_ul,
+                "Syringe_rate_ulsec": 300,
+            },
+        )
+        epm.add(
+            "ADSS_sub_refill_syringe",
+            {
+                "syringe": "electrolyte",
+                "fill_volume_ul": refill_volume_ul,
                 "Syringe_rate_ulsec": 300,
             },
         )
@@ -1341,318 +1357,6 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
                     "DrainWait_s": Clean_drain_s,
                 },
             )
-
-    return epm.planned_experiments  # returns complete experiment list
-
-
-@sequence(version=3)
-def ADSS_CA_cell_multipotential(
-    # solid_custom_position: str = "cell1_we",
-    plate_id: int = 5917,
-    plate_sample_no: int = 14050,  #  instead of map select
-    same_sample: bool = False,
-    stay_sample: bool = False,
-    # liquid_custom_position: str = "elec_res1",
-    liquid_sample_no: int = 220,
-    liquid_sample_volume_ul: float = 4000,
-    CA_potentials_vs: list[float] = [-0.5, 0.0, 0.5, 1.0],
-    potential_versus: str = "oer",
-    ph: float = 9.53,
-    ref_type: str = "leakless",
-    ref_offset__V: float = 0.0,
-    CA_duration_sec: float = 1320,
-    aliquot_times_sec: list[float] = [60, 600, 1140],
-    aliquot_volume_ul: int = 200,
-    OCV_duration: float = 60,
-    OCValiquot_times_sec: list[float] = [20],
-    samplerate_sec: float = 1,
-    led_illumination: bool = False,
-    led_dutycycle: float = 1,
-    led_wavelength: str = "385",
-    Syringe_rate_ulsec: float = 300,
-    Cell_draintime_s: float = 60,
-    ReturnLineWait_s: float = 30,
-    ReturnLineReverseWait_s: float = 3,
-    ResidualWait_s: float = 15,
-    flush_volume_ul: float = 2000,
-    clean: bool = False,
-    clean_volume_ul: float = 5000,
-    refill: bool = False,
-    refill_volume_ul: float = 6000,
-    water_refill_volume_ul: float = 6000,
-    PAL_Injector: str = "LS 4",
-    PAL_Injector_id: str = "LS4_newsyringe040923",
-) -> list:
-    """Run an OCV/CA/OCV cycle at each potential in ``CA_potentials_vs``.
-
-    Loads the sample (or uses the same one), fills the cell, then for each
-    potential adds OCV before, CA at the potential, and OCV after. The
-    ``led_illumination`` flag selects the ``*_photo`` variants. After the
-    measurement the cell is drained and optionally flushed/cleaned/refilled.
-
-    Args:
-        plate_id: Plate id of the solid sample.
-        plate_sample_no: Sample number on the plate.
-        same_sample: Skip the move-to-sample step.
-        stay_sample: Flush+drain after the experiment.
-        liquid_sample_no: Reservoir liquid sample number.
-        liquid_sample_volume_ul: Cell fill volume (uL).
-        CA_potentials_vs: CA potentials to sweep through (V).
-        potential_versus: Frame label for CAs (``"oer"``/``"rhe"``).
-        ph: Solution pH.
-        ref_type: Reference electrode type label.
-        ref_offset__V: Reference electrode offset (V).
-        CA_duration_sec: CA hold duration (s) for each potential.
-        aliquot_times_sec: CA-relative aliquot timestamps (s).
-        aliquot_volume_ul: Aliquot volume (uL).
-        OCV_duration: OCV duration (s) before and after each CA.
-        OCValiquot_times_sec: OCV-relative aliquot timestamps (s).
-        samplerate_sec: Sample interval (s).
-        led_illumination: Use photo-CA/OCV variants when True.
-        led_dutycycle: LED toggle duty cycle (0-1).
-        led_wavelength: LED wavelength string.
-        Syringe_rate_ulsec: Syringe rate (uL/s).
-        Cell_draintime_s: Drain duration (s).
-        ReturnLineWait_s: Forward return-line wait (s).
-        ReturnLineReverseWait_s: Reverse return-line wait (s).
-        ResidualWait_s: Passthrough residual wait (s).
-        flush_volume_ul: Flush volume (uL) when ``stay_sample`` is True.
-        clean: Move-to-clean-cell and clean.
-        clean_volume_ul: Cleaning volume (uL).
-        refill: Refill syringes at end.
-        refill_volume_ul: Refill volume for working solution (uL).
-        water_refill_volume_ul: Refill volume for water (uL).
-        PAL_Injector: PAL injector key.
-        PAL_Injector_id: PAL injector identifier.
-
-    Returns:
-        List of planned experiments to dispatch.
-    """
-
-    epm = ExperimentPlanMaker()
-
-    # for solid_sample_no in plate_sample_no_list:  # have to indent add expts if used
-
-    if same_sample:
-        epm.add(
-            "ADSS_sub_load",
-            {
-                "solid_custom_position": "cell1_we",
-                "solid_plate_id": plate_id,
-                "solid_sample_no": plate_sample_no,
-                "liquid_custom_position": "cell1_we",
-                "liquid_sample_no": liquid_sample_no,
-                "liquid_sample_volume_ul": liquid_sample_volume_ul,
-            },
-        )
-    else:
-        epm.add(
-            "ADSS_sub_sample_start",
-            {
-                "solid_custom_position": "cell1_we",
-                "solid_plate_id": plate_id,
-                "solid_sample_no": plate_sample_no,
-                "liquid_custom_position": "cell1_we",
-                "liquid_sample_no": liquid_sample_no,
-                "liquid_sample_volume_ul": liquid_sample_volume_ul,
-            },
-        )
-    if led_illumination:
-        epm.add(
-            "ADSS_sub_cell_illumination",
-            {
-                "led_wavelength": led_wavelength,
-                "illumination_on": led_illumination,
-            },
-        )
-    epm.add(
-        "ADSS_sub_cellfill_prefilled",
-        {
-            "Solution_volume_ul": liquid_sample_volume_ul,
-            "Syringe_rate_ulsec": Syringe_rate_ulsec,
-        },
-    )
-    # redundant?
-    # epm.add(
-    #     "ADSS_sub_load_liquid",
-    #     {
-    #         "liquid_custom_position": liquid_custom_position,
-    #         "liquid_sample_no": liquid_sample_no,
-    #     }
-    # )
-    # epm.add(
-    #     "ADSS_sub_load_solid",
-    #     {
-    #         "solid_custom_position": solid_custom_position,
-    #         "solid_plate_id": plate_id,
-    #         "solid_sample_no": plate_sample_no,
-    #     }
-    # )
-    epm.add("ADSS_sub_recirculate", {})
-
-    for CA_potential_vs in CA_potentials_vs:
-        if led_illumination:
-
-            epm.add(
-                "ADSS_sub_OCV_photo",
-                {
-                    "Tval__s": OCV_duration,
-                    "samplerate_sec": samplerate_sec,
-                    "ph": ph,
-                    "ref_type": ref_type,
-                    "ref_offset__V": ref_offset__V,
-                    "led_wavelength": led_wavelength,
-                    "toggle_illum_duty": led_dutycycle,
-                    "aliquot_volume_ul": aliquot_volume_ul,
-                    "aliquot_times_sec": OCValiquot_times_sec,
-                    "aliquot_insitu": True,
-                    "PAL_Injector": PAL_Injector,
-                    "PAL_Injector_id": PAL_Injector_id,
-                    "rinse_1": 1,
-                },
-            )
-            epm.add(
-                "ADSS_sub_CA_photo",
-                {
-                    "CA_potential": CA_potential_vs,
-                    "ph": ph,
-                    "ref_type": ref_type,
-                    "ref_offset__V": ref_offset__V,
-                    "potential_versus": potential_versus,
-                    "samplerate_sec": samplerate_sec,
-                    "CA_duration_sec": CA_duration_sec,
-                    "led_wavelength": led_wavelength,
-                    "toggle_illum_duty": led_dutycycle,
-                    "aliquot_volume_ul": aliquot_volume_ul,
-                    "aliquot_times_sec": aliquot_times_sec,
-                    "aliquot_insitu": True,
-                    "PAL_Injector": PAL_Injector,
-                    "PAL_Injector_id": PAL_Injector_id,
-                },
-            )
-            epm.add(
-                "ADSS_sub_OCV_photo",
-                {
-                    "Tval__s": OCV_duration,
-                    "samplerate_sec": samplerate_sec,
-                    "ph": ph,
-                    "ref_type": ref_type,
-                    "ref_offset__V": ref_offset__V,
-                    "led_wavelength": led_wavelength,
-                    "toggle_illum_duty": led_dutycycle,
-                    "aliquot_volume_ul": aliquot_volume_ul,
-                    "aliquot_times_sec": OCValiquot_times_sec,
-                    "aliquot_insitu": True,
-                    "PAL_Injector": PAL_Injector,
-                    "PAL_Injector_id": PAL_Injector_id,
-                    "rinse_1": 0,
-                    "rinse_4": 1,
-                },
-            )
-            epm.add(
-                "ADSS_sub_cell_illumination",
-                {
-                    "led_wavelength": led_wavelength,
-                    "illumination_on": False,
-                },
-            )
-        else:
-
-            epm.add(
-                "ADSS_sub_OCV",
-                {
-                    "Tval__s": OCV_duration,
-                    "samplerate_sec": samplerate_sec,
-                    "ph": ph,
-                    "ref_type": ref_type,
-                    "ref_offset__V": ref_offset__V,
-                    "aliquot_volume_ul": aliquot_volume_ul,
-                    "aliquot_times_sec": OCValiquot_times_sec,
-                    "aliquot_insitu": True,
-                    "PAL_Injector": PAL_Injector,
-                    "PAL_Injector_id": PAL_Injector_id,
-                    "rinse_1": 1,
-                },
-            )
-            epm.add(
-                "ADSS_sub_CA",
-                {
-                    "CA_potential": CA_potential_vs,
-                    "ph": ph,
-                    "ref_type": ref_type,
-                    "ref_offset__V": ref_offset__V,
-                    "potential_versus": potential_versus,
-                    "samplerate_sec": samplerate_sec,
-                    "CA_duration_sec": CA_duration_sec,
-                    "aliquot_volume_ul": aliquot_volume_ul,
-                    "aliquot_times_sec": aliquot_times_sec,
-                    "aliquot_insitu": True,
-                    "PAL_Injector": PAL_Injector,
-                    "PAL_Injector_id": PAL_Injector_id,
-                },
-            )
-            epm.add(
-                "ADSS_sub_OCV",
-                {
-                    "Tval__s": OCV_duration,
-                    "samplerate_sec": samplerate_sec,
-                    "ph": ph,
-                    "ref_type": ref_type,
-                    "ref_offset__V": ref_offset__V,
-                    "aliquot_volume_ul": aliquot_volume_ul,
-                    "aliquot_times_sec": OCValiquot_times_sec,
-                    "aliquot_insitu": True,
-                    "PAL_Injector": PAL_Injector,
-                    "PAL_Injector_id": PAL_Injector_id,
-                    "rinse_1": 0,
-                    "rinse_4": 1,
-                },
-            )
-
-    epm.add(
-        "ADSS_sub_drain_cell",
-        {
-            "DrainWait_s": Cell_draintime_s,
-            "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-            #    "ResidualWait_s": ResidualWait_s,
-        },
-    )
-    if stay_sample:
-        _adss_flush_drain_cell(
-            epm,
-            flush_volume_ul,
-            Syringe_rate_ulsec,
-            ReturnLineWait_s,
-            Cell_draintime_s,
-            ReturnLineReverseWait_s,
-        )
-    epm.add("ADSS_sub_unload_liquid", {})
-
-    epm.add("ADSS_sub_unloadall_customs", {})
-
-    if clean:
-
-        _adss_move_clean_cell_with_return_line(
-            epm,
-            clean_volume_ul,
-            Syringe_rate_ulsec,
-            ReturnLineWait_s,
-            Cell_draintime_s,
-            ReturnLineReverseWait_s,
-        )
-    if refill:
-        epm.add(
-            "ADSS_sub_refill_syringes",
-            {
-                "Waterclean_volume_ul": water_refill_volume_ul,
-                "Solution_volume_ul": refill_volume_ul,
-                "Syringe_rate_ulsec": 300,
-            },
-        )
-
-    #    epm.add("ADSS_sub_tray_unload",{})
-
-    # epm.add("ADSS_sub_shutdown", {})
 
     return epm.planned_experiments  # returns complete experiment list
 

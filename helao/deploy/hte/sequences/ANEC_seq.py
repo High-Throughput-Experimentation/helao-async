@@ -64,7 +64,7 @@ def _anec_seq_cell(
     flush: add ``ANEC_sub_flush_fill_cell`` each iteration
         (flush time ``p["liquid_flush_time"]``, default 80 s).
     setheat: add ``ANEC_sub_setheat`` at the top of each iteration.
-    heatoff: ``None`` | ``"loop"`` (before each drain) | ``"end"`` (after the loop).
+    heatoff: ``None`` | ``"end"`` (after the loop).
     alloff: ``None`` | ``"always"`` | ``"multi"`` (only for >1 potential).
     ready_prefix: prepend startup, normal_state and two cleanups.
     """
@@ -284,8 +284,6 @@ def _anec_seq_cell(
                 {"toolGC": p["toolGC"], "volume_ul_GC": p["volume_ul_GC"]},
             )
 
-        if heatoff == "loop":
-            epm.add("ANEC_sub_heatoff", {})
         epm.add("ANEC_sub_drain_cell", {"drain_time": p["liquidDrain_time"]})
 
     if heatoff == "end":
@@ -976,7 +974,7 @@ def ANEC_CA_DOE_demo_headspace(
     )
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ANEC_repeat_CA(
     num_repeats: int = 1,
     plate_id: int = 4534,
@@ -1034,9 +1032,7 @@ def ANEC_repeat_CA(
     Returns:
         List of planned experiments to dispatch.
     """
-    return _anec_seq_cell(
-        **locals(), tech="CA", loop="repeat", sampling="aliquot", heatoff="loop"
-    )
+    return _anec_seq_cell(**locals(), tech="CA", loop="repeat", sampling="aliquot")
 
 
 @sequence(version=2)
@@ -1483,6 +1479,7 @@ def ANEC_ferricyanide_protocol(
     return _anec_seq_ferricyanide(**locals(), simple=False)
 
 
+@sequence(version=1)
 def ANEC_create_and_load_liquid_sample(
     volume_ml: float = 0.84,
     source: list[str] = ["autoGDE"],

@@ -41,51 +41,6 @@ ALLOWED = {
             "liquid_sample_volume_ul",
         )
     },
-    # ADSS_sub_refill_syringes does not exist in any hte experiment library.
-    (
-        "ADSS_seq.py",
-        "ADSS_CA_cell_1potential",
-        "ADSS_sub_refill_syringes",
-        "<unknown experiment>",
-    ),
-    (
-        "ADSS_seq.py",
-        "ADSS_PA_CVs_CAs_cell",
-        "ADSS_sub_refill_syringes",
-        "<unknown experiment>",
-    ),
-    (
-        "ADSS_seq.py",
-        "ADSS_CA_cell_multipotential",
-        "ADSS_sub_refill_syringes",
-        "<unknown experiment>",
-    ),
-    # CCSI sequences queue experiments that were renamed/removed
-    # (CCSI_sub_liquidfill_syringes -> CCSI_sub_cellfill; full_fill_syringe gone).
-    (
-        "CCSI_seq.py",
-        "CCSI_Solution_testing",
-        "CCSI_sub_full_fill_syringe",
-        "<unknown experiment>",
-    ),
-    (
-        "CCSI_seq.py",
-        "CCSI_Solution_testing_fixed_cleans",
-        "CCSI_sub_liquidfill_syringes",
-        "<unknown experiment>",
-    ),
-    (
-        "CCSI_seq.py",
-        "CCSI_priming",
-        "CCSI_sub_liquidfill_syringes",
-        "<unknown experiment>",
-    ),
-    (
-        "CCSI_seq.py",
-        "CCSI_priming",
-        "CCSI_sub_full_fill_syringe",
-        "<unknown experiment>",
-    ),
     # CCSI key typos / dead keys whose fix would change what actually runs.
     ("CCSI_seq.py", "CCSI_initialization", "CCSI_sub_clean_inject", "initialization"),
     (

@@ -21,6 +21,7 @@ EXPERIMENTS = [
     "ANEC_sub_GC_headspacealiquot_nomixing",
     "ANEC_sub_GC_preparation",
     "ANEC_sub_GCLiquid_analysis",
+    # Heat experiments disabled together with the TEC server (5c006b38).
     # "ANEC_sub_HeatCA",
     # "ANEC_sub_HeatCV",
     # "ANEC_sub_heatoff",
