@@ -1,16 +1,17 @@
-"""Readers and conversion helpers for the HELAO ``.hlo`` data file format.
-
-A ``.hlo`` file is a YAML header followed by a ``%%`` separator line and one
-JSON object per line of data. This module exposes utilities to read both
-header and body, to stream the body in chunks, and to convert a ``.hlo``
-file to Parquet (carrying the optional header as schema metadata).
-``HelaoData`` is lazily re-exported from ``helao.helpers.helao_data``.
+"""Readers for HELAO data files: the legacy ``.hlo`` (YAML header, ``%%``, JSON lines), the current pair ``X.meta.json`` (header) + ``X.jsonl`` (rows), and the S3 ``X.hlo.json`` shape ``{"meta", "data"}``.
+This module exposes utilities to read both header and body, to stream the body
+in chunks, and to convert a data file to Parquet (carrying the optional header
+as schema metadata). ``HelaoData`` is lazily re-exported from
+``helao.helpers.helao_data``.
 """
 
 __all__ = [
     "read_hlo",
     "read_hlo_stream",
     "read_hlo_bytes",
+    "read_hlo_pair_bytes",
+    "resolve_data_file",
+    "read_hlo_via",
     "read_hlo_header",
     "read_hlo_data_chunks",
     "hlo_to_parquet",
@@ -19,10 +20,12 @@ __all__ = [
 ]
 
 import json
+import os
 from collections import defaultdict
+from collections.abc import Callable, Collection
 from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Union
 
 if TYPE_CHECKING:
     from .helao_data import HelaoData
@@ -33,39 +36,75 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from ruamel.yaml import YAML
 
+from helao.hexagon.domain.naming import DATA_SUFFIX, HEADER_SUFFIX, data_sibling
+
 from .yml_tools import yml_load
 
 _yaml = YAML()
+#: Names that denote a data file and may be resolved to their ``.jsonl``/``.hlo``.
+_DATA_NAMES = (".hlo", ".hlo.json", DATA_SUFFIX, HEADER_SUFFIX)
 
 
-def read_hlo(
-    path: str, keep_keys: list = [], omit_keys: list = []
-) -> tuple[dict, dict]:
-    """Read a ``.hlo`` file and return its header and body as dicts.
+def _keep(key, keep_keys, omit_keys) -> bool:
+    """``keep_keys`` wins when given; otherwise ``omit_keys`` drops."""
+    return key in keep_keys if keep_keys else key not in omit_keys
 
-    Accepts either a filesystem path or the raw file content as ``bytes``
-    (e.g. as returned by :meth:`FileMapper.read_bytes`), so a caller that has
-    already pulled the bytes out of a zip member need not write them to disk.
+
+def _loads(content: bytes):
+    """orjson, falling back to stdlib for the NaN/Infinity tokens it rejects."""
+    try:
+        return orjson.loads(content)
+    except orjson.JSONDecodeError:
+        return json.loads(content)
+
+
+def _read_s3_shape(content: bytes, keep_keys, omit_keys) -> tuple[dict, dict]:
+    """The S3 ``X.hlo.json`` document ``{"meta": ..., "data": {col: [...]}}``."""
+    doc = _loads(content)
+    data = defaultdict(list)
+    for k, v in (doc.get("data") or {}).items():
+        if _keep(k, keep_keys, omit_keys):
+            data[k] = v
+    return dict(doc.get("meta") or {}), data
+
+
+def read_hlo(path, keep_keys: list = [], omit_keys: list = []) -> tuple[dict, dict]:
+    """Read any data-file shape and return ``(meta, data)``.
+
+    Dispatch is by name: ``.hlo`` (legacy, YAML header + ``%%`` + rows),
+    ``.jsonl`` (rows; header from a sibling ``.meta.json`` when present),
+    ``.meta.json`` (header; rows from the sibling ``.jsonl``, which must
+    exist -- a missing header is legal, missing rows are a lost artifact),
+    ``.hlo.json`` (the S3 ``{"meta", "data"}`` document). Raw ``bytes`` are
+    parsed as a legacy ``.hlo``.
 
     Args:
-        path: Filesystem path to the ``.hlo`` file, or its raw ``bytes``.
+        path: Filesystem path, or raw legacy ``.hlo`` bytes.
         keep_keys: When non-empty, only these keys are kept from the body.
-        omit_keys: Keys to omit from the body (ignored when ``keep_keys`` is
-            populated, which takes precedence).
+        omit_keys: Keys to drop from the body when ``keep_keys`` is empty.
 
     Returns:
-        A ``(meta, data)`` tuple where ``meta`` is the parsed YAML header
-        and ``data`` is a dict of column lists assembled from the body.
+        ``(meta, data)``: the header dict and a dict of column lists.
     """
     if isinstance(path, (bytes, bytearray)):
         return read_hlo_bytes(path, keep_keys=keep_keys, omit_keys=omit_keys)
-    path_to_hlo = Path(path)
-    with open(str(path_to_hlo), "rb") as f:
+    p = str(path)
+    if p.endswith(".hlo.json"):
+        return _read_s3_shape(Path(p).read_bytes(), keep_keys, omit_keys)
+    if p.endswith((DATA_SUFFIX, HEADER_SUFFIX)):
+        header = data_sibling(p, HEADER_SUFFIX)
+        meta = orjson.loads(Path(header).read_bytes()) if os.path.isfile(header) else {}
+        with open(data_sibling(p, DATA_SUFFIX), "rb") as f:
+            _, data = read_hlo_stream(
+                f, keep_keys=keep_keys, omit_keys=omit_keys, has_header=False
+            )
+        return meta, data
+    with open(p, "rb") as f:
         return read_hlo_stream(f, keep_keys=keep_keys, omit_keys=omit_keys)
 
 
 def read_hlo_stream(
-    stream, keep_keys: list = [], omit_keys: list = []
+    stream, keep_keys: list = [], omit_keys: list = [], has_header: bool = True
 ) -> tuple[dict, dict]:
     """Parse an HLO ``(meta, data)`` pair from an open binary stream.
 
@@ -79,6 +118,8 @@ def read_hlo_stream(
         keep_keys: When non-empty, only these keys are kept from the body.
         omit_keys: Keys to omit from the body (ignored when ``keep_keys`` is
             populated, which takes precedence).
+        has_header: ``False`` for a ``.jsonl``: every line is a row, even one
+            that does not start with ``{``.
 
     Returns:
         A ``(meta, data)`` tuple where ``meta`` is the parsed YAML header
@@ -94,7 +135,7 @@ def read_hlo_stream(
     data = defaultdict(list)
 
     for line in stream:
-        if not header_end:
+        if has_header and not header_end:
             stripped = line.decode("utf8", "ignore").lstrip()
             if stripped.startswith("%%"):
                 # The header/data separator. A ``%%`` seen before any header
@@ -128,7 +169,7 @@ def read_hlo_stream(
                 print(f"skipping unparseable hlo data line: {line[:80]!r}")
                 continue
         for k in line_dict:
-            if k in keep_keys or k not in omit_keys:
+            if _keep(k, keep_keys, omit_keys):
                 v = line_dict[k]
                 if isinstance(v, list):
                     data[k] += v
@@ -163,17 +204,120 @@ def read_hlo_bytes(
     return read_hlo_stream(BytesIO(content), keep_keys=keep_keys, omit_keys=omit_keys)
 
 
+def read_hlo_pair_bytes(
+    meta_bytes: Optional[bytes],
+    data_bytes: bytes,
+    keep_keys: list = [],
+    omit_keys: list = [],
+) -> tuple[dict, dict]:
+    """``(meta, data)`` from the bytes of a ``.meta.json`` (or None) and its ``.jsonl``."""
+    meta = orjson.loads(meta_bytes) if meta_bytes else {}
+    _, data = read_hlo_stream(
+        BytesIO(data_bytes), keep_keys=keep_keys, omit_keys=omit_keys, has_header=False
+    )
+    return meta, data
+
+
+Where = Union[str, os.PathLike, Collection[str], Callable[[str], bool], None]
+
+
+def _exists_fn(where: Where) -> Callable[[str], bool]:
+    if callable(where):
+        return where
+    if isinstance(where, (str, os.PathLike)):
+        return lambda n: os.path.isfile(os.path.join(where, n))
+    names = set(where or ())
+    return names.__contains__
+
+
+def resolve_data_file(where: Where, name: str) -> Optional[str]:
+    """The physical file a recorded data name refers to, or ``None``.
+
+    A data name (``X.hlo``/``X.jsonl``/``X.meta.json``/``X.hlo.json``) is
+    reduced to its stem ``X`` (directory kept) and resolved to the first of
+    ``X.jsonl``, ``X.hlo``, ``X.hlo.json`` that exists: metadata records the
+    S3 name ``X.hlo.json``, the local artifact is the ``.jsonl`` (current) or
+    ``.hlo`` (legacy), and a tree rebuilt from S3 holds only ``.hlo.json``.
+    ``X.meta.json`` never resolves to itself. Any other name is tried as-is.
+
+    Args:
+        where: A directory, a collection of names (e.g. a zip ``namelist()``),
+            or an ``exists(name) -> bool`` callable.
+        name: The recorded name, relative to ``where``.
+    """
+    exists = _exists_fn(where)
+    if not name.endswith(_DATA_NAMES):
+        return name if exists(name) else None
+    candidates = (data_sibling(name, s) for s in (DATA_SUFFIX, ".hlo", ".hlo.json"))
+    return next((c for c in candidates if exists(c)), None)
+
+
+def read_hlo_via(
+    where: Where,
+    get_bytes: Callable[[str], bytes],
+    name: str,
+    keep_keys: list = [],
+    omit_keys: list = [],
+) -> tuple[dict, dict]:
+    """:func:`read_hlo` for a byte source: a zip, a run-tree mapper, a loader.
+
+    With ``where=None`` existence is probed by calling ``get_bytes``;
+    ``FileNotFoundError`` and ``KeyError`` (a zip's missing member) mean absent.
+
+    Raises:
+        FileNotFoundError: ``name`` resolves to nothing, or to a header whose
+            ``.jsonl`` is missing.
+    """
+    cache: dict[str, bytes] = {}
+
+    def probe(n: str) -> bool:
+        try:
+            cache[n] = get_bytes(n)
+        except (FileNotFoundError, KeyError):
+            return False
+        return True
+
+    exists = probe if where is None else _exists_fn(where)
+    fetch = (
+        (lambda n: cache[n] if n in cache else get_bytes(n))
+        if where is None
+        else get_bytes
+    )
+    phys = resolve_data_file(exists, name)
+    if phys is None:
+        raise FileNotFoundError(name)
+    if phys.endswith(".hlo.json"):
+        return _read_s3_shape(fetch(phys), keep_keys, omit_keys)
+    if phys.endswith((DATA_SUFFIX, HEADER_SUFFIX)):
+        header, rows = data_sibling(phys, HEADER_SUFFIX), data_sibling(
+            phys, DATA_SUFFIX
+        )
+        if not exists(rows):
+            raise FileNotFoundError(rows)
+        meta_bytes = fetch(header) if exists(header) else None
+        return read_hlo_pair_bytes(meta_bytes, fetch(rows), keep_keys, omit_keys)
+    return read_hlo_bytes(fetch(phys), keep_keys=keep_keys, omit_keys=omit_keys)
+
+
 def read_hlo_header(file_path) -> tuple:
     """Read the YAML header of an HLO file.
 
+    For a ``.jsonl``/``.meta.json`` pair the header comes from the
+    ``.meta.json`` and the data start index is 0.
+
     Args:
-        file_path: Path to the ``.hlo`` file.
+        file_path: Path to the ``.hlo``, ``.jsonl`` or ``.meta.json`` file.
 
     Returns:
         A ``(header_dict, data_start_index)`` tuple where
         ``data_start_index`` is the zero-based index of the first body line
         (or ``-1`` if no ``%%`` marker was found).
     """
+    p = str(file_path)
+    if p.endswith((DATA_SUFFIX, HEADER_SUFFIX)):
+        header = data_sibling(p, HEADER_SUFFIX)
+        meta = orjson.loads(Path(header).read_bytes()) if os.path.isfile(header) else {}
+        return meta, 0
     yml_lines = []
     data_start_index = -1
     with open(file_path, encoding="utf-8") as f:
@@ -205,6 +349,8 @@ def read_hlo_data_chunks(file_path, data_start_index, chunk_size=100):
         dict of column lists for at most ``chunk_size`` lines and
         ``max_chunk_len`` is the longest column length in that chunk.
     """
+    if str(file_path).endswith(HEADER_SUFFIX):
+        file_path = data_sibling(file_path, DATA_SUFFIX)
     with open(file_path, encoding="utf-8") as f:
         chunkd = defaultdict(list)
         for i, line in enumerate(f):
