@@ -1,6 +1,6 @@
 """Local-filesystem variant of the HELAO data loader.
 
-Indexes ``*-{seq,exp,act,prc}.yml`` files under a run tree (active, finished,
+Indexes ``*-{seq,exp,act,prc}.json`` (and legacy ``.yml``) files under a run tree (active, finished,
 synced, or diag) or a synced sequence ``.zip`` archive into pandas dataframes,
 and exposes ``LocalLoader`` + per-record wrappers that read YAML/HLO/parquet
 content via :class:`helao.helpers.file_mapper.FileMapper`.
@@ -8,7 +8,6 @@ content via :class:`helao.helpers.file_mapper.FileMapper`.
 
 import os
 from datetime import datetime
-from glob import glob
 from io import BytesIO
 from typing import Optional
 from uuid import UUID
@@ -24,8 +23,9 @@ from helao.core.drivers.data.loaders.model_base import (
 from helao.core.drivers.data.process_locator import process_uuid_of
 from helao.core.models.run_dir import RunDir, is_legacy_path, is_run_root
 from helao.helpers.file_mapper import FileMapper
-from helao.helpers.hlo_data import read_hlo_bytes
-from helao.helpers.yml_tools import yml_load
+from helao.helpers.hlo_data import read_hlo_via
+from helao.helpers.meta_io import meta_glob, read_meta
+from helao.hexagon.domain.naming import meta_kind
 
 
 def parse_seq_path(ymlp, target) -> tuple:
@@ -41,7 +41,7 @@ def parse_seq_path(ymlp, target) -> tuple:
     Returns:
         ``(timestamp, seq_name, seq_lab, plate_id, sample_no, yml_dir, ymlp)``.
     """
-    if ymlp.endswith(".yml") or target.endswith(".zip"):
+    if meta_kind(ymlp) is not None or target.endswith(".zip"):
         yml_dir = os.path.basename(os.path.dirname(ymlp))
         yml_file = os.path.basename(ymlp)
         if target.endswith(".zip"):
@@ -96,7 +96,7 @@ def parse_exp_path(ymlp) -> tuple:
     Returns:
         ``(timestamp, exp_name, yml_dir, ymlp)``.
     """
-    if ymlp.endswith(".yml"):
+    if meta_kind(ymlp) is not None:
         yml_dir = os.path.basename(os.path.dirname(ymlp))
     else:
         yml_dir = os.path.basename(ymlp)
@@ -121,7 +121,7 @@ def parse_act_path(ymlp) -> tuple:
     Raises:
         ValueError: If the directory name does not split into 4 or 5 fields.
     """
-    if ymlp.endswith(".yml"):
+    if meta_kind(ymlp) is not None:
         yml_dir = os.path.basename(os.path.dirname(ymlp))
     else:
         yml_dir = os.path.basename(ymlp)
@@ -152,7 +152,7 @@ def parse_prc_path(ymlp) -> tuple:
     yml_dir = os.path.basename(os.path.dirname(ymlp))
     _, exp_name = yml_dir.split("__")
     yml_file = os.path.basename(ymlp)
-    idx, prc_uuid, techname = yml_file.replace("-prc.yml", "").split("__")
+    idx, prc_uuid, techname = yml_file.rsplit("-prc.", 1)[0].split("__")
     prc_uuid = UUID(prc_uuid)
     prc_idx = int(idx)
     try:
@@ -258,34 +258,37 @@ class LocalLoader:
             with ZipFile(self.target, "r") as zf:
                 zip_contents = zf.namelist()
             self._is_microorch_zip = "MANIFEST.txt" in zip_contents
-            _yml_paths = [x for x in zip_contents if x.endswith(".yml")]
+            _yml_paths = [x for x in zip_contents if meta_kind(x) is not None]
             self._zip_members = set(_yml_paths)
             # The mirror still holds the processes of records synced before the
             # write moved into the RUNS_* tree. Union both, but never index the
             # same process twice: the in-zip copy wins.
             in_zip_uuids = {
-                process_uuid_of(x) for x in _yml_paths if x.endswith("-prc.yml")
+                process_uuid_of(x) for x in _yml_paths if meta_kind(x) == "prc"
             }
             _yml_paths += [
                 x
-                for x in glob(
-                    os.path.join(process_dir, "**", "*-prc.yml"), recursive=True
-                )
+                for x in map(str, meta_glob(process_dir, "prc", "**/*"))
                 if process_uuid_of(x) not in in_zip_uuids
             ]
         elif os.path.isdir(self.target):
             self._zip_members = set()
             for check_dir in check_dirs:
-                _yml_paths += glob(
-                    os.path.join(check_dir, "**", "*.yml"), recursive=True
-                )
+                _yml_paths += [
+                    str(p)
+                    for p in meta_glob(check_dir, ("seq", "exp", "act", "prc"), "**/*")
+                ]
         else:
             self._zip_members = set()
             for check_dir in check_dirs:
-                _yml_paths += glob(
-                    os.path.join(os.path.dirname(check_dir), "**", "*.yml"),
-                    recursive=True,
-                )
+                _yml_paths += [
+                    str(p)
+                    for p in meta_glob(
+                        os.path.dirname(check_dir),
+                        ("seq", "exp", "act", "prc"),
+                        "**/*",
+                    )
+                ]
 
         # check_dirs collapse to the same directory whenever the target is not
         # under a RUNS_* tree (the RUNS_* -> state replacements are then no-ops),
@@ -294,9 +297,7 @@ class LocalLoader:
         _yml_paths = list(dict.fromkeys(_yml_paths))
 
         for suffix in ("seq", "exp", "act", "prc"):
-            self._yml_paths[suffix] = [
-                x for x in _yml_paths if x.endswith(f"-{suffix}.yml")
-            ]
+            self._yml_paths[suffix] = [x for x in _yml_paths if meta_kind(x) == suffix]
 
         seq_parts = []
         for ymlp in self._yml_paths["seq"]:
@@ -457,11 +458,10 @@ class LocalLoader:
         # the tree that gets zipped, and false as soon as one is a zip member.
         if self.target.endswith(".zip") and path in self._zip_members:
             with ZipFile(self.target, "r") as zf:
-                metad = dict(
-                    yml_load(
-                        zf.open(path).read().replace(b"\x89", b"%").decode("utf-8")
-                    )
-                )
+                raw = zf.read(path)
+            if path.endswith(".yml"):
+                raw = raw.replace(b"\x89", b"%")  # legacy repair; never on JSON
+            metad = dict(read_meta(raw, name=path))
         else:
             # metad = yml_load("".join(builtins.open(path, "r").readlines()))
             FM = FileMapper(path)
@@ -666,8 +666,7 @@ class LocalLoader:
         if self.target.endswith(".zip"):
             hlotarget = "/".join([os.path.dirname(yml_path), hlo_fn])
             with ZipFile(self.target, "r") as zf:
-                content = zf.open(hlotarget).read()
-            return HloPayload(*read_hlo_bytes(content))
+                return HloPayload(*read_hlo_via(set(zf.namelist()), zf.read, hlotarget))
         else:
             # return read_hlo(os.path.join(os.path.dirname(yml_path), hlo_fn))
             FM = FileMapper(yml_path)
@@ -1020,17 +1019,17 @@ class HelaoProcess(HelaoDataModelMixin, HelaoModel):
             return HloPayload()
         fd = self.hlo_file
         rel = f"{self._artifact_paths[fd['action_uuid']]}/{fd['file_name']}"
+
         # Through get_bytes("", ...) like ``artifacts``, so a synced sequence
-        # zip works too. Process files name the S3 ``.hlo.json`` conversion;
-        # on disk and in the zip it is the raw ``.hlo``.
-        names = [rel, rel[: -len(".json")]] if rel.endswith(".hlo.json") else [rel]
-        for name in names:
-            try:
-                raw = self.loader.get_bytes("", name).read()
-            except (FileNotFoundError, KeyError):
-                continue
-            return HloPayload(*read_hlo_bytes(raw))
-        raise FileNotFoundError(f"{rel} not found under {self.loader.target}")
+        # zip works too. Process files name the S3 ``.hlo.json``; on disk and
+        # in the zip it is the ``.jsonl`` pair or the legacy ``.hlo``.
+        def _get(name: str) -> bytes:
+            return self.loader.get_bytes("", name).read()
+
+        try:
+            return HloPayload(*read_hlo_via(None, _get, rel))
+        except FileNotFoundError:
+            raise FileNotFoundError(f"{rel} not found under {self.loader.target}")
 
     def read_action_file(self, relative_path: str) -> bytes:
         """Read the raw bytes of an action file by its run-tree-relative path.

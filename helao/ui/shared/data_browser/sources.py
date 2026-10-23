@@ -13,10 +13,11 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
-import yaml
 
 from helao.core.drivers.data.process_locator import process_uuid_of
 from helao.core.models.run_dir import RunDir
+from helao.helpers.meta_io import meta_glob, read_meta
+from helao.hexagon.domain.naming import meta_kind
 from helao.ui.shared.data_browser.readers import make_zip_locator
 
 INDEX_COLUMNS = [
@@ -34,7 +35,9 @@ INDEX_COLUMNS = [
     "locator",
 ]
 
-DATA_EXTS = (".hlo", ".json", ".parquet")
+# Bare ``.json`` is not a data extension: records (``-act.json``) and headers
+# (``.meta.json``) are JSON too.
+DATA_EXTS = (".hlo", ".jsonl", ".hlo.json", ".parquet")
 
 
 def _list_day_dirs(base):
@@ -157,17 +160,16 @@ def _first_sample(meta):
     return ""
 
 
-def _safe_yaml(path):
+def _safe_meta(path):
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
+        return read_meta(path) or {}
     except Exception:
         return {}
 
 
-def _safe_yaml_bytes(content):
+def _safe_meta_bytes(content, name):
     try:
-        return yaml.safe_load(content) or {}
+        return read_meta(content, name=name) or {}
     except Exception:
         return {}
 
@@ -251,13 +253,13 @@ class RunsSourceIndex(SourceIndex):
         rows = []
         for seq_dir in sorted(p for p in day.iterdir() if p.is_dir()):
             seq_name = _seq_name(seq_dir.name)
-            for act_yml in sorted(seq_dir.glob("*/*/*-act.yml")):
+            for act_yml in meta_glob(seq_dir, "act", "*/*/*"):
                 act_dir = act_yml.parent
                 exp_name = act_dir.parent.name
-                meta = _safe_yaml(act_yml)
+                meta = _safe_meta(act_yml)
                 technique, sample, run_type = _meta_fields(meta)
                 for f in sorted(act_dir.iterdir()):
-                    if f.is_file() and f.suffix.lower() in DATA_EXTS:
+                    if f.is_file() and f.name.lower().endswith(DATA_EXTS):
                         rows.append(
                             _row(
                                 source=self.source,
@@ -288,11 +290,11 @@ class RunsSourceIndex(SourceIndex):
                 names = zf.namelist()
                 act_meta = {}
                 for n in names:
-                    if n.endswith("-act.yml"):
-                        act_meta[posixpath.dirname(n)] = _safe_yaml_bytes(zf.read(n))
+                    if meta_kind(n) == "act":
+                        act_meta[posixpath.dirname(n)] = _safe_meta_bytes(zf.read(n), n)
                 for n in names:
                     ext = posixpath.splitext(n)[1].lower()
-                    if ext not in DATA_EXTS:
+                    if not n.lower().endswith(DATA_EXTS):
                         continue
                     actdir = posixpath.dirname(n)
                     meta = act_meta.get(actdir, {})
@@ -412,13 +414,13 @@ class DerivedSourceIndex(SourceIndex):
         rows.extend(self._colocated_zip_process_rows(date_str, seen))
         day = self.base / date_str
         if day.is_dir():
-            for prc_yml in sorted(day.glob("*/*/*-prc.yml")):
+            for prc_yml in meta_glob(day, "prc", "*/*/*"):
                 uuid = process_uuid_of(prc_yml)
                 if uuid and uuid in seen:
                     continue
                 exp_dir = prc_yml.parent
                 seq_dir = exp_dir.parent
-                meta = _safe_yaml(prc_yml)
+                meta = _safe_meta(prc_yml)
                 rows.extend(
                     self._process_rows(
                         date_str, seq_dir.name, exp_dir.name, prc_yml.stem, meta
@@ -437,13 +439,13 @@ class DerivedSourceIndex(SourceIndex):
             day = self.root / tree / date_str
             if not day.is_dir():
                 continue
-            for prc_yml in sorted(day.glob("*/*/*-prc.yml")):
+            for prc_yml in meta_glob(day, "prc", "*/*/*"):
                 uuid = process_uuid_of(prc_yml)
                 if uuid and uuid in seen:
                     continue
                 exp_dir = prc_yml.parent
                 seq_dir = exp_dir.parent
-                meta = _safe_yaml(prc_yml)
+                meta = _safe_meta(prc_yml)
                 rows.extend(
                     self._process_rows(
                         date_str, seq_dir.name, exp_dir.name, prc_yml.stem, meta
@@ -474,14 +476,14 @@ class DerivedSourceIndex(SourceIndex):
                 continue
             with zf:
                 for n in zf.namelist():
-                    if not n.endswith("-prc.yml"):
+                    if meta_kind(n) != "prc":
                         continue
                     member_name = posixpath.basename(n)
                     uuid = process_uuid_of(member_name)
                     if uuid and uuid in seen:
                         continue
                     exp_dirname = posixpath.basename(posixpath.dirname(n))
-                    meta = _safe_yaml_bytes(zf.read(n))
+                    meta = _safe_meta_bytes(zf.read(n), n)
                     node = posixpath.splitext(member_name)[0]
                     rows.extend(
                         self._process_rows(
@@ -498,7 +500,7 @@ class DerivedSourceIndex(SourceIndex):
         rows = []
         for fi in meta.get("files") or []:
             fn = (fi or {}).get("file_name", "")
-            if not fn or posixpath.splitext(fn)[1].lower() not in DATA_EXTS:
+            if not fn or not fn.lower().endswith(DATA_EXTS):
                 continue
             locator, available = _resolve_run_file(
                 self.root, date_str, seq_dirname, exp_dirname, fn
@@ -524,12 +526,16 @@ class DerivedSourceIndex(SourceIndex):
     def _index_analyses(self, date_str, day):
         rows = []
         for ana_dir in sorted(p for p in day.iterdir() if p.is_dir()):
-            ymls = sorted(ana_dir.glob("*.yml"))
-            # first yml is the AnalysisModel; missing or extra ymls fall through to local-json indexing
-            meta = _safe_yaml(ymls[0]) if ymls else {}
+            models = meta_glob(ana_dir, "ana")
+            legacy = sorted(p for p in ana_dir.glob("*.yml"))
+            # The AnalysisModel: <uuid>-ana.json, else the legacy first <uuid>.yml.
+            model = models[0] if models else (legacy[0] if legacy else None)
+            meta = _safe_meta(model) if model is not None else {}
             ana_name = meta.get("analysis_name", _seq_name(ana_dir.name))
             sample = meta.get("global_sample_label") or ""
-            local_jsons = {p.name: p for p in ana_dir.glob("*.json")}
+            local_jsons = {
+                p.name: p for p in ana_dir.glob("*.json") if meta_kind(p) != "ana"
+            }
             outputs = meta.get("outputs") or []
             if outputs:
                 for out in outputs:

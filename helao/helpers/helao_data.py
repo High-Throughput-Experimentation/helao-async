@@ -10,7 +10,6 @@ from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
-import builtins
 import os
 import re
 import zipfile
@@ -24,10 +23,20 @@ import orjson
 import pandas as pd
 
 from helao.core.models.run_dir import RunDir, is_legacy_path, is_run_root
+from helao.hexagon.domain.naming import HEADER_SUFFIX, meta_kind
 
 from .file_mapper import FileMapper
-from .hlo_data import read_hlo_bytes
-from .yml_tools import yml_load
+from .hlo_data import read_hlo_via, resolve_data_file
+from .meta_io import meta_glob, read_meta
+
+
+def _is_data_member(p: str) -> bool:
+    """A data file: not a record/process/analysis meta, header, ``.yml`` or ``.prg``."""
+    return (
+        p.split(".")[-1] not in ("yml", "prg")
+        and meta_kind(p) is None
+        and not p.endswith(HEADER_SUFFIX)
+    )
 
 
 class HelaoData:
@@ -67,7 +76,6 @@ class HelaoData:
         self._yml_cache = {}
         self.ord = ["seq", "exp", "act"]
         self.abbrd = {"seq": "sequence", "exp": "experiment", "act": "action"}
-        skip_exts = ["yml", "prg"]
         if isinstance(target, str):
             self.target = target
             if self.target.endswith(".zip"):  # this will always be a zipped sequence
@@ -80,10 +88,10 @@ class HelaoData:
                         self.ymlpath = kwargs["ztarget"]
                     else:
                         self.ymlpath = [
-                            p for p in self.zflist if p.endswith("-seq.yml")
+                            p for p in self.zflist if meta_kind(p) == "seq"
                         ][0]
                     self.ymldir = os.path.dirname(self.ymlpath)
-                    self.type = self.ymlpath.split("-")[-1].replace(".yml", "")
+                    self.type = meta_kind(self.ymlpath) or ""
                     # self.yml = yml_load(zf.open(self.ymlpath).read().decode("UTF-8"))
                 self.seq = []
                 self.exp = []
@@ -92,7 +100,7 @@ class HelaoData:
                     sub_exps = [
                         p
                         for p in self.zflist
-                        if p.endswith("-exp.yml") and p.startswith(self.ymldir)
+                        if meta_kind(p) == "exp" and p.startswith(self.ymldir)
                     ]
                     self.exp = [
                         HelaoData(self.target, zflist=self.zflist, ztarget=p)
@@ -107,7 +115,7 @@ class HelaoData:
                     sub_acts = [
                         p
                         for p in self.zflist
-                        if p.endswith("-act.yml") and p.startswith(self.ymldir)
+                        if meta_kind(p) == "act" and p.startswith(self.ymldir)
                     ]
                     self.act = [
                         HelaoData(self.target, zflist=self.zflist, ztarget=p)
@@ -121,7 +129,7 @@ class HelaoData:
                 self._data_files = [
                     p
                     for p in self.zflist
-                    if p.split(".")[-1] not in skip_exts and p.startswith(self.ymldir)
+                    if _is_data_member(p) and p.startswith(self.ymldir)
                     # and os.path.dirname(p) == self.ymldir
                 ]
                 nosync_path = os.path.dirname(self.target).replace(
@@ -133,15 +141,11 @@ class HelaoData:
                     # Record suffixes only: a colocated -prc.yml sorts ahead of
                     # a timestamped -exp.yml, and the next line derives
                     # self.type from whichever name is picked.
-                    self.ymlpath = [
-                        x
-                        for x in sorted(glob(os.path.join(self.target, "*.yml")))
-                        if x.endswith(("-seq.yml", "-exp.yml", "-act.yml"))
-                    ][0]
-                elif target.endswith(".yml"):
+                    self.ymlpath = str(meta_glob(self.target, ("seq", "exp", "act"))[0])
+                elif meta_kind(target) is not None:
                     self.ymldir = os.path.dirname(self.target)
                     self.ymlpath = target
-                self.type = self.ymlpath.split("-")[-1].replace(".yml", "")
+                self.type = meta_kind(self.ymlpath) or ""
                 # self.yml = yml_load("".join(builtins.open(self.ymlpath, "r").readlines()))
                 # A record under the single RUNS tree has exactly one home, so
                 # there is nothing to glob across. Only archives need the
@@ -162,7 +166,12 @@ class HelaoData:
                 self.seq = [
                     HelaoData(x)
                     for x in sorted(
-                        glob(os.path.join(yml_reldir, "*", "*-seq.yml")),
+                        [
+                            str(p)
+                            for p in meta_glob(
+                                yml_reldir, "seq", "*/*", wildcard_root=True
+                            )
+                        ],
                         key=lambda x: float(
                             os.path.basename(os.path.dirname(x)).split("__")[0]
                         ),
@@ -171,7 +180,12 @@ class HelaoData:
                 self.exp = [
                     HelaoData(x)
                     for x in sorted(
-                        glob(os.path.join(yml_reldir, "*", "*-exp.yml")),
+                        [
+                            str(p)
+                            for p in meta_glob(
+                                yml_reldir, "exp", "*/*", wildcard_root=True
+                            )
+                        ],
                         key=lambda x: float(
                             os.path.basename(os.path.dirname(x)).split("__")[0]
                         ),
@@ -180,7 +194,12 @@ class HelaoData:
                 self.act = [
                     HelaoData(x)
                     for x in sorted(
-                        glob(os.path.join(yml_reldir, "*", "*-act.yml")),
+                        [
+                            str(p)
+                            for p in meta_glob(
+                                yml_reldir, "act", "*/*", wildcard_root=True
+                            )
+                        ],
                         key=lambda x: float(
                             os.path.basename(os.path.dirname(x)).split("__")[0]
                         ),
@@ -189,7 +208,7 @@ class HelaoData:
                 self._data_files = [
                     x
                     for x in glob(os.path.join(yml_reldir, "**", "*"), recursive=True)
-                    if x.split(".")[-1] not in skip_exts and os.path.isfile(x)
+                    if _is_data_member(x) and os.path.isfile(x)
                 ]
                 nosync_path = self.ymldir.replace(
                     RunDir.SYNCED.value, RunDir.NOSYNC.value
@@ -208,16 +227,14 @@ class HelaoData:
 
     @property
     def yml(self) -> dict:
-        """Return the parsed YAML metadata for this node (cached)."""
+        """Return the parsed record metadata (``.json`` or legacy ``.yml``), cached."""
         if self._yml_cache:
             return self._yml_cache
         if self.target.endswith(".zip"):  # this will always be a zipped sequence
             with zipfile.ZipFile(self.target, "r") as zf:
-                yml_dict = yml_load(zf.open(self.ymlpath).read().decode("UTF-8"))
+                yml_dict = read_meta(zf.read(self.ymlpath), name=self.ymlpath)
         else:
-            yml_dict = yml_load(
-                "".join(builtins.open(self.ymlpath, "r", encoding="utf-8").readlines())
-            )
+            yml_dict = read_meta(self.ymlpath)
         self._yml_cache = yml_dict
         return yml_dict
 
@@ -293,19 +310,18 @@ class HelaoData:
         A record copied out of a station (for example into a shared data
         repository) has no ``RUNS``/``RUNS_*``/``DIAG``/``PROCESSES`` segment,
         so neither :class:`FileMapper` nor :meth:`_runs_relpath` can anchor
-        it. Such a file is read where it is. ``.hlo`` data files are recorded
-        as ``.hlo.json`` but stored as ``.hlo``, so both names are tried.
+        it. Such a file is read where it is. A recorded ``X.hlo.json``
+        resolves to ``X.jsonl`` or ``X.hlo`` (:func:`resolve_data_file`).
 
         Raises:
             FileNotFoundError: ``p`` is detached and neither name exists.
         """
         if any(is_run_root(v) for v in Path(p).parts):
             return None
-        names = [p, p[: -len(".json")]] if p.endswith(".hlo.json") else [p]
-        for name in names:
-            if os.path.isfile(name):
-                with open(name, "rb") as f:
-                    return f.read()
+        name = resolve_data_file(os.path.isfile, p)
+        if name is not None:
+            with open(name, "rb") as f:
+                return f.read()
         raise FileNotFoundError(p)
 
     @property
@@ -338,13 +354,18 @@ class HelaoData:
             and ``data`` is a dict of column lists.
         """
         if self.target.endswith(".zip") and RunDir.NOSYNC.value not in hlotarget:
-            member = self._resolve_zip_member(hlotarget)
-            return read_hlo_bytes(
-                self.read_file(member), keep_keys=keep_keys, omit_keys=omit_keys
+            return read_hlo_via(
+                set(self.zflist), self.read_file, hlotarget, keep_keys, omit_keys
             )
-        raw = self._detached_bytes(hlotarget)
-        if raw is not None:
-            return read_hlo_bytes(raw, keep_keys=keep_keys, omit_keys=omit_keys)
+        if not any(is_run_root(v) for v in Path(hlotarget).parts):
+            # Detached: a record copied out of any run tree is read where it is.
+            return read_hlo_via(
+                os.path.isfile,
+                lambda n: Path(n).read_bytes(),
+                hlotarget,
+                keep_keys,
+                omit_keys,
+            )
         fm = FileMapper(hlotarget)
         return fm.read_hlo(self._runs_relpath(hlotarget))
 
@@ -402,29 +423,6 @@ class HelaoData:
 
         return {}, json_dict
 
-    def _resolve_zip_member(self, hlotarget: str) -> str:
-        """Map a logical data-file name to its physical zip member.
-
-        ``.hlo`` files are recorded under their canonical ``.hlo.json`` name
-        but archived as raw ``.hlo``. When ``hlotarget`` is not itself a
-        member but its ``.hlo`` counterpart is, the latter is returned.
-
-        Args:
-            hlotarget: Member name as recorded in metadata.
-
-        Returns:
-            The actual member name present in the archive (unchanged when no
-            mapping applies).
-        """
-        if hlotarget in self.zflist:
-            return hlotarget
-        if (
-            hlotarget.endswith(".hlo.json")
-            and hlotarget[: -len(".json")] in self.zflist
-        ):
-            return hlotarget[: -len(".json")]
-        return hlotarget
-
     def read_file(self, hlotarget) -> bytes:
         """Read a single zip member as raw bytes.
 
@@ -447,10 +445,10 @@ class HelaoData:
             A ``(meta, data)`` tuple, or ``({}, {})`` if the extension is not
             supported.
         """
-        # ``.hlo`` data files are recorded under their canonical ``.hlo.json``
-        # name but stored as raw ``.hlo``, so both route to the HLO reader;
-        # only genuine (non-HLO) ``.json`` files go to the JSON reader.
-        if target_data_file.endswith(".hlo") or target_data_file.endswith(".hlo.json"):
+        # Data files are the ``.jsonl`` pair (header ``.meta.json``) or legacy
+        # ``.hlo``, recorded as ``X.hlo.json``; all route to the HLO reader.
+        # Only genuine (non-HLO) ``.json`` files go to the JSON reader.
+        if target_data_file.endswith((".hlo", ".hlo.json", ".jsonl", ".meta.json")):
             return self.read_hlo(target_data_file)
         elif target_data_file.endswith(".json"):
             return self.read_json(target_data_file)

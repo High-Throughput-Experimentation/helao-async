@@ -23,7 +23,8 @@ from typing import Optional
 
 import pyarrow.parquet as pq
 
-from helao.helpers.hlo_data import read_hlo_bytes
+from helao.helpers.hlo_data import read_hlo_bytes, read_hlo_pair_bytes
+from helao.hexagon.domain.naming import HEADER_SUFFIX, data_sibling
 
 ZIP_PREFIX = "zip::"
 ZIP_SEP = "::"
@@ -52,6 +53,19 @@ def _read_bytes(locator: str) -> tuple[str, bytes]:
         return os.path.basename(parsed[1]), f.read()
 
 
+def _header_bytes(locator: str) -> Optional[bytes]:
+    """The sibling ``.meta.json`` of a ``.jsonl`` locator, or None when absent."""
+    parsed = parse_locator(locator)
+    try:
+        if parsed[0] == "zip":
+            _, zip_path, member = parsed
+            sib = make_zip_locator(zip_path, data_sibling(member, HEADER_SUFFIX))
+            return _read_bytes(sib)[1]
+        return _read_bytes(data_sibling(parsed[1], HEADER_SUFFIX))[1]
+    except (FileNotFoundError, KeyError):
+        return None
+
+
 def read_dataset(locator: str, fmt: Optional[str] = None) -> tuple[dict, dict]:
     """Read any supported column-bearing file into (meta, {column: list})."""
     file_name, content = _read_bytes(locator)
@@ -59,6 +73,8 @@ def read_dataset(locator: str, fmt: Optional[str] = None) -> tuple[dict, dict]:
         fmt = os.path.splitext(file_name)[1].lower().lstrip(".")
     if fmt == "hlo":
         return read_hlo_bytes(content)
+    if fmt == "jsonl":
+        return read_hlo_pair_bytes(_header_bytes(locator), content)
     if fmt == "json":
         return _read_json(content)
     if fmt == "parquet":

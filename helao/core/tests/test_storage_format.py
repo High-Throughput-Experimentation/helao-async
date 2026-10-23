@@ -2,12 +2,18 @@
 
 import io
 import json
+import os
 import zipfile
 from pathlib import Path
 
 import orjson
 import pytest
 
+from helao.core.drivers.data.loaders.localfs import LocalLoader
+from helao.helpers.file_mapper import FileMapper
+from helao.helpers.helao_data import HelaoData
+from helao.ui.shared.data_browser.readers import make_zip_locator, read_dataset
+from helao.ui.shared.data_browser.sources import RunsSourceIndex
 from helao.helpers.hlo_data import (
     hlo_to_parquet,
     read_helao_metadata,
@@ -285,3 +291,165 @@ def test_header_and_parquet_from_a_pair(tmp_path):
     out = tmp_path / "P__0.parquet"
     hlo_to_parquet(str(tmp_path / "P__0.meta.json"), str(out), chunk_size=2)
     assert read_helao_metadata(str(out)) == HEADER["optional"]
+
+
+U_SEQ = "00000000-0000-0000-0000-000000000001"
+U_EXP = "00000000-0000-0000-0000-000000000002"
+U_ACT = "00000000-0000-0000-0000-000000000003"
+
+
+def _new_tree(root: Path) -> dict:
+    """A one-seq/one-exp/one-act RUNS_FINISHED tree in the NEW format."""
+    seq = root / "RUNS_FINISHED" / "25.28" / "0716" / "131415__GMTEST__golden"
+    exp = seq / "250716.131420__TEST_exp"
+    act = exp / "0__0__SIM__acquire_data"
+    write_meta(
+        seq / "250716.131415123456-seq.json",
+        {
+            "file_type": "sequence",
+            "sequence_uuid": U_SEQ,
+            "sequence_name": "GMTEST",
+            "sequence_label": "golden",
+            "sequence_timestamp": "2025-07-16 13:14:15.123456",
+            "sequence_status": ["finished"],
+            "sequence_params": {},
+        },
+    )
+    write_meta(
+        exp / "250716.131420123456-exp.json",
+        {
+            "file_type": "experiment",
+            "experiment_uuid": U_EXP,
+            "sequence_uuid": U_SEQ,
+            "experiment_name": "TEST_exp",
+            "experiment_timestamp": "2025-07-16 13:14:20.123456",
+            "experiment_status": ["finished"],
+            "experiment_params": {},
+        },
+    )
+    write_meta(
+        act / "250716.131421123456-act.json",
+        {
+            "file_type": "action",
+            "action_uuid": U_ACT,
+            "experiment_uuid": U_EXP,
+            "sequence_uuid": U_SEQ,
+            "action_name": "acquire_data",
+            "action_timestamp": "2025-07-16 13:14:21.123456",
+            "action_status": ["finished"],
+            "action_params": {"label": "\u0189\u00b5"},
+            "files": [
+                {"file_name": "WsSim-0.0.0.0__0.jsonl", "file_type": "helao__file"}
+            ],
+        },
+    )
+    write_pair(act, "WsSim-0.0.0.0__0", HEADER, ROWS)
+    return {"seq": seq, "exp": exp, "act": act}
+
+
+def test_file_mapper_reads_pair_and_json_meta(tmp_path):
+    t = _new_tree(tmp_path)
+    fm = FileMapper(t["act"])
+    rel = os.path.join(*t["act"].relative_to(tmp_path / "RUNS_FINISHED").parts)
+    # the S3 name and the header name both resolve to the rows file's pair
+    for name in ("WsSim-0.0.0.0__0.hlo.json", "WsSim-0.0.0.0__0.meta.json"):
+        meta, data = fm.read_hlo(os.path.join(rel, name))
+        assert (meta, dict(data)) == (HEADER, DATA)
+    assert (
+        fm.read_yml(os.path.join(rel, "250716.131421123456-act.json"))["action_uuid"]
+        == U_ACT
+    )
+
+
+def test_file_mapper_reads_a_headerless_jsonl(tmp_path):
+    act = tmp_path / "RUNS_FINISHED" / "25.28" / "0716" / "s" / "e" / "a"
+    write_pair(act, "X__0", None, ROWS)
+    fm = FileMapper(act)
+    rel = os.path.join(*act.relative_to(tmp_path / "RUNS_FINISHED").parts)
+    meta, data = fm.read_hlo(os.path.join(rel, "X__0.jsonl"))
+    assert (meta, dict(data)) == ({}, DATA)
+
+
+def test_file_mapper_reads_a_legacy_hlo_via_its_s3_name(tmp_path):
+    act = tmp_path / "RUNS_FINISHED" / "25.28" / "0716" / "s" / "e" / "a"
+    act.mkdir(parents=True)
+    write_legacy_hlo(act / "X__0.hlo", HEADER, ROWS)
+    fm = FileMapper(act)
+    rel = os.path.join(*act.relative_to(tmp_path / "RUNS_FINISHED").parts)
+    meta, data = fm.read_hlo(os.path.join(rel, "X__0.hlo.json"))
+    assert (meta, dict(data)) == (HEADER, DATA)
+
+
+def _zip_tree(tmp_path, t):
+    zp = tmp_path / "RUNS_SYNCED" / "25.28" / "0716" / "131415__GMTEST__golden.zip"
+    zp.parent.mkdir(parents=True)
+    with zipfile.ZipFile(zp, "w") as zf:
+        for f in t["seq"].rglob("*"):
+            if f.is_file():
+                zf.write(f, f.relative_to(t["seq"]).as_posix())
+    return zp
+
+
+def test_helao_data_walks_a_json_tree(tmp_path):
+    t = _new_tree(tmp_path)
+    hd = HelaoData(str(t["seq"] / "250716.131415123456-seq.json"))
+    assert hd.type == "seq" and hd.uuid == U_SEQ
+    (exp,) = hd.exp
+    (act,) = exp.act
+    assert act.type == "act" and act.uuid == U_ACT
+    assert [os.path.basename(p) for p in act.data_files] == ["WsSim-0.0.0.0__0.jsonl"]
+    meta, data = act.read_data_file(act.data_files[0])
+    assert (meta, dict(data)) == (HEADER, DATA)
+
+
+def test_zipped_json_meta_keeps_non_ascii(tmp_path):
+    """Review Focus 3: the legacy 0x89 repair must not touch a JSON member."""
+    t = _new_tree(tmp_path)
+    zp = _zip_tree(tmp_path, t)
+    # 'U+0189' is C6 89 in UTF-8, so a blind 0x89 -> '%' swap corrupts it.
+    act_member = (
+        "250716.131420__TEST_exp/0__0__SIM__acquire_data/250716.131421123456-act.json"
+    )
+    ll = LocalLoader(data_path=str(zp))
+    assert ll.get_yml(act_member)["action_params"]["label"] == "\u0189\u00b5"
+    hd = HelaoData(str(zp))
+    (act,) = hd.exp[0].act
+    assert act.yml["action_params"]["label"] == "\u0189\u00b5"
+    meta, data = act.read_hlo(act.data_files[0])
+    assert (meta, dict(data)) == (HEADER, DATA)
+    # FileMapper zip path too
+    fm = FileMapper(tmp_path / "RUNS_FINISHED" / "25.28" / "0716")
+    got = fm.read_yml("25.28/0716/131415__GMTEST__golden/" + act_member)
+    assert got["action_params"]["label"] == "\u0189\u00b5"
+
+
+def test_zipped_legacy_yml_keeps_the_0x89_repair(tmp_path):
+    zp = tmp_path / "RUNS_SYNCED" / "25.28" / "0716" / "SEQ.zip"
+    zp.parent.mkdir(parents=True)
+    with zipfile.ZipFile(zp, "w") as zf:
+        zf.writestr("e/a/x-act.yml", b"action_name: a\nnote: p\x89q\n")
+    fm = FileMapper(tmp_path / "RUNS_FINISHED" / "25.28" / "0716")
+    assert fm.read_yml("25.28/0716/SEQ/e/a/x-act.yml")["note"] == "p%q"
+
+
+def test_local_loader_indexes_and_reads_a_json_tree(tmp_path):
+    t = _new_tree(tmp_path)
+    ll = LocalLoader(data_path=str(t["seq"]))
+    assert (len(ll.sequences), len(ll.experiments), len(ll.actions)) == (1, 1, 1)
+    meta, data = ll.get_act(0).hlo
+    assert (meta, dict(data)) == (HEADER, DATA)
+
+
+def test_data_browser_indexes_and_reads_a_pair(tmp_path):
+    t = _new_tree(tmp_path)
+    rows = RunsSourceIndex(tmp_path, "FINISHED").index()
+    assert list(rows.file_name) == ["WsSim-0.0.0.0__0.jsonl"]
+    assert list(rows.file_type) == ["jsonl"]
+    meta, data = read_dataset(rows.locator.iloc[0])
+    assert (meta, dict(data)) == (HEADER, DATA)
+    zp = tmp_path / "z.zip"
+    with zipfile.ZipFile(zp, "w") as zf:
+        for f in t["act"].iterdir():
+            zf.write(f, f"a/{f.name}")
+    meta, data = read_dataset(make_zip_locator(str(zp), "a/WsSim-0.0.0.0__0.jsonl"))
+    assert (meta, dict(data)) == (HEADER, DATA)

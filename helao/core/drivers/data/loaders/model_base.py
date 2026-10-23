@@ -112,6 +112,7 @@ class HelaoDataModelMixin:
             x
             for x in file_list
             if x["file_name"].endswith(".hlo")
+            or x["file_name"].endswith(".jsonl")
             or x["file_name"].endswith(".json")
             or x["file_type"] in ["helao__json_file", "json__file"]
         ]
@@ -132,7 +133,9 @@ class HelaoDataModelMixin:
         Returns:
             A three-element list, or three empty values if no match.
         """
-        hlo_files = [x for x in self.data_files if x["file_name"].endswith(".hlo")]
+        hlo_files = [
+            x for x in self.data_files if x["file_name"].endswith((".hlo", ".jsonl"))
+        ]
         if contains:
             hlo_files = [x for x in hlo_files if contains in x["file_type"]]
         if not hlo_files:

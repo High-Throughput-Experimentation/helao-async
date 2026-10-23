@@ -24,6 +24,7 @@ from helao.core.drivers.data.loaders.model_base import (
 )
 from helao.core.models.credentials import HelaoCredentials
 from helao.helpers import helao_logging as logging
+from helao.hexagon.domain.naming import data_stem
 
 #: The SQL metadata backend is being retired and no deployment queries it.
 _SQL_DEPRECATED = (
@@ -461,8 +462,8 @@ class HelaoLoader:
             :class:`HloPayload` of the ``.hlo.json``; empty if the file name is
             not a valid HLO.
         """
-        if hlo_fn.endswith(".hlo"):
-            keystr = f"raw_data/{str(action_uuid)}/{hlo_fn}.json"
+        if hlo_fn.endswith((".hlo", ".jsonl")):
+            keystr = f"raw_data/{str(action_uuid)}/{data_stem(hlo_fn)}.hlo.json"
         elif hlo_fn.endswith(".json"):
             if not hlo_fn.endswith(".hlo.json"):
                 keystr = f"raw_data/{str(action_uuid)}/{hlo_fn.replace('.json', '.hlo.json')}"
