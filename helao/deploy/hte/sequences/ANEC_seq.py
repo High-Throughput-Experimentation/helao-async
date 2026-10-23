@@ -2190,51 +2190,6 @@ def ANEC_create_and_load_liquid_sample(
     return epm.planned_experiments
 
 
-# =============================================================================
-# def ANEC_create_liquid_sample(
-#     sequence_version: int = 1,
-#     no_of_samples: int = 5,
-#     volume_ml: float = 0.84,
-#     source: list[str] = ["autoGDE"],
-#     partial_molarity: list[str] = ["unknown"],
-#     chemical: list[str] = ["unknown"],
-#     ph: float = 7.8,
-#     supplier: list[str] = ["N/A"],
-#     lot_number: list[str] = ["N/A"],
-#     electrolyte_name: str = "1M KHCO3",
-#     prep_date: str = "2024-03-19",
-#
-#
-# ):
-#     epm = ExperimentPlanMaker()
-#     for _ in range(no_of_samples):
-#         epm.add(
-#             "create_liquid_sample",
-#             {"volume_ml": volume_ml, "source": source, "partial_molarity":partial_molarity, "chemical":chemical, "ph":ph, "supplier":supplier, "lot_number":lot_number,"electrolyte_name":electrolyte_name, "prep_date":prep_date},
-#         )
-#
-#     return epm.planned_experiments
-#
-# def ANEC_create_liquid_tray(
-#     sequence_version: int = 1,
-#     liquid_sample_no: list[int] = [1, 1, 1, 1, 1],
-#     machine_name: str = "hte-ecms-01",
-#     slot: int = 1,
-#     vial: list[int] = [1, 2, 3, 4, 5],
-#
-#
-# ):
-#     epm = ExperimentPlanMaker()
-#     for num, (sample_no, vial_no) in enumerate(zip(liquid_sample_no, vial)):
-#         epm.add(
-#             "load_liquid_sample",
-#             {"liquid_sample_no": sample_no, "machine_name": machine_name, "tray":2, "slot":slot, "vial":vial_no},
-#         )
-#
-#     return epm.planned_experiments
-# =============================================================================
-
-
 @sequence(version=1)
 def GC_Archiveliquid_analysis(
     source_tray: int = 2,

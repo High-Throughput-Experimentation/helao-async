@@ -2647,23 +2647,6 @@ def ADSS_sub_keep_electrolyte(
     return apm.planned_actions
 
 
-# def ADSS_sub_empty_cell(
-#     experiment: Experiment,
-#     experiment_version: int = 1,
-#     ReversePurgeWait_s: float = 20,
-# ):
-
-#     apm = ActionPlanMaker()
-#     apm.add(NI_server, "gasvalve", {"gasvalve": "inlet", "on": 0})
-#     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
-#     apm.add(NI_server, "pump", {"pump": "direction", "on": 1})
-#     apm.add(NI_server, "pump", {"pump": "peripump", "on": 1})
-#     apm.add(ORCH_server, "wait", {"waittime": ReversePurgeWait_s})
-#     apm.add(NI_server, "pump", {"pump": "peripump", "on": 0})
-
-#     return apm.planned_actions
-
-
 # need to move to clean spot first before beginning clean
 @experiment(version=5)
 def ADSS_sub_clean_cell(
@@ -2860,55 +2843,6 @@ def ADSS_sub_move_to_ref_measurement(
     apm.add(MOTOR_server, "z_move", {"z_position": "seal"})
 
     return apm.planned_actions
-
-
-# def ADSS_sub_refill_syringes(
-#     experiment: Experiment,
-#     experiment_version: int = 1,
-#     Solution_volume_ul: float = 0,
-#     Waterclean_volume_ul: float = 5000,
-#     Syringe_rate_ulsec: float = 300,
-# ):
-#     apm = ActionPlanMaker()
-#     if Solution_volume_ul != 0:
-#         apm.add(NI_server, "liquidvalve", {"liquidvalve": "work_refill", "on": 1})
-#         apm.add(ORCH_server, "wait", {"waittime": 0.25})
-#         apm.add(
-#             WORKSYRINGE_server,
-#             "withdraw",
-#             {
-#                 "rate_uL_sec": Syringe_rate_ulsec,
-#                 "volume_uL": Solution_volume_ul + 25,
-#             },
-#         )
-#         apm.add(
-#             WORKSYRINGE_server,
-#             "infuse",
-#             {"rate_uL_sec": Syringe_rate_ulsec, "volume_uL": 25},
-#         )
-#         apm.add(ORCH_server, "wait", {"waittime": 40})
-#         apm.add(NI_server, "liquidvalve", {"liquidvalve": "work_refill", "on": 0})
-
-#     if Waterclean_volume_ul != 0:
-#         apm.add(NI_server, "liquidvalve", {"liquidvalve": "clean_refill", "on": 1})
-#         apm.add(ORCH_server, "wait", {"waittime": 0.25})
-#         apm.add(
-#             CLEANSYRINGE_server,
-#             "withdraw",
-#             {
-#                 "rate_uL_sec": Syringe_rate_ulsec,
-#                 "volume_uL": Waterclean_volume_ul + 25,
-#             },
-#         )
-#         apm.add(
-#             CLEANSYRINGE_server,
-#             "infuse",
-#             {"rate_uL_sec": Syringe_rate_ulsec, "volume_uL": 25},
-#         )
-#         apm.add(ORCH_server, "wait", {"waittime": 10})
-#         apm.add(NI_server, "liquidvalve", {"liquidvalve": "clean_refill", "on": 0})
-
-#     return apm.planned_actions
 
 
 @experiment(version=4)

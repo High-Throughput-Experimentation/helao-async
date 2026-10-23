@@ -1,5 +1,3 @@
-aiodebug
-aioshutil
 nidaqmx
 pydasher
 uuid7

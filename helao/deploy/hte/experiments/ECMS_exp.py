@@ -417,48 +417,6 @@ def ECMS_sub_electrolyte_fill_cell(
     return apm.planned_actions
 
 
-# =============================================================================
-# def ECMS_sub_electrolyte_fill_cell(
-#     experiment: Experiment,
-#     experiment_version: int = 1,
-#     liquid_forward_time: float = 20,
-#     liquid_backward_time: float = 10,
-#     reservoir_liquid_sample_no: int = 1,
-#     volume_ul_cell_liquid: int = 1
-# ):
-#     """Add electrolyte volume to cell position.
-#
-#     (1) create liquid sample using volume_ul_cell and liquid_sample_no
-#     """
-#
-#     apm = ActionPlanMaker()
-#
-#     # Fill cell with liquid
-#     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 1})
-#     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 1})
-#     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 0})
-#     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 1})
-#     apm.add(ORCH_server, "wait", {"waittime": liquid_forward_time})
-#     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 1})
-#     apm.add(ORCH_server, "wait", {"waittime": liquid_backward_time})
-#     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 0})
-#     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
-#     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 0})
-#     apm.add(
-#         PAL_server,
-#         "archive_custom_add_liquid",
-#         {
-#             "custom": "cell1_we",
-#             "source_liquid_in": LiquidSample(
-#                 sample_no=reservoir_liquid_sample_no, machine_name=ORCH_HOST
-#             ).model_dump(),
-#             "volume_ml": volume_ul_cell_liquid,
-#             "combine_liquids": True,
-#             "dilute_liquids": True,
-#         },
-#     )
-#     return apm.planned_actions
-# =============================================================================
 @experiment(version=2)
 def ECMS_sub_electrolyte_fill_cell_recirculation(
     liquid_backward_time: float = 80,
@@ -501,48 +459,6 @@ def ECMS_sub_electrolyte_fill_cell_recirculation(
         },
     )
     return apm.planned_actions
-
-
-# =============================================================================
-# def ECMS_sub_electrolyte_fill_cell_recirculation(
-#     experiment: Experiment,
-#     experiment_version: int = 1,
-#     #liquid_forward_time: float = 20,
-#     liquid_backward_time: float = 10,
-#     reservoir_liquid_sample_no: int = 1,
-#     volume_ul_cell_liquid: int = 1
-# ):
-#     """Add electrolyte volume to cell position.
-#
-#     (1) create liquid sample using volume_ul_cell and liquid_sample_no
-#     """
-#
-#     apm = ActionPlanMaker()
-#
-#     # Fill cell with liquid
-#     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4A", "on": 1})
-#     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 1})
-#     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 1})
-#     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 1})
-#     apm.add(ORCH_server, "wait", {"waittime": liquid_backward_time})
-#     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 0})
-#     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 1})
-#     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4A", "on": 0})
-#     apm.add(
-#         PAL_server,
-#         "archive_custom_add_liquid",
-#         {
-#             "custom": "cell1_we",
-#             "source_liquid_in": LiquidSample(
-#                 sample_no=reservoir_liquid_sample_no, machine_name=ORCH_HOST
-#             ).model_dump(),
-#             "volume_ml": volume_ul_cell_liquid,
-#             "combine_liquids": True,
-#             "dilute_liquids": True,
-#         },
-#     )
-#     return apm.planned_actions
-# =============================================================================
 
 
 @experiment(version=2)
@@ -1081,30 +997,6 @@ def ECMS_sub_drain_recirculation(
     return apm.planned_actions
 
 
-# =============================================================================
-# def ECMS_sub_drain_recirculation(
-#     experiment: Experiment,
-#     experiment_version: int = 1,
-#     liquid_drain_time: float = 60,
-# ):
-#     """Add electrolyte volume to cell position.
-#
-#     (1) create liquid sample using volume_ul_cell and liquid_sample_no
-#     """
-#
-#     apm = ActionPlanMaker()
-#
-#     # Fill cell with liquid
-#     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 1})
-#     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 1})
-#     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 0})
-#     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 1})
-#     apm.add(ORCH_server, "wait", {"waittime": liquid_drain_time})
-#     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 0})
-#     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 0})
-#     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
-#     return apm.planned_actions
-# =============================================================================
 @experiment(version=2)
 def ECMS_sub_clean_cell_recirculation(
     cleaning_times: int = 2,
@@ -1562,108 +1454,6 @@ def ECMS_sub_pulsecali(
     return apm.planned_actions
 
 
-# =============================================================================
-# def ECMS_sub_CA_CO2flow(
-#     experiment: Experiment,
-#     experiment_version: int = 1,
-#     WE_potential__V: float = 0.0,
-#     WE_versus: str = "ref",
-#     CA_duration_sec: float = 0.1,
-#     SampleRate: float = 0.01,
-#     IErange: str = "auto",
-#     ref_offset__V: float = 0.0,
-#     ref_type: str = "leakless",
-#     pH: float = 6.8,
-#     MS_equilibrium_time: float = 90.0,
-#     CO2_flow_duration_sec: float = 60.0,
-#     CO2_flow_rate_sccm: float = 0.0,
-#     inert_gas_flow_rate_sccm: float = 10.0,
-# ):
-#     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-#     if WE_versus == "ref":
-#         potential_vsRef = WE_potential__V - 1.0 * ref_offset__V
-#     elif WE_versus == "rhe":
-#         potential_vsRef = (
-#             WE_potential__V - 1.0 * ref_offset__V - 0.059 * pH - REF_TABLE[ref_type]
-#         )
-#     else:
-#         raise ValueError("WE_versus must be either 'ref' or 'rhe'")
-#     apm.add(
-#         PAL_server,
-#         "archive_custom_query_sample",
-#         {"custom": "cell1_we"},
-#         to_global_params=["_fast_samples_in"],
-#     )
-#     apm.add(
-#         PSTAT_server,
-#         "run_CA",
-#         {
-#             "Vval__V": potential_vsRef,
-#             "Tval__s": CA_duration_sec,
-#             "AcqInterval__s": SampleRate,
-#             "IErange": IErange,
-#         },
-#         from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-#         process_finish=True,
-#         technique_name="CA",
-#         process_contrib=[
-#             ProcessContrib.action_params,
-#             ProcessContrib.files,
-#             ProcessContrib.samples_in,
-#             ProcessContrib.samples_out,
-#         ],
-#     )
-#
-#     # ORCH/wait with no wait condition for CO2 flow duration time
-#     apm.add(
-#         ORCH_server,
-#         "wait",
-#         {"waittime": CO2_flow_duration_sec},
-#         start_condition=asc.no_wait,
-#     )
-#     # MFC stop CO2, hold valve closed
-#     apm.add(
-#         MFC_server,
-#         "set_flowrate",
-#         {
-#             "flowrate_sccm": CO2_flow_rate_sccm,
-#             "ramp_sccm_sec": 0.0,
-#             "device_name": "CO2",
-#         },
-#         start_condition=asc.wait_for_orch,
-#     )
-#     apm.add(
-#         MFC_server,
-#         "hold_valve_closed_action",
-#         {"device_name": "CO2"},
-#         start_condition=asc.no_wait,
-#     )
-#     # CALIBRATIONMFCSECOND for inert gas set flow rate
-#     apm.add(
-#         CALIBRATIONMFCSECOND_server,
-#         "set_flowrate",
-#         {
-#             "flowrate_sccm": inert_gas_flow_rate_sccm,
-#             "ramp_sccm_sec": 0.0,
-#             "device_name": "Caligassecond",
-#         },
-#         start_condition=asc.no_wait,
-#     )
-#     # CALIBRATIONMFCSECOND cancel valve hold
-#     apm.add(
-#         CALIBRATIONMFCSECOND_server,
-#         "cancel_hold_valve_action",
-#         {"device_name": "Caligassecond"},
-#         start_condition=asc.no_wait,
-#     )
-#
-#
-#     apm.add(ORCH_server, "wait", {"waittime": MS_equilibrium_time})
-#     # apm.add(ORCH_server, "wait", {"waittime": 10})
-#
-#     return apm.planned_actions
-#
-# =============================================================================
 @experiment(version=1)
 def ECMS_sub_preCA_CO2flow(
     MS_equilibrium_time: float = 10.0,
