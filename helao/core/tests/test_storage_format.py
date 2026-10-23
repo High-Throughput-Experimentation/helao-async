@@ -611,3 +611,39 @@ def test_helao_yml_walks_a_mixed_json_tree(tmp_path):
     assert [Path(p) for p in drv.list_pending()] == [s]
     assert [Path(p) for p in drv.list_pending_exps()] == [e]
     assert [Path(p) for p in drv.list_pending_acts()] == [a]
+
+
+def _finish_pending_driver(pending, resets):
+    drv = sd.SyncDriver.__new__(sd.SyncDriver)
+    drv.list_pending = lambda *a, **k: pending  # type: ignore[method-assign]
+
+    async def enqueue(path, rank=0):
+        return None
+
+    drv.enqueue_yml = enqueue  # type: ignore[method-assign]
+    drv.reset_sync = lambda p: resets.append(p) or True  # type: ignore[method-assign]
+    return drv
+
+
+def test_finish_pending_does_not_reset_a_json_record(tmp_path):
+    import asyncio
+
+    seq = write_meta(
+        tmp_path / "RUNS" / "2026" / "1023" / "s" / "261023.120000000000-seq.json",
+        {"sequence_uuid": "x"},
+    )
+    resets = []
+    asyncio.run(_finish_pending_driver([str(seq)], resets).finish_pending())
+    assert resets == []
+
+
+def test_finish_pending_still_resets_a_legacy_progress_sidecar(tmp_path):
+    import asyncio
+
+    seq = tmp_path / "RUNS_FINISHED" / "2026" / "1023" / "s" / "x-seq.yml"
+    prog = tmp_path / "RUNS_SYNCED" / "2026" / "1023" / "s" / "x-seq.progress"
+    prog.parent.mkdir(parents=True)
+    prog.write_text("a: 1\n", encoding="utf-8")
+    resets = []
+    asyncio.run(_finish_pending_driver([str(seq)], resets).finish_pending())
+    assert resets == [str(prog.parent)]

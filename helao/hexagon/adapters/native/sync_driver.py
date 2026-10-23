@@ -2841,7 +2841,10 @@ class SyncDriver:
             Legacy artifacts only -- see the caller's docstring for why this does
             not (and must not) look for ``.prg``.
             """
-            if os.path.exists(
+            # ``.progress`` sidecars exist only beside legacy ``.yml`` records;
+            # on a ``.json`` record the replace below is a no-op and the probe
+            # would test the record itself.
+            if pp.endswith(".yml") and os.path.exists(
                 pp.replace(RunDir.FINISHED.value, RunDir.SYNCED.value).replace(
                     ".yml", ".progress"
                 )

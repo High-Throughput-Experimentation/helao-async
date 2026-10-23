@@ -311,6 +311,7 @@ async def test_write_off_repushes_a_backlog_group_with_the_marker(
         await drv.enqueue_yml(exp_yml, 1)
         await drain(drv, timeout=15)
         assert yml_load(old, fast=True)["missing_action_orders"] == [2]
+        assert [p.name for p in exp_yml.parent.glob("1__*-prc.*")] == [old.name]
         assert bodies and all(b["missing_action_orders"] == [2] for b in bodies)
     finally:
         await teardown_driver(drv)
