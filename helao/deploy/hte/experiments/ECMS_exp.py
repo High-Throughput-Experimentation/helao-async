@@ -129,6 +129,127 @@ def ECMS_sub_load_solid(
     return apm.planned_actions
 
 
+_ECMS_MFC = {
+    "CO2": MFC_server,
+    "Caligas": CALIBRATIONMFC_server,
+    "Caligassecond": CALIBRATIONMFCSECOND_server,
+}
+
+
+def _ecms_mfc(
+    apm,
+    device,
+    flowrate_sccm,
+    ramp_sccm_sec,
+    then="cancel_hold_valve_action",
+    start=asc.no_wait,
+):
+    """Set one MFC's flow rate, then release (or close) its hold valve."""
+    apm.add(
+        _ECMS_MFC[device],
+        "set_flowrate",
+        {
+            "flowrate_sccm": flowrate_sccm,
+            "ramp_sccm_sec": ramp_sccm_sec,
+            "device_name": device,
+        },
+        start,
+    )
+    apm.add(_ECMS_MFC[device], then, {"device_name": device}, asc.no_wait)
+
+
+def _ecms_vs_ref(V, WE_versus, ref_offset__V, pH, ref_type, allow_ocv=False):
+    """Convert a WE potential to volts vs the reference electrode (arithmetic verbatim)."""
+    WE_versus = resolve_we_versus(WE_versus)
+    if WE_versus == "ref":
+        return V - 1.0 * ref_offset__V
+    if WE_versus == "ocv" and allow_ocv:
+        return V
+    if WE_versus == "rhe":
+        return V - 1.0 * ref_offset__V - 0.059 * pH - ref_offset(ref_type)
+    # legacy: CA/CA_CO2flow never handled 'ocv' and read an unbound local; keep that
+    # exact failure (Phase 3 decides the fix)
+    raise UnboundLocalError(
+        "cannot access local variable 'potential_vsRef' where it is not associated with a value"
+    )
+
+
+def _ecms_pstat(apm, endpoint, params, technique):
+    """Query the cell sample, then run one PSTAT technique on it."""
+    apm.add(
+        SAMPLE_server,
+        "archive_custom_query_sample",
+        {"custom": "cell1_we"},
+        to_global_params=["_fast_samples_in"],
+    )
+    apm.add(
+        PSTAT_server,
+        endpoint,
+        params,
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
+        process_finish=True,
+        technique_name=technique,
+        process_contrib=[
+            ProcessContrib.action_params,
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+
+
+def _ecms_add_liquid(apm, sample_no, volume_ul, combine=True, dilute=True):
+    """Record `volume_ul` of reservoir liquid `sample_no` as added to the cell."""
+    apm.add(
+        SAMPLE_server,
+        "archive_custom_add_liquid",
+        {
+            "custom": "cell1_we",
+            "source_liquid_in": LiquidSample(
+                sample_no=sample_no, machine_name=ORCH_HOST
+            ).model_dump(),
+            "volume_ml": volume_ul / 1000,
+            "combine_liquids": combine,
+            "dilute_liquids": dilute,
+        },
+    )
+
+
+def _ecms_fill_cell(apm, inlet_valve, liquid_backward_time, sample_no, volume_ul):
+    """Pump electrolyte into the cell through `inlet_valve` (4A reservoir, 4B recirculation)."""
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": inlet_valve, "on": 1})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 1})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 1})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": liquid_backward_time})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
+    apm.add(NI_server, "liquidvalve", {"liquidvalve": inlet_valve, "on": 0})
+    _ecms_add_liquid(apm, sample_no, volume_ul)
+    return apm.planned_actions
+
+
+def _ecms_headspace_purge(
+    apm,
+    device,
+    equilibrium_duration,
+    flowrate_sccm,
+    flow_ramp_sccm,
+    MS_baseline_duration,
+):
+    """Purge the headspace with `device`'s gas, then route it to the MS for a baseline."""
+    apm.add(NI_server, "gasvalve", {"gasvalve": "1", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "2A", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "3A", "on": 1})
+    _ecms_mfc(apm, device, flowrate_sccm, flow_ramp_sccm)
+    apm.add(ORCH_server, "wait", {"waittime": equilibrium_duration})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "2B", "on": 1})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "6B", "on": 0})
+    apm.add(NI_server, "gasvalve", {"gasvalve": "6A", "on": 1})
+    apm.add(ORCH_server, "wait", {"waittime": MS_baseline_duration})
+    return apm.planned_actions
+
+
 @experiment(version=2)
 def ECMS_sub_load_liquid(
     reservoir_liquid_sample_no: int = 1,
@@ -147,22 +268,13 @@ def ECMS_sub_load_liquid(
     Returns:
         List of planned actions for the orchestrator.
     """
-
     apm = ActionPlanMaker()
-
-    # (3) Create liquid sample and add to assembly
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_add_liquid",
-        {
-            "custom": "cell1_we",
-            "source_liquid_in": LiquidSample(
-                sample_no=reservoir_liquid_sample_no, machine_name=ORCH_HOST
-            ).model_dump(),
-            "volume_ml": volume_ul_cell_liquid / 1000,
-            "combine_liquids": combine_True_False,
-            "dilute_liquids": water_True_False,
-        },
+    _ecms_add_liquid(
+        apm,
+        reservoir_liquid_sample_no,
+        volume_ul_cell_liquid,
+        combine_True_False,
+        water_True_False,
     )
     return apm.planned_actions
 
@@ -208,60 +320,9 @@ def ECMS_sub_normal_state() -> list:
     Returns:
         List of planned actions for the orchestrator.
     """
-
     apm = ActionPlanMaker()
-
-    # Fill cell with liquid
-
-    apm.add(
-        MFC_server,
-        "set_flowrate",
-        {
-            "flowrate_sccm": 0.0,
-            "ramp_sccm_sec": 0.0,
-            "device_name": "CO2",
-        },
-        asc.no_wait,
-    )
-    apm.add(
-        MFC_server,
-        "hold_valve_closed_action",
-        {"device_name": "CO2"},
-        asc.no_wait,
-    )
-
-    apm.add(
-        CALIBRATIONMFC_server,
-        "set_flowrate",
-        {
-            "flowrate_sccm": 0.0,
-            "ramp_sccm_sec": 0.0,
-            "device_name": "Caligas",
-        },
-        asc.no_wait,
-    )
-    apm.add(
-        CALIBRATIONMFC_server,
-        "hold_valve_closed_action",
-        {"device_name": "Caligas"},
-        asc.no_wait,
-    )
-    apm.add(
-        CALIBRATIONMFCSECOND_server,
-        "set_flowrate",
-        {
-            "flowrate_sccm": 0.0,
-            "ramp_sccm_sec": 0.0,
-            "device_name": "Caligassecond",
-        },
-        asc.no_wait,
-    )
-    apm.add(
-        CALIBRATIONMFCSECOND_server,
-        "hold_valve_closed_action",
-        {"device_name": "Caligassecond"},
-        asc.no_wait,
-    )
+    for device in ("CO2", "Caligas", "Caligassecond"):
+        _ecms_mfc(apm, device, 0.0, 0.0, then="hold_valve_closed_action")
     apm.add(NI_server, "gasvalve", {"gasvalve": "1", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "2A", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "3A", "on": 0})
@@ -269,7 +330,6 @@ def ECMS_sub_normal_state() -> list:
     apm.add(NI_server, "gasvalve", {"gasvalve": "6A", "on": 0})
     apm.add(NI_server, "gasvalve", {"gasvalve": "6B", "on": 1})
     apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0})
-    # apm.add(ORCH_server, "wait", {"waittime": baseline_duration})
     return apm.planned_actions
 
 
@@ -280,72 +340,18 @@ def ECMS_sub_alloff() -> list:
     Returns:
         List of planned actions for the orchestrator.
     """
-
     apm = ActionPlanMaker()
-    apm.add(
-        NI_server,
-        "pump",
-        {
-            "pump": "RecirculatingPeriPump1",
-            "on": 0,
-        },
-    )
-    apm.add(
-        NI_server,
-        "pump",
-        {
-            "pump": "RecirculatingPeriPump2",
-            "on": 0,
-        },
-    )
-    apm.add(
-        MFC_server,
-        "set_flowrate",
-        {
-            "flowrate_sccm": 0.0,
-            "ramp_sccm_sec": 0.0,
-            "device_name": "CO2",
-        },
-        asc.no_wait,
-    )
-    apm.add(
-        MFC_server,
-        "hold_valve_closed_action",
-        {"device_name": "CO2"},
-        asc.no_wait,
-    )
-    apm.add(
-        CALIBRATIONMFC_server,
-        "set_flowrate",
-        {
-            "flowrate_sccm": 0.0,
-            "ramp_sccm_sec": 0.0,
-            "device_name": "Caligas",
-        },
-        asc.no_wait,
-    )
-    apm.add(
-        CALIBRATIONMFC_server,
-        "hold_valve_closed_action",
-        {"device_name": "Caligas"},
-        asc.no_wait,
-    )
-    apm.add(NI_server, "gasvalve", {"gasvalve": "2B", "on": 0}, asc.no_wait)
-    apm.add(NI_server, "gasvalve", {"gasvalve": "1", "on": 0}, asc.no_wait)
-    apm.add(NI_server, "gasvalve", {"gasvalve": "2A", "on": 0}, asc.no_wait)
-    apm.add(NI_server, "gasvalve", {"gasvalve": "3A", "on": 0}, asc.no_wait)
-    apm.add(NI_server, "gasvalve", {"gasvalve": "3B", "on": 0}, asc.no_wait)
-    apm.add(NI_server, "gasvalve", {"gasvalve": "6A", "on": 0}, asc.no_wait)
-    apm.add(NI_server, "gasvalve", {"gasvalve": "6B", "on": 0}, asc.no_wait)
-    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 0}, asc.no_wait)
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "4A", "on": 0}, asc.no_wait)
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 0}, asc.no_wait)
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5A", "on": 0}, asc.no_wait)
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0}, asc.no_wait)
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1", "on": 0})
+    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 0})
+    for device in ("CO2", "Caligas"):
+        _ecms_mfc(apm, device, 0.0, 0.0, then="hold_valve_closed_action")
+    for valve in ("2B", "1", "2A", "3A", "3B", "6A", "6B", "7"):
+        apm.add(NI_server, "gasvalve", {"gasvalve": valve, "on": 0}, asc.no_wait)
+    for valve in ("4A", "4B", "5A", "5B"):
+        apm.add(NI_server, "liquidvalve", {"liquidvalve": valve, "on": 0}, asc.no_wait)
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump1-dir", "on": 0})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 0})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-maxspd", "on": 0})
-
     return apm.planned_actions
 
 
@@ -389,32 +395,13 @@ def ECMS_sub_electrolyte_fill_cell(
     Returns:
         List of planned actions for the orchestrator.
     """
-
-    apm = ActionPlanMaker()
-
-    # Fill cell with liquid
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "4A", "on": 1})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 1})
-    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 1})
-    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": liquid_backward_time})
-    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "4A", "on": 0})
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_add_liquid",
-        {
-            "custom": "cell1_we",
-            "source_liquid_in": LiquidSample(
-                sample_no=reservoir_liquid_sample_no, machine_name=ORCH_HOST
-            ).model_dump(),
-            "volume_ml": volume_ul_cell_liquid / 1000,
-            "combine_liquids": True,
-            "dilute_liquids": True,
-        },
+    return _ecms_fill_cell(
+        ActionPlanMaker(),
+        "4A",
+        liquid_backward_time,
+        reservoir_liquid_sample_no,
+        volume_ul_cell_liquid,
     )
-    return apm.planned_actions
 
 
 @experiment(version=2)
@@ -433,32 +420,13 @@ def ECMS_sub_electrolyte_fill_cell_recirculation(
     Returns:
         List of planned actions for the orchestrator.
     """
-
-    apm = ActionPlanMaker()
-
-    # Fill cell with liquid
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 1})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 1})
-    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 1})
-    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": liquid_backward_time})
-    apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
-    apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 0})
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_add_liquid",
-        {
-            "custom": "cell1_we",
-            "source_liquid_in": LiquidSample(
-                sample_no=reservoir_liquid_sample_no, machine_name=ORCH_HOST
-            ).model_dump(),
-            "volume_ml": volume_ul_cell_liquid / 1000,
-            "combine_liquids": True,
-            "dilute_liquids": True,
-        },
+    return _ecms_fill_cell(
+        ActionPlanMaker(),
+        "4B",
+        liquid_backward_time,
+        reservoir_liquid_sample_no,
+        volume_ul_cell_liquid,
     )
-    return apm.planned_actions
 
 
 @experiment(version=2)
@@ -508,49 +476,14 @@ def ECMS_sub_headspace_purge_and_CO2baseline(
     Returns:
         List of planned actions for the orchestrator.
     """
-
-    apm = ActionPlanMaker()
-
-    # Fill cell with liquid
-    apm.add(NI_server, "gasvalve", {"gasvalve": "1", "on": 1})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "2A", "on": 1})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "3A", "on": 1})
-    apm.add(
-        MFC_server,
-        "set_flowrate",
-        {
-            "flowrate_sccm": flowrate_sccm,
-            "ramp_sccm_sec": flow_ramp_sccm,
-            "device_name": "CO2",
-        },
-        asc.no_wait,
+    return _ecms_headspace_purge(
+        ActionPlanMaker(),
+        "CO2",
+        CO2equilibrium_duration,
+        flowrate_sccm,
+        flow_ramp_sccm,
+        MS_baseline_duration,
     )
-    apm.add(
-        MFC_server,
-        "cancel_hold_valve_action",
-        {"device_name": "CO2"},
-        asc.no_wait,
-    )
-    # =============================================================================
-    #     apm.add(
-    #         MFC_server,
-    #         "acquire_flowrate",
-    #         {
-    #             "flowrate_sccm": flowrate_sccm,
-    #             "ramp_sccm_sec": flow_ramp_sccm,
-    #             "acquisition_rate": co2measure_acqrate,
-    #             "duration": flow_duration,
-    #             "stay_open": True
-    #         },
-    #         asc.no_wait,
-    #     )
-    # =============================================================================
-    apm.add(ORCH_server, "wait", {"waittime": CO2equilibrium_duration})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "2B", "on": 1})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "6B", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "6A", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": MS_baseline_duration})
-    return apm.planned_actions
 
 
 @experiment(version=1)
@@ -573,36 +506,14 @@ def ECMS_sub_headspace_purge_and_Arbaseline(
     Returns:
         List of planned actions for the orchestrator.
     """
-
-    apm = ActionPlanMaker()
-
-    # Fill cell with liquid
-    apm.add(NI_server, "gasvalve", {"gasvalve": "1", "on": 1})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "2A", "on": 1})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "3A", "on": 1})
-    apm.add(
-        CALIBRATIONMFCSECOND_server,
-        "set_flowrate",
-        {
-            "flowrate_sccm": flowrate_sccm,
-            "ramp_sccm_sec": flow_ramp_sccm,
-            "device_name": "Caligassecond",
-        },
-        asc.no_wait,
+    return _ecms_headspace_purge(
+        ActionPlanMaker(),
+        "Caligassecond",
+        Arequilibrium_duration,
+        flowrate_sccm,
+        flow_ramp_sccm,
+        MS_baseline_duration,
     )
-    apm.add(
-        CALIBRATIONMFCSECOND_server,
-        "cancel_hold_valve_action",
-        {"device_name": "Caligassecond"},
-        asc.no_wait,
-    )
-
-    apm.add(ORCH_server, "wait", {"waittime": Arequilibrium_duration})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "2B", "on": 1})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "6B", "on": 0})
-    apm.add(NI_server, "gasvalve", {"gasvalve": "6A", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": MS_baseline_duration})
-    return apm.planned_actions
 
 
 @experiment(version=1)
@@ -670,42 +581,21 @@ def ECMS_sub_CA(
     Returns:
         List of planned actions for the orchestrator.
     """
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    WE_versus = resolve_we_versus(WE_versus)
-    if WE_versus == "ref":
-        potential_vsRef = WE_potential__V - 1.0 * ref_offset__V
-    elif WE_versus == "rhe":
-        potential_vsRef = (
-            WE_potential__V - 1.0 * ref_offset__V - 0.059 * pH - ref_offset(ref_type)
-        )
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {"custom": "cell1_we"},
-        to_global_params=["_fast_samples_in"],
-    )
-    apm.add(
-        PSTAT_server,
+    apm = ActionPlanMaker()
+    _ecms_pstat(
+        apm,
         "run_CA",
         {
-            "Vval__V": potential_vsRef,
+            "Vval__V": _ecms_vs_ref(
+                WE_potential__V, WE_versus, ref_offset__V, pH, ref_type
+            ),
             "Tval__s": CA_duration_sec,
             "AcqInterval__s": SampleRate,
             "IErange": IErange,
         },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        process_finish=True,
-        technique_name="CA",
-        process_contrib=[
-            ProcessContrib.action_params,
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+        "CA",
     )
     apm.add(ORCH_server, "wait", {"waittime": MS_equilibrium_time})
-    # apm.add(ORCH_server, "wait", {"waittime": 10})
-
     return apm.planned_actions
 
 
@@ -884,81 +774,46 @@ def ECMS_sub_CV(
     Returns:
         List of planned actions for the orchestrator.
     """
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    WE_versus = resolve_we_versus(WE_versus)
-    if WE_versus == "ref":
-        potential_init_vsRef = WE_potential_init__V - 1.0 * ref_offset__V
-        potential_apex1_vsRef = WE_potential_apex1__V - 1.0 * ref_offset__V
-        potential_apex2_vsRef = WE_potential_apex2__V - 1.0 * ref_offset__V
-        potential_final_vsRef = WE_potential_final__V - 1.0 * ref_offset__V
-    elif WE_versus == "ocv":
-        potential_init_vsRef = WE_potential_init__V
-        potential_apex1_vsRef = WE_potential_apex1__V
-        potential_apex2_vsRef = WE_potential_apex2__V
-        potential_final_vsRef = WE_potential_final__V
-    elif WE_versus == "rhe":
-        potential_init_vsRef = (
-            WE_potential_init__V
-            - 1.0 * ref_offset__V
-            - 0.059 * pH
-            - ref_offset(ref_type)
-        )
-        potential_apex1_vsRef = (
-            WE_potential_apex1__V
-            - 1.0 * ref_offset__V
-            - 0.059 * pH
-            - ref_offset(ref_type)
-        )
-        potential_apex2_vsRef = (
-            WE_potential_apex2__V
-            - 1.0 * ref_offset__V
-            - 0.059 * pH
-            - ref_offset(ref_type)
-        )
-        potential_final_vsRef = (
-            WE_potential_final__V
-            - 1.0 * ref_offset__V
-            - 0.059 * pH
-            - ref_offset(ref_type)
-        )
-
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {"custom": "cell1_we"},
-        to_global_params=["_fast_samples_in"],
-    )
-
-    apm.add(
-        PSTAT_server,
-        "run_CV",
-        {
-            "Vinit__V": potential_init_vsRef,
-            "Vapex1__V": potential_apex1_vsRef,
-            "Vapex2__V": potential_apex2_vsRef,
-            "Vfinal__V": potential_final_vsRef,
-            "ScanRate__V_s": ScanRate_V_s,
-            "Cycles": Cycles,
-            "AcqInterval__s": SampleRate,
-            "IErange": IErange,
-            "SamplingMode": SamplingMode,
-            "versus_OCV": versus_OCV,
-            "OCV_duration__s": OCV_duration__s,
-            "OCV_acquisition_period__s": OCV_acquisition_period__s,
-        },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        process_finish=True,
-        technique_name=["CV"],
-        process_contrib=[
-            ProcessContrib.action_params,
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
-    )
+    apm = ActionPlanMaker()
+    params = {
+        "Vinit__V": _ecms_vs_ref(
+            WE_potential_init__V, WE_versus, ref_offset__V, pH, ref_type, allow_ocv=True
+        ),
+        "Vapex1__V": _ecms_vs_ref(
+            WE_potential_apex1__V,
+            WE_versus,
+            ref_offset__V,
+            pH,
+            ref_type,
+            allow_ocv=True,
+        ),
+        "Vapex2__V": _ecms_vs_ref(
+            WE_potential_apex2__V,
+            WE_versus,
+            ref_offset__V,
+            pH,
+            ref_type,
+            allow_ocv=True,
+        ),
+        "Vfinal__V": _ecms_vs_ref(
+            WE_potential_final__V,
+            WE_versus,
+            ref_offset__V,
+            pH,
+            ref_type,
+            allow_ocv=True,
+        ),
+        "ScanRate__V_s": ScanRate_V_s,
+        "Cycles": Cycles,
+        "AcqInterval__s": SampleRate,
+        "IErange": IErange,
+        "SamplingMode": SamplingMode,
+        "versus_OCV": versus_OCV,
+        "OCV_duration__s": OCV_duration__s,
+        "OCV_acquisition_period__s": OCV_acquisition_period__s,
+    }
+    _ecms_pstat(apm, "run_CV", params, ["CV"])
     apm.add(ORCH_server, "wait", {"waittime": MS_equilibrium_time})
-    # apm.add(ORCH_server, "wait", {"waittime": 10})
-
     return apm.planned_actions
 
 
@@ -1110,10 +965,7 @@ def ECMS_sub_final_clean_cell(
     Returns:
         List of planned actions for the orchestrator.
     """
-
     apm = ActionPlanMaker()
-
-    # Fill cell with liquid
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4A", "on": 1})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 1})
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2-dir", "on": 1})
@@ -1127,20 +979,7 @@ def ECMS_sub_final_clean_cell(
     apm.add(NI_server, "pump", {"pump": "RecirculatingPeriPump2", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 0})
-
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_add_liquid",
-        {
-            "custom": "cell1_we",
-            "source_liquid_in": LiquidSample(
-                sample_no=reservoir_liquid_sample_no, machine_name=ORCH_HOST
-            ).model_dump(),
-            "volume_ml": volume_ul_cell_liquid / 1000,
-            "combine_liquids": True,
-            "dilute_liquids": True,
-        },
-    )
+    _ecms_add_liquid(apm, reservoir_liquid_sample_no, volume_ul_cell_liquid)
     return apm.planned_actions
 
 
@@ -1163,46 +1002,11 @@ def ECMS_sub_cali(
     Returns:
         List of planned actions for the orchestrator.
     """
-
     apm = ActionPlanMaker()
-
-    # set CO2 flow rate
-    apm.add(
-        MFC_server,
-        "set_flowrate",
-        {
-            "flowrate_sccm": CO2flowrate_sccm,
-            "ramp_sccm_sec": flow_ramp_sccm,
-            "device_name": "CO2",
-        },
-        asc.no_wait,
-    )
-    apm.add(
-        MFC_server,
-        "cancel_hold_valve_action",
-        {"device_name": "CO2"},
-        asc.no_wait,
-    )
-    # set Calibration gas flow rate
+    _ecms_mfc(apm, "CO2", CO2flowrate_sccm, flow_ramp_sccm)
     apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 1})
-    apm.add(
-        CALIBRATIONMFC_server,
-        "set_flowrate",
-        {
-            "flowrate_sccm": Califlowrate_sccm,
-            "ramp_sccm_sec": flow_ramp_sccm,
-            "device_name": "Caligas",
-        },
-        asc.no_wait,
-    )
-    apm.add(
-        CALIBRATIONMFC_server,
-        "cancel_hold_valve_action",
-        {"device_name": "Caligas"},
-        asc.no_wait,
-    )
+    _ecms_mfc(apm, "Caligas", Califlowrate_sccm, flow_ramp_sccm)
     apm.add(ORCH_server, "wait", {"waittime": MSsignal_quilibrium_time})
-
     return apm.planned_actions
 
 
@@ -1225,46 +1029,11 @@ def ECMS_sub_cali_second(
     Returns:
         List of planned actions for the orchestrator.
     """
-
     apm = ActionPlanMaker()
-
-    # set CO2 flow rate
-    apm.add(
-        MFC_server,
-        "set_flowrate",
-        {
-            "flowrate_sccm": CO2flowrate_sccm,
-            "ramp_sccm_sec": flow_ramp_sccm,
-            "device_name": "CO2",
-        },
-        asc.no_wait,
-    )
-    apm.add(
-        MFC_server,
-        "cancel_hold_valve_action",
-        {"device_name": "CO2"},
-        asc.no_wait,
-    )
-    # set Calibration gas flow rate
+    _ecms_mfc(apm, "CO2", CO2flowrate_sccm, flow_ramp_sccm)
     apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 1})
-    apm.add(
-        CALIBRATIONMFCSECOND_server,
-        "set_flowrate",
-        {
-            "flowrate_sccm": Califlowrate_sccm,
-            "ramp_sccm_sec": flow_ramp_sccm,
-            "device_name": "Caligassecond",
-        },
-        asc.no_wait,
-    )
-    apm.add(
-        CALIBRATIONMFCSECOND_server,
-        "cancel_hold_valve_action",
-        {"device_name": "Caligassecond"},
-        asc.no_wait,
-    )
+    _ecms_mfc(apm, "Caligassecond", Califlowrate_sccm, flow_ramp_sccm)
     apm.add(ORCH_server, "wait", {"waittime": MSsignal_quilibrium_time})
-
     return apm.planned_actions
 
 
@@ -1288,65 +1057,12 @@ def ECMS_sub_threegascali(
     Returns:
         List of planned actions for the orchestrator.
     """
-
     apm = ActionPlanMaker()
-
-    # set CO2 flow rate
-    apm.add(
-        MFC_server,
-        "set_flowrate",
-        {
-            "flowrate_sccm": CO2flowrate_sccm,
-            "ramp_sccm_sec": flow_ramp_sccm,
-            "device_name": "CO2",
-        },
-        asc.no_wait,
-    )
-    apm.add(
-        MFC_server,
-        "cancel_hold_valve_action",
-        {"device_name": "CO2"},
-        asc.no_wait,
-    )
-    # set Calibration gas flow rate
+    _ecms_mfc(apm, "CO2", CO2flowrate_sccm, flow_ramp_sccm)
     apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 1})
-    # cali gas one
-    apm.add(
-        CALIBRATIONMFC_server,
-        "set_flowrate",
-        {
-            "flowrate_sccm": Califlowrate_sccm,
-            "ramp_sccm_sec": flow_ramp_sccm,
-            "device_name": "Caligas",
-        },
-        asc.no_wait,
-    )
-    apm.add(
-        CALIBRATIONMFC_server,
-        "cancel_hold_valve_action",
-        {"device_name": "Caligas"},
-        asc.no_wait,
-    )
-
-    # cali gas two
-    apm.add(
-        CALIBRATIONMFCSECOND_server,
-        "set_flowrate",
-        {
-            "flowrate_sccm": Califlowrate_two_sccm,
-            "ramp_sccm_sec": flow_ramp_sccm,
-            "device_name": "Caligassecond",
-        },
-        asc.no_wait,
-    )
-    apm.add(
-        CALIBRATIONMFCSECOND_server,
-        "cancel_hold_valve_action",
-        {"device_name": "Caligassecond"},
-        asc.no_wait,
-    )
+    _ecms_mfc(apm, "Caligas", Califlowrate_sccm, flow_ramp_sccm)
+    _ecms_mfc(apm, "Caligassecond", Califlowrate_two_sccm, flow_ramp_sccm)
     apm.add(ORCH_server, "wait", {"waittime": MSsignal_quilibrium_time})
-
     return apm.planned_actions
 
 
@@ -1368,49 +1084,10 @@ def ECMS_sub_inertgascali(
     Returns:
         List of planned actions for the orchestrator.
     """
-
     apm = ActionPlanMaker()
-
-    # set CO2 flow rate
-    apm.add(
-        MFC_server,
-        "set_flowrate",
-        {
-            "flowrate_sccm": CO2flowrate_sccm,
-            "ramp_sccm_sec": flow_ramp_sccm,
-            "device_name": "CO2",
-        },
-        asc.no_wait,
-    )
-    apm.add(
-        MFC_server,
-        "cancel_hold_valve_action",
-        {"device_name": "CO2"},
-        asc.no_wait,
-    )
-    # set Calibration gas flow rate
-    # apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 1})
-    # cali gas one
-
-    # cali gas two
-    apm.add(
-        CALIBRATIONMFCSECOND_server,
-        "set_flowrate",
-        {
-            "flowrate_sccm": Califlowrate_two_sccm,
-            "ramp_sccm_sec": flow_ramp_sccm,
-            "device_name": "Caligassecond",
-        },
-        asc.no_wait,
-    )
-    apm.add(
-        CALIBRATIONMFCSECOND_server,
-        "cancel_hold_valve_action",
-        {"device_name": "Caligassecond"},
-        asc.no_wait,
-    )
+    _ecms_mfc(apm, "CO2", CO2flowrate_sccm, flow_ramp_sccm)
+    _ecms_mfc(apm, "Caligassecond", Califlowrate_two_sccm, flow_ramp_sccm)
     apm.add(ORCH_server, "wait", {"waittime": MSsignal_quilibrium_time})
-
     return apm.planned_actions
 
 
@@ -1431,26 +1108,9 @@ def ECMS_sub_pulsecali(
     Returns:
         List of planned actions for the orchestrator.
     """
-
     apm = ActionPlanMaker()
-    apm.add(
-        CALIBRATIONMFC_server,
-        "set_flowrate",
-        {
-            "flowrate_sccm": Califlowrate_sccm,
-            "ramp_sccm_sec": flow_ramp_sccm,
-            "device_name": "Caligas",
-        },
-        asc.no_wait,
-    )
-    apm.add(
-        CALIBRATIONMFC_server,
-        "cancel_hold_valve_action",
-        {"device_name": "Caligas"},
-        asc.no_wait,
-    )
+    _ecms_mfc(apm, "Caligas", Califlowrate_sccm, flow_ramp_sccm)
     apm.add(ORCH_server, "wait", {"waittime": MSsignal_quilibrium_time})
-
     return apm.planned_actions
 
 
@@ -1476,60 +1136,19 @@ def ECMS_sub_preCA_CO2flow(
     Returns:
         List of planned actions for the orchestrator.
     """
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
-    for cycle, (CO2_flow_duration_sec, CO2_flow_rate) in enumerate(
-        zip(flow_change_duration_sec, CO2_flow_rate_sccm)
+    apm = ActionPlanMaker()
+    for CO2_flow_duration_sec, CO2_flow_rate in zip(
+        flow_change_duration_sec, CO2_flow_rate_sccm
     ):
-        # ORCH/wait with no wait condition for CO2 flow duration time
-        inert_gas_flow_rate_sccm = total_MFC_flow_rate_sccm - CO2_flow_rate
         apm.add(
             ORCH_server,
             "wait",
             {"waittime": CO2_flow_duration_sec},
             start_condition=asc.no_wait,
         )
-        # MFC stop CO2, hold valve closed
-        apm.add(
-            MFC_server,
-            "set_flowrate",
-            {
-                "flowrate_sccm": CO2_flow_rate,
-                "ramp_sccm_sec": 0.0,
-                "device_name": "CO2",
-            },
-            start_condition=asc.wait_for_orch,
-        )
-
-        apm.add(
-            MFC_server,
-            "cancel_hold_valve_action",
-            {"device_name": "CO2"},
-            start_condition=asc.no_wait,
-        )
-
-        # CALIBRATIONMFCSECOND for inert gas set flow rate
-        apm.add(
-            CALIBRATIONMFCSECOND_server,
-            "set_flowrate",
-            {
-                "flowrate_sccm": inert_gas_flow_rate_sccm,
-                "ramp_sccm_sec": 0.0,
-                "device_name": "Caligassecond",
-            },
-            start_condition=asc.no_wait,
-        )
-        # CALIBRATIONMFCSECOND cancel valve hold
-        apm.add(
-            CALIBRATIONMFCSECOND_server,
-            "cancel_hold_valve_action",
-            {"device_name": "Caligassecond"},
-            start_condition=asc.no_wait,
-        )
-
+        _ecms_mfc(apm, "CO2", CO2_flow_rate, 0.0, start=asc.wait_for_orch)
+        _ecms_mfc(apm, "Caligassecond", total_MFC_flow_rate_sccm - CO2_flow_rate, 0.0)
     apm.add(ORCH_server, "wait", {"waittime": MS_equilibrium_time})
-    # apm.add(ORCH_server, "wait", {"waittime": 10})
-
     return apm.planned_actions
 
 
@@ -1575,90 +1194,26 @@ def ECMS_sub_CA_CO2flow(
     Returns:
         List of planned actions for the orchestrator.
     """
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    WE_versus = resolve_we_versus(WE_versus)
-    if WE_versus == "ref":
-        potential_vsRef = WE_potential__V - 1.0 * ref_offset__V
-    elif WE_versus == "rhe":
-        potential_vsRef = (
-            WE_potential__V - 1.0 * ref_offset__V - 0.059 * pH - ref_offset(ref_type)
-        )
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {"custom": "cell1_we"},
-        to_global_params=["_fast_samples_in"],
-    )
-    apm.add(
-        PSTAT_server,
+    apm = ActionPlanMaker()
+    _ecms_pstat(
+        apm,
         "run_CA",
         {
-            "Vval__V": potential_vsRef,
+            "Vval__V": _ecms_vs_ref(
+                WE_potential__V, WE_versus, ref_offset__V, pH, ref_type
+            ),
             "Tval__s": CA_duration_sec,
             "AcqInterval__s": SampleRate,
             "IErange": IErange,
         },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        process_finish=True,
-        technique_name="CA",
-        process_contrib=[
-            ProcessContrib.action_params,
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+        "CA",
     )
-
-    for cycle, (CO2_flow_duration_sec, CO2_flow_rate) in enumerate(
-        zip(flow_change_duration_sec, CO2_flow_rate_sccm)
-    ):
-        # ORCH/wait with no wait condition for CO2 flow duration time
-        inert_gas_flow_rate_sccm = total_MFC_flow_rate_sccm - CO2_flow_rate
-        apm.add(
-            ORCH_server,
-            "wait",
-            {"waittime": CO2_flow_duration_sec},
-            start_condition=asc.no_wait,
+    apm.add_actions(
+        ECMS_sub_preCA_CO2flow(
+            MS_equilibrium_time=MS_equilibrium_time,
+            total_MFC_flow_rate_sccm=total_MFC_flow_rate_sccm,
+            flow_change_duration_sec=flow_change_duration_sec,
+            CO2_flow_rate_sccm=CO2_flow_rate_sccm,
         )
-        # MFC stop CO2, hold valve closed
-        apm.add(
-            MFC_server,
-            "set_flowrate",
-            {
-                "flowrate_sccm": CO2_flow_rate,
-                "ramp_sccm_sec": 0.0,
-                "device_name": "CO2",
-            },
-            start_condition=asc.wait_for_orch,
-        )
-
-        apm.add(
-            MFC_server,
-            "cancel_hold_valve_action",
-            {"device_name": "CO2"},
-            start_condition=asc.no_wait,
-        )
-
-        # CALIBRATIONMFCSECOND for inert gas set flow rate
-        apm.add(
-            CALIBRATIONMFCSECOND_server,
-            "set_flowrate",
-            {
-                "flowrate_sccm": inert_gas_flow_rate_sccm,
-                "ramp_sccm_sec": 0.0,
-                "device_name": "Caligassecond",
-            },
-            start_condition=asc.no_wait,
-        )
-        # CALIBRATIONMFCSECOND cancel valve hold
-        apm.add(
-            CALIBRATIONMFCSECOND_server,
-            "cancel_hold_valve_action",
-            {"device_name": "Caligassecond"},
-            start_condition=asc.no_wait,
-        )
-
-    apm.add(ORCH_server, "wait", {"waittime": MS_equilibrium_time})
-    # apm.add(ORCH_server, "wait", {"waittime": 10})
-
+    )
     return apm.planned_actions

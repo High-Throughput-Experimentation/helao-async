@@ -524,33 +524,16 @@ def ANEC_sub_GC_preparation(
     Returns:
         List of planned actions for the orchestrator.
     """
+    apm = ActionPlanMaker()
 
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": 60})
-    apm.add(NI_server, "pump", {"pump": "Direction", "on": 0})
-    apm.add(ORCH_server, "wait", {"waittime": 30})
-    apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": 60})
-    apm.add(NI_server, "pump", {"pump": "Direction", "on": 0})
-    apm.add(ORCH_server, "wait", {"waittime": 30})
-    apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 0})
-    apm.add(
-        PAL_server,
-        "PAL_ANEC_GC",
-        {
-            "toolGC": toolGC,
-            "source": "cell1_we",
-            "volume_ul_GC": volume_ul_GC,
-        },
-        process_finish=True,
-        technique_name=["headspace_GC_back_analysis", "headspace_GC_front_analysis"],
-        process_contrib=[
-            ProcessContrib.action_params,
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+    for _ in range(2):
+        apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": 60})
+        apm.add(NI_server, "pump", {"pump": "Direction", "on": 0})
+        apm.add(ORCH_server, "wait", {"waittime": 30})
+
+    apm.add_actions(
+        ANEC_sub_GC_headspacealiquot_nomixing(toolGC=toolGC, volume_ul_GC=volume_ul_GC)
     )
     return apm.planned_actions
 
@@ -569,20 +552,12 @@ def ANEC_sub_load_solid_only(
     Returns:
         List of planned actions for the orchestrator.
     """
-
     apm = ActionPlanMaker()
     apm.add_actions(ANEC_sub_unload_cell())
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_load",
-        {
-            "custom": "cell1_we",
-            "load_sample_in": SolidSample(
-                sample_no=solid_sample_no,
-                plate_id=solid_plate_id,
-                machine_name="legacy",
-            ),
-        },
+    apm.add_actions(
+        ANEC_sub_load_solid(
+            solid_plate_id=solid_plate_id, solid_sample_no=solid_sample_no
+        )
     )
     return apm.planned_actions
 
@@ -609,45 +584,21 @@ def ANEC_sub_load_solid_and_clean_cell(
     Returns:
         List of planned actions for the orchestrator.
     """
-
     apm = ActionPlanMaker()
-    apm.add_actions(ANEC_sub_unload_cell())
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_load",
-        {
-            "custom": "cell1_we",
-            "load_sample_in": SolidSample(
-                sample_no=solid_sample_no,
-                plate_id=solid_plate_id,
-                machine_name="legacy",
-            ),
-        },
+    apm.add_actions(
+        ANEC_sub_load_solid_only(
+            solid_plate_id=solid_plate_id, solid_sample_no=solid_sample_no
+        )
     )
     apm.add_actions(ANEC_sub_drain_cell())
     apm.add_actions(
-        ANEC_sub_flush_fill_cell(
-            reservoir_liquid_sample_no=reservoir_liquid_sample_no,
-        )
+        ANEC_sub_flush_fill_cell(reservoir_liquid_sample_no=reservoir_liquid_sample_no)
     )
     apm.add(ORCH_server, "wait", {"waittime": recirculation_time})
-    apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 0})
-    apm.add(
-        PAL_server,
-        "PAL_ANEC_GC",
-        {
-            "toolGC": PALtools(toolGC),
-            "source": "cell1_we",
-            "volume_ul_GC": volume_ul_GC,
-        },
-        process_finish=True,
-        technique_name=["headspace_GC_back_analysis", "headspace_GC_front_analysis"],
-        process_contrib=[
-            ProcessContrib.action_params,
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+    apm.add_actions(
+        ANEC_sub_GC_headspacealiquot_nomixing(
+            toolGC=PALtools(toolGC), volume_ul_GC=volume_ul_GC
+        )
     )
     apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
     apm.add_actions(ANEC_sub_drain_cell())
@@ -799,48 +750,104 @@ def ANEC_sub_aliquot(
     Returns:
         List of planned actions for the orchestrator.
     """
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm = ActionPlanMaker()
 
-    # first circulate the liquid back and forth
-    # e.g. mix it by reversing the flow a few times
-    apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": 60})
-    apm.add(NI_server, "pump", {"pump": "Direction", "on": 0})
-    apm.add(ORCH_server, "wait", {"waittime": 30})
-    apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
-    apm.add(ORCH_server, "wait", {"waittime": 60})
-    apm.add(NI_server, "pump", {"pump": "Direction", "on": 0})
-    apm.add(ORCH_server, "wait", {"waittime": 30})
-    apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 0})
-    apm.add(
-        PAL_server,
-        "PAL_ANEC_aliquot",
-        {
-            "toolGC": toolGC,
-            "toolarchive": toolarchive,
-            "source": "cell1_we",
-            "volume_ul_GC": volume_ul_GC,
-            "volume_ul_archive": volume_ul_archive,
-            "wash1": wash1,
-            "wash2": wash2,
-            "wash3": wash3,
-            "wash4": wash4,
-        },
-        process_finish=True,
-        technique_name=[
-            "headspace_GC_back_analysis",
-            "headspace_GC_front_analysis",
-            "liquid_product_archive",
-        ],
-        process_contrib=[
-            ProcessContrib.action_params,
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+    for _ in range(2):
+        apm.add(NI_server, "pump", {"pump": "Direction", "on": 1})
+        apm.add(ORCH_server, "wait", {"waittime": 60})
+        apm.add(NI_server, "pump", {"pump": "Direction", "on": 0})
+        apm.add(ORCH_server, "wait", {"waittime": 30})
+
+    apm.add_actions(
+        ANEC_sub_aliquot_nomixing(
+            toolGC=toolGC,
+            toolarchive=toolarchive,
+            volume_ul_GC=volume_ul_GC,
+            volume_ul_archive=volume_ul_archive,
+            wash1=wash1,
+            wash2=wash2,
+            wash3=wash3,
+            wash4=wash4,
+        )
     )
-    apm.add(NI_server, "pump", {"pump": "PeriPump1", "on": 1})
+    return apm.planned_actions
 
+
+_ANEC_CONTRIB = [
+    ProcessContrib.action_params,
+    ProcessContrib.files,
+    ProcessContrib.samples_in,
+    ProcessContrib.samples_out,
+]
+
+
+def _anec_vs_ref(
+    V, WE_versus, ref_offset__V, pH, ref_type, unbound_name="potential_vsRef"
+):
+    """Convert a WE potential to volts vs the reference electrode (arithmetic verbatim)."""
+    WE_versus = resolve_we_versus(WE_versus)
+    if WE_versus == "ref":
+        return V - 1.0 * ref_offset__V
+    if WE_versus == "rhe":
+        return V - 1.0 * ref_offset__V - 0.059 * pH - ref_offset(ref_type)
+    # legacy: 'ocv' was never handled and the inlined originals read an unbound
+    # local; keep that exact failure (Phase 3 decides the fix)
+    raise UnboundLocalError(
+        f"cannot access local variable '{unbound_name}' where it is not associated with a value"
+    )
+
+
+def _anec_run(apm, endpoint, params, technique, toggle=None, heat_degc=None):
+    """Query the cell sample, then run one PSTAT technique, optionally under an
+    LED toggle cycle (toggle = (source, init_delay, duty, period, duration))
+    and/or TEC temperature control."""
+    apm.add(
+        SAMPLE_server,
+        "archive_custom_query_sample",
+        {"custom": "cell1_we"},
+        to_global_params=["_fast_samples_in"],
+    )
+    if toggle is not None:
+        source, delay, duty, period, duration = toggle
+        apm.add(
+            IO_server,
+            "set_digital_cycle",
+            {
+                "trigger_name": "gamry_ttl0",
+                "triggertype": toggle_triggertype,
+                "out_name": source,
+                "out_name_gamry": "gamry_aux",
+                "toggle_init_delay": delay,
+                "toggle_duty": duty,
+                "toggle_period": period,
+                "toggle_duration": duration,
+            },
+            process_finish=False,
+            process_contrib=[ProcessContrib.files],
+        )
+    if heat_degc is not None:
+        apm.add(TEC_server, "set_temperature", {"target_temperature_degc": heat_degc})
+        apm.add(
+            TEC_server,
+            "record_tec",
+            {"duration": -1, "acquisition_rate": 0.2},
+            nonblocking=True,
+        )
+        apm.add(TEC_server, "enable_tec", {})
+        apm.add(TEC_server, "wait_till_stable", {})
+    apm.add(
+        PSTAT_server,
+        endpoint,
+        params,
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
+        process_finish=True,
+        technique_name=technique,
+        process_contrib=_ANEC_CONTRIB,
+    )
+    if heat_degc is not None:
+        apm.add(TEC_server, "cancel_record_tec", {})
+    if toggle is not None:
+        apm.add(IO_server, "stop_digital_cycle", {})
     return apm.planned_actions
 
 
@@ -868,19 +875,8 @@ def ANEC_sub_CP(
     Returns:
         List of planned actions for the orchestrator.
     """
-
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
-    # get sample for gamry
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {"custom": "cell1_we"},
-        to_global_params=["_fast_samples_in"],
-    )
-
-    apm.add(
-        PSTAT_server,
+    return _anec_run(
+        ActionPlanMaker(),
         "run_CP",
         {
             "Ival": CP_current,
@@ -888,18 +884,8 @@ def ANEC_sub_CP(
             "AcqInterval__s": SampleRate,
             "IErange": IErange,
         },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        technique_name="CP",
-        process_finish=True,
-        process_contrib=[
-            ProcessContrib.action_params,
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+        "CP",
     )
-
-    return apm.planned_actions  # returns complete action list to orch
 
 
 @experiment(version=1)
@@ -931,43 +917,19 @@ def ANEC_sub_CA(
     Returns:
         List of planned actions for the orchestrator.
     """
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    WE_versus = resolve_we_versus(WE_versus)
-    if WE_versus == "ref":
-        potential_vsRef = WE_potential__V - 1.0 * ref_offset__V
-    elif WE_versus == "rhe":
-        potential_vsRef = (
-            WE_potential__V - 1.0 * ref_offset__V - 0.059 * pH - ref_offset(ref_type)
-        )
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {"custom": "cell1_we"},
-        to_global_params=["_fast_samples_in"],
-    )
-    apm.add(
-        PSTAT_server,
+    return _anec_run(
+        ActionPlanMaker(),
         "run_CA",
         {
-            "Vval__V": potential_vsRef,
+            "Vval__V": _anec_vs_ref(
+                WE_potential__V, WE_versus, ref_offset__V, pH, ref_type
+            ),
             "Tval__s": CA_duration_sec,
             "AcqInterval__s": SampleRate,
             "IErange": IErange,
         },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        process_finish=True,
-        technique_name="CA",
-        process_contrib=[
-            ProcessContrib.action_params,
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+        "CA",
     )
-
-    # apm.add(ORCH_server, "wait", {"waittime": 10})
-
-    return apm.planned_actions
 
 
 @experiment(version=2)
@@ -1001,56 +963,20 @@ def ANEC_sub_HeatCA(
     Returns:
         List of planned actions for the orchestrator.
     """
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    WE_versus = resolve_we_versus(WE_versus)
-    if WE_versus == "ref":
-        potential_vsRef = WE_potential__V - 1.0 * ref_offset__V
-    elif WE_versus == "rhe":
-        potential_vsRef = (
-            WE_potential__V - 1.0 * ref_offset__V - 0.059 * pH - ref_offset(ref_type)
-        )
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {"custom": "cell1_we"},
-        to_global_params=["_fast_samples_in"],
-    )
-    apm.add(
-        TEC_server,
-        "set_temperature",
-        {"target_temperature_degc": target_temperature_degc},
-    )
-    apm.add(
-        TEC_server,
-        "record_tec",
-        {"duration": -1, "acquisition_rate": 0.2},
-        nonblocking=True,
-    )
-    apm.add(TEC_server, "enable_tec", {})
-    apm.add(TEC_server, "wait_till_stable", {})
-    apm.add(
-        PSTAT_server,
+    return _anec_run(
+        ActionPlanMaker(),
         "run_CA",
         {
-            "Vval__V": potential_vsRef,
+            "Vval__V": _anec_vs_ref(
+                WE_potential__V, WE_versus, ref_offset__V, pH, ref_type
+            ),
             "Tval__s": CA_duration_sec,
             "AcqInterval__s": SampleRate,
             "IErange": IErange,
         },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        process_finish=True,
-        technique_name="CA",
-        process_contrib=[
-            ProcessContrib.action_params,
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+        "CA",
+        heat_degc=target_temperature_degc,
     )
-    # apm.add(ORCH_server, "wait", {"waittime": 10})
-    apm.add(TEC_server, "cancel_record_tec", {})
-
-    return apm.planned_actions
 
 
 @experiment(version=2)
@@ -1067,41 +993,12 @@ def ANEC_sub_OCV(
     Returns:
         List of planned actions for the orchestrator.
     """
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
-    # get sample for gamry
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {
-            "custom": "cell1_we",
-        },
-        to_global_params=[
-            "_fast_samples_in"
-        ],  # save new liquid_sample_no of eche cell to globals
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-    )
-
-    # OCV
-    apm.add(
-        PSTAT_server,
+    return _anec_run(
+        ActionPlanMaker(),
         "run_OCV",
-        {
-            "Tval__s": Tval__s,
-            "AcqInterval__s": 0.05,
-            "IErange": IErange,
-        },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        technique_name="CP",
-        process_finish=True,
-        process_contrib=[
-            ProcessContrib.action_params,
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+        {"Tval__s": Tval__s, "AcqInterval__s": 0.05, "IErange": IErange},
+        "CP",
     )
-    return apm.planned_actions  # returns complete action list to orch
 
 
 @experiment(version=2)
@@ -1159,73 +1056,31 @@ def ANEC_sub_photo_CA(
     Returns:
         List of planned actions for the orchestrator.
     """
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm = ActionPlanMaker()
     if int(round(toggle_illum_time)) == -1:
         toggle_illum_time = CA_duration_sec
-    WE_versus = resolve_we_versus(WE_versus)
-    if WE_versus == "ref":
-        potential_vsRef = WE_potential__V - 1.0 * ref_offset__V
-    elif WE_versus == "rhe":
-        potential_vsRef = (
-            WE_potential__V - 1.0 * ref_offset__V - 0.059 * pH - ref_offset(ref_type)
-        )
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {"custom": "cell1_we"},
-        to_global_params=["_fast_samples_in"],
-    )
-    #    apm.add(NI_server, "led", {"led":"led", "on": 1})
-    # adding IO server for Galil LED toggle control instead of NI
-    apm.add(
-        IO_server,
-        "set_digital_cycle",
-        {
-            "trigger_name": "gamry_ttl0",
-            "triggertype": toggle_triggertype,
-            "out_name": illumination_source,
-            "out_name_gamry": "gamry_aux",
-            "toggle_init_delay": toggle_dark_time_init,
-            "toggle_duty": toggle_illum_duty,
-            "toggle_period": toggle_illum_period,
-            "toggle_duration": toggle_illum_time,
-        },
-        process_finish=False,
-        process_contrib=[
-            ProcessContrib.files,
-        ],
-    )
-
-    apm.add(
-        PSTAT_server,
+    return _anec_run(
+        apm,
         "run_CA",
         {
-            "Vval__V": potential_vsRef,
+            "Vval__V": _anec_vs_ref(
+                WE_potential__V, WE_versus, ref_offset__V, pH, ref_type
+            ),
             "Tval__s": CA_duration_sec,
             "AcqInterval__s": SampleRate,
-            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "TTLwait": gamrychannelwait,
+            "TTLsend": gamrychannelsend,
             "IErange": IErange,
         },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        process_finish=True,
-        technique_name="CA",
-        process_contrib=[
-            ProcessContrib.action_params,
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+        "CA",
+        toggle=(
+            illumination_source,
+            toggle_dark_time_init,
+            toggle_illum_duty,
+            toggle_illum_period,
+            toggle_illum_time,
+        ),
     )
-    apm.add(
-        IO_server,
-        "stop_digital_cycle",
-        {},
-    )
-    # #    apm.add(NI_server, "led", {"led":"led", "on": 0})
-    # apm.add(ORCH_server, "wait", {"waittime": 10})
-
-    return apm.planned_actions
 
 
 @experiment(version=1)
@@ -1265,73 +1120,34 @@ def ANEC_sub_CV(
     Returns:
         List of planned actions for the orchestrator.
     """
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    WE_versus = resolve_we_versus(WE_versus)
-    if WE_versus == "ref":
-        potential_init_vsRef = WE_potential_init__V - 1.0 * ref_offset__V
-        potential_apex1_vsRef = WE_potential_apex1__V - 1.0 * ref_offset__V
-        potential_apex2_vsRef = WE_potential_apex2__V - 1.0 * ref_offset__V
-        potential_final_vsRef = WE_potential_final__V - 1.0 * ref_offset__V
-    elif WE_versus == "rhe":
-        potential_init_vsRef = (
-            WE_potential_init__V
-            - 1.0 * ref_offset__V
-            - 0.059 * pH
-            - ref_offset(ref_type)
-        )
-        potential_apex1_vsRef = (
-            WE_potential_apex1__V
-            - 1.0 * ref_offset__V
-            - 0.059 * pH
-            - ref_offset(ref_type)
-        )
-        potential_apex2_vsRef = (
-            WE_potential_apex2__V
-            - 1.0 * ref_offset__V
-            - 0.059 * pH
-            - ref_offset(ref_type)
-        )
-        potential_final_vsRef = (
-            WE_potential_final__V
-            - 1.0 * ref_offset__V
-            - 0.059 * pH
-            - ref_offset(ref_type)
-        )
-
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {"custom": "cell1_we"},
-        to_global_params=["_fast_samples_in"],
-    )
-
-    apm.add(
-        PSTAT_server,
+    return _anec_run(
+        ActionPlanMaker(),
         "run_CV",
         {
-            "Vinit__V": potential_init_vsRef,
-            "Vapex1__V": potential_apex1_vsRef,
-            "Vapex2__V": potential_apex2_vsRef,
-            "Vfinal__V": potential_final_vsRef,
+            "Vinit__V": _anec_vs_ref(
+                WE_potential_init__V,
+                WE_versus,
+                ref_offset__V,
+                pH,
+                ref_type,
+                "potential_init_vsRef",
+            ),
+            "Vapex1__V": _anec_vs_ref(
+                WE_potential_apex1__V, WE_versus, ref_offset__V, pH, ref_type
+            ),
+            "Vapex2__V": _anec_vs_ref(
+                WE_potential_apex2__V, WE_versus, ref_offset__V, pH, ref_type
+            ),
+            "Vfinal__V": _anec_vs_ref(
+                WE_potential_final__V, WE_versus, ref_offset__V, pH, ref_type
+            ),
             "ScanRate__V_s": ScanRate_V_s,
             "Cycles": Cycles,
             "AcqInterval__s": SampleRate,
             "IErange": IErange,
         },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        process_finish=True,
-        technique_name=["CV"],
-        process_contrib=[
-            ProcessContrib.action_params,
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+        ["CV"],
     )
-
-    # apm.add(ORCH_server, "wait", {"waittime": 10})
-
-    return apm.planned_actions
 
 
 @experiment(version=2)
@@ -1373,89 +1189,35 @@ def ANEC_sub_HeatCV(
     Returns:
         List of planned actions for the orchestrator.
     """
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    WE_versus = resolve_we_versus(WE_versus)
-    if WE_versus == "ref":
-        potential_init_vsRef = WE_potential_init__V - 1.0 * ref_offset__V
-        potential_apex1_vsRef = WE_potential_apex1__V - 1.0 * ref_offset__V
-        potential_apex2_vsRef = WE_potential_apex2__V - 1.0 * ref_offset__V
-        potential_final_vsRef = WE_potential_final__V - 1.0 * ref_offset__V
-    elif WE_versus == "rhe":
-        potential_init_vsRef = (
-            WE_potential_init__V
-            - 1.0 * ref_offset__V
-            - 0.059 * pH
-            - ref_offset(ref_type)
-        )
-        potential_apex1_vsRef = (
-            WE_potential_apex1__V
-            - 1.0 * ref_offset__V
-            - 0.059 * pH
-            - ref_offset(ref_type)
-        )
-        potential_apex2_vsRef = (
-            WE_potential_apex2__V
-            - 1.0 * ref_offset__V
-            - 0.059 * pH
-            - ref_offset(ref_type)
-        )
-        potential_final_vsRef = (
-            WE_potential_final__V
-            - 1.0 * ref_offset__V
-            - 0.059 * pH
-            - ref_offset(ref_type)
-        )
-
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {"custom": "cell1_we"},
-        to_global_params=["_fast_samples_in"],
-    )
-
-    apm.add(
-        TEC_server,
-        "set_temperature",
-        {"target_temperature_degc": target_temperature_degc},
-    )
-    apm.add(
-        TEC_server,
-        "record_tec",
-        {"duration": -1, "acquisition_rate": 0.2},
-        nonblocking=True,
-    )
-    apm.add(TEC_server, "enable_tec", {})
-
-    apm.add(TEC_server, "wait_till_stable", {})
-
-    apm.add(
-        PSTAT_server,
+    return _anec_run(
+        ActionPlanMaker(),
         "run_CV",
         {
-            "Vinit__V": potential_init_vsRef,
-            "Vapex1__V": potential_apex1_vsRef,
-            "Vapex2__V": potential_apex2_vsRef,
-            "Vfinal__V": potential_final_vsRef,
+            "Vinit__V": _anec_vs_ref(
+                WE_potential_init__V,
+                WE_versus,
+                ref_offset__V,
+                pH,
+                ref_type,
+                "potential_init_vsRef",
+            ),
+            "Vapex1__V": _anec_vs_ref(
+                WE_potential_apex1__V, WE_versus, ref_offset__V, pH, ref_type
+            ),
+            "Vapex2__V": _anec_vs_ref(
+                WE_potential_apex2__V, WE_versus, ref_offset__V, pH, ref_type
+            ),
+            "Vfinal__V": _anec_vs_ref(
+                WE_potential_final__V, WE_versus, ref_offset__V, pH, ref_type
+            ),
             "ScanRate__V_s": ScanRate_V_s,
             "Cycles": Cycles,
             "AcqInterval__s": SampleRate,
             "IErange": IErange,
         },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        process_finish=True,
-        technique_name=["CV"],
-        process_contrib=[
-            ProcessContrib.action_params,
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+        ["CV"],
+        heat_degc=target_temperature_degc,
     )
-
-    # apm.add(ORCH_server, "wait", {"waittime": 10})
-    apm.add(TEC_server, "cancel_record_tec", {})
-
-    return apm.planned_actions
 
 
 @experiment(version=1)
@@ -1521,117 +1283,57 @@ def ANEC_sub_photo_CV(
     Returns:
         List of planned actions for the orchestrator.
     """
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm = ActionPlanMaker()
+
     CV_duration_sec = abs(WE_potential_apex1__V - WE_potential_init__V) / ScanRate_V_s
     CV_duration_sec += abs(WE_potential_final__V - WE_potential_apex2__V) / ScanRate_V_s
-    CV_duration_sec += (
-        abs(WE_potential_apex2__V - WE_potential_apex1__V)
-        / ScanRate_V_s
-        #        * Cycles
-    )
+    CV_duration_sec += abs(WE_potential_apex2__V - WE_potential_apex1__V) / ScanRate_V_s
     CV_duration_sec += (
         abs(WE_potential_apex2__V - WE_potential_apex1__V)
         / ScanRate_V_s
         * 2.0
         * (Cycles - 1)
     )
-
     if int(round(toggle_illum_time)) == -1:
         toggle_illum_time = CV_duration_sec
-    WE_versus = resolve_we_versus(WE_versus)
-    if WE_versus == "ref":
-        potential_init_vsRef = WE_potential_init__V - 1.0 * ref_offset__V
-        potential_apex1_vsRef = WE_potential_apex1__V - 1.0 * ref_offset__V
-        potential_apex2_vsRef = WE_potential_apex2__V - 1.0 * ref_offset__V
-        potential_final_vsRef = WE_potential_final__V - 1.0 * ref_offset__V
-    elif WE_versus == "rhe":
-        potential_init_vsRef = (
-            WE_potential_init__V
-            - 1.0 * ref_offset__V
-            - 0.059 * pH
-            - ref_offset(ref_type)
-        )
-        potential_apex1_vsRef = (
-            WE_potential_apex1__V
-            - 1.0 * ref_offset__V
-            - 0.059 * pH
-            - ref_offset(ref_type)
-        )
-        potential_apex2_vsRef = (
-            WE_potential_apex2__V
-            - 1.0 * ref_offset__V
-            - 0.059 * pH
-            - ref_offset(ref_type)
-        )
-        potential_final_vsRef = (
-            WE_potential_final__V
-            - 1.0 * ref_offset__V
-            - 0.059 * pH
-            - ref_offset(ref_type)
-        )
 
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {"custom": "cell1_we"},
-        to_global_params=["_fast_samples_in"],
-    )
-
-    #    apm.add(NI_server, "led", {"led":"led", "on": 1})
-    # adding IO server for Galil LED toggle control instead of NI
-    apm.add(
-        IO_server,
-        "set_digital_cycle",
-        {
-            "trigger_name": "gamry_ttl0",
-            "triggertype": toggle_triggertype,
-            "out_name": illumination_source,
-            "out_name_gamry": "gamry_aux",
-            "toggle_init_delay": toggle_dark_time_init,
-            "toggle_duty": toggle_illum_duty,
-            "toggle_period": toggle_illum_period,
-            "toggle_duration": toggle_illum_time,
-            #                "stop_via_ttl": False,
-        },
-        process_finish=False,
-        process_contrib=[
-            ProcessContrib.files,
-        ],
-    )
-
-    apm.add(
-        PSTAT_server,
+    return _anec_run(
+        apm,
         "run_CV",
         {
-            "Vinit__V": potential_init_vsRef,
-            "Vapex1__V": potential_apex1_vsRef,
-            "Vapex2__V": potential_apex2_vsRef,
-            "Vfinal__V": potential_final_vsRef,
+            "Vinit__V": _anec_vs_ref(
+                WE_potential_init__V,
+                WE_versus,
+                ref_offset__V,
+                pH,
+                ref_type,
+                "potential_init_vsRef",
+            ),
+            "Vapex1__V": _anec_vs_ref(
+                WE_potential_apex1__V, WE_versus, ref_offset__V, pH, ref_type
+            ),
+            "Vapex2__V": _anec_vs_ref(
+                WE_potential_apex2__V, WE_versus, ref_offset__V, pH, ref_type
+            ),
+            "Vfinal__V": _anec_vs_ref(
+                WE_potential_final__V, WE_versus, ref_offset__V, pH, ref_type
+            ),
             "ScanRate__V_s": ScanRate_V_s,
             "Cycles": Cycles,
             "AcqInterval__s": SampleRate,
-            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "TTLwait": gamrychannelwait,
+            "TTLsend": gamrychannelsend,
             "IErange": IErange,
         },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        process_finish=True,
-        technique_name="CV",
-        process_contrib=[
-            ProcessContrib.action_params,
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+        "CV",
+        toggle=(
+            illumination_source,
+            toggle_dark_time_init,
+            toggle_illum_duty,
+            toggle_illum_period,
+            toggle_illum_time,
+        ),
     )
-    apm.add(
-        IO_server,
-        "stop_digital_cycle",
-        {},
-    )
-    # apm.add(ORCH_server, "wait", {"waittime": 10})
-
-    return apm.planned_actions
 
 
 @experiment(version=1)
@@ -1820,88 +1522,41 @@ def ANEC_sub_photo_LSV(
     Returns:
         List of planned actions for the orchestrator.
     """
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    apm = ActionPlanMaker()
     CV_duration_sec = abs(WE_potential_apex1__V - WE_potential_init__V) / ScanRate_V_s
-
     if int(round(toggle_illum_time)) == -1:
         toggle_illum_time = CV_duration_sec
-    WE_versus = resolve_we_versus(WE_versus)
-    if WE_versus == "ref":
-        potential_init_vsRef = WE_potential_init__V - 1.0 * ref_offset__V
-        potential_apex1_vsRef = WE_potential_apex1__V - 1.0 * ref_offset__V
-    elif WE_versus == "rhe":
-        potential_init_vsRef = (
-            WE_potential_init__V
-            - 1.0 * ref_offset__V
-            - 0.059 * pH
-            - ref_offset(ref_type)
-        )
-        potential_apex1_vsRef = (
-            WE_potential_apex1__V
-            - 1.0 * ref_offset__V
-            - 0.059 * pH
-            - ref_offset(ref_type)
-        )
-
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {"custom": "cell1_we"},
-        to_global_params=["_fast_samples_in"],
-    )
-
-    #    apm.add(NI_server, "led", {"led":"led", "on": 1})
-    # adding IO server for Galil LED toggle control instead of NI
-    apm.add(
-        IO_server,
-        "set_digital_cycle",
-        {
-            "trigger_name": "gamry_ttl0",
-            "triggertype": toggle_triggertype,
-            "out_name": illumination_source,
-            "out_name_gamry": "gamry_aux",
-            "toggle_init_delay": toggle_dark_time_init,
-            "toggle_duty": toggle_illum_duty,
-            "toggle_period": toggle_illum_period,
-            "toggle_duration": toggle_illum_time,
-        },
-        process_finish=False,
-        process_contrib=[
-            ProcessContrib.files,
-        ],
-    )
-
-    apm.add(
-        PSTAT_server,
+    params = {
+        "Vinit__V": _anec_vs_ref(
+            WE_potential_init__V,
+            WE_versus,
+            ref_offset__V,
+            pH,
+            ref_type,
+            "potential_init_vsRef",
+        ),
+        "Vfinal__V": _anec_vs_ref(
+            WE_potential_apex1__V, WE_versus, ref_offset__V, pH, ref_type
+        ),
+        "ScanRate__V_s": ScanRate_V_s,
+        "AcqInterval__s": SampleRate,
+        "TTLwait": gamrychannelwait,
+        "TTLsend": gamrychannelsend,
+        "IErange": IErange,
+    }
+    return _anec_run(
+        apm,
         "run_LSV",
-        {
-            "Vinit__V": potential_init_vsRef,
-            "Vfinal__V": potential_apex1_vsRef,
-            "ScanRate__V_s": ScanRate_V_s,
-            "AcqInterval__s": SampleRate,
-            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
-            "IErange": IErange,
-        },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        process_finish=True,
-        technique_name=["LSV"],
-        process_contrib=[
-            ProcessContrib.action_params,
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+        params,
+        ["LSV"],
+        toggle=(
+            illumination_source,
+            toggle_dark_time_init,
+            toggle_illum_duty,
+            toggle_illum_period,
+            toggle_illum_time,
+        ),
     )
-    apm.add(
-        IO_server,
-        "stop_digital_cycle",
-        {},
-    )
-
-    # apm.add(ORCH_server, "wait", {"waittime": 10})
-
-    return apm.planned_actions
 
 
 @experiment(version=1)
@@ -1954,64 +1609,26 @@ def ANEC_sub_photo_CP(
     Returns:
         List of planned actions for the orchestrator.
     """
-
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
+    apm = ActionPlanMaker()
     if int(round(toggle_illum_time)) == -1:
         toggle_illum_time = CP_duration_sec
-
-    # get sample for gamry
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {"custom": "cell1_we"},
-        to_global_params=["_fast_samples_in"],
-    )
-
-    apm.add(
-        IO_server,
-        "set_digital_cycle",
-        {
-            "trigger_name": "gamry_ttl0",
-            "triggertype": toggle_triggertype,
-            "out_name": illumination_source,
-            "out_name_gamry": "gamry_aux",
-            "toggle_init_delay": toggle_dark_time_init,
-            "toggle_duty": toggle_illum_duty,
-            "toggle_period": toggle_illum_period,
-            "toggle_duration": toggle_illum_time,
-        },
-        process_finish=False,
-        process_contrib=[
-            ProcessContrib.files,
-        ],
-    )
-
-    apm.add(
-        PSTAT_server,
+    return _anec_run(
+        apm,
         "run_CP",
         {
             "Ival": CP_current,
             "Tval__s": CP_duration_sec,
             "AcqInterval__s": SampleRate,
-            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "TTLwait": gamrychannelwait,
+            "TTLsend": gamrychannelsend,
             "IErange": IErange,
         },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        technique_name="CP",
-        process_finish=True,
-        process_contrib=[
-            ProcessContrib.action_params,
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+        "CP",
+        toggle=(
+            illumination_source,
+            toggle_dark_time_init,
+            toggle_illum_duty,
+            toggle_illum_period,
+            toggle_illum_time,
+        ),
     )
-    apm.add(
-        IO_server,
-        "stop_digital_cycle",
-        {},
-    )
-
-    return apm.planned_actions  # returns complete action list to orch

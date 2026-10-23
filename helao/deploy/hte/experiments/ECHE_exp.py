@@ -164,6 +164,99 @@ def ECHE_sub_load_solid(
     return apm.planned_actions  # returns complete action list to orch
 
 
+_ECHE_PSTAT_CONTRIB = [
+    ProcessContrib.files,
+    ProcessContrib.samples_in,
+    ProcessContrib.samples_out,
+]
+
+
+def _eche_cell_pstat(
+    apm,
+    endpoint,
+    technique,
+    params,
+    led=None,
+    led_contrib=_ECHE_PSTAT_CONTRIB,
+    **kwargs,
+):
+    """query cell1_we -> [LED cycle on] -> run_<technique> -> [LED cycle off].
+
+    led: (out_name, init_delay, duty, period, duration) for set_digital_cycle.
+    """
+    apm.add(
+        SAMPLE_server,
+        "archive_custom_query_sample",
+        {"custom": "cell1_we"},
+        to_global_params=["_fast_samples_in"],
+        start_condition=ActionStartCondition.wait_for_all,
+    )
+    if led is not None:
+        apm.add(
+            IO_server,
+            "set_digital_cycle",
+            {
+                "trigger_name": "gamry_ttl0",
+                "triggertype": toggle_triggertype,
+                "out_name": led[0],
+                "out_name_gamry": "gamry_aux",
+                "toggle_init_delay": led[1],
+                "toggle_duty": led[2],
+                "toggle_period": led[3],
+                "toggle_duration": led[4],
+            },
+            start_condition=ActionStartCondition.wait_for_all,
+            process_finish=False,
+            process_contrib=list(led_contrib),
+        )
+    apm.add(
+        PSTAT_server,
+        endpoint,
+        params,
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
+        start_condition=ActionStartCondition.wait_for_all,
+        technique_name=technique,
+        process_finish=True,
+        process_contrib=list(_ECHE_PSTAT_CONTRIB),
+        **kwargs,
+    )
+    if led is not None:
+        apm.add(IO_server, "stop_digital_cycle", {})
+    return apm.planned_actions
+
+
+def _eche_ca_potential(
+    CA_potential, potential_versus, ref_type, ref_offset__V, solution_ph
+):
+    versus = 1.23 if resolve_potential_versus(potential_versus) == "oer" else 0
+    if ref_type == "rhe":
+        potential = CA_potential - ref_offset__V + versus
+    else:
+        potential = (
+            CA_potential
+            - 1.0 * ref_offset__V
+            + versus
+            - 0.059 * solution_ph
+            - ref_offset(ref_type)
+        )
+    print(f"ECHE_sub_CA potential: {potential}")
+    return potential
+
+
+def _eche_cv_params(
+    Vinit, Vapex1, Vapex2, Vfinal, ref_offset__V, ref_type, solution_ph
+):
+    def vs(v):
+        return v - 1.0 * ref_offset__V - ref_offset(ref_type) - 0.059 * solution_ph
+
+    return {
+        "Vinit__V": vs(Vinit),
+        "Vapex1__V": vs(Vapex1),
+        "Vapex2__V": vs(Vapex2),
+        "Vfinal__V": vs(Vfinal),
+    }
+
+
 @experiment(version=2)
 def ECHE_sub_startup(
     solid_custom_position: str = "cell1_we",
@@ -187,12 +280,8 @@ def ECHE_sub_startup(
         List of planned actions for the orchestrator.
     """
 
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
-    # unload all samples from custom positions
+    apm = ActionPlanMaker()
     apm.add_actions(ECHE_sub_unloadall_customs())
-
-    # load new requested solid samples
     apm.add_actions(
         ECHE_sub_load_solid(
             solid_custom_position=solid_custom_position,
@@ -200,8 +289,6 @@ def ECHE_sub_startup(
             solid_sample_no=solid_sample_no,
         )
     )
-
-    # add liquid to solid
     apm.add_actions(
         ECHE_sub_add_liquid(
             solid_custom_position=solid_custom_position,
@@ -210,36 +297,12 @@ def ECHE_sub_startup(
             liquid_volume_ml=liquid_volume_ml,
         )
     )
-
-    # get sample plate coordinates
-    apm.add(
-        MOTOR_server,
-        "solid_get_samples_xy",
-        {
-            "plate_id": solid_plate_id,
-            "sample_no": solid_sample_no,
-        },
-        to_global_params=[
-            "_platexy"
-        ],  # save new liquid_sample_no of eche cell to globals
-        start_condition=ActionStartCondition.wait_for_all,
+    apm.add_actions(
+        ECHE_sub_movetosample(
+            solid_plate_id=solid_plate_id, solid_sample_no=solid_sample_no
+        )
     )
-
-    # move to position
-    apm.add(
-        MOTOR_server,
-        "move",
-        {
-            # "d_mm": [x_mm, y_mm],
-            "axis": ["x", "y"],
-            "mode": MoveModes.absolute,
-            "transformation": TransformationModes.platexy,
-        },
-        from_global_act_params={"_platexy": "d_mm"},
-        start_condition=ActionStartCondition.wait_for_all,
-    )
-
-    return apm.planned_actions  # returns complete action list to orch
+    return apm.planned_actions
 
 
 @experiment(version=1)
@@ -317,85 +380,33 @@ def ECHE_sub_CA_led(
         List of planned actions for the orchestrator.
     """
 
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
+    apm = ActionPlanMaker()
     if int(round(toggle_illum_time)) == -1:
         toggle_illum_time = CA_duration_sec
-
-    # get sample for gamry
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {
-            "custom": "cell1_we",
-        },
-        to_global_params=[
-            "_fast_samples_in"
-        ],  # save new liquid_sample_no of eche cell to globals
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+    potential = _eche_ca_potential(
+        CA_potential, potential_versus, ref_type, ref_offset__V, solution_ph
     )
-
-    # setup toggle on galil_io
-    apm.add(
-        IO_server,
-        "set_digital_cycle",
-        {
-            "trigger_name": "gamry_ttl0",
-            "triggertype": toggle_triggertype,
-            "out_name": illumination_source,
-            "out_name_gamry": "gamry_aux",
-            "toggle_init_delay": toggle_dark_time_init,
-            "toggle_duty": toggle_illum_duty,
-            "toggle_period": toggle_illum_period,
-            "toggle_duration": toggle_illum_time,
-        },
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        process_finish=False,
-        process_contrib=[
-            ProcessContrib.files,
-        ],
-    )
-
-    # # calculate potential
-    versus = 0  # for vs rhe
-    potential_versus = resolve_potential_versus(potential_versus)
-    if potential_versus == "oer":
-        versus = 1.23
-    if ref_type == "rhe":
-        potential = CA_potential - ref_offset__V + versus
-    else:
-        potential = (
-            CA_potential
-            - 1.0 * ref_offset__V
-            + versus
-            - 0.059 * solution_ph
-            - ref_offset(ref_type)
-        )
-    print(f"ECHE_sub_CA potential: {potential}")
-    apm.add(
-        PSTAT_server,
+    return _eche_cell_pstat(
+        apm,
         "run_CA",
+        "CA",
         {
             "Vval__V": potential,
             "Tval__s": CA_duration_sec,
             "AcqInterval__s": samplerate_sec,
-            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "TTLwait": gamrychannelwait,
+            "TTLsend": gamrychannelsend,
             "IErange": gamry_i_range,
         },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        technique_name="CA",
-        process_finish=True,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+        led=(
+            illumination_source,
+            toggle_dark_time_init,
+            toggle_illum_duty,
+            toggle_illum_period,
+            toggle_illum_time,
+        ),
+        led_contrib=[ProcessContrib.files],
     )
-    apm.add(IO_server, "stop_digital_cycle", {})
-
-    return apm.planned_actions  # returns complete action list to orch
 
 
 @experiment(version=2)
@@ -412,40 +423,19 @@ def ECHE_sub_OCV(
     Returns:
         List of planned actions for the orchestrator.
     """
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {
-            "custom": "cell1_we",
-        },
-        to_global_params=[
-            "_fast_samples_in"
-        ],  # save new liquid_sample_no of eche cell to globals
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-    )
-    apm.add(
-        PSTAT_server,
+
+    return _eche_cell_pstat(
+        ActionPlanMaker(),
         "run_OCV",
+        "OCV",
         {
             "Tval__s": Tval__s,
             "AcqInterval__s": SampleRate,
-            "TTLwait": -1,  # -1 disables, else select TTL 0-3
-            "TTLsend": -1,  # -1 disables, else select TTL 0-3
-            # "IErange": "auto",
+            "TTLwait": -1,
+            "TTLsend": -1,
         },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        technique_name="OCV",
-        process_finish=True,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
         to_global_params={"Ewe_V__mean_final": "HISPEC_OCV"},
     )
-    return apm.planned_actions  # returns complete action list to orch
 
 
 @experiment(version=2)
@@ -465,43 +455,19 @@ def ECHE_sub_preCV(
         List of planned actions for the orchestrator.
     """
 
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
-    # get sample for gamry
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {
-            "custom": "cell1_we",
-        },
-        to_global_params=[
-            "_fast_samples_in"
-        ],  # save new liquid_sample_no of eche cell to globals
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-    )
-    apm.add(
-        PSTAT_server,
+    return _eche_cell_pstat(
+        ActionPlanMaker(),
         "run_CA",
+        "CA",
         {
             "Vval__V": CA_potential,
             "Tval__s": CA_duration_sec,
             "AcqInterval__s": samplerate_sec,
-            "TTLwait": -1,  # -1 disables, else select TTL 0-3
-            "TTLsend": -1,  # -1 disables, else select TTL 0-3
+            "TTLwait": -1,
+            "TTLsend": -1,
             "IErange": "auto",
         },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        technique_name="CA",
-        process_finish=True,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
     )
-
-    return apm.planned_actions  # returns complete action list to orch
 
 
 @experiment(version=3)
@@ -541,63 +507,21 @@ def ECHE_sub_CA(
         List of planned actions for the orchestrator.
     """
 
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
-    # get sample for gamry
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {
-            "custom": "cell1_we",
-        },
-        to_global_params=[
-            "_fast_samples_in"
-        ],  # save new liquid_sample_no of eche cell to globals
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+    apm = ActionPlanMaker()
+    potential = _eche_ca_potential(
+        CA_potential, potential_versus, ref_type, ref_offset__V, solution_ph
     )
-
-    # apply potential
-    # potential = (
-    #     CA_potential_vsRHE
-    #     - 1.0 * ref_vs_nhe
-    #     - 0.059 * solution_ph
-    # # calculate potential
-    versus = 0  # for vs rhe
-    potential_versus = resolve_potential_versus(potential_versus)
-    if potential_versus == "oer":
-        versus = 1.23
-    if ref_type == "rhe":
-        potential = CA_potential - ref_offset__V + versus
-    else:
-        potential = (
-            CA_potential
-            - 1.0 * ref_offset__V
-            + versus
-            - 0.059 * solution_ph
-            - ref_offset(ref_type)
-        )
-    print(f"ECHE_sub_CA potential: {potential}")
-    apm.add(
-        PSTAT_server,
+    return _eche_cell_pstat(
+        apm,
         "run_CA",
+        "CA",
         {
             "Vval__V": potential,
             "Tval__s": CA_duration_sec,
             "AcqInterval__s": samplerate_sec,
             "IErange": gamry_i_range,
         },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        technique_name="CA",
-        process_finish=True,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
     )
-
-    return apm.planned_actions  # returns complete action list to orch
 
 
 @experiment(version=4)
@@ -671,99 +595,45 @@ def ECHE_sub_CV_led(
         List of planned actions for the orchestrator.
     """
 
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
+    apm = ActionPlanMaker()
     CV_duration_sec = abs(Vapex1_vsRHE - Vinit_vsRHE) / scanrate_voltsec
     CV_duration_sec += abs(Vfinal_vsRHE - Vapex2_vsRHE) / scanrate_voltsec
-    CV_duration_sec += (
-        abs(Vapex2_vsRHE - Vapex1_vsRHE)
-        / scanrate_voltsec
-        # * cycles
-    )
+    CV_duration_sec += abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec
     CV_duration_sec += (
         abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec * 2.0 * (cycles - 1)
     )
-
     if int(round(toggle_illum_time)) == -1:
         toggle_illum_time = CV_duration_sec
-
-    # get sample for gamry
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {
-            "custom": "cell1_we",
-        },
-        to_global_params=[
-            "_fast_samples_in"
-        ],  # save new liquid_sample_no of eche cell to globals
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+    params = _eche_cv_params(
+        Vinit_vsRHE,
+        Vapex1_vsRHE,
+        Vapex2_vsRHE,
+        Vfinal_vsRHE,
+        ref_offset__V,
+        ref_type,
+        solution_ph,
     )
-
-    # setup toggle on galil_io
-    apm.add(
-        IO_server,
-        "set_digital_cycle",
-        {
-            "trigger_name": "gamry_ttl0",
-            "triggertype": toggle_triggertype,
-            "out_name": illumination_source,
-            "out_name_gamry": "gamry_aux",
-            "toggle_init_delay": toggle_dark_time_init,
-            "toggle_duty": toggle_illum_duty,
-            "toggle_period": toggle_illum_period,
-            "toggle_duration": toggle_illum_time,
-        },
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        process_finish=False,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+    params.update(
+        ScanRate__V_s=scanrate_voltsec,
+        AcqInterval__s=samplerate_sec,
+        Cycles=cycles,
+        TTLwait=gamrychannelwait,
+        TTLsend=gamrychannelsend,
+        IErange=gamry_i_range,
     )
-
-    # apply potential
-    apm.add(
-        PSTAT_server,
+    return _eche_cell_pstat(
+        apm,
         "run_CV",
-        {
-            "Vinit__V": Vinit_vsRHE
-            - 1.0 * ref_offset__V
-            - ref_offset(ref_type)
-            - 0.059 * solution_ph,
-            "Vapex1__V": Vapex1_vsRHE
-            - 1.0 * ref_offset__V
-            - ref_offset(ref_type)
-            - 0.059 * solution_ph,
-            "Vapex2__V": Vapex2_vsRHE
-            - 1.0 * ref_offset__V
-            - ref_offset(ref_type)
-            - 0.059 * solution_ph,
-            "Vfinal__V": Vfinal_vsRHE
-            - 1.0 * ref_offset__V
-            - ref_offset(ref_type)
-            - 0.059 * solution_ph,
-            "ScanRate__V_s": scanrate_voltsec,
-            "AcqInterval__s": samplerate_sec,
-            "Cycles": cycles,
-            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
-            "IErange": gamry_i_range,
-        },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        technique_name="CV",
-        process_finish=True,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+        "CV",
+        params,
+        led=(
+            illumination_source,
+            toggle_dark_time_init,
+            toggle_illum_duty,
+            toggle_illum_period,
+            toggle_illum_time,
+        ),
     )
-    apm.add(IO_server, "stop_digital_cycle", {})
-
-    return apm.planned_actions  # returns complete action list to orch
 
 
 @experiment(version=3)
@@ -811,59 +681,22 @@ def ECHE_sub_CV(
         List of planned actions for the orchestrator.
     """
 
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
-    # get sample for gamry
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {
-            "custom": "cell1_we",
-        },
-        to_global_params=[
-            "_fast_samples_in"
-        ],  # save new liquid_sample_no of eche cell to globals
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+    params = _eche_cv_params(
+        Vinit_vsRHE,
+        Vapex1_vsRHE,
+        Vapex2_vsRHE,
+        Vfinal_vsRHE,
+        ref_offset__V,
+        ref_type,
+        solution_ph,
     )
-
-    # apply potential
-    apm.add(
-        PSTAT_server,
-        "run_CV",
-        {
-            "Vinit__V": Vinit_vsRHE
-            - 1.0 * ref_offset__V
-            - ref_offset(ref_type)
-            - 0.059 * solution_ph,
-            "Vapex1__V": Vapex1_vsRHE
-            - 1.0 * ref_offset__V
-            - ref_offset(ref_type)
-            - 0.059 * solution_ph,
-            "Vapex2__V": Vapex2_vsRHE
-            - 1.0 * ref_offset__V
-            - ref_offset(ref_type)
-            - 0.059 * solution_ph,
-            "Vfinal__V": Vfinal_vsRHE
-            - 1.0 * ref_offset__V
-            - ref_offset(ref_type)
-            - 0.059 * solution_ph,
-            "ScanRate__V_s": scanrate_voltsec,
-            "AcqInterval__s": samplerate_sec,
-            "Cycles": cycles,
-            "IErange": gamry_i_range,
-        },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        technique_name="CV",
-        process_finish=True,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+    params.update(
+        ScanRate__V_s=scanrate_voltsec,
+        AcqInterval__s=samplerate_sec,
+        Cycles=cycles,
+        IErange=gamry_i_range,
     )
-
-    return apm.planned_actions  # returns complete action list to orch
+    return _eche_cell_pstat(ActionPlanMaker(), "run_CV", "CV", params)
 
 
 @experiment(version=3)
@@ -901,47 +734,17 @@ def ECHE_sub_CP(
         List of planned actions for the orchestrator.
     """
 
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
-    # get sample for gamry
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {
-            "custom": "cell1_we",
-        },
-        to_global_params=[
-            "_fast_samples_in"
-        ],  # save new liquid_sample_no of eche cell to globals
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-    )
-
-    #    # apply potential
-    #   potential = (
-    #        CA_potential_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph
-    #    )
-    #    print(f"ECHE_sub_CA potential: {potential}")
-    apm.add(
-        PSTAT_server,
+    return _eche_cell_pstat(
+        ActionPlanMaker(),
         "run_CP",
+        "CP",
         {
             "Ival__A": CP_current,
             "Tval__s": CP_duration_sec,
             "AcqInterval__s": samplerate_sec,
             "IErange": gamry_i_range,
         },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        technique_name="CP",
-        process_finish=True,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
     )
-
-    return apm.planned_actions  # returns complete action list to orch
 
 
 @experiment(version=4)
@@ -1001,71 +804,29 @@ def ECHE_sub_CP_led(
         List of planned actions for the orchestrator.
     """
 
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
+    apm = ActionPlanMaker()
     if int(round(toggle_illum_time)) == -1:
         toggle_illum_time = CP_duration_sec
-
-    # get sample for gamry
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {
-            "custom": "cell1_we",
-        },
-        to_global_params=[
-            "_fast_samples_in"
-        ],  # save new liquid_sample_no of eche cell to globals
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-    )
-
-    # setup toggle on galil_io
-    apm.add(
-        IO_server,
-        "set_digital_cycle",
-        {
-            "trigger_name": "gamry_ttl0",
-            "triggertype": toggle_triggertype,
-            "out_name": illumination_source,
-            "out_name_gamry": "gamry_aux",
-            "toggle_init_delay": toggle_dark_time_init,
-            "toggle_duty": toggle_illum_duty,
-            "toggle_period": toggle_illum_period,
-            "toggle_duration": toggle_illum_time,
-        },
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        process_finish=False,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
-    )
-
-    apm.add(
-        PSTAT_server,
+    return _eche_cell_pstat(
+        apm,
         "run_CP",
+        "CP",
         {
             "Ival__A": CP_current,
             "Tval__s": CP_duration_sec,
             "AcqInterval__s": samplerate_sec,
-            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "TTLwait": gamrychannelwait,
+            "TTLsend": gamrychannelsend,
             "IErange": gamry_i_range,
         },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        technique_name="CP",
-        process_finish=True,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+        led=(
+            illumination_source,
+            toggle_dark_time_init,
+            toggle_illum_duty,
+            toggle_illum_period,
+            toggle_illum_time,
+        ),
     )
-    apm.add(IO_server, "stop_digital_cycle", {})
-
-    return apm.planned_actions  # returns complete action list to orch
 
 
 @experiment(version=1)

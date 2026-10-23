@@ -16,11 +16,132 @@ SEQUENCES = [
 ]
 
 import random
+from types import SimpleNamespace
 
 from helao.core.models.electrolyte import Electrolyte
 from helao.helpers.constants import SPEC_MAP
 from helao.helpers.lib_decorators import sequence
 from helao.helpers.premodels import ExperimentPlanMaker
+
+
+def _echeuvis_led(p, measure):
+    """Shared body of ECHEUVIS_CV_led / _CA_led / _CP_led.
+
+    ``p`` is the caller's ``locals()``; ``measure(epm)`` queues the technique's
+    own experiments (it stays a nested def in the wrapper so the literal keys that
+    test_sequence_param_keys allowlists are still attributed to the wrapper).
+    """
+    p = SimpleNamespace(**p)
+    epm = ExperimentPlanMaker()
+
+    def disengage():
+        epm.add(
+            "ECHEUVIS_sub_disengage",
+            {
+                "clear_we": True,
+                "clear_ce": False,
+                "z_height": p.cell_disengaged_z,
+                "vent_wait": p.cell_vent_wait,
+            },
+        )
+
+    def engage(flow=True):
+        epm.add(
+            "ECHEUVIS_sub_engage",
+            {
+                "flow_we": flow,
+                "flow_ce": flow,
+                "z_height": p.cell_engaged_z,
+                "fill_wait": p.cell_fill_wait,
+            },
+        )
+
+    def interrupt(reason):
+        epm.add("ECHEUVIS_sub_interrupt", {"reason": reason})
+
+    def refs(solid_sample_no):
+        epm.add("ECHE_sub_unloadall_customs", {})
+        if p.use_z_motor:
+            disengage()
+        else:
+            interrupt("Stop flow and prepare for xy motion to ref location.")
+        epm.add(
+            "UVIS_sub_setup_ref",
+            {
+                "reference_mode": "builtin",
+                "solid_custom_position": "cell1_we",
+                "solid_plate_id": p.plate_id,
+                "solid_sample_no": solid_sample_no,
+                "specref_code": 1,
+            },
+        )
+        if p.use_z_motor:
+            engage()
+        else:
+            interrupt("Restore flow and prepare for reference measurement.")
+        for run_use in ("ref_dark", "ref_light"):
+            for st in SPEC_MAP[p.spec_technique]:
+                epm.add(
+                    "UVIS_sub_measure",
+                    {
+                        "spec_type": st,
+                        "spec_int_time_ms": p.spec_int_time_ms,
+                        "spec_n_avg": p.spec_n_avg,
+                        "duration_sec": p.spec_ref_duration,
+                        "toggle_source": p.led_names[0],
+                        "toggle_is_shutter": False,
+                        "illumination_wavelength": p.led_wavelengths_nm[0],
+                        "illumination_intensity": p.led_intensities_mw[0],
+                        "illumination_intensity_date": p.led_date,
+                        "illumination_side": p.led_type,
+                        "technique_name": p.spec_technique,
+                        "run_use": run_use,
+                        "reference_mode": "builtin",
+                    },
+                )
+
+    refs(p.plate_sample_no_list[0])
+    if p.use_z_motor:
+        disengage()
+    else:
+        interrupt("Stop flow and prepare for xy motion to starting sample.")
+
+    for i, plate_sample in enumerate(p.plate_sample_no_list):
+        if i > 0 and p.use_z_motor:
+            disengage()
+        epm.add(
+            "ECHE_sub_startup",
+            {
+                "solid_custom_position": "cell1_we",
+                "solid_plate_id": p.plate_id,
+                "solid_sample_no": plate_sample,
+                "reservoir_liquid_sample_no": p.reservoir_liquid_sample_no,
+                "solution_bubble_gas": p.solution_bubble_gas,
+                "liquid_volume_ml": p.liquid_volume_ml,
+            },
+        )
+        if p.use_z_motor:
+            engage()
+        elif i == 0:  # initial sample
+            interrupt("Restore flow and prepare for sample measurement.")
+        measure(epm)
+
+    refs(p.plate_sample_no_list[-1])
+    if p.use_z_motor:
+        engage(flow=False)  # leave cell sealed w/solution for storage
+    epm.add(
+        "UVIS_calc_abs",
+        {
+            "ev_parts": p.calc_ev_parts,
+            "bin_width": p.calc_bin_width,
+            "window_length": p.calc_window_length,
+            "poly_order": p.calc_poly_order,
+            "lower_wl": p.calc_lower_wl,
+            "upper_wl": p.calc_upper_wl,
+        },
+    )
+    epm.add("ECHE_sub_shutdown", {})
+    return epm.planned_experiments
 
 
 @sequence(version=5)
@@ -128,148 +249,8 @@ def ECHEUVIS_CV_led(
     Returns:
         List of planned experiments to dispatch.
     """
-    epm = ExperimentPlanMaker()
 
-    epm.add("ECHE_sub_unloadall_customs", {})
-    if use_z_motor:
-        epm.add(
-            "ECHEUVIS_sub_disengage",
-            {
-                "clear_we": True,
-                "clear_ce": False,
-                "z_height": cell_disengaged_z,
-                "vent_wait": cell_vent_wait,
-            },
-        )
-    else:
-        epm.add(
-            "ECHEUVIS_sub_interrupt",
-            {"reason": "Stop flow and prepare for xy motion to ref location."},
-        )
-    epm.add(
-        "UVIS_sub_setup_ref",
-        {
-            "reference_mode": "builtin",
-            "solid_custom_position": "cell1_we",
-            "solid_plate_id": plate_id,
-            "solid_sample_no": plate_sample_no_list[0],
-            "specref_code": 1,
-        },
-    )
-    if use_z_motor:
-        epm.add(
-            "ECHEUVIS_sub_engage",
-            {
-                "flow_we": True,
-                "flow_ce": True,
-                "z_height": cell_engaged_z,
-                "fill_wait": cell_fill_wait,
-            },
-        )
-    else:
-        epm.add(
-            "ECHEUVIS_sub_interrupt",
-            {"reason": "Restore flow and prepare for reference measurement."},
-        )
-
-    # dark ref
-    for st in SPEC_MAP[spec_technique]:
-        epm.add(
-            "UVIS_sub_measure",
-            {
-                "spec_type": st,
-                "spec_int_time_ms": spec_int_time_ms,
-                "spec_n_avg": spec_n_avg,
-                "duration_sec": spec_ref_duration,
-                "toggle_source": led_names[0],
-                "toggle_is_shutter": False,
-                "illumination_wavelength": led_wavelengths_nm[0],
-                "illumination_intensity": led_intensities_mw[0],
-                "illumination_intensity_date": led_date,
-                "illumination_side": led_type,
-                "technique_name": spec_technique,
-                "run_use": "ref_dark",
-                "reference_mode": "builtin",
-            },
-        )
-    # light ref
-    for st in SPEC_MAP[spec_technique]:
-        epm.add(
-            "UVIS_sub_measure",
-            {
-                "spec_type": st,
-                "spec_int_time_ms": spec_int_time_ms,
-                "spec_n_avg": spec_n_avg,
-                "duration_sec": spec_ref_duration,
-                "toggle_source": led_names[0],
-                "toggle_is_shutter": False,
-                "illumination_wavelength": led_wavelengths_nm[0],
-                "illumination_intensity": led_intensities_mw[0],
-                "illumination_intensity_date": led_date,
-                "illumination_side": led_type,
-                "technique_name": spec_technique,
-                "run_use": "ref_light",
-                "reference_mode": "builtin",
-            },
-        )
-    if use_z_motor:
-        epm.add(
-            "ECHEUVIS_sub_disengage",
-            {
-                "clear_we": True,
-                "clear_ce": False,
-                "z_height": cell_disengaged_z,
-                "vent_wait": cell_vent_wait,
-            },
-        )
-    else:
-        epm.add(
-            "ECHEUVIS_sub_interrupt",
-            {"reason": "Stop flow and prepare for xy motion to starting sample."},
-        )
-
-    for i, plate_sample in enumerate(plate_sample_no_list):
-        if i > 0 and use_z_motor:
-            epm.add(
-                "ECHEUVIS_sub_disengage",
-                {
-                    "clear_we": True,
-                    "clear_ce": False,
-                    "z_height": cell_disengaged_z,
-                    "vent_wait": cell_vent_wait,
-                },
-            )
-
-        epm.add(
-            "ECHE_sub_startup",
-            {
-                "solid_custom_position": "cell1_we",
-                "solid_plate_id": plate_id,
-                "solid_sample_no": plate_sample,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "solution_bubble_gas": solution_bubble_gas,
-                "liquid_volume_ml": liquid_volume_ml,
-            },
-        )
-
-        if use_z_motor:
-            epm.add(
-                "ECHEUVIS_sub_engage",
-                {
-                    "flow_we": True,
-                    "flow_ce": True,
-                    "z_height": cell_engaged_z,
-                    "fill_wait": cell_fill_wait,
-                },
-            )
-        else:
-            if i == 0:  # initial sample
-                epm.add(
-                    "ECHEUVIS_sub_interrupt",
-                    {"reason": "Restore flow and prepare for sample measurement."},
-                )
-
-        # CV1
+    def measure(epm):
         epm.add(
             "ECHE_sub_preCV",
             {
@@ -319,114 +300,7 @@ def ECHEUVIS_CV_led(
             },
         )
 
-    epm.add("ECHE_sub_unloadall_customs", {})
-    if use_z_motor:
-        epm.add(
-            "ECHEUVIS_sub_disengage",
-            {
-                "clear_we": True,
-                "clear_ce": False,
-                "z_height": cell_disengaged_z,
-                "vent_wait": cell_vent_wait,
-            },
-        )
-    else:
-        epm.add(
-            "ECHEUVIS_sub_interrupt",
-            {"reason": "Stop flow and prepare for xy motion to ref location."},
-        )
-    epm.add(
-        "UVIS_sub_setup_ref",
-        {
-            "reference_mode": "builtin",
-            "solid_custom_position": "cell1_we",
-            "solid_plate_id": plate_id,
-            "solid_sample_no": plate_sample_no_list[-1],
-            "specref_code": 1,
-        },
-    )
-
-    if use_z_motor:
-        epm.add(
-            "ECHEUVIS_sub_engage",
-            {
-                "flow_we": True,
-                "flow_ce": True,
-                "z_height": cell_engaged_z,
-                "fill_wait": cell_fill_wait,
-            },
-        )
-    else:
-        epm.add(
-            "ECHEUVIS_sub_interrupt",
-            {"reason": "Restore flow and prepare for reference measurement."},
-        )
-    # dark ref
-    for st in SPEC_MAP[spec_technique]:
-        epm.add(
-            "UVIS_sub_measure",
-            {
-                "spec_type": st,
-                "spec_int_time_ms": spec_int_time_ms,
-                "spec_n_avg": spec_n_avg,
-                "duration_sec": spec_ref_duration,
-                "toggle_source": led_names[0],
-                "toggle_is_shutter": False,
-                "illumination_wavelength": led_wavelengths_nm[0],
-                "illumination_intensity": led_intensities_mw[0],
-                "illumination_intensity_date": led_date,
-                "illumination_side": led_type,
-                "technique_name": spec_technique,
-                "run_use": "ref_dark",
-                "reference_mode": "builtin",
-            },
-        )
-    # light ref
-    for st in SPEC_MAP[spec_technique]:
-        epm.add(
-            "UVIS_sub_measure",
-            {
-                "spec_type": st,
-                "spec_int_time_ms": spec_int_time_ms,
-                "spec_n_avg": spec_n_avg,
-                "duration_sec": spec_ref_duration,
-                "toggle_source": led_names[0],
-                "toggle_is_shutter": False,
-                "illumination_wavelength": led_wavelengths_nm[0],
-                "illumination_intensity": led_intensities_mw[0],
-                "illumination_intensity_date": led_date,
-                "illumination_side": led_type,
-                "technique_name": spec_technique,
-                "run_use": "ref_light",
-                "reference_mode": "builtin",
-            },
-        )
-
-    if use_z_motor:
-        # leave cell sealed w/solution for storage
-        epm.add(
-            "ECHEUVIS_sub_engage",
-            {
-                "flow_we": False,
-                "flow_ce": False,
-                "z_height": cell_engaged_z,
-                "fill_wait": cell_fill_wait,
-            },
-        )
-    epm.add(
-        "UVIS_calc_abs",
-        {
-            "ev_parts": calc_ev_parts,
-            "bin_width": calc_bin_width,
-            "window_length": calc_window_length,
-            "poly_order": calc_poly_order,
-            "lower_wl": calc_lower_wl,
-            "upper_wl": calc_upper_wl,
-        },
-    )
-    epm.add("ECHE_sub_shutdown", {})
-
-    return epm.planned_experiments  # returns complete experiment list
+    return _echeuvis_led(locals(), measure)
 
 
 @sequence(version=5)
@@ -526,148 +400,8 @@ def ECHEUVIS_CA_led(
     Returns:
         List of planned experiments to dispatch.
     """
-    epm = ExperimentPlanMaker()
 
-    epm.add("ECHE_sub_unloadall_customs", {})
-    if use_z_motor:
-        epm.add(
-            "ECHEUVIS_sub_disengage",
-            {
-                "clear_we": True,
-                "clear_ce": False,
-                "z_height": cell_disengaged_z,
-                "vent_wait": cell_vent_wait,
-            },
-        )
-    else:
-        epm.add(
-            "ECHEUVIS_sub_interrupt",
-            {"reason": "Stop flow and prepare for xy motion to ref location."},
-        )
-    epm.add(
-        "UVIS_sub_setup_ref",
-        {
-            "reference_mode": "builtin",
-            "solid_custom_position": "cell1_we",
-            "solid_plate_id": plate_id,
-            "solid_sample_no": plate_sample_no_list[0],
-            "specref_code": 1,
-        },
-    )
-    if use_z_motor:
-        epm.add(
-            "ECHEUVIS_sub_engage",
-            {
-                "flow_we": True,
-                "flow_ce": True,
-                "z_height": cell_engaged_z,
-                "fill_wait": cell_fill_wait,
-            },
-        )
-    else:
-        epm.add(
-            "ECHEUVIS_sub_interrupt",
-            {"reason": "Restore flow and prepare for reference measurement."},
-        )
-
-    # dark ref
-    for st in SPEC_MAP[spec_technique]:
-        epm.add(
-            "UVIS_sub_measure",
-            {
-                "spec_type": st,
-                "spec_int_time_ms": spec_int_time_ms,
-                "spec_n_avg": spec_n_avg,
-                "duration_sec": spec_ref_duration,
-                "toggle_source": led_names[0],
-                "toggle_is_shutter": False,
-                "illumination_wavelength": led_wavelengths_nm[0],
-                "illumination_intensity": led_intensities_mw[0],
-                "illumination_intensity_date": led_date,
-                "illumination_side": led_type,
-                "technique_name": spec_technique,
-                "run_use": "ref_dark",
-                "reference_mode": "builtin",
-            },
-        )
-    # light ref
-    for st in SPEC_MAP[spec_technique]:
-        epm.add(
-            "UVIS_sub_measure",
-            {
-                "spec_type": st,
-                "spec_int_time_ms": spec_int_time_ms,
-                "spec_n_avg": spec_n_avg,
-                "duration_sec": spec_ref_duration,
-                "toggle_source": led_names[0],
-                "toggle_is_shutter": False,
-                "illumination_wavelength": led_wavelengths_nm[0],
-                "illumination_intensity": led_intensities_mw[0],
-                "illumination_intensity_date": led_date,
-                "illumination_side": led_type,
-                "technique_name": spec_technique,
-                "run_use": "ref_light",
-                "reference_mode": "builtin",
-            },
-        )
-    if use_z_motor:
-        epm.add(
-            "ECHEUVIS_sub_disengage",
-            {
-                "clear_we": True,
-                "clear_ce": False,
-                "z_height": cell_disengaged_z,
-                "vent_wait": cell_vent_wait,
-            },
-        )
-    else:
-        epm.add(
-            "ECHEUVIS_sub_interrupt",
-            {"reason": "Stop flow and prepare for xy motion to starting sample."},
-        )
-
-    for i, plate_sample in enumerate(plate_sample_no_list):
-        if i > 0 and use_z_motor:
-            epm.add(
-                "ECHEUVIS_sub_disengage",
-                {
-                    "clear_we": True,
-                    "clear_ce": False,
-                    "z_height": cell_disengaged_z,
-                    "vent_wait": cell_vent_wait,
-                },
-            )
-
-        epm.add(
-            "ECHE_sub_startup",
-            {
-                "solid_custom_position": "cell1_we",
-                "solid_plate_id": plate_id,
-                "solid_sample_no": plate_sample,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "solution_bubble_gas": solution_bubble_gas,
-                "liquid_volume_ml": liquid_volume_ml,
-            },
-        )
-
-        if use_z_motor:
-            epm.add(
-                "ECHEUVIS_sub_engage",
-                {
-                    "flow_we": True,
-                    "flow_ce": True,
-                    "z_height": cell_engaged_z,
-                    "fill_wait": cell_fill_wait,
-                },
-            )
-        else:
-            if i == 0:  # initial sample
-                epm.add(
-                    "ECHEUVIS_sub_interrupt",
-                    {"reason": "Restore flow and prepare for sample measurement."},
-                )
-
-        # OCV
+    def measure(epm):
         epm.add(
             "ECHE_sub_OCV",
             {
@@ -675,7 +409,6 @@ def ECHEUVIS_CA_led(
                 "SampleRate": 0.05,
             },
         )
-        # CA1
         epm.add(
             "ECHEUVIS_sub_CA_led",
             {
@@ -713,112 +446,7 @@ def ECHEUVIS_CA_led(
             },
         )
 
-    epm.add("ECHE_sub_unloadall_customs", {})
-    if use_z_motor:
-        epm.add(
-            "ECHEUVIS_sub_disengage",
-            {
-                "clear_we": True,
-                "clear_ce": False,
-                "z_height": cell_disengaged_z,
-                "vent_wait": cell_vent_wait,
-            },
-        )
-    else:
-        epm.add(
-            "ECHEUVIS_sub_interrupt",
-            {"reason": "Stop flow and prepare for xy motion to ref location."},
-        )
-    epm.add(
-        "UVIS_sub_setup_ref",
-        {
-            "reference_mode": "builtin",
-            "solid_custom_position": "cell1_we",
-            "solid_plate_id": plate_id,
-            "solid_sample_no": plate_sample_no_list[-1],
-            "specref_code": 1,
-        },
-    )
-    if use_z_motor:
-        epm.add(
-            "ECHEUVIS_sub_engage",
-            {
-                "flow_we": True,
-                "flow_ce": True,
-                "z_height": cell_engaged_z,
-                "fill_wait": cell_fill_wait,
-            },
-        )
-    else:
-        epm.add(
-            "ECHEUVIS_sub_interrupt",
-            {"reason": "Restore flow and prepare for reference measurement."},
-        )
-    # dark ref
-    for st in SPEC_MAP[spec_technique]:
-        epm.add(
-            "UVIS_sub_measure",
-            {
-                "spec_type": st,
-                "spec_int_time_ms": spec_int_time_ms,
-                "spec_n_avg": spec_n_avg,
-                "duration_sec": spec_ref_duration,
-                "toggle_source": led_names[0],
-                "toggle_is_shutter": False,
-                "illumination_wavelength": led_wavelengths_nm[0],
-                "illumination_intensity": led_intensities_mw[0],
-                "illumination_intensity_date": led_date,
-                "illumination_side": led_type,
-                "technique_name": spec_technique,
-                "run_use": "ref_dark",
-                "reference_mode": "builtin",
-            },
-        )
-    # light ref
-    for st in SPEC_MAP[spec_technique]:
-        epm.add(
-            "UVIS_sub_measure",
-            {
-                "spec_type": st,
-                "spec_int_time_ms": spec_int_time_ms,
-                "spec_n_avg": spec_n_avg,
-                "duration_sec": spec_ref_duration,
-                "toggle_source": led_names[0],
-                "toggle_is_shutter": False,
-                "illumination_wavelength": led_wavelengths_nm[0],
-                "illumination_intensity": led_intensities_mw[0],
-                "illumination_intensity_date": led_date,
-                "illumination_side": led_type,
-                "technique_name": spec_technique,
-                "run_use": "ref_light",
-                "reference_mode": "builtin",
-            },
-        )
-    if use_z_motor:
-        # leave cell sealed w/solution for storage
-        epm.add(
-            "ECHEUVIS_sub_engage",
-            {
-                "flow_we": False,
-                "flow_ce": False,
-                "z_height": cell_engaged_z,
-                "fill_wait": cell_fill_wait,
-            },
-        )
-    epm.add(
-        "UVIS_calc_abs",
-        {
-            "ev_parts": calc_ev_parts,
-            "bin_width": calc_bin_width,
-            "window_length": calc_window_length,
-            "poly_order": calc_poly_order,
-            "lower_wl": calc_lower_wl,
-            "upper_wl": calc_upper_wl,
-        },
-    )
-    epm.add("ECHE_sub_shutdown", {})
-
-    return epm.planned_experiments  # returns complete experiment list
+    return _echeuvis_led(locals(), measure)
 
 
 @sequence(version=5)
@@ -916,148 +544,8 @@ def ECHEUVIS_CP_led(
     Returns:
         List of planned experiments to dispatch.
     """
-    epm = ExperimentPlanMaker()
 
-    epm.add("ECHE_sub_unloadall_customs", {})
-    if use_z_motor:
-        epm.add(
-            "ECHEUVIS_sub_disengage",
-            {
-                "clear_we": True,
-                "clear_ce": False,
-                "z_height": cell_disengaged_z,
-                "vent_wait": cell_vent_wait,
-            },
-        )
-    else:
-        epm.add(
-            "ECHEUVIS_sub_interrupt",
-            {"reason": "Stop flow and prepare for xy motion to ref location."},
-        )
-    epm.add(
-        "UVIS_sub_setup_ref",
-        {
-            "reference_mode": "builtin",
-            "solid_custom_position": "cell1_we",
-            "solid_plate_id": plate_id,
-            "solid_sample_no": plate_sample_no_list[0],
-            "specref_code": 1,
-        },
-    )
-    if use_z_motor:
-        epm.add(
-            "ECHEUVIS_sub_engage",
-            {
-                "flow_we": True,
-                "flow_ce": True,
-                "z_height": cell_engaged_z,
-                "fill_wait": cell_fill_wait,
-            },
-        )
-    else:
-        epm.add(
-            "ECHEUVIS_sub_interrupt",
-            {"reason": "Restore flow and prepare for reference measurement."},
-        )
-
-    # dark ref
-    for st in SPEC_MAP[spec_technique]:
-        epm.add(
-            "UVIS_sub_measure",
-            {
-                "spec_type": st,
-                "spec_int_time_ms": spec_int_time_ms,
-                "spec_n_avg": spec_n_avg,
-                "duration_sec": spec_ref_duration,
-                "toggle_source": led_names[0],
-                "toggle_is_shutter": False,
-                "illumination_wavelength": led_wavelengths_nm[0],
-                "illumination_intensity": led_intensities_mw[0],
-                "illumination_intensity_date": led_date,
-                "illumination_side": led_type,
-                "technique_name": spec_technique,
-                "run_use": "ref_dark",
-                "reference_mode": "builtin",
-            },
-        )
-    # light ref
-    for st in SPEC_MAP[spec_technique]:
-        epm.add(
-            "UVIS_sub_measure",
-            {
-                "spec_type": st,
-                "spec_int_time_ms": spec_int_time_ms,
-                "spec_n_avg": spec_n_avg,
-                "duration_sec": spec_ref_duration,
-                "toggle_source": led_names[0],
-                "toggle_is_shutter": False,
-                "illumination_wavelength": led_wavelengths_nm[0],
-                "illumination_intensity": led_intensities_mw[0],
-                "illumination_intensity_date": led_date,
-                "illumination_side": led_type,
-                "technique_name": spec_technique,
-                "run_use": "ref_light",
-                "reference_mode": "builtin",
-            },
-        )
-    if use_z_motor:
-        epm.add(
-            "ECHEUVIS_sub_disengage",
-            {
-                "clear_we": True,
-                "clear_ce": False,
-                "z_height": cell_disengaged_z,
-                "vent_wait": cell_vent_wait,
-            },
-        )
-    else:
-        epm.add(
-            "ECHEUVIS_sub_interrupt",
-            {"reason": "Stop flow and prepare for xy motion to starting sample."},
-        )
-
-    for i, plate_sample in enumerate(plate_sample_no_list):
-        if i > 0 and use_z_motor:
-            epm.add(
-                "ECHEUVIS_sub_disengage",
-                {
-                    "clear_we": True,
-                    "clear_ce": False,
-                    "z_height": cell_disengaged_z,
-                    "vent_wait": cell_vent_wait,
-                },
-            )
-
-        epm.add(
-            "ECHE_sub_startup",
-            {
-                "solid_custom_position": "cell1_we",
-                "solid_plate_id": plate_id,
-                "solid_sample_no": plate_sample,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "solution_bubble_gas": solution_bubble_gas,
-                "liquid_volume_ml": liquid_volume_ml,
-            },
-        )
-
-        if use_z_motor:
-            epm.add(
-                "ECHEUVIS_sub_engage",
-                {
-                    "flow_we": True,
-                    "flow_ce": True,
-                    "z_height": cell_engaged_z,
-                    "fill_wait": cell_fill_wait,
-                },
-            )
-        else:
-            if i == 0:  # initial sample
-                epm.add(
-                    "ECHEUVIS_sub_interrupt",
-                    {"reason": "Restore flow and prepare for sample measurement."},
-                )
-
-        # CP1
+    def measure(epm):
         epm.add(
             "ECHEUVIS_sub_CP_led",
             {
@@ -1095,112 +583,7 @@ def ECHEUVIS_CP_led(
             },
         )
 
-    epm.add("ECHE_sub_unloadall_customs", {})
-    if use_z_motor:
-        epm.add(
-            "ECHEUVIS_sub_disengage",
-            {
-                "clear_we": True,
-                "clear_ce": False,
-                "z_height": cell_disengaged_z,
-                "vent_wait": cell_vent_wait,
-            },
-        )
-    else:
-        epm.add(
-            "ECHEUVIS_sub_interrupt",
-            {"reason": "Stop flow and prepare for xy motion to ref location."},
-        )
-    epm.add(
-        "UVIS_sub_setup_ref",
-        {
-            "reference_mode": "builtin",
-            "solid_custom_position": "cell1_we",
-            "solid_plate_id": plate_id,
-            "solid_sample_no": plate_sample_no_list[-1],
-            "specref_code": 1,
-        },
-    )
-    if use_z_motor:
-        epm.add(
-            "ECHEUVIS_sub_engage",
-            {
-                "flow_we": True,
-                "flow_ce": True,
-                "z_height": cell_engaged_z,
-                "fill_wait": cell_fill_wait,
-            },
-        )
-    else:
-        epm.add(
-            "ECHEUVIS_sub_interrupt",
-            {"reason": "Restore flow and prepare for reference measurement."},
-        )
-    # dark ref
-    for st in SPEC_MAP[spec_technique]:
-        epm.add(
-            "UVIS_sub_measure",
-            {
-                "spec_type": st,
-                "spec_int_time_ms": spec_int_time_ms,
-                "spec_n_avg": spec_n_avg,
-                "duration_sec": spec_ref_duration,
-                "toggle_source": led_names[0],
-                "toggle_is_shutter": False,
-                "illumination_wavelength": led_wavelengths_nm[0],
-                "illumination_intensity": led_intensities_mw[0],
-                "illumination_intensity_date": led_date,
-                "illumination_side": led_type,
-                "technique_name": spec_technique,
-                "run_use": "ref_dark",
-                "reference_mode": "builtin",
-            },
-        )
-    # light ref
-    for st in SPEC_MAP[spec_technique]:
-        epm.add(
-            "UVIS_sub_measure",
-            {
-                "spec_type": st,
-                "spec_int_time_ms": spec_int_time_ms,
-                "spec_n_avg": spec_n_avg,
-                "duration_sec": spec_ref_duration,
-                "toggle_source": led_names[0],
-                "toggle_is_shutter": False,
-                "illumination_wavelength": led_wavelengths_nm[0],
-                "illumination_intensity": led_intensities_mw[0],
-                "illumination_intensity_date": led_date,
-                "illumination_side": led_type,
-                "technique_name": spec_technique,
-                "run_use": "ref_light",
-                "reference_mode": "builtin",
-            },
-        )
-    if use_z_motor:
-        # leave cell sealed w/solution for storage
-        epm.add(
-            "ECHEUVIS_sub_engage",
-            {
-                "flow_we": False,
-                "flow_ce": False,
-                "z_height": cell_engaged_z,
-                "fill_wait": cell_fill_wait,
-            },
-        )
-    epm.add(
-        "UVIS_calc_abs",
-        {
-            "ev_parts": calc_ev_parts,
-            "bin_width": calc_bin_width,
-            "window_length": calc_window_length,
-            "poly_order": calc_poly_order,
-            "lower_wl": calc_lower_wl,
-            "upper_wl": calc_upper_wl,
-        },
-    )
-    epm.add("ECHE_sub_shutdown", {})
-
-    return epm.planned_experiments  # returns complete experiment list
+    return _echeuvis_led(locals(), measure)
 
 
 @sequence(version=1)
