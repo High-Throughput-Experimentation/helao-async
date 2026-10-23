@@ -46,8 +46,8 @@ def _check_surface(reporter):
         lambda: [m.value for m in PotentialVersus] == ["rhe", "oer"],
     )
     reporter.check(
-        "WEVersus values == ['ref', 'rhe']",
-        lambda: [m.value for m in WEVersus] == ["ref", "rhe"],
+        "WEVersus values == ['ref', 'rhe', 'ocv']",
+        lambda: [m.value for m in WEVersus] == ["ref", "rhe", "ocv"],
     )
     reporter.check(
         "BubbleGas values == ['N2', 'O2']",
