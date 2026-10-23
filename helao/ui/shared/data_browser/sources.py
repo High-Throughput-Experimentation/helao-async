@@ -17,7 +17,8 @@ import pandas as pd
 from helao.core.drivers.data.process_locator import process_uuid_of
 from helao.core.models.run_dir import RunDir
 from helao.helpers.meta_io import meta_glob, read_meta
-from helao.hexagon.domain.naming import meta_kind
+from helao.helpers.hlo_data import resolve_data_file
+from helao.hexagon.domain.naming import HEADER_SUFFIX, meta_kind
 from helao.ui.shared.data_browser.readers import make_zip_locator
 
 INDEX_COLUMNS = [
@@ -35,9 +36,17 @@ INDEX_COLUMNS = [
     "locator",
 ]
 
-# Bare ``.json`` is not a data extension: records (``-act.json``) and headers
-# (``.meta.json``) are JSON too.
-DATA_EXTS = (".hlo", ".jsonl", ".hlo.json", ".parquet")
+# ``.json`` covers ``.hlo.json`` and plain JSON data files, but records
+# (``-act.json``) and headers (``.meta.json``) are JSON too: see _is_data_name.
+DATA_EXTS = (".hlo", ".jsonl", ".json", ".parquet")
+
+
+def _is_data_name(n: str) -> bool:
+    """A data file name: a DATA_EXTS suffix that is not a record or a header."""
+    n = n.lower()
+    return (
+        n.endswith(DATA_EXTS) and meta_kind(n) is None and not n.endswith(HEADER_SUFFIX)
+    )
 
 
 def _list_day_dirs(base):
@@ -259,7 +268,7 @@ class RunsSourceIndex(SourceIndex):
                 meta = _safe_meta(act_yml)
                 technique, sample, run_type = _meta_fields(meta)
                 for f in sorted(act_dir.iterdir()):
-                    if f.is_file() and f.name.lower().endswith(DATA_EXTS):
+                    if f.is_file() and _is_data_name(f.name):
                         rows.append(
                             _row(
                                 source=self.source,
@@ -294,7 +303,7 @@ class RunsSourceIndex(SourceIndex):
                         act_meta[posixpath.dirname(n)] = _safe_meta_bytes(zf.read(n), n)
                 for n in names:
                     ext = posixpath.splitext(n)[1].lower()
-                    if not n.lower().endswith(DATA_EXTS):
+                    if not _is_data_name(n):
                         continue
                     actdir = posixpath.dirname(n)
                     meta = act_meta.get(actdir, {})
@@ -326,8 +335,18 @@ RUN_TREES = ("RUNS", "DIAG", RunDir.FINISHED.value, RunDir.DIAG.value)
 def _resolve_run_file(root, date_str, seq_dirname, exp_dirname, file_name):
     """Locate a data file by basename in an unzipped run tree or a RUNS_SYNCED zip.
 
-    Returns (locator, available).
+    A recorded ``X.hlo.json`` resolves to the local ``X.jsonl`` or ``X.hlo``
+    (:func:`resolve_data_file`). Returns (locator, available).
     """
+    name = resolve_data_file(
+        lambda n: _find_run_file(root, date_str, seq_dirname, exp_dirname, n)[1],
+        file_name,
+    )
+    return _find_run_file(root, date_str, seq_dirname, exp_dirname, name or file_name)
+
+
+def _find_run_file(root, date_str, seq_dirname, exp_dirname, file_name):
+    """Exact-basename search behind :func:`_resolve_run_file`."""
     root = Path(root)
     for tree in RUN_TREES:
         exp_path = root / tree / date_str / seq_dirname / exp_dirname
@@ -500,11 +519,13 @@ class DerivedSourceIndex(SourceIndex):
         rows = []
         for fi in meta.get("files") or []:
             fn = (fi or {}).get("file_name", "")
-            if not fn or not fn.lower().endswith(DATA_EXTS):
+            if not fn or not _is_data_name(fn):
                 continue
             locator, available = _resolve_run_file(
                 self.root, date_str, seq_dirname, exp_dirname, fn
             )
+            # file_type follows the PHYSICAL file, so read_dataset picks its reader.
+            phys = posixpath.basename(locator) if available else fn
             rows.append(
                 _row(
                     source="PROCESSES",
@@ -515,7 +536,7 @@ class DerivedSourceIndex(SourceIndex):
                     sample=sample,
                     run_type=run_type,
                     file_name=fn,
-                    file_type=posixpath.splitext(fn)[1].lower().lstrip("."),
+                    file_type=posixpath.splitext(phys)[1].lower().lstrip("."),
                     date=date_str,
                     available=available,
                     locator=locator,

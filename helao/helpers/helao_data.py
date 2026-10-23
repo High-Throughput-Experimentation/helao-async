@@ -169,7 +169,10 @@ class HelaoData:
                         [
                             str(p)
                             for p in meta_glob(
-                                yml_reldir, "seq", "*/*", wildcard_root=True
+                                yml_reldir,
+                                "seq",
+                                "*/*",
+                                wildcard_root=is_legacy_path(self.ymldir),
                             )
                         ],
                         key=lambda x: float(
@@ -183,7 +186,10 @@ class HelaoData:
                         [
                             str(p)
                             for p in meta_glob(
-                                yml_reldir, "exp", "*/*", wildcard_root=True
+                                yml_reldir,
+                                "exp",
+                                "*/*",
+                                wildcard_root=is_legacy_path(self.ymldir),
                             )
                         ],
                         key=lambda x: float(
@@ -197,7 +203,10 @@ class HelaoData:
                         [
                             str(p)
                             for p in meta_glob(
-                                yml_reldir, "act", "*/*", wildcard_root=True
+                                yml_reldir,
+                                "act",
+                                "*/*",
+                                wildcard_root=is_legacy_path(self.ymldir),
                             )
                         ],
                         key=lambda x: float(

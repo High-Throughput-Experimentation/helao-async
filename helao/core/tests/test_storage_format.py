@@ -453,3 +453,47 @@ def test_data_browser_indexes_and_reads_a_pair(tmp_path):
             zf.write(f, f"a/{f.name}")
     meta, data = read_dataset(make_zip_locator(str(zp), "a/WsSim-0.0.0.0__0.jsonl"))
     assert (meta, dict(data)) == (HEADER, DATA)
+
+
+def test_data_browser_lists_json_data_but_not_records_or_headers(tmp_path):
+    t = _new_tree(tmp_path)
+    (t["act"] / "foo.json").write_text('{"a": [1, 2]}', encoding="utf-8")
+    rows = RunsSourceIndex(tmp_path, "FINISHED").index()
+    assert sorted(rows.file_name) == ["WsSim-0.0.0.0__0.jsonl", "foo.json"]
+
+
+def test_data_browser_process_resolves_s3_name_to_the_local_jsonl(tmp_path):
+    from helao.ui.shared.data_browser.sources import DerivedSourceIndex
+
+    t = _new_tree(tmp_path)
+    write_meta(
+        t["exp"] / "0__00000000-0000-0000-0000-0000000000aa__tech-prc.json",
+        {
+            "file_type": "process",
+            "technique_name": "tech",
+            "files": [
+                {"file_name": "WsSim-0.0.0.0__0.hlo.json", "file_type": "helao__file"}
+            ],
+        },
+    )
+    rows = DerivedSourceIndex(tmp_path, "PROCESSES").index()
+    assert len(rows) == 1
+    r = rows.iloc[0]
+    assert r["available"] and r["file_type"] == "jsonl"
+    meta, data = read_dataset(r["locator"])
+    assert (meta, dict(data)) == (HEADER, DATA)
+
+
+def test_helao_data_finds_children_of_a_bracketed_runs_sequence(tmp_path):
+    seq = tmp_path / "RUNS" / "25.28" / "0716" / "131415__GM[x]__golden"
+    exp = seq / "250716.131420__TEST_exp"
+    write_meta(
+        seq / "250716.131415123456-seq.json",
+        {"file_type": "sequence", "sequence_uuid": U_SEQ},
+    )
+    write_meta(
+        exp / "250716.131420123456-exp.json",
+        {"file_type": "experiment", "experiment_uuid": U_EXP},
+    )
+    hd = HelaoData(str(seq / "250716.131415123456-seq.json"))
+    assert len(hd.exp) == 1
