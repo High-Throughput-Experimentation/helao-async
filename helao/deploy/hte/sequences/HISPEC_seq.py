@@ -12,7 +12,7 @@ from helao.helpers.lib_decorators import sequence
 from helao.helpers.premodels import ExperimentPlanMaker
 
 
-@sequence(version=3)
+@sequence(version=4)
 def HISPEC_CV(
     plate_id: int = 1,  # @Dan - what is this? -- plate_id is the ID of the material library in our database. it's first assigned to a substrate after which we can use this ID to track the library's deposition, annealing, and experiment history
     plate_sample_no_list: list = [
@@ -267,8 +267,6 @@ def HISPEC_CV(
                 "fill_wait": cell_fill_wait,
             },
         )
-    else:
-        epm.add("ECHE_sub_unloadall_customs", {})
     # epm.add(
     #     "UVIS_calc_abs",
     #     {
@@ -286,7 +284,7 @@ def HISPEC_CV(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=3)
+@sequence(version=4)
 def HISPEC_EIS_only(
     plate_id: int = 1,  # @Dan - what is this? -- plate_id is the ID of the material library in our database. it's first assigned to a substrate after which we can use this ID to track the library's deposition, annealing, and experiment history
     plate_sample_no_list: list = [
@@ -473,8 +471,6 @@ def HISPEC_EIS_only(
                 "fill_wait": cell_fill_wait,
             },
         )
-    else:
-        epm.add("ECHE_sub_unloadall_customs", {})
 
     epm.add("HISPEC_sub_shutdown", {})
 

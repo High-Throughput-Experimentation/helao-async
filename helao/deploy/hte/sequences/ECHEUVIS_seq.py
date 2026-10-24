@@ -770,7 +770,7 @@ def ECHEUVIS_diagnostic_CV(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=6)
+@sequence(version=7)
 def ECHEUVIS_multiCA_led(
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -1017,8 +1017,6 @@ def ECHEUVIS_multiCA_led(
                 "fill_wait": cell_fill_wait,
             },
         )
-    else:
-        epm.add("ECHE_sub_unloadall_customs", {})
     # epm.add(
     #     "UVIS_calc_abs",
     #     {

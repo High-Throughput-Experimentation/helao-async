@@ -305,15 +305,31 @@ def ECHE_sub_startup(
     return apm.planned_actions
 
 
-@experiment(version=1)
-def ECHE_sub_shutdown() -> list:
+@experiment(version=2)
+def ECHE_sub_shutdown(
+    rel_move_offset_x_mm: Optional[float] = None,
+    rel_move_offset_y_mm: Optional[float] = None,
+) -> list:
     """Unload all samples from PAL custom positions.
+
+    Args:
+        rel_move_offset_x_mm: When either offset is set, first move X/Y by the
+            offsets (folded ``ECHE_sub_rel_move``); an unset one moves 0 mm.
+        rel_move_offset_y_mm: Relative Y displacement (mm), see above.
 
     Returns:
         List of planned actions for the orchestrator.
     """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+
+    if rel_move_offset_x_mm is not None or rel_move_offset_y_mm is not None:
+        apm.add_actions(
+            ECHE_sub_rel_move(
+                offset_x_mm=rel_move_offset_x_mm or 0.0,
+                offset_y_mm=rel_move_offset_y_mm or 0.0,
+            )
+        )
 
     # unload all samples from custom positions
     apm.add_actions(ECHE_sub_unloadall_customs())

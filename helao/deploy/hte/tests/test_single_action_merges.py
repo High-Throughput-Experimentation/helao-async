@@ -13,6 +13,7 @@ from helao.deploy.hte.experiments import (
     ECHE_exp,
     ECHEUVIS_exp,
     ECMS_exp,
+    HISPEC_exp,
     UVIS_exp,
 )
 from helao.deploy.hte.sequences import (
@@ -236,3 +237,59 @@ def test_tier3_pairs_are_folded(mod, first, second):
             _assert_no_pair(names, first, second)
             seen = seen or second in names
     assert seen, f"{second} appears in no {mod.__name__} plan"
+
+
+@pytest.mark.parametrize(
+    "mod,seqs,shutdown",
+    [
+        (ECHEUVIS_seq, ["ECHEUVIS_multiCA_led"], "ECHEUVIS_sub_shutdown"),
+        (HISPEC_seq, ["HISPEC_CV", "HISPEC_EIS_only"], "HISPEC_sub_shutdown"),
+    ],
+)
+def test_no_unloadall_before_shutdown(mod, seqs, shutdown):
+    seen = 0
+    for use_z in (False, True):
+        for name in seqs:
+            names = _names(getattr(mod, name), use_z_motor=use_z)
+            assert names[-1] == shutdown
+            _assert_no_pair(names, "ECHE_sub_unloadall_customs", shutdown)
+            seen += 1
+    assert seen == 2 * len(seqs)
+
+
+def test_shutdowns_still_start_with_the_identical_unload():
+    want = _flat(_run(ECHE_exp.ECHE_sub_unloadall_customs))[0]
+    for fn in (
+        ECHEUVIS_exp.ECHEUVIS_sub_shutdown,
+        HISPEC_exp.HISPEC_sub_shutdown,
+    ):
+        assert _flat(_run(fn))[0] == want
+
+
+def test_shutdown_rel_move_is_rel_move_then_shutdown():
+    kw = {"offset_x_mm": 2.5, "offset_y_mm": -1.5}
+    got = _flat(
+        _run(
+            ECHE_exp.ECHE_sub_shutdown,
+            rel_move_offset_x_mm=2.5,
+            rel_move_offset_y_mm=-1.5,
+        )
+    )
+    want = _flat(_run(ECHE_exp.ECHE_sub_rel_move, **kw)) + _flat(
+        _run(ECHE_exp.ECHE_sub_shutdown)
+    )
+    assert got == want
+    assert [g["action_name"] for g in got] == ["move", "archive_custom_unloadall"]
+
+
+def test_shutdown_rel_move_unset_is_just_the_unload():
+    got = _flat(_run(ECHE_exp.ECHE_sub_shutdown))
+    assert got == _flat(_run(ECHE_exp.ECHE_sub_unloadall_customs))
+    assert "ECHE_sub_rel_move" in ECHE_exp.EXPERIMENTS
+
+
+def test_eche_move_is_one_shutdown_with_offsets():
+    got = list(ECHE_seq.ECHE_move(move_x_mm=3.0, move_y_mm=4.0))
+    assert [e.experiment_name for e in got] == ["ECHE_sub_shutdown"]
+    assert got[0].experiment_params["rel_move_offset_x_mm"] == 3.0
+    assert got[0].experiment_params["rel_move_offset_y_mm"] == 4.0

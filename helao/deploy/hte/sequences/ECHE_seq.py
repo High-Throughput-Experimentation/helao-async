@@ -293,14 +293,14 @@ def ECHE_movetosample(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=1)
+@sequence(version=2)
 def ECHE_move(
     move_x_mm: float = 1.0,
     move_y_mm: float = 1.0,
 ) -> list:
     """Issue a relative move on the ECHE motor stage.
 
-    Calls ``ECHE_sub_rel_move`` then ``ECHE_sub_shutdown``.
+    One ``ECHE_sub_shutdown`` carrying the offsets (relative move, then unload).
 
     Args:
         move_x_mm: Relative x offset to move by (mm).
@@ -313,14 +313,12 @@ def ECHE_move(
     epm = ExperimentPlanMaker()
 
     epm.add(
-        "ECHE_sub_rel_move",
+        "ECHE_sub_shutdown",
         {
-            "offset_x_mm": move_x_mm,
-            "offset_y_mm": move_y_mm,
+            "rel_move_offset_x_mm": move_x_mm,
+            "rel_move_offset_y_mm": move_y_mm,
         },
     )
-
-    epm.add("ECHE_sub_shutdown", {})
 
     return epm.planned_experiments  # returns complete experiment list
 
