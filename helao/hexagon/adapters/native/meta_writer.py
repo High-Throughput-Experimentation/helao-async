@@ -23,7 +23,6 @@ it at call time (cache-nothing rule). ``ActionHost`` constructs it as its
 # suppressed at file scope rather than fixed in the bodies.
 # pyright: reportCallIssue=false, reportArgumentType=false, reportOptionalMemberAccess=false
 
-import hashlib
 import os
 from uuid import UUID
 
@@ -34,6 +33,7 @@ from helao.helpers import helao_logging as logging
 from helao.helpers.file_utils import replace_when_free, staging_path
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.meta_io import dumps_meta, resolve_meta_path
+from helao.hexagon.domain.naming import new_file_conn_key
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -154,15 +154,7 @@ class NativeMetaFileWriter:
         Args:
             key: Arbitrary string used to seed the hash.
         """
-        # return shortuuid.decode(key)
-        # Instansiate new md5_hash
-        md5_hash = hashlib.md5()
-        # Pass the_string to the md5_hash as bytes
-        md5_hash.update(key.encode("utf-8"))
-        # Generate the hex md5 hash of all the read bytes
-        the_md5_hex_str = md5_hash.hexdigest()
-        # Return a String repersenation of the uuid of the md5 hash
-        return UUID(the_md5_hex_str)
+        return new_file_conn_key(key)
 
     def dflt_file_conn_key(self) -> UUID:
         """Return the default file-connection key (``md5(str(None))``)."""

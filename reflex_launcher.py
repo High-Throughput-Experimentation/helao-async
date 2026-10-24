@@ -469,14 +469,12 @@ if __name__ == "__main__":
         asyncio.set_event_loop(asyncio.SelectorEventLoop())
 
     from helao.core.version import get_hlo_version, hlo_version
-    from helao.helpers import config_loader
-    from helao.helpers import helao_logging as logging
+    from helao.helpers.launcher_bootstrap import launcher_bootstrap
     from helao.helpers.parent_death import (
         _set_pdeathsig,
         arm_parent_death_signal,
         monitor_detached,
     )
-    from helao.helpers.yml_tools import yml_load
 
     # Die with launch.py rather than orphaning and holding this server's two
     # ports. Armed here, at the top, so it also covers the port-preflight and
@@ -490,28 +488,8 @@ if __name__ == "__main__":
     confArg = sys.argv[1]
     server_key = sys.argv[2]
 
-    if config_loader.CONFIG is None:
-        config_dict, _validated = config_loader.read_validated_config(confArg)
-        config_loader.install_global_config(config_dict)
-    CONFIG = config_loader.CONFIG
-
-    server_config = CONFIG["servers"][server_key]
+    CONFIG, server_config, LOGGER = launcher_bootstrap(confArg, server_key)
     root = CONFIG.get("root", None)
-    log_root = os.path.join(root, "LOGS") if root else None
-    email_config = (
-        yml_load(CONFIG["alert_config_path"])
-        if CONFIG.get("alert_config_path", False)
-        else {}
-    )
-    if logging.LOGGER is None:
-        logging.LOGGER = logging.make_logger(
-            logger_name=server_key,
-            log_dir=log_root,
-            email_config=email_config,
-            log_level=server_config.get("log_level", CONFIG.get("log_level", 20)),
-        )
-    LOGGER = logging.LOGGER
-    LOGGER.info(f"Loaded config from: {CONFIG['loaded_config_path']}")
 
     servHost = server_config["host"]
     servPort = server_config["port"]

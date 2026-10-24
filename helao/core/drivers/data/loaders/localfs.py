@@ -738,6 +738,14 @@ class LocalLoader:
 ABBR_MAP = {"act": "action", "exp": "experiment", "seq": "sequence", "prc": "process"}
 
 
+def _mirror_identity(model) -> None:
+    """Also expose name/uuid/timestamp/params as ``<helao_type>_*`` (``technique_name`` for processes)."""
+    t = model.helao_type
+    setattr(model, "technique_name" if t == "process" else f"{t}_name", model.name)
+    for attr in ("uuid", "timestamp", "params"):
+        setattr(model, f"{t}_{attr}", getattr(model, attr))
+
+
 class HelaoModel:
     """Base wrapper around a yml record discovered by ``LocalLoader``.
 
@@ -785,6 +793,7 @@ class HelaoModel:
         self.params = meta_dict.get(f"{helao_type}_params", {})
         self.meta_dict = meta_dict
         self.loader = loader
+        _mirror_identity(self)
 
     @property
     def json(self) -> dict:
@@ -833,20 +842,6 @@ class HelaoAction(HelaoDataModel):
     action_timestamp: datetime
     action_params: dict
 
-    def __init__(self, yml_path: str, meta_dict: dict, loader: LocalLoader):
-        """Populate ``action_*`` attributes from the parsed yml.
-
-        Args:
-            yml_path: Source yml path.
-            meta_dict: Parsed yml dict.
-            loader: Owning ``LocalLoader``.
-        """
-        super().__init__(yml_path=yml_path, meta_dict=meta_dict, loader=loader)
-        self.action_name = self.name
-        self.action_uuid = self.uuid
-        self.action_timestamp = self.timestamp
-        self.action_params = self.params
-
 
 class HelaoExperiment(HelaoModel):
     """Experiment record loaded from a local yml tree.
@@ -862,20 +857,6 @@ class HelaoExperiment(HelaoModel):
     experiment_uuid: UUID
     experiment_timestamp: datetime
     experiment_params: dict
-
-    def __init__(self, yml_path: str, meta_dict: dict, loader: LocalLoader):
-        """Populate ``experiment_*`` attributes from the parsed yml.
-
-        Args:
-            yml_path: Source yml path.
-            meta_dict: Parsed yml dict.
-            loader: Owning ``LocalLoader``.
-        """
-        super().__init__(yml_path=yml_path, meta_dict=meta_dict, loader=loader)
-        self.experiment_name = self.name
-        self.experiment_uuid = self.uuid
-        self.experiment_timestamp = self.timestamp
-        self.experiment_params = self.params
 
 
 class HelaoSequence(HelaoModel):
@@ -896,18 +877,8 @@ class HelaoSequence(HelaoModel):
     sequence_params: dict
 
     def __init__(self, yml_path: str, meta_dict: dict, loader: LocalLoader):
-        """Populate ``sequence_*`` attributes from the parsed yml.
-
-        Args:
-            yml_path: Source yml path.
-            meta_dict: Parsed yml dict.
-            loader: Owning ``LocalLoader``.
-        """
+        """Populate the base attributes plus ``sequence_label``."""
         super().__init__(yml_path=yml_path, meta_dict=meta_dict, loader=loader)
-        self.sequence_name = self.name
-        self.sequence_uuid = self.uuid
-        self.sequence_timestamp = self.timestamp
-        self.sequence_params = self.params
         self.sequence_label = meta_dict.get("sequence_label", "")
 
 
@@ -925,20 +896,6 @@ class HelaoProcess(HelaoDataModelMixin, HelaoModel):
     process_uuid: UUID
     process_timestamp: datetime
     process_params: dict
-
-    def __init__(self, yml_path: str, meta_dict: dict, loader: LocalLoader):
-        """Populate ``process_*`` and ``technique_name`` attributes from the parsed yml.
-
-        Args:
-            yml_path: Source yml path.
-            meta_dict: Parsed yml dict.
-            loader: Owning ``LocalLoader``.
-        """
-        super().__init__(yml_path=yml_path, meta_dict=meta_dict, loader=loader)
-        self.process_uuid = self.uuid
-        self.process_timestamp = self.timestamp
-        self.process_params = self.params
-        self.technique_name = self.name
 
     @property
     def experiment(self) -> "HelaoExperiment":

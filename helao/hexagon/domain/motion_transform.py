@@ -16,7 +16,7 @@ import numpy as np
 
 LOGGER = logging.getLogger(__name__)
 
-__all__ = ["TransformXY"]
+__all__ = ["TransformXY", "plan_move_target", "wants_counts"]
 
 
 class TransformXY:
@@ -381,3 +381,104 @@ class TransformXY:
             LOGGER.error(f"Instrument Matrix singular ", exc_info=True)
             # ``self.Minv`` is the 4x4 system inverse: leave it alone, or every
             # later transform fails on a shape mismatch. Returns None.
+
+
+def wants_counts(units) -> bool:
+    """True when ``units`` selects the counts domain rather than mm.
+
+    Accepts the shared ``Units`` str-enum or a bare string: a ``(str, Enum)``
+    member carries its own value, so one comparison covers both. Anything that
+    is not exactly ``"counts"`` is mm; the endpoint's typed enum is what
+    rejects a misspelling with a 422 before it can reach here.
+    """
+    return getattr(units, "value", units) == "counts"
+
+
+_MOTOR_AXES = ("x", "y", "z", "Rx", "Ry", "Rz")
+
+
+def plan_move_target(tf, motor_pos, axis, d_mm, mode, transformation, log=None):
+    """Turn a move request in any frame into motor-frame axes and targets.
+
+    The frame/mode half of ``_motor_move`` shared by the Galil and Thorlabs
+    drivers; unit conversion, speed limits and the per-axis device commands
+    stay in each driver. ``mode`` and ``transformation`` are the drivers'
+    ``MoveModes``/``TransformationModes`` members (compared by value, so the
+    domain needs neither enum).
+
+    Args:
+        tf: A :class:`TransformXY`.
+        motor_pos: ``query_axis_position`` result (``ax`` and ``position``).
+        axis: List of requested axis names.
+        d_mm: List of requested values, parallel to ``axis``.
+        mode: Move mode member (relative, absolute or homing).
+        transformation: Frame member (motorxy, platexy or instrxy).
+        log: Optional one-argument callable receiving the trace messages.
+
+    Returns:
+        ``(axis, d_mm, rebased)``. ``rebased`` is True when a relative request
+        was converted to absolute motor targets; the caller then switches its
+        mode to absolute. Homing and motorxy requests come back untouched.
+    """
+    log = log or (lambda msg: None)
+    # don't use dicts as we do math on these vectors: x, y, z, Rx, Ry, Rz
+    current_positionvec = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    req_positionvec = [None, None, None, None, None, None]
+    reqdict = dict(zip(axis, d_mm))
+    log(f"requested position ({mode}): {reqdict}")
+
+    for idx, ax in enumerate(_MOTOR_AXES):
+        if ax in motor_pos["ax"]:
+            current_positionvec[idx] = motor_pos["position"][motor_pos["ax"].index(ax)]
+            if ax in reqdict:
+                req_positionvec[idx] = reqdict[ax]
+
+    log(f"motor position vector: {current_positionvec[0:3]}")
+    log(f"requested position vector ({mode}) {req_positionvec}")
+
+    rebased = False
+    if transformation == "motorxy":
+        log(f"motion: got motorxy ({mode}), no transformation necessary")
+    elif transformation == "platexy":
+        log(f"motion: got platexy ({mode}), converting to motorxy")
+        motorxy: list = [0, 0, 1]
+        motorxy[0] = current_positionvec[0]
+        motorxy[1] = current_positionvec[1]
+        current_platexy = tf.transform_motorxy_to_platexy(motorxy)
+        log(f"current plate position (calc from motor): {current_platexy}")
+        if mode in ("relative", "absolute"):
+            new_platexy: list = [0, 0, 1]
+            for i in range(2):
+                if req_positionvec[i] is None:
+                    new_platexy[i] = current_platexy[i]
+                elif mode == "relative":
+                    new_platexy[i] = current_platexy[i] + req_positionvec[i]
+                else:
+                    new_platexy[i] = req_positionvec[i]
+            log(f"new platexy (abs): {new_platexy}")
+            new_motorxy = tf.transform_platexy_to_motorxy(new_platexy)
+            log(f"new motorxy (abs): {new_motorxy}")
+            axis = ["x", "y"]
+            d_mm = [d for d in new_motorxy[0:2]]
+            rebased = mode == "relative"
+    elif transformation == "instrxy":
+        log(f"mode: {mode}")
+        log(f"motion: got instrxyz ({mode}), converting to motorxy")
+        current_instrxyz = tf.transform_motorxyz_to_instrxyz(current_positionvec[0:3])
+        log(f"current instrument position (calc from motor): {current_instrxyz}")
+        if mode in ("relative", "absolute"):
+            new_instrxyz = current_instrxyz
+            for i in range(3):
+                if req_positionvec[i] is not None:
+                    if mode == "relative":
+                        new_instrxyz[i] = new_instrxyz[i] + req_positionvec[i]
+                    else:
+                        new_instrxyz[i] = req_positionvec[i]
+            log(f"new instrument position (abs): {new_instrxyz}")
+            new_motorxyz = tf.transform_instrxyz_to_motorxyz(new_instrxyz[0:3])
+            log(f"new motor position (abs): {new_motorxyz}")
+            axis = ["x", "y", "z"]
+            d_mm = [d for d in new_motorxyz[0:3]]
+            rebased = mode == "relative"
+    # homing: no coordinate conversion needed (the length is still checked)
+    return axis, d_mm, rebased

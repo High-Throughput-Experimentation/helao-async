@@ -52,6 +52,14 @@ def _as_datetime(value):
     return value
 
 
+def _mirror_identity(model) -> None:
+    """Also expose name/uuid/timestamp/params as ``<helao_type>_*`` (``technique_name`` for processes)."""
+    t = model.helao_type
+    setattr(model, "technique_name" if t == "process" else f"{t}_name", model.name)
+    for attr in ("uuid", "timestamp", "params"):
+        setattr(model, f"{t}_{attr}", getattr(model, attr))
+
+
 class HelaoModel:
     """Base wrapper around a HELAO record (action/experiment/sequence/process).
 
@@ -102,6 +110,7 @@ class HelaoModel:
         self.params = self.meta_dict.get(f"{helao_type}_params", {})
         key = "technique_name" if helao_type == "process" else f"{helao_type}_name"
         self.name = self.meta_dict.get(key)
+        _mirror_identity(self)
 
     @property
     def json(self) -> dict:
@@ -154,10 +163,6 @@ class HelaoAction(HelaoDataModel):
             query_df: Optional SQL result frame.
         """
         super().__init__(helao_type="action", uuid=uuid, query_df=query_df)
-        self.action_name = self.name
-        self.action_uuid = self.uuid
-        self.action_timestamp = self.timestamp
-        self.action_params = self.params
 
 
 class HelaoExperiment(HelaoModel):
@@ -176,10 +181,6 @@ class HelaoExperiment(HelaoModel):
             query_df: Optional SQL result frame.
         """
         super().__init__(helao_type="experiment", uuid=uuid, query_df=query_df)
-        self.experiment_name = self.name
-        self.experiment_uuid = self.uuid
-        self.experiment_timestamp = self.timestamp
-        self.experiment_params = self.params
 
 
 class HelaoSequence(HelaoModel):
@@ -198,10 +199,6 @@ class HelaoSequence(HelaoModel):
             query_df: Optional SQL result frame.
         """
         super().__init__(helao_type="sequence", uuid=uuid, query_df=query_df)
-        self.sequence_name = self.name
-        self.sequence_uuid = self.uuid
-        self.sequence_timestamp = self.timestamp
-        self.sequence_params = self.params
 
 
 class HelaoProcess(HelaoDataModel):
@@ -220,10 +217,6 @@ class HelaoProcess(HelaoDataModel):
             query_df: Optional SQL result frame.
         """
         super().__init__(helao_type="process", uuid=uuid, query_df=query_df)
-        self.technique_name = self.name
-        self.process_uuid = self.uuid
-        self.process_timestamp = self.timestamp
-        self.process_params = self.params
 
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER

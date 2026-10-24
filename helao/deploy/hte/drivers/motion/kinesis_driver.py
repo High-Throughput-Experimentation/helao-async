@@ -27,6 +27,7 @@ from helao.core.drivers.helao_driver import (
     HelaoDriver,
 )
 from helao.helpers.make_str_enum import make_str_enum
+from helao.hexagon.domain.motion_transform import wants_counts
 
 
 class MoveModes(str, Enum):
@@ -49,17 +50,6 @@ MOTION_STATES = [
     "homing",
     "active",
 ]
-
-
-def _wants_counts(units) -> bool:
-    """True when ``units`` selects the counts domain rather than mm.
-
-    Accepts the shared ``Units`` str-enum or a bare string: a ``(str, Enum)``
-    member carries its own value, so one comparison covers both. Anything that
-    is not exactly ``"counts"`` is mm; the endpoint's typed enum is what
-    rejects a misspelling with a 422 before it can reach here.
-    """
-    return getattr(units, "value", units) == "counts"
 
 
 class KinesisMotor(HelaoDriver):
@@ -238,7 +228,7 @@ class KinesisMotor(HelaoDriver):
             elif move_mode == MoveModes.absolute:
                 move_func = self.motors[axis].move_to
                 LOGGER.info("kinesis motor starting motion")
-            if _wants_counts(units):
+            if wants_counts(units):
                 move_func(value, scale=False)
             else:
                 move_func(value)

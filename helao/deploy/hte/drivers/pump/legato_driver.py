@@ -16,6 +16,7 @@ from typing import Any, Optional
 
 import serial
 
+from helao.deploy.hte.drivers.serial_lifecycle import SerialLifecycleMixin
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -101,7 +102,7 @@ ulmap = {
 _POLL_READ_TIMEOUT_S = 5.0
 
 
-class KDS100(HelaoDriver):
+class KDS100(SerialLifecycleMixin, HelaoDriver):
     """HELAO ``HelaoDriver`` wrapper for KD Scientific Legato 100 syringe pump(s) on an RS-232 chain.
 
     The serial port specified in ``config['port']`` is opened by :meth:`connect`,
@@ -156,49 +157,6 @@ class KDS100(HelaoDriver):
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
-        return response
-
-    def get_status(self) -> DriverResponse:
-        """Return whether the serial connection has been opened.
-
-        Returns:
-            ``DriverResponse`` with ``status=ok`` if connected, else
-            ``status=uninitialized``.
-        """
-        if self.com is not None:
-            return DriverResponse(
-                response=DriverResponseType.success, status=DriverStatus.ok
-            )
-        return DriverResponse(
-            response=DriverResponseType.success, status=DriverStatus.uninitialized
-        )
-
-    def stop(self) -> DriverResponse:
-        """No active operation to abort; reports current status."""
-        return DriverResponse(
-            response=DriverResponseType.success, status=DriverStatus.ok
-        )
-
-    def reset(self) -> DriverResponse:
-        """Force-close and reopen the serial connection."""
-        self.disconnect()
-        return self.connect()
-
-    def disconnect(self) -> DriverResponse:
-        """Close the underlying serial port."""
-        try:
-            if self.com is not None:
-                self.com.close()
-            response = DriverResponse(
-                response=DriverResponseType.success, status=DriverStatus.ok
-            )
-        except Exception:
-            LOGGER.error("disconnect failed", exc_info=True)
-            response = DriverResponse(
-                response=DriverResponseType.failed, status=DriverStatus.error
-            )
-        finally:
-            self.com = None
         return response
 
     def shutdown(self):
@@ -361,18 +319,6 @@ class KDS100(HelaoDriver):
             cmd = "wrun"
         else:
             return False
-        resp = await self.send(pump_name, cmd)
-        self.update_status_from_response(resp)
-        return resp
-
-    async def set_force(self, pump_name: str, force_val: int) -> list:
-        """Set the infusion force in percent.
-
-        Args:
-            pump_name: Configured pump key.
-            force_val: Force value in percent.
-        """
-        cmd = f"forc {force_val}"
         resp = await self.send(pump_name, cmd)
         self.update_status_from_response(resp)
         return resp

@@ -15,6 +15,7 @@ from typing import Any, Optional
 import serial
 
 # import traceback
+from helao.deploy.hte.drivers.serial_lifecycle import SerialLifecycleMixin
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -131,7 +132,7 @@ def str2bin(val: str) -> list:
         return []
 
 
-class SIMDOS(HelaoDriver):
+class SIMDOS(SerialLifecycleMixin, HelaoDriver):
     """``HelaoDriver`` wrapper for the KNF SIMDOS RC-P diaphragm pump over RS-485.
 
     The serial port specified in ``config['port']`` is opened by :meth:`connect`,
@@ -183,49 +184,6 @@ class SIMDOS(HelaoDriver):
             )
         return response
 
-    def get_status(self) -> DriverResponse:
-        """Return whether the serial connection has been opened.
-
-        Returns:
-            ``DriverResponse`` with ``status=ok`` if connected, else
-            ``status=uninitialized``.
-        """
-        if self.com is not None:
-            return DriverResponse(
-                response=DriverResponseType.success, status=DriverStatus.ok
-            )
-        return DriverResponse(
-            response=DriverResponseType.success, status=DriverStatus.uninitialized
-        )
-
-    def stop(self) -> DriverResponse:
-        """No active operation to abort; reports current status."""
-        return DriverResponse(
-            response=DriverResponseType.success, status=DriverStatus.ok
-        )
-
-    def reset(self) -> DriverResponse:
-        """Force-close and reopen the serial connection."""
-        self.disconnect()
-        return self.connect()
-
-    def disconnect(self) -> DriverResponse:
-        """Close the underlying serial port."""
-        try:
-            if self.com is not None:
-                self.com.close()
-            response = DriverResponse(
-                response=DriverResponseType.success, status=DriverStatus.ok
-            )
-        except Exception:
-            LOGGER.error("disconnect failed", exc_info=True)
-            response = DriverResponse(
-                response=DriverResponseType.failed, status=DriverStatus.error
-            )
-        finally:
-            self.com = None
-        return response
-
     def shutdown(self):
         """Close the underlying serial port on server shutdown."""
         self.disconnect()
@@ -272,49 +230,29 @@ class SIMDOS(HelaoDriver):
             LOGGER.info("command returned multiple responses, using first")
         return resp[0]
 
-    def get_opstat(self) -> dict:
-        """Query operation status bits (``?SS1``) and return their decoded labels."""
-        resp = self.send("?SS1")
+    def _decode_stat(self, cmd: str, table: list) -> dict:
+        """Query status register ``cmd`` and label each bit from ``table``."""
+        resp = self.send(cmd)
         if resp is None:
             return {}
-        state_dict = {}
         bits = str2bin(resp)
-        for i, casetup in enumerate(OPSTAT):
-            state_dict[i] = (casetup[bits[i]], bits[i])
-        return state_dict
+        return {i: (labels[bits[i]], bits[i]) for i, labels in enumerate(table)}
+
+    def get_opstat(self) -> dict:
+        """Query operation status bits (``?SS1``) and return their decoded labels."""
+        return self._decode_stat("?SS1", OPSTAT)
 
     def get_sysstat(self) -> dict:
         """Query system status bits (``?SS2``) and return their decoded labels."""
-        resp = self.send("?SS2")
-        if resp is None:
-            return {}
-        state_dict = {}
-        bits = str2bin(resp)
-        for i, casetup in enumerate(SYSTAT):
-            state_dict[i] = (casetup[bits[i]], bits[i])
-        return state_dict
+        return self._decode_stat("?SS2", SYSTAT)
 
     def get_runstat(self) -> dict:
         """Query run-mode status bit (``?SS3``)."""
-        resp = self.send("?SS3")
-        if resp is None:
-            return {}
-        state_dict = {}
-        bits = str2bin(resp)
-        for i, casetup in enumerate(RUSTAT):
-            state_dict[i] = (casetup[bits[i]], bits[i])
-        return state_dict
+        return self._decode_stat("?SS3", RUSTAT)
 
     def get_dispstat(self) -> dict:
         """Query dispense-mode status bits (``?SS4``)."""
-        resp = self.send("?SS4")
-        if resp is None:
-            return {}
-        state_dict = {}
-        bits = str2bin(resp)
-        for i, casetup in enumerate(DISTAT):
-            state_dict[i] = (casetup[bits[i]], bits[i])
-        return state_dict
+        return self._decode_stat("?SS4", DISTAT)
 
     def get_faults(self) -> dict:
         """Query fault diagnostic bits (``?SS6``) and label active faults."""
@@ -363,23 +301,6 @@ class SIMDOS(HelaoDriver):
             LOGGER.info(f"could not set pump mode to {mode.name}")
         return success
 
-    def get_run_param(self, param: PumpParam) -> int:
-        """Read a run parameter (rate/time/volume).
-
-        Args:
-            param: :class:`PumpParam` identifying which parameter to read.
-
-        Returns:
-            Parameter value as an integer, or ``-1`` on failure.
-        """
-        parcmd = param.value
-        resp = self.send(f"?{parcmd}")
-        if resp is not None:
-            return int(resp)
-        else:
-            LOGGER.info(f"could not validate {param.name}")
-            return -1
-
     def set_run_param(self, param: PumpParam, val: int) -> bool:
         """Set a run parameter, validating against per-parameter limits and readback.
 
@@ -408,45 +329,28 @@ class SIMDOS(HelaoDriver):
                 LOGGER.info(f"could not validate {param.name} setpoint")
         return success
 
+    async def _ky(self, code: int) -> bool:
+        """Send ``KY<code>`` with polling paused; ``True`` if the pump acknowledged."""
+        await self.stop_polling()
+        resp = self.send(f"KY{code}")
+        await self.start_polling()
+        return resp is not None
+
     async def stop_pump(self) -> bool:
         """Stop the pump (``KY0``); pauses polling around the command."""
-        await self.stop_polling()
-        success = False
-        resp = self.send("KY0")
-        await self.start_polling()
-        if resp is not None:
-            success = True
-        return success
+        return await self._ky(0)
 
     async def start_pump(self) -> bool:
         """Start the pump (``KY1``); pauses polling around the command."""
-        await self.stop_polling()
-        success = False
-        resp = self.send("KY1")
-        await self.start_polling()
-        if resp is not None:
-            success = True
-        return success
+        return await self._ky(1)
 
     async def prime(self) -> bool:
         """Prime the pump (``KY2``); pauses polling around the command."""
-        await self.stop_polling()
-        success = False
-        resp = self.send("KY2")
-        await self.start_polling()
-        if resp is not None:
-            success = True
-        return success
+        return await self._ky(2)
 
     async def pause(self) -> bool:
         """Pause the pump (``KY3``); pauses polling around the command."""
-        await self.stop_polling()
-        success = False
-        resp = self.send("KY3")
-        await self.start_polling()
-        if resp is not None:
-            success = True
-        return success
+        return await self._ky(3)
 
 
 class SIMDOSPoller(DriverPoller):

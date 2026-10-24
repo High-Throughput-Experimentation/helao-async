@@ -278,3 +278,33 @@ class DriverPoller:
         """
         LOGGER.info("DriverPoller.get_data() has not been implemented")
         return DriverResponse()
+
+
+class NoDeviceDriver(HelaoDriver):
+    """Base for drivers with no physical device: every lifecycle call succeeds."""
+
+    def connect(self) -> DriverResponse:
+        """Nothing to connect to; always succeeds."""
+        return DriverResponse(
+            response=DriverResponseType.success,
+            message="no device",
+            status=DriverStatus.ok,
+        )
+
+    def get_status(self) -> DriverResponse:
+        """Nothing to poll; always reports ok."""
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
+
+    def stop(self) -> DriverResponse:
+        """Nothing to abort; always succeeds."""
+        return self.get_status()
+
+    def reset(self) -> DriverResponse:
+        """Nothing to reinitialize; always succeeds."""
+        return self.get_status()
+
+    def disconnect(self) -> DriverResponse:
+        """Nothing to release; always succeeds."""
+        return self.get_status()

@@ -116,7 +116,12 @@ class GalilAlignerHost:
     Constructed by the action server after the driver connects (when
     ``enable_aligner`` is set). Owns the Bokeh ``Server`` and the
     aligner-orchestration verbs formerly on the driver.
+
+    ``_context_class`` is the seam for deployments whose aligner session needs
+    more state than :class:`AlignerMotorContext` carries.
     """
+
+    _context_class = AlignerMotorContext
 
     def __init__(
         self,
@@ -133,7 +138,7 @@ class GalilAlignerHost:
         self._server_name = server_name
         self._config = config or {}
         self._ui_host = ui_host
-        self.context = AlignerMotorContext(driver, base)
+        self.context = self._context_class(driver, base)
         self.bokehapp: Any = None
 
     def start(self) -> None:

@@ -19,12 +19,7 @@ from scipy.signal import savgol_filter
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from helao.core.drivers.helao_driver import (
-    DriverResponse,
-    DriverResponseType,
-    DriverStatus,
-    HelaoDriver,
-)
+from helao.core.drivers.helao_driver import NoDeviceDriver
 from helao.hexagon.domain.naming import meta_kind
 from helao.helpers.file_mapper import FileMapper
 from helao.helpers.premodels import Experiment
@@ -104,7 +99,7 @@ def squeeze_foms(d) -> dict:
     return sd
 
 
-class Calc(HelaoDriver):
+class Calc(NoDeviceDriver):
     """In-sequence figure-of-merit and loop-control driver."""
 
     def __init__(self, config: dict = {}):
@@ -116,38 +111,6 @@ class Calc(HelaoDriver):
         super().__init__(config=config)
         self.config_dict = self.config
         self.yaml = YAML(typ="safe")
-
-    def connect(self) -> DriverResponse:
-        """No physical device to connect to; always succeeds."""
-        return DriverResponse(
-            response=DriverResponseType.success,
-            message="no device",
-            status=DriverStatus.ok,
-        )
-
-    def get_status(self) -> DriverResponse:
-        """No physical device to poll; always reports ok."""
-        return DriverResponse(
-            response=DriverResponseType.success, status=DriverStatus.ok
-        )
-
-    def stop(self) -> DriverResponse:
-        """No active activity to abort; always succeeds."""
-        return DriverResponse(
-            response=DriverResponseType.success, status=DriverStatus.ok
-        )
-
-    def reset(self) -> DriverResponse:
-        """No device state to reinitialize; always succeeds."""
-        return DriverResponse(
-            response=DriverResponseType.success, status=DriverStatus.ok
-        )
-
-    def disconnect(self) -> DriverResponse:
-        """No physical connection to release; always succeeds."""
-        return DriverResponse(
-            response=DriverResponseType.success, status=DriverStatus.ok
-        )
 
     def gather_seq_data(self, seq_absdir: str, action_name: str) -> dict:
         """Load ``.hlo``/``.yml`` action results for one action name.

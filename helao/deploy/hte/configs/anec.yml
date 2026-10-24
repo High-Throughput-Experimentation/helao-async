@@ -62,7 +62,6 @@ servers:
       galil_ip_str: 192.168.99.222
       def_speed_count_sec: 10000
       max_speed_count_sec: 25000
-      ipstr: 192.168.200.23
       axis_id:
         x: C
         y: B

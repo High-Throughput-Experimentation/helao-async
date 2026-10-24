@@ -46,7 +46,11 @@ from helao.core.models.sample import SolidSample
 from helao.deploy.hte.drivers.motion.enum import MoveModes, TransformationModes
 from helao.helpers import helao_logging as logging
 from helao.hexagon.adapters.shared.calibration_store import JsonFileCalibrationStore
-from helao.hexagon.domain.motion_transform import TransformXY
+from helao.hexagon.domain.motion_transform import (
+    TransformXY,
+    plan_move_target,
+    wants_counts,
+)
 from helao.hexagon.ports.galil_command_channel import (
     GalilChannelError,
     GalilCommandChannel,
@@ -59,18 +63,6 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 _AXIS_LETTERS = "ABCDEFGH"
 # Per-axis init register writes, verbatim from the legacy connect() sequence.
 _AXIS_INIT = [("MT", 2), ("CE", 4), ("TW", 32000), ("SD", 256000)]
-
-
-def _wants_counts(units: Any) -> bool:
-    """True when ``units`` selects the counts domain rather than mm.
-
-    Accepts the shared ``Units`` str-enum or a bare string: a ``(str, Enum)``
-    member carries its own value, so one comparison covers both and no
-    spelling can fall through silently -- anything that is not exactly
-    ``"counts"`` is mm, and the endpoint's typed enum is what rejects a
-    misspelling with a 422 before it ever reaches here.
-    """
-    return getattr(units, "value", units) == "counts"
 
 
 class NativeGalilMotion(HelaoDriver):
@@ -544,7 +536,7 @@ class NativeGalilMotion(HelaoDriver):
         stopping = False
         mode = MoveModes(mode)
         transformation = TransformationModes(transformation)
-        counts_mode = _wants_counts(units)
+        counts_mode = wants_counts(units)
 
         if counts_mode and transformation != TransformationModes.motorxy:
             # The platexy/instrxy branches below do mm arithmetic on d_mm; a
@@ -566,77 +558,11 @@ class NativeGalilMotion(HelaoDriver):
             }
 
         tmpmotorpos = await self.query_axis_position(axis=self.get_all_axis())
-        current_positionvec = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        req_positionvec: list = [None, None, None, None, None, None]
-        reqdict = dict(zip(axis, d_mm))
-
-        for idx, ax in enumerate(["x", "y", "z", "Rx", "Ry", "Rz"]):
-            if ax in tmpmotorpos["ax"]:
-                current_positionvec[idx] = tmpmotorpos["position"][
-                    tmpmotorpos["ax"].index(ax)
-                ]
-                if ax in reqdict:
-                    req_positionvec[idx] = reqdict[ax]
-
-        if transformation == TransformationModes.motorxy:
-            pass
-        elif transformation == TransformationModes.platexy:
-            motorxy = [0.0, 0.0, 1.0]
-            motorxy[0] = current_positionvec[0]
-            motorxy[1] = current_positionvec[1]
-            current_platexy = tf.transform_motorxy_to_platexy(motorxy)
-            if mode == MoveModes.relative:
-                new_platexy = [0.0, 0.0, 1.0]
-                if req_positionvec[0] is not None:
-                    new_platexy[0] = current_platexy[0] + req_positionvec[0]
-                else:
-                    new_platexy[0] = current_platexy[0]
-                if req_positionvec[1] is not None:
-                    new_platexy[1] = current_platexy[1] + req_positionvec[1]
-                else:
-                    new_platexy[1] = current_platexy[1]
-                new_motorxy = tf.transform_platexy_to_motorxy(new_platexy)
-                axis = ["x", "y"]
-                d_mm = [d for d in new_motorxy[0:2]]
-                mode = MoveModes.absolute
-            elif mode == MoveModes.absolute:
-                new_platexy = [0.0, 0.0, 1.0]
-                if req_positionvec[0] is not None:
-                    new_platexy[0] = req_positionvec[0]
-                else:
-                    new_platexy[0] = current_platexy[0]
-                if req_positionvec[1] is not None:
-                    new_platexy[1] = req_positionvec[1]
-                else:
-                    new_platexy[1] = current_platexy[1]
-                new_motorxy = tf.transform_platexy_to_motorxy(new_platexy)
-                axis = ["x", "y"]
-                d_mm = [d for d in new_motorxy[0:2]]
-            elif mode == MoveModes.homing:
-                pass
-        elif transformation == TransformationModes.instrxy:
-            current_instrxyz = tf.transform_motorxyz_to_instrxyz(
-                current_positionvec[0:3]
-            )
-            if mode == MoveModes.relative:
-                new_instrxyz = current_instrxyz
-                for i in range(3):
-                    if req_positionvec[i] is not None:
-                        new_instrxyz[i] = new_instrxyz[i] + req_positionvec[i]
-                new_motorxyz = tf.transform_instrxyz_to_motorxyz(new_instrxyz[0:3])
-                axis = ["x", "y", "z"]
-                d_mm = [d for d in new_motorxyz[0:3]]
-                mode = MoveModes.absolute
-            elif mode == MoveModes.absolute:
-                new_instrxyz = current_instrxyz
-                for i in range(3):
-                    if req_positionvec[i] is not None:
-                        new_instrxyz[i] = req_positionvec[i]
-                new_motorxyz = tf.transform_instrxyz_to_motorxyz(new_instrxyz[0:3])
-                axis = ["x", "y", "z"]
-                d_mm = [d for d in new_motorxyz[0:3]]
-            elif mode == MoveModes.homing:
-                pass
+        axis, d_mm, rebased = plan_move_target(
+            tf, tmpmotorpos, axis, d_mm, mode, transformation
+        )
+        if rebased:
+            mode = MoveModes.absolute
 
         ret_moved_axis: list = []
         ret_speed: list = []

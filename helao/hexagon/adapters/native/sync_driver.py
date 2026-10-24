@@ -23,7 +23,6 @@ formatting-only follow-up drops the exclusion.
 __all__ = ["AsyncRWLock", "HelaoYml", "Progress", "SyncDriver"]
 
 import asyncio
-import codecs
 import gzip
 import io
 import json
@@ -88,23 +87,6 @@ ABR_MAP = {
     "seq": "sequence",
     "prc": "process",
 }
-
-
-def dict2json(input_dict: dict) -> io.BytesIO:
-    """Serialize a dict to a UTF-8 JSON byte stream rewound to position 0.
-
-    Args:
-        input_dict: Dictionary to serialize.
-
-    Returns:
-        A ``BytesIO`` containing the JSON bytes, ready for upload.
-    """
-    bio = io.BytesIO()
-    stream_writer = codecs.getwriter("utf-8")
-    wrapper_file = stream_writer(bio)
-    json.dump(input_dict, wrapper_file)
-    bio.seek(0)
-    return bio
 
 
 def _pending_only(paths: list) -> list:
@@ -2681,7 +2663,7 @@ class SyncDriver:
                     *close* it, where rewinding instead raises ``ValueError:
                     I/O operation on closed file``.
                     """
-                    body: Union[io.BytesIO, str] = dict2json(msg)
+                    body: Union[io.BytesIO, str] = io.BytesIO(json.dumps(msg).encode())
                     if compress:
                         gzipped = io.BytesIO()
                         with gzip.GzipFile(fileobj=gzipped, mode="wb") as f:

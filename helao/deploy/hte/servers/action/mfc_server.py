@@ -38,6 +38,26 @@ from ...drivers.mfc.alicat_driver import (
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
+async def _cancel(app: ActionHost, ctx: ActionContext, prefix: str) -> dict:
+    """Stop the executor named by ``exec_id``, else all ``prefix`` executors.
+
+    The ``device_name`` param, when set, filters the prefix match.
+    """
+    active = await ctx.begin()
+    params = active.action.action_params
+    if params["exec_id"] is not None:
+        app.stop_executor(params["exec_id"])
+    else:
+        dev_dict = (
+            {}
+            if params["device_name"] is None
+            else {"device_name": params["device_name"]}
+        )
+        app.stop_all_executor_prefix(prefix, dev_dict)
+    finished_action = await active.finish()
+    return finished_action.as_dict()
+
+
 async def mfc_dyn_endpoints(app: ActionHost):
     """Register MFC endpoints once the driver is online.
 
@@ -119,19 +139,7 @@ async def mfc_dyn_endpoints(app: ActionHost):
             Returns:
                 The finished action dictionary.
             """
-            active = await ctx.begin()
-            if active.action.action_params["exec_id"] is not None:
-                app.stop_executor(active.action.action_params["exec_id"])
-            else:
-                if active.action.action_params["device_name"] is None:
-                    dev_dict = {}
-                else:
-                    dev_dict = {
-                        "device_name": active.action.action_params["device_name"]
-                    }
-                app.stop_all_executor_prefix("maintain_concentration", dev_dict)
-            finished_action = await active.finish()
-            return finished_action.as_dict()
+            return await _cancel(app, ctx, "maintain_concentration")
 
     else:
         LOGGER.info(f"server_name {co2_sensor_key} was not found in config.")
@@ -203,19 +211,7 @@ async def mfc_dyn_endpoints(app: ActionHost):
             Returns:
                 The finished action dictionary.
             """
-            active = await ctx.begin()
-            if active.action.action_params["exec_id"] is not None:
-                app.stop_executor(active.action.action_params["exec_id"])
-            else:
-                if active.action.action_params["device_name"] is None:
-                    dev_dict = {}
-                else:
-                    dev_dict = {
-                        "device_name": active.action.action_params["device_name"]
-                    }
-                app.stop_all_executor_prefix("acquire_flowrate", dev_dict)
-            finished_action = await active.finish()
-            return finished_action.as_dict()
+            return await _cancel(app, ctx, "acquire_flowrate")
 
         @app.action()
         @action_version(2)
@@ -281,19 +277,7 @@ async def mfc_dyn_endpoints(app: ActionHost):
             Returns:
                 The finished action dictionary.
             """
-            active = await ctx.begin()
-            if active.action.action_params["exec_id"] is not None:
-                app.stop_executor(active.action.action_params["exec_id"])
-            else:
-                if active.action.action_params["device_name"] is None:
-                    dev_dict = {}
-                else:
-                    dev_dict = {
-                        "device_name": active.action.action_params["device_name"]
-                    }
-                app.stop_all_executor_prefix("acquire_pressure", dev_dict)
-            finished_action = await active.finish()
-            return finished_action.as_dict()
+            return await _cancel(app, ctx, "acquire_pressure")
 
         @app.action()
         async def set_flowrate(
@@ -474,19 +458,7 @@ async def mfc_dyn_endpoints(app: ActionHost):
             Returns:
                 The finished action dictionary.
             """
-            active = await ctx.begin()
-            if active.action.action_params["exec_id"] is not None:
-                app.stop_executor(active.action.action_params["exec_id"])
-            else:
-                if active.action.action_params["device_name"] is None:
-                    dev_dict = {}
-                else:
-                    dev_dict = {
-                        "device_name": active.action.action_params["device_name"]
-                    }
-                app.stop_all_executor_prefix("maintain_pressure", dev_dict)
-            finished_action = await active.finish()
-            return finished_action.as_dict()
+            return await _cancel(app, ctx, "maintain_pressure")
 
         @app.post("/start_polling", tags=["private"])
         async def start_polling() -> str:

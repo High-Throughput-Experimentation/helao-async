@@ -216,11 +216,3 @@ DTAQ_UNIV = GamryDtaq(
         "unknown1",
     ],
 )
-
-DTAQ_EIS = GamryDtaq(
-    name="GamryCOM.GamryDtaqEis",
-    output_keys=[
-        "I_A",
-        "Ewe_V",
-    ],
-)

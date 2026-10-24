@@ -37,7 +37,6 @@ Exit helao and restart.
 
 __all__ = ["makeApp"]
 
-import asyncio
 from enum import Enum
 from typing import Optional, Union
 
@@ -46,6 +45,12 @@ import numpy as np
 from helao.core.error import ErrorCodes
 from helao.hexagon.app.action_context import ActionContext
 from helao.hexagon.app.action_host import ActionHost
+from helao.hexagon.app.motion_panel import (
+    PANEL_MOVE_TASKS,  # noqa: F401 -- re-exported; the private-endpoint tests drain it
+    dispatch_panel_move,
+    first_error,
+    running_actions,
+)
 from helao.ui.shared.motion_control import Units
 from helao.helpers import helao_logging as logging
 from helao.helpers.make_str_enum import make_str_enum
@@ -71,101 +76,6 @@ from ...drivers.motion.enum import (
 )
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-
-
-def _running_actions(app: ActionHost) -> list:
-    """Names of this server's endpoints that currently have a running action.
-
-    Whether an action is running is knowable only server-side, from the
-    ``Base`` object no shared module holds, so this check cannot live beside
-    the rest of the panel logic in ``motion_control.py`` -- only the
-    *rendering* of a refusal does. Same sweep the queueing middleware performs
-    in ``base_api.py``, without its single-endpoint narrowing: a panel command
-    for the stage cares that the server is moving something, not which route
-    was asked to move it.
-    """
-    return [ep for ep, em in app.actionservermodel.endpoints.items() if em.active_dict]
-
-
-def _first_error(err_code) -> ErrorCodes:
-    """Collapse ``_motor_move``'s per-axis error list to a single code.
-
-    The driver reports one code per requested axis; these endpoints request
-    exactly one, but the early-refusal branches return a bare code rather than
-    a list, so both shapes arrive here. The first non-``none`` entry wins --
-    a partial success on a single-axis move is still a failed move.
-    """
-    if isinstance(err_code, list):
-        for code in err_code:
-            if code != ErrorCodes.none:
-                return code
-        return ErrorCodes.none if err_code else ErrorCodes.unspecified
-    return err_code if err_code is not None else ErrorCodes.unspecified
-
-
-def _first_count(counts) -> Optional[int]:
-    """Pull the commanded count out of ``_motor_move``'s per-axis list.
-
-    ``None`` -- never ``0`` -- when the driver did not report one: zero is a
-    legitimate count, so a missing value shown as zero would read as a
-    deliberate no-op move.
-    """
-    if isinstance(counts, list):
-        counts = counts[0] if counts else None
-    if counts is None:
-        return None
-    try:
-        return int(counts)
-    except (TypeError, ValueError):
-        return None
-
-
-#: Panel moves currently in flight. A strong reference has to be held: the
-#: event loop keeps only a weak one to a running task, so a bare
-#: ``create_task`` whose result nobody stores can be collected mid-move.
-PANEL_MOVE_TASKS: set = set()
-
-
-def _dispatch_panel_move(coro, axis: str, value: float, units: str):
-    """Run a panel move in the background and report what it eventually did.
-
-    The endpoint that calls this has already answered the panel, so this
-    callback is the only place a later failure can surface. Both failure
-    shapes are covered, and the second is the common one:
-
-    * an exception -- which without a done-callback becomes "Task exception
-      was never retrieved" at collection time, i.e. nothing an operator sees;
-    * a non-``none`` ``ErrorCodes`` in the returned dict, which is how
-      ``_motor_move`` reports nearly every real fault. An exception-only
-      callback would swallow those silently.
-
-    The completed count is logged too. It used to be in the endpoint's return
-    payload and cannot be now, so the log is where it lives.
-    """
-    task = asyncio.create_task(coro)
-    PANEL_MOVE_TASKS.add(task)
-
-    def _report(finished: asyncio.Task) -> None:
-        PANEL_MOVE_TASKS.discard(finished)
-        what = f"panel move on axis '{axis}' to {value} {units}"
-        if finished.cancelled():
-            LOGGER.error(f"{what} was cancelled before it completed")
-            return
-        exc = finished.exception()
-        if exc is not None:
-            LOGGER.error(f"{what} raised {exc!r}", exc_info=exc)
-            return
-        result = finished.result() or {}
-        error_code = _first_error(result.get("err_code"))
-        if error_code != ErrorCodes.none:
-            LOGGER.error(f"{what} -> {error_code}")
-        else:
-            LOGGER.info(
-                f"{what} completed, counts={_first_count(result.get('counts'))}"
-            )
-
-    task.add_done_callback(_report)
-    return task
 
 
 async def galil_dyn_endpoints(app: ActionHost):
@@ -788,7 +698,7 @@ async def galil_dyn_endpoints(app: ActionHost):
                     code now says **accepted and dispatched**, never
                     "completed": nothing about the move's outcome is known
                     yet. A failure after dispatch reaches the log (see
-                    ``_dispatch_panel_move``) and the panel's position
+                    ``dispatch_panel_move``) and the panel's position
                     readout, not this return value. That trade was made
                     deliberately -- a wrong "failed" is worse here than a
                     delayed "failed", because it provokes a duplicate move.
@@ -799,7 +709,7 @@ async def galil_dyn_endpoints(app: ActionHost):
                     plausible-looking figure, since the conversion happens in
                     the driver and has not run yet.
                 """
-                running = _running_actions(app)
+                running = running_actions(app)
                 if running:
                     LOGGER.info(
                         f"refusing panel move on axis '{axis}': actions running "
@@ -817,7 +727,7 @@ async def galil_dyn_endpoints(app: ActionHost):
                 # window costs is only *where* the refusal is reported: it
                 # lands in the log instead of in this endpoint's return.
                 axis_name = getattr(axis, "value", axis)
-                _dispatch_panel_move(
+                dispatch_panel_move(
                     app.driver._motor_move(
                         d_mm=value,
                         axis=axis_name,
@@ -829,6 +739,7 @@ async def galil_dyn_endpoints(app: ActionHost):
                     axis=axis_name,
                     value=value,
                     units=units.value,
+                    logger=LOGGER,
                 )
                 # np.floor, not int(): the driver floors, and int() truncates
                 # towards zero, so a negative non-integral count would be
@@ -867,7 +778,7 @@ async def galil_dyn_endpoints(app: ActionHost):
                     axes the stop was issued to.
                 """
                 axes = app.driver.get_all_axis()
-                running = _running_actions(app)
+                running = running_actions(app)
                 if running:
                     LOGGER.warning(
                         f"panel stop_motion issued while actions are running on "
@@ -875,7 +786,7 @@ async def galil_dyn_endpoints(app: ActionHost):
                         f"their recorded end position will not be the commanded one"
                     )
                 ret = await app.driver.stop_axis(axes)
-                return _first_error(ret.get("err_code")), {"stopped": axes}
+                return first_error(ret.get("err_code")), {"stopped": axes}
 
             @app.post("/get_axis_positions", tags=["private"])
             async def get_axis_positions():

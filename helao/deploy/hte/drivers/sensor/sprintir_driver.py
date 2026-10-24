@@ -24,6 +24,7 @@ from helao.core.drivers.helao_driver import (
 )
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
+from helao.deploy.hte.drivers.serial_lifecycle import SerialLifecycleMixin
 from helao.helpers import helao_logging as logging
 from helao.helpers.executor import Executor
 
@@ -39,7 +40,7 @@ TODO: send CO2 reading to bokeh visualizer w/o writing data
 """
 
 
-class SprintIR(HelaoDriver):
+class SprintIR(SerialLifecycleMixin, HelaoDriver):
     """Serial HelaoDriver for the SprintIR-6S NDIR CO2 sensor.
 
     The serial connection is opened by :meth:`connect`, not by construction;
@@ -138,49 +139,6 @@ class SprintIR(HelaoDriver):
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
-        return response
-
-    def get_status(self) -> DriverResponse:
-        """Return whether the serial port has been opened.
-
-        Returns:
-            ``DriverResponse`` with ``status=ok`` if connected, else
-            ``status=uninitialized``.
-        """
-        if self.com is not None:
-            return DriverResponse(
-                response=DriverResponseType.success, status=DriverStatus.ok
-            )
-        return DriverResponse(
-            response=DriverResponseType.success, status=DriverStatus.uninitialized
-        )
-
-    def stop(self) -> DriverResponse:
-        """No active operation to abort; reports current status."""
-        return DriverResponse(
-            response=DriverResponseType.success, status=DriverStatus.ok
-        )
-
-    def reset(self) -> DriverResponse:
-        """Force-close and reopen the serial connection."""
-        self.disconnect()
-        return self.connect()
-
-    def disconnect(self) -> DriverResponse:
-        """Close the underlying serial port."""
-        try:
-            if self.com is not None:
-                self.com.close()
-            response = DriverResponse(
-                response=DriverResponseType.success, status=DriverStatus.ok
-            )
-        except Exception:
-            LOGGER.error("disconnect failed", exc_info=True)
-            response = DriverResponse(
-                response=DriverResponseType.failed, status=DriverStatus.error
-            )
-        finally:
-            self.com = None
         return response
 
     def shutdown(self):

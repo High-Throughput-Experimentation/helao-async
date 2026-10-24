@@ -122,9 +122,7 @@ def hlo_filename(
 
 def new_file_conn_key(key: str) -> UUID:
     """UUID derived from the MD5 hash of ``key`` (base_meta_writer.py:154)."""
-    md5_hash = hashlib.md5()
-    md5_hash.update(key.encode("utf-8"))
-    return UUID(md5_hash.hexdigest())
+    return UUID(hashlib.md5(key.encode("utf-8")).hexdigest())
 
 
 def dflt_file_conn_key() -> UUID:
