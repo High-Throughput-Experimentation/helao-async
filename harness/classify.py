@@ -21,7 +21,7 @@ class ArtifactRow(Enum):
     SEQ_YML = 1
     EXP_YML = 2
     ACT_YML = 3
-    HLO = 4  # streamed AND one-shot .hlo (rows 4/5 share the suffix)
+    HLO = 4  # streamed AND one-shot data (.hlo, or the .jsonl of a pair)
     AUX_FILE = 5  # non-hlo one-shot/postprocess outputs (.csv, ...)
     PRC_YML = 7
     PRG = 8
@@ -38,7 +38,9 @@ RE_YYWW = re.compile(r"^\d{2}\.\d{2}$")  # %y.%U
 RE_MMDD = re.compile(r"^\d{4}$")
 RE_SEQ_DIR = re.compile(r"^\d{6}(__.+)$")  # HHMMSS__name__label...
 RE_EXP_DIR = re.compile(r"^\d{6}\.\d{6}(__.+)$")  # %y%m%d.%H%M%S__name
-RE_META_YML = re.compile(r"^\d{6}\.\d{12}-(seq|exp|act)\.yml$")  # %y%m%d.%H%M%S%f
+RE_META_YML = re.compile(
+    r"^\d{6}\.\d{12}-(seq|exp|act)\.(?:yml|json)$"
+)  # %y%m%d.%H%M%S%f
 RE_META_PRG = re.compile(r"^\d{6}\.\d{12}-(seq|exp|act)\.prg$")
 RE_SEQ_ZIP = re.compile(r"^\d{6}(__.+)\.zip$")
 RE_SEQ_ZIPDIR = re.compile(r"^\d{6}(__.+)\.zipdir$")  # explode_zips target
@@ -117,6 +119,14 @@ def normalize_name(part: str) -> str:
     m = RE_SEQ_DIR.match(part)
     if m:
         return f"TS{m.group(1)}"
+    # New-format names collapse onto their legacy twins so a legacy golden and
+    # a JSON-era capture pair member-by-member (JSON storage spec §3).
+    if part.endswith(".jsonl"):
+        return part[: -len(".jsonl")] + ".hlo"
+    if part.endswith("-prc.json"):
+        return part[: -len(".json")] + ".yml"
+    if part.endswith("-ana.json"):
+        return part[: -len("-ana.json")] + ".yml"
     return part
 
 
@@ -134,17 +144,20 @@ def classify_file(relpath: str) -> ArtifactRow:
         return ArtifactRow.IGNORE
     if parts and parts[0] == "S3_SIM":
         return ArtifactRow.S3_RECORD
-    if name.endswith("-seq.yml"):
+    if name.endswith(("-seq.yml", "-seq.json")):
         return ArtifactRow.SEQ_YML
-    if name.endswith("-exp.yml"):
+    if name.endswith(("-exp.yml", "-exp.json")):
         return ArtifactRow.EXP_YML
-    if name.endswith("-act.yml"):
+    if name.endswith(("-act.yml", "-act.json")):
         return ArtifactRow.ACT_YML
-    if name.endswith("-prc.yml"):
+    if name.endswith(("-prc.yml", "-prc.json")):
         return ArtifactRow.PRC_YML
     if name.endswith(".prg"):
         return ArtifactRow.PRG
-    if name.endswith(".hlo"):
+    if name.endswith(".meta.json"):
+        # The header half of a pair; compared through the .jsonl's read_hlo meta.
+        return ArtifactRow.IGNORE
+    if name.endswith((".hlo", ".jsonl")):
         return ArtifactRow.HLO
     if name.endswith(".parquet"):
         return ArtifactRow.PARQUET
