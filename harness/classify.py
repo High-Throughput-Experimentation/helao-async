@@ -81,7 +81,7 @@ def fold_legacy_week_token():
         _YYWW_TOKEN = saved
 
 
-def normalize_name(part: str) -> str:
+def normalize_name(part: str, *, collapse_new_suffixes: bool = True) -> str:
     """Strip volatile timestamp components from ONE path element (§5.5).
 
     Everything derived from wall-clock time (week/date dirs, seq/exp dir
@@ -121,6 +121,9 @@ def normalize_name(part: str) -> str:
         return f"TS{m.group(1)}"
     # New-format names collapse onto their legacy twins so a legacy golden and
     # a JSON-era capture pair member-by-member (JSON storage spec §3).
+    # Run-tree names only: S3_SIM keeps its names (``manifest.jsonl`` is an S3 record).
+    if not collapse_new_suffixes:
+        return part
     if part.endswith(".jsonl"):
         return part[: -len(".jsonl")] + ".hlo"
     if part.endswith("-prc.json"):
@@ -132,7 +135,9 @@ def normalize_name(part: str) -> str:
 
 def normalize_relpath(relpath: str) -> str:
     """Normalize every element of a /-separated relative path."""
-    return "/".join(normalize_name(p) for p in PurePosixPath(relpath).parts)
+    parts = PurePosixPath(relpath).parts
+    collapse = not (parts and parts[0] == "S3_SIM")
+    return "/".join(normalize_name(p, collapse_new_suffixes=collapse) for p in parts)
 
 
 def classify_file(relpath: str) -> ArtifactRow:
