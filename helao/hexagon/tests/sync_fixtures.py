@@ -21,8 +21,7 @@ def make_sync_driver(tmp_root, cls, cfg_extra=None, postfinish_hooks=None):
     Must be called with a running event loop (SyncDriver.__init__ spawns the
     syncer worker tasks). Callers are responsible for teardown_driver().
 
-    ``cfg_extra`` is merged into the driver params (e.g. an
-    ``auto_analyze_sequences`` alias block); ``postfinish_hooks`` is the SYNC
+    ``cfg_extra`` is merged into the driver params; ``postfinish_hooks`` is the SYNC
     entry's top-level hook config and is forwarded only when given, so this
     fixture works against a constructor without that keyword."""
     hd = HelaoDirs(

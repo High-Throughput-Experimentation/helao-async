@@ -5,8 +5,7 @@ Boots the REAL compositions under uvicorn inside the test's event loop: the
 OrchHost the hte orchestrator module builds, the SIM through its own makeApp, and the
 test deployment's sim_db_server — real HTTP routes registered through the
 real registration code, and the co-located ZMQ RPC mirrors HelaoFastAPI
-auto-registers on http_port+10000 (§10.1 fixture-fidelity; boot pattern
-proven by test_adapter_transport.py). Race injection happens via the host's
+auto-registers on http_port+10000 (§10.1 fixture-fidelity). Race injection happens via the host's
 own reducer runtime, orch_app._hex_runtime.handle(event), from a concurrent
 task (DD-3).
 

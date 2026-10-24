@@ -39,7 +39,6 @@ def _host():
             config=_Stub(),
             logging=_Stub(),
             clock=_Stub(),
-            transport=_Stub(),
             state_persistence=_Stub(),
             health=_Stub(),
             artifact_store=_Stub(),

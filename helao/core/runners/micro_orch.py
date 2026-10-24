@@ -192,14 +192,14 @@ class MicroOrch:
         bound, and never degrade to "no hooks" (spec §3.3).
         """
         self.experiment_hooks = self._load_prefinish(
-            "prefinish_experiment_hooks", "exp_postprocess_libs", "experiment"
+            "prefinish_experiment_hooks", "experiment"
         )
         self.sequence_hooks = self._load_prefinish(
-            "prefinish_sequence_hooks", "seq_postprocess_libs", "sequence"
+            "prefinish_sequence_hooks", "sequence"
         )
         await self.dispatcher.serve(self.host, derive_rpc_port(self.port))
 
-    def _load_prefinish(self, key: str, alias: str, level: str) -> HookSet:
+    def _load_prefinish(self, key: str, level: str) -> HookSet:
         override = self._prefinish_overrides[key]
         source = (
             {key: override}
@@ -207,7 +207,7 @@ class MicroOrch:
             else find_orchestrator_entry(self.world_cfg)
         )
         return load_hook_set(
-            prefinish_config(source, key, alias, self.server_key),
+            prefinish_config(source, key, self.server_key),
             phase="prefinish",
             level=level,
         )

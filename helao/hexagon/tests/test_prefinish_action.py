@@ -10,7 +10,6 @@ from pathlib import Path
 
 import pytest
 
-from helao.core.hooks import HookConfigError
 from helao.helpers.yml_tools import yml_load
 from helao.hexagon.tests.test_action_writes_artifacts import _run_one_action
 
@@ -58,27 +57,3 @@ async def test_raising_hook_is_recorded_and_the_action_still_finishes(tmp_path):
     assert "finished" in str(meta["action_status"])
     assert meta["prefinish_errors"][0]["hook"] == str(hook_path)
     assert "boom from test hook" in meta["prefinish_errors"][0]["error"]
-
-
-def test_old_and_new_key_together_refused_at_startup():
-    from helao.deploy.test.servers.action.ws_simulator import makeApp
-    from helao.helpers import config_loader
-
-    config_loader.CONFIG = {
-        "root": tempfile.mkdtemp(prefix="helao_prefinish_"),
-        "dummy": True,
-        "simulation": True,
-        "run_type": "simulation",
-        "servers": {
-            "SIM": {
-                "host": "127.0.0.1",
-                "port": 8002,
-                "group": "action",
-                "params": {"columns": {"a": 1, "b": 2}},
-                "hlo_postprocess_libs": ["hlo_to_csv"],
-                "prefinish_hooks": {"hlo_to_csv": ["*"]},
-            }
-        },
-    }
-    with pytest.raises(HookConfigError):
-        makeApp("SIM")

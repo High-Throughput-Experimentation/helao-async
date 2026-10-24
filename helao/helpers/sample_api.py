@@ -2,8 +2,8 @@
 
 Provides per-sample-type APIs (liquid, gas, solid, assembly) sharing a common
 :class:`SampleModelAPI` base, a :class:`UnifiedSampleDataAPI` dispatcher that
-routes by ``sample_type``, a legacy CSV/JSON :class:`OldLiquidSampleAPI`
-adapter, and helpers for unpacking assemblies and updating volumes.
+routes by ``sample_type``, and helpers for unpacking assemblies and updating
+volumes.
 """
 
 __all__ = [
@@ -11,7 +11,6 @@ __all__ = [
     "GasSampleAPI",
     "AssemblySampleAPI",
     "UnifiedSampleDataAPI",
-    "OldLiquidSampleAPI",
     "unpack_samples_helper",
     "update_vol",
 ]
@@ -24,9 +23,7 @@ from socket import gethostname
 from typing import Any, Union
 from uuid import UUID
 
-import aiofiles
 import pandas as pd
-import shortuuid
 
 from helao.helpers import helao_logging as logging
 from helao.hexagon.domain.sample_volume import update_vol as domain_update_vol
@@ -683,23 +680,6 @@ class LiquidSampleAPI(SampleModelAPI):
             sample.dilution_factor = 1.0
         return sample
 
-    async def old_jsondb_to_sqlitedb(self):
-        """Migrate every row from the legacy JSON/CSV liquid db into this sqlite db."""
-        old_liquid_sample_db = OldLiquidSampleAPI(self._base)
-        counts = await old_liquid_sample_db.count_samples()
-        LOGGER.info(f"old db sample count: {counts}")
-        for i in range(counts):
-            sample = LiquidSample.model_validate(
-                {"sample_no": i + 1, "machine_name": gethostname().lower()}
-            )
-            sample = await old_liquid_sample_db.get_samples(sample)
-            sample.server_name = "PAL"
-            sample.machine_name = gethostname().lower()
-            sample.global_label = sample.get_global_label()
-            sample.sample_creation_timecode = 0
-            # sample.action_timestamp = "00000000.000000000000"
-            await self.new_samples([sample])
-
 
 class GasSampleAPI(SampleModelAPI):
     """Sample API for gas samples with volume and dilution columns."""
@@ -859,221 +839,6 @@ class SolidSampleAPI(SampleModelAPI):
         await asyncio.sleep(0.01)
         # only check if its a valid sample
         return await self.get_samples(samples=samples)
-
-
-class OldLiquidSampleAPI:
-    """Legacy CSV+per-sample-JSON liquid sample database (predecessor format).
-
-    Used solely to read existing records for migration into :class:`LiquidSampleAPI`.
-    """
-
-    def __init__(self, Serv_class):
-        self._base = Serv_class
-
-        self._dbfile = "liquid_ID_database.csv"
-        self._dbfilepath = self._base.helaodirs.db_root
-        self.fdb = None
-        self.headerlines = 0
-        # create folder first if it not exist
-        if not os.path.exists(self._dbfilepath):
-            os.makedirs(self._dbfilepath)
-
-        if not os.path.exists(os.path.join(self._dbfilepath, self._dbfile)):
-            # file does not exists, create file
-            f = open(
-                os.path.join(self._dbfilepath, self._dbfile), "w", encoding="utf-8"
-            )
-            f.close()
-
-        LOGGER.info(
-            f"liquid sample no database is: {os.path.join(self._dbfilepath, self._dbfile)}"
-        )
-
-    async def _open_db(self, mode) -> bool:
-        """Open the legacy CSV index file in the requested mode.
-
-        Args:
-            mode: ``aiofiles.open`` mode string.
-
-        Returns:
-            True if the file was opened, False if the db directory is missing.
-        """
-        if os.path.exists(self._dbfilepath):
-            self.fdb = await aiofiles.open(
-                os.path.join(self._dbfilepath, self._dbfile), mode, encoding="utf-8"
-            )
-            return True
-        else:
-            return False
-
-    async def _close_db(self):
-        """Close the legacy CSV index file handle."""
-        await self.fdb.close()
-
-    async def count_samples(self) -> int:
-        """Return the number of liquid sample rows in the legacy CSV index."""
-        if not await self._open_db("a+"):
-            return 0
-        counter = 0
-        await self.fdb.seek(0)
-        async for line in self.fdb:
-            counter += 1
-        await self._close_db()
-        return counter - self.headerlines
-
-    async def new_samples(self, new_sample: LiquidSample) -> LiquidSample:
-        """Append a new liquid sample row to the legacy CSV and per-sample JSON file.
-
-        Args:
-            new_sample: Sample to persist; ``sample_no`` is assigned from the
-                current row count.
-
-        Returns:
-            The same sample with ``sample_no`` populated.
-        """
-
-        async def write_sample_no_jsonfile(filename, datadict):
-            """Write a per-sample JSON sidecar next to the CSV index."""
-            self.fjson = await aiofiles.open(
-                os.path.join(self._dbfilepath, filename), "a+", encoding="utf-8"
-            )
-            await self.fjson.write(json.dumps(datadict))
-            await self.fjson.close()
-
-        async def add_line(line):
-            if not line.endswith("\n"):
-                line += "\n"
-            await self.fdb.write(line)
-
-        LOGGER.info(f"new entry dict: {new_sample.model_dump()}")
-        new_sample.sample_no = await self.count_samples() + 1
-        LOGGER.info(f"new liquid sample no: {new_sample.sample_no}")
-        # dump dict to separate json file
-        await write_sample_no_jsonfile(
-            f"{new_sample.sample_no:08d}__{new_sample.sample_creation_experiment_uuid}__{new_sample.sample_creation_action_uuid}.json",
-            new_sample.model_dump(),
-        )
-        # add newid to db csv
-        await self._open_db("a+")
-        await add_line(
-            f"{new_sample.sample_no},{new_sample.sample_creation_experiment_uuid},{new_sample.sample_creation_action_uuid}"
-        )
-        await self._close_db()
-        return new_sample
-
-    async def get_samples(self, sample: LiquidSample):
-        """Read and normalize one legacy liquid sample record.
-
-        Accepts a sample stub with at least ``sample_no`` and
-        ``machine_name`` matching the local host; reads the corresponding
-        legacy JSON sidecar and migrates old field names (``id``,
-        ``sample_id``, ``AUID``, ``DUID``, ``volume_mL``, ``source``).
-
-        Args:
-            sample: Sample stub used to locate the record.
-
-        Returns:
-            Populated :class:`LiquidSample` or ``None`` if the record is
-            missing or the host check fails.
-        """
-
-        async def load_json_file(filename, linenr=1):
-            async with aiofiles.open(
-                os.path.join(self._dbfilepath, filename), "r+", encoding="utf-8"
-            ) as f:
-                counter = 0
-                retval = ""
-                await f.seek(0)
-                async for line in f:
-                    counter += 1
-                    if counter == linenr:
-                        retval = line
-                retval = json.loads(retval)
-                return retval
-
-        async def get_sample_details(sample_no):
-            # need to add headerline count
-            sample_no = sample_no + self.headerlines
-            await self._open_db("r+")
-            counter = 0
-            retval = ""
-            await self.fdb.seek(0)
-            async for line in self.fdb:
-                counter += 1
-                if counter == sample_no:
-                    retval = line
-                    break
-            await self._close_db()
-            return retval
-
-        # for now it only checks against local samples
-        if sample.machine_name != gethostname().lower():
-            LOGGER.error(f"can only load from local db, got {sample.machine_name}")
-            return None  # return default empty one
-
-        data = await get_sample_details(sample.sample_no)
-        if data != "":
-            data = data.strip("\n").split(",")
-            fileID = int(data[0])
-            sample_creation_experiment_uuid = data[1]
-            sample_creation_action_uuid = data[2]
-            filename = f"{fileID:08d}__{sample_creation_experiment_uuid}__{sample_creation_action_uuid}.json"
-            LOGGER.info(f"data json file: {filename}")
-
-            liquid_sample_jsondict = await load_json_file(filename, 1)
-            # fix for old db version
-
-            comment = "old_comment:" + liquid_sample_jsondict.get("comment", "")
-            comment += "; plate_id:" + str(liquid_sample_jsondict.get("plate_id", ""))
-            comment += "; sample_no:" + str(liquid_sample_jsondict.get("sample_no", ""))
-            liquid_sample_jsondict.update({"comment": comment})
-
-            # the action time was something different and doesn't map
-            # to any new fields
-            # del liquid_sample_jsondict["action_time"]
-            # liquid_sample_jsondict.update({"action_timestamp":liquid_sample_jsondict.get("action_time","00000000.000000000000")})
-
-            volume_mL = liquid_sample_jsondict.get("volume_mL", 0.0)
-            liquid_sample_jsondict.update({"volume_ml": volume_mL})
-            source = liquid_sample_jsondict.get("source", [])
-            new_source = []
-            for src in source:
-                if src != "":
-                    new_source.append(f"{gethostname().lower()}__liquid__{src}")
-
-            liquid_sample_jsondict.update({"source": new_source})
-
-            if "id" in liquid_sample_jsondict:  # old v1
-                # liquid_sample_jsondict["plate_sample_no"] = liquid_sample_jsondict["sample_no"]
-                liquid_sample_jsondict["sample_no"] = liquid_sample_jsondict["id"]
-                del liquid_sample_jsondict["id"]
-                if "plate_id" in liquid_sample_jsondict:
-                    del liquid_sample_jsondict["plate_id"]
-
-            if "sample_id" in liquid_sample_jsondict:
-                liquid_sample_jsondict["sample_no"] = liquid_sample_jsondict[
-                    "sample_id"
-                ]
-                del liquid_sample_jsondict["sample_id"]
-
-            if "AUID" in liquid_sample_jsondict:
-                liquid_sample_jsondict["sample_creation_action_uuid"] = (
-                    shortuuid.decode(liquid_sample_jsondict["AUID"])
-                )
-                del liquid_sample_jsondict["AUID"]
-
-            if "DUID" in liquid_sample_jsondict:
-                liquid_sample_jsondict["sample_creation_experiment_uuid"] = (
-                    shortuuid.decode(liquid_sample_jsondict["DUID"])
-                )
-                del liquid_sample_jsondict["DUID"]
-
-            ret_liquid_sample = LiquidSample.model_validate(liquid_sample_jsondict)
-            LOGGER.info(f"data json content: {ret_liquid_sample.model_dump()}")
-
-            return ret_liquid_sample
-        else:
-            return None  # will be default empty one
 
 
 class UnifiedSampleDataAPI:

@@ -127,7 +127,6 @@ def _host(key):
             config=_Stub(),
             logging=_Stub(),
             clock=_Clock(),
-            transport=_Stub(),
             state_persistence=_Stub(),
             health=_Stub(),
             artifact_store=NativeArtifactStoreAdapter(config=_Stub(), clock=_Clock()),

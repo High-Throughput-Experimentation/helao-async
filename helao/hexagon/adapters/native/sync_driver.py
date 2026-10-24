@@ -1227,7 +1227,7 @@ class SyncDriver:
 
         Args:
             config: Driver/server config dict; supplies AWS keys, bucket,
-                ``max_tasks``, and ``auto_analyze_sequences``.
+                and ``max_tasks``.
             helaodirs: Resolved HELAO directory paths for this server.
             postfinish_hooks: The SYNC entry's top-level hook config; ``None``
                 selects the default chain (finish-hooks spec §3.2).
@@ -1239,9 +1239,7 @@ class SyncDriver:
         self.postfinish = {
             level: load_hook_set(hook_map, phase="postfinish", level=level)
             for level, hook_map in postfinish_config(
-                postfinish_hooks,
-                self.config_dict.get("auto_analyze_sequences"),
-                "SYNC",
+                postfinish_hooks, "SYNC", params=config
             ).items()
         }
         # config_dict is the live world config that /get_config serves, so the

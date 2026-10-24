@@ -14,8 +14,6 @@ __all__ = [
     "read_validated_config",
     "is_ui_only_server",
     "install_global_config",
-    "load_global_config",
-    "sync_finished_enabled",
     "CONFIG",
 ]
 
@@ -165,22 +163,6 @@ def install_global_config(config_dict: dict) -> dict:
     return CONFIG
 
 
-def load_global_config(confArg: str, set_global: bool = False) -> dict:
-    """DEPRECATED shim — use :func:`read_validated_config` + :func:`install_global_config`.
-
-    Historical behavior: with ``set_global=True`` this stored a munchified
-    ``HelaoConfig`` dump on ``CONFIG`` and returned the raw dict; both in-repo
-    callers immediately overwrote ``CONFIG`` with that raw return value, so the
-    validated dump was never observable at runtime. The shim now validates and
-    installs the raw dict directly — the identical net module state.
-    """
-    if set_global:
-        config_dict, _validated = read_validated_config(confArg)
-        install_global_config(config_dict)
-        return config_dict
-    return read_config(confArg)
-
-
 class OrchServerParams(BaseModel):
     """Per-orchestrator ``params:`` block from a config YAML.
 
@@ -246,24 +228,6 @@ class ServerConfig(BaseModel):
     verbose: Optional[bool] = False
 
 
-def sync_finished_enabled(world_cfg: Optional[dict]) -> bool:
-    """Whether a finished record should enter the unsynced set (spec §6).
-
-    Defaults to ``True``. A group with no syncer server is always ``False``
-    regardless of the key: there is nothing to hand a record to, so the
-    record is done the moment it finishes.
-
-    Distinct from the per-record ``sync_data`` field, which has never meant
-    "skip sync" -- it means "do not upload this record's .hlo payloads".
-    """
-    from helao.helpers.server_keys import resolve_sync_server_key
-
-    cfg = world_cfg or {}
-    if resolve_sync_server_key(cfg) is None:
-        return False
-    return bool(cfg.get("sync_finished", True))
-
-
 class HelaoConfig(BaseModel):
     """Top-level schema for a HELAO orchestration-group config file.
 
@@ -280,8 +244,6 @@ class HelaoConfig(BaseModel):
             ``helao/deploy/<deployment>/sequences`` to import for the orchestrator.
         sequence_params: Default parameters merged into sequences at runtime.
         servers: Mapping of server key to :class:`ServerConfig`.
-        sync_finished: Whether a finished record is handed to the syncer's
-            unsynced set. See :func:`sync_finished_enabled`.
         alert_config_path: Path to the email-alert configuration, if any.
         builtin_ref_motorxy: Built-in reference XY motor coordinates.
     """
@@ -295,6 +257,5 @@ class HelaoConfig(BaseModel):
     sequence_libraries: Optional[list[str]] = None
     sequence_params: Optional[dict] = None
     servers: Optional[dict[str, ServerConfig]] = None
-    sync_finished: Optional[bool] = True
     alert_config_path: Optional[str] = None
     builtin_ref_motorxy: Optional[list[float]] = None

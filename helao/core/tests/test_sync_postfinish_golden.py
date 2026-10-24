@@ -86,7 +86,7 @@ ANA = {
     "host": "127.0.0.1",
     "port": 8999,
     "endpoint": "analyze_test",
-    "analysis_params": {"a": 1},
+    "params": {"a": 1},
 }
 #: .prg keys that exist before the refactor; the refactor may add others.
 LEGACY_PRG_KEYS = (
@@ -442,7 +442,11 @@ async def test_default_chain_golden(tmp_path, mod, monkeypatch, fmt):
     drv = make_sync_driver(
         tmp_path,
         mod.SyncDriver,
-        cfg_extra={"auto_analyze_sequences": {"test_seq": ANA}},
+        postfinish_hooks={
+            "action": {"s3_upload": ["*"]},
+            "experiment": {"s3_upload": ["*"]},
+            "sequence": {"s3_upload": ["*"], "dispatch_analysis": {"test_seq": ANA}},
+        },
     )
     try:
         seq_yml, exp_yml, act0, act1 = _build_tree(tmp_path, fmt)

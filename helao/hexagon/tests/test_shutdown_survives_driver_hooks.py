@@ -59,7 +59,6 @@ def _host():
         config=stub,
         logging=stub,
         clock=stub,
-        transport=stub,
         state_persistence=stub,
         health=stub,
         artifact_store=stub,

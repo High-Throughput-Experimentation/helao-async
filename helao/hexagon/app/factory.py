@@ -10,7 +10,6 @@ from helao.hexagon.adapters.shared.config import from_global_config
 from helao.hexagon.adapters.shared.health import LegacyHealthAdapter
 from helao.hexagon.adapters.shared.logging_adapter import LegacyLoggingAdapter
 from helao.hexagon.adapters.shared.state_persistence import QueuePckStore
-from helao.hexagon.adapters.shared.transport import LegacyTransportAdapter
 from helao.hexagon.adapters.native.artifact_store import NativeArtifactStoreAdapter
 from helao.hexagon.app.wiring import PortWiring
 
@@ -29,7 +28,6 @@ def build_wiring(server_key: str) -> PortWiring:
         config=config,
         logging=LegacyLoggingAdapter(),
         clock=clock,
-        transport=LegacyTransportAdapter(config),
         state_persistence=QueuePckStore(root),
         health=LegacyHealthAdapter(),
         # P2b-1 native write runtime; ActionHost binds itself to it

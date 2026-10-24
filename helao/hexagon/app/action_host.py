@@ -253,12 +253,9 @@ class ActionHost(HelaoFastAPI):
         self.history = DequeDict(maxlen=200)
 
         # Pre-finish hooks for this server's actions (finish-hooks spec §3,
-        # §5.1). `hlo_postprocess_libs` is the deprecated alias; a bad config
-        # raises here rather than degrading to "no hooks".
+        # §5.1). A bad config raises here rather than degrading to "no hooks".
         self.prefinish_hooks = load_hook_set(
-            prefinish_config(
-                self.server_cfg, "prefinish_hooks", "hlo_postprocess_libs", server_key
-            ),
+            prefinish_config(self.server_cfg, "prefinish_hooks", server_key),
             phase="prefinish",
             level="action",
         )

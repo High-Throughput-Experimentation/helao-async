@@ -61,32 +61,11 @@ def journal_of(driver: SyncDriver) -> RunStateJournal:
     return driver.run_journal
 
 
-# --- config surface (spec §6) ------------------------------------------------
-
-
-def test_sync_finished_defaults_to_true():
-    from helao.helpers.config_loader import sync_finished_enabled
-
-    cfg = {"servers": {"SYNC": {"group": "action"}}}
-    assert sync_finished_enabled(cfg) is True
-    assert sync_finished_enabled({**cfg, "sync_finished": False}) is False
-    assert sync_finished_enabled({**cfg, "sync_finished": True}) is True
-
-
-def test_no_sync_server_means_sync_finished_is_false():
-    """Spec §6: a group with no syncer behaves as sync_finished: false."""
-    from helao.helpers.config_loader import sync_finished_enabled
-
-    cfg = {"sync_finished": True, "servers": {"ORCH": {"group": "orchestrator"}}}
-    assert sync_finished_enabled(cfg) is False
-    assert sync_finished_enabled({}) is False
-
-
 # --- the handoff (spec §4.1, §4.3) -------------------------------------------
 
 
 def test_a_record_that_finishes_without_syncing_is_evicted(tmp_path: Path):
-    """sync_finished: false -> straight to done, never enters the unsynced set."""
+    """A record that goes ACTIVE -> DONE never enters the unsynced set."""
     producer = RunStateJournal(tmp_path, "SIM")
     producer.append("u1", "action", ACTIVE, "RUNS/a")
     producer.append("u1", "action", DONE, "RUNS/a")

@@ -1,4 +1,4 @@
-"""Config normalization, aliases and validation for finish hooks (spec §3).
+"""Config normalization and validation for finish hooks (spec §3).
 
 Every violation raises :class:`HookConfigError` naming the offending key: a
 bad hook config never degrades to "no hooks" (spec §3.3).
@@ -14,9 +14,6 @@ __all__ = [
 from typing import Any, Optional
 
 from helao.core.hooks import LEVELS, HookConfigError, HookMap
-from helao.helpers import helao_logging as logging
-
-LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 def normalize_hook_map(raw: Any, key: str) -> HookMap:
@@ -54,72 +51,48 @@ def normalize_hook_map(raw: Any, key: str) -> HookMap:
     return out
 
 
-def prefinish_config(server_cfg: dict, key: str, alias: str, label: str) -> HookMap:
+# Removed list keys; a config still using one is refused rather than run
+# without hooks (spec §3.3).
+_RETIRED_PREFINISH = {
+    "prefinish_hooks": "hlo_postprocess_libs",
+    "prefinish_experiment_hooks": "exp_postprocess_libs",
+    "prefinish_sequence_hooks": "seq_postprocess_libs",
+}
+
+
+def prefinish_config(server_cfg: dict, key: str, label: str) -> HookMap:
     """The pre-finish hook map of one server entry.
 
-    ``key`` is the new dict key (``prefinish_hooks`` /
-    ``prefinish_experiment_hooks`` / ``prefinish_sequence_hooks``); ``alias``
-    the retired list key it replaces (``hlo_postprocess_libs`` /
-    ``exp_postprocess_libs`` / ``seq_postprocess_libs``). An alias translates
-    to ``{name: ["*"]}`` with one deprecation warning; both keys together are
-    refused (spec §3.1). ``label`` names the server in messages.
+    ``key`` is the dict key (``prefinish_hooks`` / ``prefinish_experiment_hooks``
+    / ``prefinish_sequence_hooks``). ``label`` names the server in messages.
     """
     server_cfg = server_cfg or {}
-    if key in server_cfg and alias in server_cfg:
+    retired = _RETIRED_PREFINISH.get(key)
+    if retired and retired in server_cfg:
         raise HookConfigError(
-            f"{label}: {alias!r} and {key!r} are both set; {alias!r} is a "
-            f"deprecated alias of {key!r}, keep one"
+            f"{label}: {retired!r} was removed; use {key}: {{<hook>: ['*']}}"
         )
-    if alias in server_cfg:
-        names = server_cfg.get(alias) or []
-        if not isinstance(names, list) or not all(
-            isinstance(n, str) and n for n in names
-        ):
-            raise HookConfigError(f"{label}.{alias} must be a list of hook names")
-        LOGGER.warning(
-            f"{label}: {alias!r} is deprecated; use {key}: {{<hook>: ['*']}}"
-        )
-        return {n: {"*": None} for n in names}
     return normalize_hook_map(server_cfg.get(key), f"{label}.{key}")
 
 
 def postfinish_config(
-    postfinish_hooks: Any, auto_analyze: Any, label: str
+    postfinish_hooks: Any, label: str, params: Optional[dict] = None
 ) -> dict[str, HookMap]:
     """The post-finish chain per level for the SYNC entry (spec §3, §3.2).
 
-    ``postfinish_hooks`` absent -> the default chain equivalent to today:
-    ``s3_upload: ["*"]`` at every level, plus ``dispatch_analysis`` at
-    sequence level translated from the ``auto_analyze_sequences`` params
-    alias when that is present (one deprecation warning). A present
-    ``postfinish_hooks`` owns the whole chain (spec D4); it may only have the
-    keys in :data:`LEVELS`, and setting it together with the alias is refused.
+    ``postfinish_hooks`` absent -> the default chain, ``s3_upload: ["*"]`` at
+    every level. A present ``postfinish_hooks`` owns the whole chain (spec D4);
+    it may only have the keys in :data:`LEVELS`. ``params`` (the SYNC server
+    params) is checked for the removed ``auto_analyze_sequences`` key.
     """
-    if postfinish_hooks is not None and auto_analyze:
+    if params and "auto_analyze_sequences" in params:
         raise HookConfigError(
-            f"{label}: params.auto_analyze_sequences and postfinish_hooks are both "
-            "set; auto_analyze_sequences is a deprecated alias of "
-            "postfinish_hooks.sequence.dispatch_analysis, keep one"
+            f"{label}: params.auto_analyze_sequences was removed; use "
+            "postfinish_hooks.sequence.dispatch_analysis (rename each block's "
+            "analysis_params to params)"
         )
     if postfinish_hooks is None:
-        chain: dict[str, HookMap] = {
-            level: {"s3_upload": {"*": None}} for level in LEVELS
-        }
-        if auto_analyze:
-            if not isinstance(auto_analyze, dict) or not all(
-                isinstance(k, str) and isinstance(v, dict)
-                for k, v in auto_analyze.items()
-            ):
-                raise HookConfigError(
-                    f"{label}.params.auto_analyze_sequences must map sequence "
-                    "name -> analysis config mapping"
-                )
-            LOGGER.warning(
-                f"{label}: params.auto_analyze_sequences is deprecated; use "
-                "postfinish_hooks.sequence.dispatch_analysis"
-            )
-            chain["sequence"]["dispatch_analysis"] = dict(auto_analyze)
-        return chain
+        return {level: {"s3_upload": {"*": None}} for level in LEVELS}
     if not isinstance(postfinish_hooks, dict):
         raise HookConfigError(
             f"{label}.postfinish_hooks must be a mapping with keys {list(LEVELS)}"
@@ -130,12 +103,22 @@ def postfinish_config(
             f"{label}.postfinish_hooks has unknown keys {unknown}; "
             f"allowed: {list(LEVELS)}"
         )
-    return {
+    chain = {
         level: normalize_hook_map(
             postfinish_hooks.get(level), f"{label}.postfinish_hooks.{level}"
         )
         for level in LEVELS
     }
+    # an old auto_analyze_sequences block moved across verbatim would run with
+    # default analysis params; refuse the removed key instead
+    for level, hook_map in chain.items():
+        for name, args in (hook_map.get("dispatch_analysis") or {}).items():
+            if isinstance(args, dict) and "analysis_params" in args:
+                raise HookConfigError(
+                    f"{label}.postfinish_hooks.{level}.dispatch_analysis: block "
+                    f"{name!r} uses removed 'analysis_params'; rename to 'params'"
+                )
+    return chain
 
 
 def find_orchestrator_entry(world_cfg: Optional[dict]) -> dict:

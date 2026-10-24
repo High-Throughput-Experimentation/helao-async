@@ -28,7 +28,7 @@ import importlib
 
 import pytest
 
-from helao.helpers.config_loader import load_global_config
+from helao.helpers.config_loader import install_global_config, read_validated_config
 
 #: (module, config prefix, server key) -- one representative station per module.
 #: Measured by loading each station config and calling makeApp; every one of
@@ -74,7 +74,7 @@ def test_module_builds_under_its_station_config(
     from helao.helpers.server_api import HelaoFastAPI
     from helao.hexagon.app.action_host import ActionHost
 
-    load_global_config(config, set_global=True)
+    install_global_config(read_validated_config(config)[0])
     mod = importlib.import_module(f"helao.deploy.hte.servers.action.{module}")
     app = mod.makeApp(server_key)
 
@@ -120,7 +120,7 @@ def test_the_orchestrator_builds_a_native_OrchHost() -> None:
     """
     from helao.hexagon.app.orch_host import OrchHost
 
-    load_global_config("adss3", set_global=True)
+    install_global_config(read_validated_config("adss3")[0])
     mod = importlib.import_module("helao.deploy.hte.servers.orchestrator.async_orch2")
     app = mod.makeApp("ORCH")
     assert isinstance(app, OrchHost), f"orchestrator built a {type(app).__name__}"

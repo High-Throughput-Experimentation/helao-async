@@ -11,11 +11,6 @@ import time
 from datetime import datetime
 from typing import Optional
 
-from helao.hexagon.domain.models import (
-    Action,
-    ErrorCodes,
-)
-
 LOGGER = logging.getLogger(__name__)
 
 
@@ -39,63 +34,6 @@ class FakeClock:
 
     def offset(self) -> float:
         return self._offset
-
-
-class FakeTransport:
-    """Records every dispatch; scripted responses/failures."""
-
-    def __init__(
-        self,
-        respond_with: Optional[dict] = None,
-        fail_with: Optional[ErrorCodes] = None,
-    ):
-        _banner("FakeTransport")
-        self._respond_with = respond_with
-        self._fail_with = fail_with
-        self.dispatched: list[tuple[str, dict]] = []
-        self.private_calls: list[tuple[str, str, dict]] = []
-        self.probed: list[str] = []
-
-    async def dispatch_action(
-        self,
-        action: Action,
-        params: Optional[dict] = None,
-        timeout: float = 60,
-        retries: int = 5,
-    ) -> tuple[Optional[dict], ErrorCodes]:
-        method = f"{action.action_server.server_name}/{action.action_name}"
-        payload = dict(params or {})
-        payload["action"] = action.as_dict()
-        self.dispatched.append((method, payload))
-        if self._fail_with is not None:
-            return None, self._fail_with
-        return self._respond_with or action.as_dict(), ErrorCodes.none
-
-    async def dispatch_private(
-        self,
-        server_key: str,
-        host: str,
-        port: int,
-        private_action: str,
-        params_dict: Optional[dict] = None,
-        json_dict: Optional[dict] = None,
-        timeout: float = 60,
-        retries: int = 5,
-    ) -> tuple[Optional[dict], ErrorCodes]:
-        self.private_calls.append(
-            (
-                server_key,
-                private_action,
-                {**(params_dict or {}), **(json_dict or {})},
-            )
-        )
-        if self._fail_with is not None:
-            return None, self._fail_with
-        return self._respond_with or {}, ErrorCodes.none
-
-    async def check_endpoint(self, url: str, timeout: float = 3.0) -> bool:
-        self.probed.append(url)
-        return self._fail_with is None
 
 
 class FakeTableCatalog:

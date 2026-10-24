@@ -60,7 +60,6 @@ def test_gamry_driver_host_starts_without_comtypes(caplog):
         config=stub,
         logging=stub,
         clock=stub,
-        transport=stub,
         state_persistence=stub,
         health=stub,
         artifact_store=stub,

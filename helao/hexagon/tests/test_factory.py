@@ -59,15 +59,13 @@ def test_build_wiring_produces_real_adapters(installed_config):
     from helao.hexagon.ports.clock import ClockPort
     from helao.hexagon.ports.config import ConfigPort
     from helao.hexagon.ports.logging import LoggingPort
-    from helao.hexagon.ports.transport import TransportPort
 
     w = build_wiring("ORCH")
     assert isinstance(w.config, ConfigPort)
     assert isinstance(w.logging, LoggingPort)
     assert isinstance(w.clock, ClockPort)
-    assert isinstance(w.transport, TransportPort)
     assert w.config.world_cfg() is installed_config  # raw-dict identity end-to-end
-    w.require("config", "logging", "clock", "transport", "state_persistence")
+    w.require("config", "logging", "clock", "state_persistence")
 
 
 def test_orchestrator_exposes_loaded_modules(installed_config):

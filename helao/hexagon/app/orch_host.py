@@ -210,26 +210,15 @@ class OrchHost(ActionHost):
         self.status_summary = {}
         self.global_params = {}
 
-        # Experiment/sequence pre-finish hooks (finish-hooks spec §3, §5.1);
-        # exp_/seq_postprocess_libs are the deprecated aliases.
+        # Experiment/sequence pre-finish hooks (finish-hooks spec §3, §5.1).
         label = self.server_key
         self.prefinish_experiment_hooks = load_hook_set(
-            prefinish_config(
-                self.server_cfg,
-                "prefinish_experiment_hooks",
-                "exp_postprocess_libs",
-                label,
-            ),
+            prefinish_config(self.server_cfg, "prefinish_experiment_hooks", label),
             phase="prefinish",
             level="experiment",
         )
         self.prefinish_sequence_hooks = load_hook_set(
-            prefinish_config(
-                self.server_cfg,
-                "prefinish_sequence_hooks",
-                "seq_postprocess_libs",
-                label,
-            ),
+            prefinish_config(self.server_cfg, "prefinish_sequence_hooks", label),
             phase="prefinish",
             level="sequence",
         )

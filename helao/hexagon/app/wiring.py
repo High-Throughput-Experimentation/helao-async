@@ -18,7 +18,6 @@ from helao.hexagon.ports.clock import ClockPort
 from helao.hexagon.ports.config import ConfigPort
 from helao.hexagon.ports.logging import LoggingPort
 from helao.hexagon.ports.sync import SyncPort
-from helao.hexagon.ports.transport import TransportPort
 
 __all__ = [
     "ACTION_REQUIRED",
@@ -34,7 +33,6 @@ ORCH_REQUIRED = (
     "config",
     "logging",
     "clock",
-    "transport",
     "state_persistence",
     "health",  # P2a: HexHealthMonitor + driver-health gate consume it
 )
@@ -42,7 +40,6 @@ ACTION_REQUIRED = (
     "config",
     "logging",
     "clock",
-    "transport",
     # P2b-1: the native write runtime carries all Active write traffic —
     # a missing adapter must abort startup, never fall through to legacy
     "artifact_store",
@@ -56,7 +53,6 @@ class PortWiring:
     config: Optional[ConfigPort] = None
     logging: Optional[LoggingPort] = None
     clock: Optional[ClockPort] = None
-    transport: Optional[TransportPort] = None
     state_persistence: Optional[StatePersistencePort] = None
     artifact_store: Optional[ArtifactStorePort] = None
     sync: Optional[SyncPort] = None

@@ -73,7 +73,7 @@ def test_a_server_key_absent_from_config_yields_the_default(with_config):
 #
 # Building a real ActionHost needs a real config (build_wiring KeyErrors on a
 # server_key/host/port it can't find), so these use the actual hispec.yml
-# config via load_global_config rather than the bare-dict fixture above --
+# config via read_validated_config rather than the bare-dict fixture above --
 # the same seam test_hte_builds_on_linux.py uses to build hte servers on
 # Linux with no hardware attached.
 #
@@ -231,9 +231,9 @@ def test_adjust_nd_is_still_frozen_and_calibrate_wl_is_listed():
 
 def test_hispec_still_selects_the_spectrograph_driver(monkeypatch):
     """The switch must not have moved the default out from under hispec."""
-    from helao.helpers.config_loader import load_global_config
+    from helao.helpers.config_loader import install_global_config, read_validated_config
 
-    load_global_config("hispec", set_global=True)
+    install_global_config(read_validated_config("hispec")[0])
     monkeypatch.setattr(config_loader, "CONFIG", config_loader.CONFIG)
     assert andor_server._driver_class("ANDOR") is AndorSpectrographDriver
 
