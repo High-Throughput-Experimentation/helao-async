@@ -55,6 +55,7 @@ import pytest
 
 import helao.hexagon.adapters.native.sync_driver as native_mod
 from helao.helpers import dispatcher as dispatcher_mod
+from helao.helpers.meta_io import dumps_meta
 from helao.hexagon.tests.sync_fixtures import (
     act_meta,
     make_action,
@@ -72,6 +73,7 @@ except ImportError:  # pragma: no cover
     s3_upload_mod = None
 
 HLO = "data-0.0.0.0__0.hlo"
+JSONL = "data-0.0.0.0__0.jsonl"
 MISC = "notes.txt"
 SEQ_UUID = mk_uuid(999)
 EXP_UUID = mk_uuid(1)
@@ -225,7 +227,7 @@ SEQ_EXPECTED = {
 }
 
 
-def _exp_prg_expected(exp_yml_str: str) -> dict:
+def _exp_prg_expected(exp_yml_str: str, ext: str = ".yml") -> dict:
     """Full expected legacy-view ``.prg`` for the experiment (see module
     docstring re: int keys). Already in normalized form (placeholders, not
     real values) -- the caller compares this against
@@ -235,7 +237,7 @@ def _exp_prg_expected(exp_yml_str: str) -> dict:
         "yml": exp_yml_str,
         "api": True,
         "s3": True,
-        "process_actions_done": {0: f"{ts(1)}-act.yml", 1: f"{ts(2)}-act.yml"},
+        "process_actions_done": {0: f"{ts(1)}-act{ext}", 1: f"{ts(2)}-act{ext}"},
         "process_groups": {0: [0, 1]},
         "process_metas": {
             0: {
@@ -340,10 +342,11 @@ def _record_uploads(drv) -> dict:
     return uploads
 
 
-def _build_tree(root):
-    exp_yml = make_exp_tree(root, "RUNS", EXP_UUID)
+def _build_tree(root, fmt: str = "legacy"):
+    ext = ".yml" if fmt == "legacy" else ".json"
+    exp_yml = make_exp_tree(root, "RUNS", EXP_UUID, ext=ext)
     seq_dir = exp_yml.parent.parent
-    seq_yml = seq_dir / f"{ts(0)}-seq.yml"
+    seq_yml = seq_dir / f"{ts(0)}-seq{ext}"
     write_yml(
         seq_yml,
         {
@@ -353,16 +356,35 @@ def _build_tree(root):
             "sequence_params": {"p": 1},
         },
     )
-    act0 = make_action(exp_yml, 0)  # process_finish False
-    (act0.parent / HLO).write_text("x", encoding="utf-8")
+    act0 = make_action(exp_yml, 0, ext=ext)  # process_finish False
     (act0.parent / MISC).write_text("note", encoding="utf-8")
-    act0.write_text(
-        act0.read_text(encoding="utf-8")
-        + f"files:\n- file_name: {HLO}\n  file_type: helao__file\n"
-        + f"- file_name: {MISC}\n  file_type: aux__file\n",
-        encoding="utf-8",
-    )
-    act1 = make_action(exp_yml, 1, process_finish=True)
+    if fmt == "legacy":
+        (act0.parent / HLO).write_text("x", encoding="utf-8")
+        act0.write_text(
+            act0.read_text(encoding="utf-8")
+            + f"files:\n- file_name: {HLO}\n  file_type: helao__file\n"
+            + f"- file_name: {MISC}\n  file_type: aux__file\n",
+            encoding="utf-8",
+        )
+    else:
+        # A real pair whose read_hlo payload equals the legacy fake's.
+        (act0.parent / "data-0.0.0.0__0.meta.json").write_text(
+            dumps_meta({"k": "v"}), encoding="utf-8"
+        )
+        (act0.parent / JSONL).write_text(
+            '{"t_s": 0.0, "value": 1.0}\n', encoding="utf-8"
+        )
+        write_yml(
+            act0,
+            {
+                **act_meta(0),
+                "files": [
+                    {"file_name": JSONL, "file_type": "helao__file"},
+                    {"file_name": MISC, "file_type": "aux__file"},
+                ],
+            },
+        )
+    act1 = make_action(exp_yml, 1, process_finish=True, ext=ext)
     # Controller ruling: rewrite the whole yml from a merged dict instead of
     # appending duplicate `technique_name`/`action_split` keys as raw text --
     # the append made yml_load raise DuplicateKeyError.
@@ -397,13 +419,16 @@ async def _drive(drv, ymls, uploads):
     return calls, steps
 
 
+@pytest.mark.parametrize("fmt", ["legacy", "new"])
 @pytest.mark.parametrize("mod", [native_mod])
 @pytest.mark.asyncio
-async def test_default_chain_golden(tmp_path, mod, monkeypatch):
-    fake_hlo = lambda fp: ({"k": "v"}, {"t_s": [0.0], "value": [1.0]})  # noqa: E731
-    monkeypatch.setattr(mod, "read_hlo", fake_hlo, raising=False)
-    if s3_upload_mod is not None:
-        monkeypatch.setattr(s3_upload_mod, "read_hlo", fake_hlo)
+async def test_default_chain_golden(tmp_path, mod, monkeypatch, fmt):
+    if fmt == "legacy":
+        fake_hlo = lambda fp: ({"k": "v"}, {"t_s": [0.0], "value": [1.0]})  # noqa: E731
+        monkeypatch.setattr(mod, "read_hlo", fake_hlo, raising=False)
+        if s3_upload_mod is not None:
+            monkeypatch.setattr(s3_upload_mod, "read_hlo", fake_hlo)
+    local = HLO if fmt == "legacy" else JSONL
 
     dispatched = []
 
@@ -420,7 +445,7 @@ async def test_default_chain_golden(tmp_path, mod, monkeypatch):
         cfg_extra={"auto_analyze_sequences": {"test_seq": ANA}},
     )
     try:
-        seq_yml, exp_yml, act0, act1 = _build_tree(tmp_path)
+        seq_yml, exp_yml, act0, act1 = _build_tree(tmp_path, fmt)
         uploads = _record_uploads(drv)
         calls, steps = await _drive(
             drv, [(act0, 0), (act1, 0), (exp_yml, 1), (seq_yml, 2)], uploads
@@ -498,7 +523,7 @@ async def test_default_chain_golden(tmp_path, mod, monkeypatch):
             "s3": True,
             "files_pending": [],
             "files_s3": {
-                HLO: f"raw_data/{ACT0_UUID}/{HLO}.json",
+                local: f"raw_data/{ACT0_UUID}/{HLO}.json",
                 MISC: f"raw_data/{ACT0_UUID}/{MISC}",
             },
         }
@@ -514,7 +539,7 @@ async def test_default_chain_golden(tmp_path, mod, monkeypatch):
         exp_view = _legacy_view(exp_prg)
         _assert_ordered_equal(
             _golden_body(exp_view, puuid),
-            _exp_prg_expected(str(exp_yml)),
+            _exp_prg_expected(str(exp_yml), act0.suffix),
             path="exp.prg",
         )
         assert list(exp_yml.parent.glob("*-prc.json")), "no local -prc.json written"

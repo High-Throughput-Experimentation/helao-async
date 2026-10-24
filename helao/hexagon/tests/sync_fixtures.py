@@ -11,7 +11,8 @@ from pathlib import Path
 
 from helao.core.models.helaodirs import HelaoDirs
 from helao.core.models.run_dir import RunDir
-from helao.helpers.yml_tools import yml_dumps
+from helao.helpers.meta_io import dumps_meta
+from helao.helpers.yml_tools import yml_dumps, yml_load
 
 
 def make_sync_driver(tmp_root, cls, cfg_extra=None, postfinish_hooks=None):
@@ -67,6 +68,12 @@ def write_yml(path: Path, meta: dict) -> None:
     dumped = yml_dumps(meta)
     if isinstance(dumped, bytes):
         dumped = dumped.decode("utf-8")
+    if path.suffix == ".json":
+        # A JSON record carrying exactly the values the YAML twin would load,
+        # so a golden compares formats and not this fixture's scalar typing
+        # (ts() stamps are numeric-looking and load from YAML as floats).
+        path.write_text(dumps_meta(yml_load(dumped, fast=True)), encoding="utf-8")
+        return
     path.write_text(dumped, encoding="utf-8")
 
 
@@ -109,19 +116,23 @@ def act_meta(order: int, process_finish: bool = False) -> dict:
     }
 
 
-def make_exp_tree(root: Path, runs: str, exp_uuid: str, process_order_groups=None):
+def make_exp_tree(
+    root: Path, runs: str, exp_uuid: str, process_order_groups=None, ext: str = ".yml"
+):
     """Create <root>/<runs>/26.23/0610/<seq>/<exp>/ and return the exp yml path."""
     exp_dir = (
         root / runs / "26.23" / "0610" / f"{ts(0)}__test__seq" / f"{ts(0)}__test_exp"
     )
-    exp_yml = exp_dir / f"{ts(0)}-exp.yml"
+    exp_yml = exp_dir / f"{ts(0)}-exp{ext}"
     write_yml(exp_yml, exp_meta(exp_uuid, process_order_groups))
     return exp_yml
 
 
-def make_action(exp_yml: Path, order: int, process_finish: bool = False) -> Path:
+def make_action(
+    exp_yml: Path, order: int, process_finish: bool = False, ext: str = ".yml"
+) -> Path:
     """Create a child action dir + yml under the experiment dir; return act yml."""
     act_dir = exp_yml.parent / f"{order}__0__srv__test_action"
-    act_yml = act_dir / f"{ts(order + 1)}-act.yml"
+    act_yml = act_dir / f"{ts(order + 1)}-act{ext}"
     write_yml(act_yml, act_meta(order, process_finish))
     return act_yml
