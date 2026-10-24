@@ -100,7 +100,7 @@ def makeApp(server_key) -> ActionHost:
             acti = active.action.action_order
             retry = active.action.action_retry
             split = active.action.action_split
-            suffix = f"{k}.hlo"
+            suffix = f"{k}.jsonl"
             await active.write_file(
                 output_str=jsondata,
                 file_type="helao_calc__file",

@@ -26,7 +26,6 @@ from uuid import UUID
 
 from fastapi import HTTPException
 
-from helao.core.drivers.data.sync_driver import HelaoSyncer
 from helao.core.hooks.config import prefinish_config
 from helao.core.hooks.loader import load_hook_set
 from helao.core.models.experiment import ExperimentModel, ShortExperimentModel
@@ -41,6 +40,8 @@ from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.server_keys import resolve_sync_server_key
 from helao.helpers.ws_utils import WsPublisher
 from helao.helpers.zdeque import zdeque
+from helao.hexagon.adapters.native.native_syncer import NativeSyncer
+from helao.hexagon.adapters.native.sync_adapter import NativeSyncAdapter
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from helao.hexagon.app.action_session import ActionSession
@@ -83,9 +84,6 @@ def orch_ws_publishers(
 
 class OrchHost(ActionHost):
     """The native orchestrator server."""
-
-    # Q5 / P2b-2 D3: the orchestrator serves its own /ws_* relays, so no bridge.
-    _binds_ws_bridge = False
 
     #: Head action popped from ``action_dq`` while its start condition is awaited;
     #: ``export_queues`` serializes it so a shutdown mid-wait keeps it. A class
@@ -147,13 +145,10 @@ class OrchHost(ActionHost):
         )
 
         # --- orch.py:114-119: the syncer --------------------------------
-        # B7 follow-up, recorded not fixed: this is the legacy HelaoSyncer,
-        # imported from helao/core/drivers/. The native re-body lives at
-        # hexagon/adapters/native/sync_driver.py and the DB server already
-        # runs on it, but switching the orchestrator's own instance is a
-        # behaviour decision, and B3a makes none.
+        # The syncer is the native one (hexagon/adapters/native/native_syncer.py)
+        # and reaches callers through the SyncPort, bound at startup.
         # `use_sync` is decided here because collaborators read it, but the
-        # SyncDriver itself is constructed at startup: its __init__ calls
+        # syncer itself is constructed at startup: its __init__ calls
         # asyncio.create_task, and there is no running loop yet.
         #
         # Legacy never hit this because OrchAPI constructs Orch INSIDE its
@@ -162,7 +157,6 @@ class OrchHost(ActionHost):
         # a constructor that runs at import/build time moves it off one.
         self._sync_server_key = resolve_sync_server_key(self.world_cfg)
         self.use_sync = self._sync_server_key is not None
-        self.syncer = None
 
         # --- orch.py:121-125: the three queues --------------------------
         self.sequence_dq = zdeque([])
@@ -216,26 +210,15 @@ class OrchHost(ActionHost):
         self.status_summary = {}
         self.global_params = {}
 
-        # Experiment/sequence pre-finish hooks (finish-hooks spec §3, §5.1);
-        # exp_/seq_postprocess_libs are the deprecated aliases.
+        # Experiment/sequence pre-finish hooks (finish-hooks spec §3, §5.1).
         label = self.server_key
         self.prefinish_experiment_hooks = load_hook_set(
-            prefinish_config(
-                self.server_cfg,
-                "prefinish_experiment_hooks",
-                "exp_postprocess_libs",
-                label,
-            ),
+            prefinish_config(self.server_cfg, "prefinish_experiment_hooks", label),
             phase="prefinish",
             level="experiment",
         )
         self.prefinish_sequence_hooks = load_hook_set(
-            prefinish_config(
-                self.server_cfg,
-                "prefinish_sequence_hooks",
-                "seq_postprocess_libs",
-                label,
-            ),
+            prefinish_config(self.server_cfg, "prefinish_sequence_hooks", label),
             phase="prefinish",
             level="sequence",
         )
@@ -977,25 +960,11 @@ class OrchHost(ActionHost):
         """Dispatch the action at the head of the queue."""
         return await self.dispatch_runner._launch_action()
 
-    async def dispatch_loop_task(self) -> None:
-        """The legacy loop. Replaced by the reducer at startup (D-B3.2).
-
-        Kept because ``start_loop`` names it and the reducer cut-over is a
-        startup-time swap, not a source deletion -- but on a launched
-        OrchHost the loop task is the reducer's, not this.
-        """
-        return await self.dispatch_runner.run()
-
     # -- background tasks legacy starts from myinit ----------------------
 
     async def subscribe_all(self, retry_limit: int = 15):
         """Subscribe to every action server's status stream."""
         return await self.server_monitor.subscribe_all(retry_limit=retry_limit)
-
-    async def active_action_monitor(self):
-        """Legacy heartbeat monitor. Superseded by HexHealthMonitor when the
-        reducer runs, exactly as the graft superseded it."""
-        return await self.server_monitor.active_action_monitor()
 
     async def action_server_monitor(self):
         """Poll every action server's driver health."""
@@ -1438,11 +1407,6 @@ class OrchHost(ActionHost):
         self._hex_runtime = HexRuntime(self, self._hex_effects)
         self._hex_loop = HexDispatchLoop(self._hex_runtime)
         self._hex_ingestion = HexStatusIngestion(self, self._hex_runtime)
-        # health is required for an orch composition (ORCH_REQUIRED), and
-        # wiring.require() has already run, so this is not optional.
-        bind = getattr(self.hexagon_wiring.health, "bind_orch", None)
-        if bind is not None:
-            bind(self)
         self._hex_health = HexHealthMonitor(
             self, self._hex_runtime, self.hexagon_wiring.health
         )
@@ -1453,16 +1417,17 @@ class OrchHost(ActionHost):
         ActionHost's startup already ran by the time this fires (Starlette
         preserves registration order), so the live buffer, status log and
         regular updater are running. What legacy's ``myinit`` adds on an
-        orchestrator is these four, and the reducer replaces one of them:
-        ``active_action_monitor`` is superseded by HexHealthMonitor exactly
-        as the graft superseded it.
+        orchestrator is ``subscribe_all`` and ``action_server_monitor``; the
+        heartbeat monitor is HexHealthMonitor's.
         """
 
         @self.on_event("startup")
         async def _orch_startup():
-            if self.use_sync and self.syncer is None:
-                self.syncer = HelaoSyncer(
-                    action_serv=self, sync_server_name=self._sync_server_key
+            if self.use_sync and self.hexagon_wiring.sync is None:
+                self.hexagon_wiring.sync = NativeSyncAdapter(
+                    NativeSyncer(  # type: ignore[arg-type]
+                        self, sync_server_name=self._sync_server_key
+                    )
                 )
             self.status_subscriber = asyncio.create_task(self.subscribe_all())
             self.driver_monitor = asyncio.create_task(self.action_server_monitor())

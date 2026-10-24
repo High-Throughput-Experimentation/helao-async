@@ -1,17 +1,11 @@
-"""Port of unit_test_sync_process_recovery.py (6 scenarios) onto the NATIVE
-SyncDriver (P2c T9). Mechanical translation: legacy `_make_driver` ->
-`make_sync_driver(..., NativeSyncDriver)`, legacy `tempfile.TemporaryDirectory()`
--> pytest `tmp_path`, legacy `out["key"] = expr` -> `assert expr, "key"`. Proves
-the native re-body reproduces the legacy process-recovery behavior
-byte-for-byte (mirrors helao/core/tests/unit_test_sync_process_recovery.py).
-
-The legacy test file is NOT modified and NOT imported for logic (mirrored only)."""
+"""Process-recovery / race-hardening scenarios on the NATIVE SyncDriver:
+legacy-experiment metas, cross-run reconcile, phantom and unrebuildable group
+parking, splits, overlapping groups, and late-action reopen."""
 
 from pathlib import Path
 
 import pytest
 
-from helao.core.drivers.data.sync_driver import SyncDriver as LegacySyncDriver
 from helao.core.models.run_dir import RunDir
 from helao.hexagon.adapters.native.sync_driver import HelaoYml
 from helao.hexagon.adapters.native.sync_driver import SyncDriver as NativeSyncDriver
@@ -314,9 +308,7 @@ async def test_unrebuildable_group_parked_experiment_finishes(tmp_path):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "cls", [NativeSyncDriver, LegacySyncDriver], ids=["native", "legacy"]
-)
+@pytest.mark.parametrize("cls", [NativeSyncDriver], ids=["native"])
 async def test_late_action_reopens_pushed_group_for_repush(tmp_path, cls):
     """A --restore re-run (or errored retry) shares action_order with the attempt
     that already synced. Its fold must reopen the group so the next pass pushes a
@@ -337,7 +329,7 @@ async def test_late_action_reopens_pushed_group_for_repush(tmp_path, cls):
         # the group is pushed with only the old attempt
         ep = await drv.sync_process(ep)
         assert ep.list_unfinished_procs() == ([], [])
-        (prc,) = list(exp_yml.parent.glob("0__*-prc.yml"))
+        (prc,) = list(exp_yml.parent.glob("0__*-prc.json"))
         assert mk_uuid(500) not in prc.read_text(encoding="utf-8")
 
         # the re-run: same action_order, new uuid, its own contribution
@@ -368,9 +360,7 @@ async def test_late_action_reopens_pushed_group_for_repush(tmp_path, cls):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "cls", [NativeSyncDriver, LegacySyncDriver], ids=["native", "legacy"]
-)
+@pytest.mark.parametrize("cls", [NativeSyncDriver], ids=["native"])
 async def test_later_split_does_not_reopen_pushed_group(tmp_path, cls):
     """Splits share action_order and differ in action_split (and technique). A
     later split is not a re-attempt: the pushed group stays pushed, so there is
@@ -395,12 +385,12 @@ async def test_later_split_does_not_reopen_pushed_group(tmp_path, cls):
         ep = drv.update_process(HelaoYml(act), split0)
         ep = await drv.sync_process(ep)
         assert ep.list_unfinished_procs() == ([], [])
-        (prc,) = list(exp_yml.parent.glob("0__*-prc.yml"))
+        (prc,) = list(exp_yml.parent.glob("0__*-prc.json"))
         assert "tech_s0" in prc.name
 
         ep = drv.update_process(HelaoYml(act), split1)
         assert ep.list_unfinished_procs() == ([], []), "a later split must not reopen"
         ep = await drv.sync_process(ep)
-        assert [p.name for p in exp_yml.parent.glob("0__*-prc.yml")] == [prc.name]
+        assert [p.name for p in exp_yml.parent.glob("0__*-prc.json")] == [prc.name]
     finally:
         await teardown_driver(drv)

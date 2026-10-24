@@ -1,15 +1,7 @@
 __all__ = ["makeBokehApp"]
 
 import os
-from socket import gethostname
-
-from bokeh.layouts import Spacer, layout
-from bokeh.models.widgets import Div
-
-from helao.ui.shared.palette import HEADING_TEXT
-from helao.ui.bokeh.theme import SECTION_MARGIN, stretch_section
-from helao.ui.bokeh.vis import HelaoVis
-from helao.ui.bokeh.vis_subscriber import mount_visualizers
+from ._vis_host import build_vis_host
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -36,32 +28,10 @@ def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):
         layouts mounted as roots.
     """
 
-    app = HelaoVis(
-        server_key=server_key,
-        doc=doc,
+    return build_vis_host(
+        doc,
+        server_key,
+        "action_vis",
+        "Action visualizer",
+        lambda app: os.path.basename(app.helao_cfg["loaded_config_path"]),
     )
-    config = app.helao_cfg
-    config_filename = os.path.basename(config["loaded_config_path"])
-
-    app.vis.doc.add_root(
-        stretch_section(
-            layout(
-                [
-                    Spacer(width=20),
-                    Div(
-                        text=f"<b>Action visualizer on {gethostname().lower()} -- config: {config_filename}</b>",
-                        sizing_mode="stretch_width",
-                        height=32,
-                        styles={"font-size": "200%", "color": HEADING_TEXT},
-                    ),
-                ],
-                margin=SECTION_MARGIN,
-            )
-        )
-    )
-    app.vis.doc.add_root(Spacer(height=10))
-
-    # create visualizer objects for action servers declaring an "action_vis" key
-    mount_visualizers(app, "action_vis")
-
-    return doc

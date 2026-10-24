@@ -17,9 +17,8 @@ and is deferred to slice-3.
 
 Boundary note (spec §4.1, locked): ports/ may only import stdlib +
 `helao.hexagon.domain`/`ports` + the declared `helao_driver` exception --
-numpy is a domain-layer-only third party (per `auxiliary.py`'s `PlateInfoPort`
-precedent of typing a disallowed third-party return as a plain generic), so
-the matrix type below is `Any` rather than an actual `np.matrix` import.
+numpy is a domain-layer-only third party, so the matrix type below is `Any`
+rather than an actual `np.matrix` import.
 Concretely it is always an `np.matrix`, per the module docstring above.
 """
 

@@ -21,6 +21,7 @@ from starlette.testclient import TestClient
 from helao.deploy.hte.drivers.motion import kinesis_driver as kd
 from helao.deploy.hte.drivers.motion.kinesis_driver import KinesisMotor
 from helao.helpers.dispatcher import _query_safe
+from helao.helpers.meta_io import read_meta
 from helao.helpers.premodels import Action
 
 _AXIS = {"serial_no": "1", "pos_scale": 1228800.0, "vel_scale": 1.0, "acc_scale": 1.0}
@@ -50,7 +51,9 @@ class FakeMotor:
 @pytest.fixture
 def driver(monkeypatch):
     monkeypatch.setattr(kd.Thorlabs, "KinesisMotor", FakeMotor)
-    return KinesisMotor(config=_CFG)
+    drv = KinesisMotor(config=_CFG)
+    drv.connect()  # the host connects after construction
+    return drv
 
 
 _STOP = ("stop", (), {"immediate": True, "sync": False})
@@ -108,12 +111,9 @@ def _host(root="/tmp"):
             config=_Stub(),
             logging=_Stub(),
             clock=_Clock(),
-            transport=_Stub(),
             state_persistence=_Stub(),
-            status=_Stub(),
             health=_Stub(),
             artifact_store=NativeArtifactStoreAdapter(config=_Stub(), clock=_Clock()),
-            data_sink=_Stub(),
         ),
         helao_cfg={
             "root": root,
@@ -273,9 +273,9 @@ def test_latch_landing_after_the_gate_stops_the_executor_before_it_moves(
             os.path.join(d, f)
             for d, _, fs in os.walk(tmp_path)
             for f in fs
-            if f.endswith("-act.yml")
+            if f.endswith("-act.json")
         ]
     time.sleep(0.3)
     assert _move_calls(host.driver) == []
     assert acts, "the action never finished"
-    assert "error_code: estop" in open(acts[0], encoding="utf-8").read()
+    assert read_meta(acts[0])["error_code"] == "estop"

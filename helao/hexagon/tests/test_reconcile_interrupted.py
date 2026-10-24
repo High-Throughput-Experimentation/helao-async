@@ -26,7 +26,7 @@ from uuid import UUID
 import pytest
 
 import helao.helpers.yml_tools as yml_tools_module
-from helao.core.drivers.data.sync_driver import HelaoYml, SyncDriver
+from helao.hexagon.adapters.native.sync_driver import HelaoYml, SyncDriver
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.machine import MachineModel
@@ -68,12 +68,9 @@ def _host(sync_port=None, key="SIM", root=None):
             config=_Stub(),
             logging=_Stub(),
             clock=_Clock(),
-            transport=_Stub(),
             state_persistence=_Stub(),
-            status=_Stub(),
             health=_Stub(),
             artifact_store=NativeArtifactStoreAdapter(config=_Stub(), clock=_Clock()),
-            data_sink=_Stub(),
         ),
         helao_cfg={
             "root": root or tempfile.mkdtemp(prefix="helao_reconcile_"),
@@ -112,7 +109,7 @@ async def _journalled(host, act: Action, statuses) -> Path:
         save_root = redirect_manual_dir(save_root)
     act_dir = Path(save_root) / act.action_output_dir
     record_active(host, "action", act.action_uuid, act_dir, parent=act.experiment_uuid)
-    (yml,) = act_dir.glob("*-act.yml")
+    (yml,) = act_dir.glob("*-act.json")
     return yml
 
 
@@ -186,7 +183,7 @@ async def test_interrupted_actions_are_finished_and_handed_off(
     assert _statuses(c) == ["finished", "errored"]
     # (d) missing directory evicted with a warning, not a crash
     assert str(d_act.action_uuid) in done
-    assert any("no -act.yml" in m for m in warnings)
+    assert any("no -act record" in m for m in warnings)
 
 
 @pytest.mark.asyncio
@@ -384,3 +381,32 @@ async def test_a_failing_reconcile_task_is_logged(finish_calls, monkeypatch):
     await asyncio.sleep(0)
     assert any("Reconcile of interrupted actions failed" in m for m in errors)
     host._unlock_server_key()
+
+
+def _as_record(path: Path, ext: str) -> Path:
+    """Re-store the record at ``path`` as ``<stem><ext>``; drop the original."""
+    from helao.helpers.meta_io import dumps_meta, read_meta
+
+    target = path.with_suffix(ext)
+    text = dumps_meta(read_meta(path), target)
+    path.unlink()
+    target.write_text(text, encoding="utf-8")
+    return target
+
+
+def _act_records(act_dir: Path) -> list:
+    return sorted(p.name for p in act_dir.iterdir() if "-act." in p.name)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("ext", [".json", ".yml"])
+async def test_reconcile_rewrites_the_record_in_its_own_format(finish_calls, ext):
+    """The in-flight rule on the reconcile path: an ``-act.json`` is rewritten in
+    place, and a legacy ``-act.yml`` begun before the upgrade stays YAML. Neither
+    gains a twin, and the syncer handoff names the file actually rewritten."""
+    host = _host()
+    rec = _as_record(await _journalled(host, _action(1), [HloStatus.active]), ext)
+    await host.reconcile_interrupted()
+    assert _act_records(rec.parent) == [rec.name]
+    assert _statuses(rec) == ["finished", "errored"]
+    assert finish_calls == [str(rec)]

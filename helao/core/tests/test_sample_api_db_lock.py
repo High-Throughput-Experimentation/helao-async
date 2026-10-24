@@ -39,3 +39,16 @@ async def test_concurrent_calls_do_not_overlap_db_sessions(tmp_path):
     counts = await asyncio.gather(*(api.count_samples() for _ in range(3)))
     assert counts == [0, 0, 0]
     assert max_open == 1
+
+
+@pytest.mark.asyncio
+async def test_two_servers_initialising_a_new_db_do_not_collide(tmp_path):
+    """Several servers per host run init_db on one file; the existence check
+    is not atomic across processes, so the create must tolerate a race."""
+    serv = types.SimpleNamespace(helaodirs=types.SimpleNamespace(db_root=str(tmp_path)))
+    first, second = LiquidSampleAPI(serv), LiquidSampleAPI(serv)
+    await first.init_db()
+    # the second server saw no table before the first created it
+    await second._open_db()
+    second._create_init_db()  # raised "table ... already exists" before
+    second._close_db()

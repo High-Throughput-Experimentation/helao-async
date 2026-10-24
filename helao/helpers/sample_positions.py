@@ -217,24 +217,6 @@ class _VT_template(BaseModel, HelaoDict):
         )
         return res
 
-    def first_full(self) -> Optional[int]:
-        """Return the index of the first occupied vial slot, or None."""
-        res = next((i for i, j in enumerate(self.vials) if j), None)
-        return res
-
-    def update_vials(self, vial_dict):
-        """Set the occupancy flags from an iterable of boolean-like values.
-
-        Args:
-            vial_dict: Iterable of truthy values; entries that cannot be cast
-                to ``bool`` are set to False.
-        """
-        for i, vial in enumerate(vial_dict):
-            try:
-                self.vials[i] = bool(vial)
-            except Exception:
-                self.vials[i] = False
-
     def update_samples(self, samples):
         """Replace per-slot samples from an iterable; fall back to :class:`NoneSample` on error."""
         for i, sample in enumerate(samples):

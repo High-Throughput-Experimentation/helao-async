@@ -16,6 +16,7 @@ from typing import Any, Optional
 
 import serial
 
+from helao.deploy.hte.drivers.serial_lifecycle import SerialLifecycleMixin
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -101,17 +102,19 @@ ulmap = {
 _POLL_READ_TIMEOUT_S = 5.0
 
 
-class KDS100(HelaoDriver):
+class KDS100(SerialLifecycleMixin, HelaoDriver):
     """HELAO ``HelaoDriver`` wrapper for KD Scientific Legato 100 syringe pump(s) on an RS-232 chain.
 
     The serial port specified in ``config['port']`` is opened by :meth:`connect`,
-    not by construction. Always-on per-pump status polling is handled by the
+    which the host calls at startup (``connect_on_startup``), not by construction. Always-on per-pump status polling is handled by the
     paired :class:`KDS100Poller`, wired in as the server's ``poller_class``.
 
     Server config parameters:
         ``port``: Serial port for the daisy-chained pump(s).
         ``pumps``: dict of ``{pump_name: {"address": ..., "diameter": ...}}``.
     """
+
+    connect_on_startup = True  # the host connects after _base_hook, before the poller
 
     def __init__(self, config: dict = {}):
         """Store config; the serial connection is opened in :meth:`connect`.
@@ -128,14 +131,6 @@ class KDS100(HelaoDriver):
         self.polling = True
         self.present_volume_ul = 0.0
         self.last_state = "unknown"
-
-        # Open the serial connection now. ActionHost never calls connect(), and
-        # KDS100Poller begins polling as soon as it is constructed, so a present
-        # pump must be connected here to be readable on the first poll. An
-        # absent COM port leaves self.sio = None (connect() logs the failure);
-        # the poll and shutdown paths tolerate that (get_data short-circuits,
-        # safe_state no-ops).
-        self.connect()
 
     def connect(self) -> DriverResponse:
         """Open the serial connection to the daisy-chained pump(s).
@@ -162,49 +157,6 @@ class KDS100(HelaoDriver):
             response = DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
-        return response
-
-    def get_status(self) -> DriverResponse:
-        """Return whether the serial connection has been opened.
-
-        Returns:
-            ``DriverResponse`` with ``status=ok`` if connected, else
-            ``status=uninitialized``.
-        """
-        if self.com is not None:
-            return DriverResponse(
-                response=DriverResponseType.success, status=DriverStatus.ok
-            )
-        return DriverResponse(
-            response=DriverResponseType.success, status=DriverStatus.uninitialized
-        )
-
-    def stop(self) -> DriverResponse:
-        """No active operation to abort; reports current status."""
-        return DriverResponse(
-            response=DriverResponseType.success, status=DriverStatus.ok
-        )
-
-    def reset(self) -> DriverResponse:
-        """Force-close and reopen the serial connection."""
-        self.disconnect()
-        return self.connect()
-
-    def disconnect(self) -> DriverResponse:
-        """Close the underlying serial port."""
-        try:
-            if self.com is not None:
-                self.com.close()
-            response = DriverResponse(
-                response=DriverResponseType.success, status=DriverStatus.ok
-            )
-        except Exception:
-            LOGGER.error("disconnect failed", exc_info=True)
-            response = DriverResponse(
-                response=DriverResponseType.failed, status=DriverStatus.error
-            )
-        finally:
-            self.com = None
         return response
 
     def shutdown(self):
@@ -367,18 +319,6 @@ class KDS100(HelaoDriver):
             cmd = "wrun"
         else:
             return False
-        resp = await self.send(pump_name, cmd)
-        self.update_status_from_response(resp)
-        return resp
-
-    async def set_force(self, pump_name: str, force_val: int) -> list:
-        """Set the infusion force in percent.
-
-        Args:
-            pump_name: Configured pump key.
-            force_val: Force value in percent.
-        """
-        cmd = f"forc {force_val}"
         resp = await self.send(pump_name, cmd)
         self.update_status_from_response(resp)
         return resp

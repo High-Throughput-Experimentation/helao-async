@@ -9,6 +9,7 @@ import os
 import pytest
 
 from helao.core.models.file import HloFileGroup
+from helao.helpers.meta_io import read_meta
 from helao.helpers.premodels import Action
 from helao.hexagon.adapters.native.data_file import NativeDataFileWriter
 from helao.hexagon.tests.native_fixtures import make_base, mk_action, mk_active
@@ -37,10 +38,9 @@ def test_init_datafile_autogen_filename(tmp_path):
     a = active.action
     assert (
         file_info.file_name
-        == f"{a.action_abbr}-{a.orch_submit_order}.{a.action_order}.{a.action_retry}.{a.action_split}__0.hlo"
+        == f"{a.action_abbr}-{a.orch_submit_order}.{a.action_order}.{a.action_retry}.{a.action_split}__0.jsonl"
     )
-    assert header.endswith("\n")
-    assert "a: 1" in header
+    assert header == {"a": 1}
     assert file_info.data_keys == ["t_s"]
     assert file_info.file_type == "nu__test_file"
     assert file_info.action_uuid == a.action_uuid
@@ -60,6 +60,29 @@ def test_init_datafile_empty_header_variants(tmp_path):
         assert header == ""  # {} must NOT become "{}\n"
 
 
+def test_init_datafile_helao_headers_are_always_dicts(tmp_path):
+    _, active, _ = _native_active(tmp_path)
+    cases = [
+        ({}, {}),
+        ([], {}),
+        (None, {}),
+        (["line one", "line two"], {"text": "line one\nline two"}),
+        ("mean_ocv: 0.3\n", {"mean_ocv": 0.3}),
+        ("free text", {"text": "free text"}),
+    ]
+    for given, expected in cases:
+        header, info = active.init_datafile(
+            header=given,
+            file_type="t",
+            json_data_keys=None,
+            file_sample_label=None,
+            filename=None,
+            file_group=HloFileGroup.helao_files,
+        )
+        assert header == expected, given
+        assert info.file_name.endswith(".jsonl")
+
+
 @pytest.mark.asyncio
 async def test_log_data_set_output_file_truncates_stale_bytes(tmp_path):
     """w+ open: stale crash bytes must not survive ahead of the header
@@ -70,16 +93,45 @@ async def test_log_data_set_output_file_truncates_stale_bytes(tmp_path):
     )
     os.makedirs(out_dir, exist_ok=True)
     a = active.action
-    fname = f"{a.action_abbr}-{a.orch_submit_order}.{a.action_order}.{a.action_retry}.{a.action_split}__0.hlo"
+    fname = f"{a.action_abbr}-{a.orch_submit_order}.{a.action_order}.{a.action_retry}.{a.action_split}__0.jsonl"
     stale = os.path.join(out_dir, fname)
     open(stale, "w", encoding="utf-8").write("STALE-CRASH-BYTES\n")
     active.file_conn_dict[dflt].params.hloheader.epoch_ns = 1234567890
     await active.log_data_set_output_file(file_conn_key=dflt)
     await active.file_conn_dict[dflt].file.close()
-    text = open(stale, encoding="utf-8").read()
-    assert "STALE-CRASH-BYTES" not in text
-    assert "epoch_ns: 1234567890" in text
+    assert open(stale, encoding="utf-8").read() == ""  # rows only, none yet
+    header = read_meta(stale[: -len(".jsonl")] + ".meta.json")
+    assert header["epoch_ns"] == 1234567890
     assert active.action.files and active.action.files[-1].file_name == fname
+
+
+@pytest.mark.asyncio
+async def test_one_shot_helao_write_overwrites_the_header_and_appends_rows(tmp_path):
+    _, active, _ = _native_active(tmp_path)
+    path = await active.write_file(
+        output_str='{"a": 1}',
+        file_type="x_helao__file",
+        filename="one.jsonl",
+        file_group=HloFileGroup.helao_files,
+        header={"k": 1},
+    )
+    await active.write_file(
+        output_str='{"a": 2}\n',
+        file_type="x_helao__file",
+        filename="one.jsonl",
+        file_group=HloFileGroup.helao_files,
+        header={"k": 2},
+    )
+    assert open(path, encoding="utf-8").read() == '{"a": 1}\n{"a": 2}\n'
+    assert read_meta(path[: -len(".jsonl")] + ".meta.json") == {"k": 2}
+    nowait = active.write_file_nowait(
+        output_str='{"b": 1}',
+        file_type="x_helao__file",
+        filename="two.jsonl",
+        file_group=HloFileGroup.helao_files,
+    )
+    assert open(nowait, encoding="utf-8").read() == '{"b": 1}\n'
+    assert not os.path.exists(nowait[: -len(".jsonl")] + ".meta.json")
 
 
 @pytest.mark.asyncio
@@ -203,3 +255,18 @@ async def test_track_file_outside_the_output_dir_records_its_basename(tmp_path):
     outside.write_text("payload", encoding="utf-8")
     await active.track_file("df__aux", str(outside), [])
     assert any(fi.file_name == "aux_data.dat" for fi in active.action.files)
+
+
+@pytest.mark.asyncio
+async def test_write_file_records_the_file_only_after_the_header_wrote(tmp_path):
+    _, active, _ = _native_active(tmp_path)
+    before = len(active.action.files)
+    with pytest.raises(TypeError):
+        await active.write_file(
+            output_str='{"a": 1}',
+            file_type="x_helao__file",
+            filename="bad.jsonl",
+            file_group=HloFileGroup.helao_files,
+            header={"k": object()},
+        )
+    assert len(active.action.files) == before

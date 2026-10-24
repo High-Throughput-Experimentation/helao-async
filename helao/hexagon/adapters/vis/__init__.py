@@ -7,11 +7,8 @@ from helao.hexagon.adapters.vis.galil_aligner_host import (
     AlignerMotorContext,
     GalilAlignerHost,
 )
-from helao.hexagon.adapters.vis.ws_consumer import CHANNEL_NORMALIZERS, WsConsumer
 
 __all__ = [
     "AlignerMotorContext",
-    "CHANNEL_NORMALIZERS",
     "GalilAlignerHost",
-    "WsConsumer",
 ]

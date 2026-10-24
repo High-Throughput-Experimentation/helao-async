@@ -160,7 +160,7 @@ class Active:
             self.base.actionservermodel.estop = True
 
 
-def test_measure_init_ocv_averages_last_five_and_writes_hlo(monkeypatch):
+def test_measure_init_ocv_averages_last_five_and_writes_jsonl(monkeypatch):
     vs = [0.9, 0.9, 0.1, 0.2, 0.3, 0.4, 0.5]
 
     async def fake_measure_ocv(pstat, gamrycom, duration, period):
@@ -173,9 +173,9 @@ def test_measure_init_ocv_averages_last_five_and_writes_hlo(monkeypatch):
     params = {"OCV_duration__s": 3.0, "OCV_acquisition_period__s": 0.5}
     mean = asyncio.run(gs.measure_init_ocv(Active(written), driver, params))
     assert mean == pytest.approx(0.3)
-    assert written["filename"] == "init_ocv.hlo"
+    assert written["filename"] == "init_ocv.jsonl"
     assert json.loads(written["output_str"])["Ewe_V"] == vs
-    assert "mean_ocv: 0.3" in written["header"]
+    assert abs(written["header"]["mean_ocv"] - 0.3) < 1e-9
 
 
 @pytest.mark.parametrize(

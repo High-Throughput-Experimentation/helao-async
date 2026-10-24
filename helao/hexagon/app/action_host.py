@@ -39,7 +39,6 @@ import time
 import traceback
 from collections import namedtuple
 from datetime import datetime
-from glob import glob
 from pathlib import Path
 from typing import Annotated, Any, Callable, Optional
 
@@ -62,13 +61,14 @@ from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.run_state import ACTIVE, RunStateJournal
 from helao.helpers.time_utils import read_saved_offset, set_time
 from helao.helpers.file_utils import _relative_file_name
-from helao.helpers.yml_tools import move_dir, yml_load
+from helao.helpers.meta_io import meta_glob, read_meta
+from helao.hexagon.domain.naming import DATA_SUFFIX, HEADER_SUFFIX, meta_kind
+from helao.helpers.yml_tools import move_dir
 from helao.helpers.premodels import Action
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.ws_utils import WsPublisher
 from helao.helpers.zdeque import zdeque
-from helao.hexagon.adapters.shared.status import DispatcherStatusAdapter
-from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
+from helao.hexagon.app.action_admission import ActionAdmission, ActionFailed
 from helao.hexagon.app.wiring import ACTION_REQUIRED, PortWiring
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -121,10 +121,6 @@ class ActionHost(HelaoFastAPI):
         executors: Running executors by id (populated from Task 6).
         actionservermodel: This server's live status snapshot.
     """
-
-    #: D-B7c.1: whether __init__ binds the WS publish bridge. OrchHost turns it off: it
-    #: serves its own /ws_* relays (P2b-2 D3).
-    _binds_ws_bridge: bool = True
 
     def __init__(
         self,
@@ -182,7 +178,9 @@ class ActionHost(HelaoFastAPI):
         self._poller_class = poller_class
         self._dyn_endpoints = dyn_endpoints
 
-        self.world_cfg = self.helao_cfg
+        # HelaoFastAPI indexes helao_cfg in its __init__, so it is never None here
+        assert self.helao_cfg is not None
+        self.world_cfg: dict = self.helao_cfg
         self.root_dir = self.helao_cfg.get("root", None)
         self.fault_dir: Optional[str] = None
         self.fault_file = None
@@ -218,7 +216,7 @@ class ActionHost(HelaoFastAPI):
 
         self.actionservermodel = ActionServerModel(action_server=self.server)
         # Resolved output directories. In the frozen member surface and read by
-        # HelaoSyncer.__init__ (sync_driver.py:2203) among others -- its absence
+        # NativeSyncer.__init__ (via SyncDriver) among others -- its absence
         # is a startup crash for any driver that writes, not a lazy failure.
         self.helaodirs = helao_dirs(self.world_cfg, self.server.server_name)
         #: This server's append-only run-state journal (spec §4.1). Exactly one
@@ -255,12 +253,9 @@ class ActionHost(HelaoFastAPI):
         self.history = DequeDict(maxlen=200)
 
         # Pre-finish hooks for this server's actions (finish-hooks spec §3,
-        # §5.1). `hlo_postprocess_libs` is the deprecated alias; a bad config
-        # raises here rather than degrading to "no hooks".
+        # §5.1). A bad config raises here rather than degrading to "no hooks".
         self.prefinish_hooks = load_hook_set(
-            prefinish_config(
-                self.server_cfg, "prefinish_hooks", "hlo_postprocess_libs", server_key
-            ),
+            prefinish_config(self.server_cfg, "prefinish_hooks", server_key),
             phase="prefinish",
             level="action",
         )
@@ -281,14 +276,6 @@ class ActionHost(HelaoFastAPI):
         self.status_q = MultisubscriberQueue()
         self.data_q = MultisubscriberQueue()
         self.live_q = MultisubscriberQueue()
-        # D-B7c.1: the bridge only stores the three queue references, and the queues
-        # exist from here on, so it is bound now rather than in a startup hook.
-        self.hexagon_ws_bridge: Optional[WsPublishBridge] = None
-        if self._binds_ws_bridge and isinstance(wiring.status, DispatcherStatusAdapter):
-            self.hexagon_ws_bridge = WsPublishBridge(
-                self.status_q, self.data_q, self.live_q
-            )
-            wiring.status.bind_publish_bridge(self.hexagon_ws_bridge)
         self.status_publisher = WsPublisher(self.status_q)
         self.data_publisher = WsPublisher(self.data_q)
         self.live_publisher = WsPublisher(self.live_q)
@@ -782,12 +769,10 @@ class ActionHost(HelaoFastAPI):
                             f"Failed to push status message to {client_servkey} "
                             f"after {retry_limit} attempts."
                         )
-                    # Blocking, deliberately, and deferred past B7: this is
-                    # the pacing legacy used, and asyncio.sleep would reorder
-                    # this loop against every other coroutine on the server.
-                    # That is a behaviour change with its own station check,
-                    # not part of deleting the engine.
-                    time.sleep(0.3)
+                    # Per-client pacing, as legacy had. It yields to the event
+                    # loop (C4a): a blocking sleep here froze every coroutine
+                    # on the server for 0.3 s per client per status.
+                    await asyncio.sleep(0.3)
 
                 # delete errored and finished statuses only after every
                 # subscriber has been sent them
@@ -883,50 +868,57 @@ class ActionHost(HelaoFastAPI):
         execution both return 200; only the interleaving differs, and on a
         station that difference is two actions driving one instrument at once.
 
-        Three ways through, in the order legacy checks them:
+        The decision itself lives in :class:`ActionAdmission`, shared with the
+        RPC fast path (``rpc_dispatcher.admit``) so the two transports cannot
+        disagree. In the order legacy checks them:
 
-        1. the endpoint is idle, or the caller said ``no_wait``, or this is
+        1. a uuid this server already took -- answer with its existing record, or,
+           if the original is still running, wait for it and answer with its
+           result (a failed original re-runs, see :class:`ActionAdmission`);
+        2. the endpoint is idle, or the caller said ``no_wait``, or this is
            already a requeued launch -- run it;
-        2. the server disallows concurrency and *any* endpoint is busy -- park
+        3. the server disallows concurrency and *any* endpoint is busy -- park
            it on the unified queue;
-        3. this endpoint is busy -- park it on that endpoint's queue.
+        4. this endpoint is busy -- park it on that endpoint's queue.
 
         A parked action is answered 200 with its own action dict, not held
         open: the caller gets a real action uuid to track, and
         ``process_endpoint_queue`` redispatches it when the endpoint frees.
         """
-        from socket import gethostname
-
+        from fastapi.encoders import jsonable_encoder
         from starlette.requests import Request
         from starlette.responses import JSONResponse, Response
 
-        from helao.core.models.action_start_condition import ActionStartCondition as ASC
-        from helao.core.models.machine import MachineModel
-        from helao.helpers.eval import eval_val
-        from helao.helpers.time_utils import gen_uuid
-
         server_key = self.server_key
+        self.admission = ActionAdmission(self)
 
-        def _park(action_dict, request, queue, why: str):
-            """Build the queued action, announce it, and park it on *queue*."""
-            action_dict["action_params"] = action_dict.get("action_params", {})
-            action_dict["action_params"]["queued_on_actserv"] = True
-            extra_params = {}
-            action = Action.model_validate(action_dict)
-            action.action_uuid = gen_uuid()
-            for d in (request.query_params, request.path_params):
-                for k, v in d.items():
-                    if k in ACTION_PARAM_KEYS:
-                        extra_params[k] = eval_val(v)
-                    else:
-                        action.action_params[k] = eval_val(v)
-            action.action_name = request.url.path.strip("/").split("/")[-1]
-            action.action_server = MachineModel(
-                server_name=server_key, machine_name=gethostname().lower()
+        async def _rpc_admit(
+            method: str, args: dict, dispatch_id: Optional[str] = None
+        ):
+            if not method.startswith(f"{server_key}/"):
+                return None
+            action_dict = args.get("action")
+            return await self.admission.admit(
+                method.split("/")[-1],
+                action_dict if isinstance(action_dict, dict) else {},
+                {k: v for k, v in args.items() if k != "action"},
+                "rpc",
+                dispatch_id,
             )
-            LOGGER.info(f"{why}, queuing action {action.action_uuid}")
-            queue.append((action, extra_params))
-            return action
+
+        def _rpc_forget(method: str, args: dict, release: bool = False) -> None:
+            action_dict = args.get("action")
+            if method.startswith(f"{server_key}/") and isinstance(action_dict, dict):
+                self.admission.forget(action_dict, release=release)
+
+        def _rpc_resolve(method: str, args: dict, result) -> None:
+            action_dict = args.get("action")
+            if method.startswith(f"{server_key}/") and isinstance(action_dict, dict):
+                self.admission.resolve(action_dict, result)
+
+        self.rpc_dispatcher.admit = _rpc_admit
+        self.rpc_dispatcher.resolve = _rpc_resolve
+        self.rpc_dispatcher.forget = _rpc_forget
 
         @self.middleware("http")
         async def app_entry(request: Request, call_next):
@@ -949,42 +941,42 @@ class ActionHost(HelaoFastAPI):
             # Bodyless POSTs (``/estop`` takes only a query param) are valid.
             body_dict = json.loads(await request.body() or b"{}")
             action_dict = body_dict.get("action", {})
-            start_cond = action_dict.get("start_condition", ASC.wait_for_all)
-            ep_model = self.actionservermodel.endpoints.get(endpoint)
-            busy = bool(ep_model.active_dict) if ep_model is not None else False
-
-            if (
-                not busy
-                or start_cond == ASC.no_wait
-                or action_dict.get("action_params", {}).get("queued_launch", False)
-            ):
-                return await call_next(request)
-
-            if not self.server_params.get("allow_concurrent_actions", True):
-                active_endpoints = [
-                    ep
-                    for ep, em in self.actionservermodel.endpoints.items()
-                    if em.active_dict
-                ]
-                if not active_endpoints:
-                    return await call_next(request)
-                action = _park(
+            try:
+                held = await self.admission.admit(
+                    endpoint,
                     action_dict,
-                    request,
-                    self.local_action_queue,
-                    "action server is busy and does not allow concurrency",
+                    {**request.query_params, **request.path_params},
+                    "http",
+                    request.headers.get("x-helao-dispatch-id"),
                 )
-                await self.status_q.put(action.get_act())
-                return JSONResponse(action.as_dict())
-
-            action = _park(
-                action_dict,
-                request,
-                self.endpoint_queues[endpoint],
-                "simultaneous action requests received",
+            except ActionFailed as e:
+                return Response(str(e), status_code=500)
+            if held is not None:
+                # An RPC original's result may hold UUIDs, datetimes, Paths.
+                return JSONResponse(jsonable_encoder(held))
+            try:
+                response = await call_next(request)
+                if response.status_code >= 400:
+                    self.admission.forget(action_dict)
+                    return response
+                if not action_dict.get("action_uuid"):
+                    return response
+                # Repeats of this uuid wait on the handler's result, so read
+                # the body once and rebuild the response from it.
+                body = b"".join([c async for c in response.body_iterator])  # type: ignore[attr-defined]
+            except BaseException:
+                self.admission.forget(action_dict)
+                raise
+            try:
+                self.admission.resolve(action_dict, json.loads(body))
+            except ValueError:
+                self.admission.resolve(action_dict, body.decode(errors="replace"))
+            return Response(
+                body,
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                media_type=response.media_type,
             )
-            await self.status_q.put(action.get_act())
-            return JSONResponse(action.as_dict())
 
     def _register_exception_handler(self) -> None:
         """E-stop in-flight work when an action route raises.
@@ -1415,15 +1407,15 @@ class ActionHost(HelaoFastAPI):
         """Reconcile one stale journal entry; see :meth:`reconcile_interrupted`."""
         act_dir = os.path.join(str(self.helaodirs.root), rec["path"])
         action = None
-        for yml in sorted(glob(os.path.join(act_dir, "*-act.yml"))):
-            candidate = Action.model_validate(yml_load(yml))
+        for yml in meta_glob(act_dir, "act"):
+            candidate = Action.model_validate(read_meta(yml))
             if str(candidate.action_uuid) == uuid:
                 action = candidate
                 break
         assert self.run_journal is not None
         if action is None:
             LOGGER.warning(
-                f"Interrupted action {uuid}: no -act.yml in {act_dir}; "
+                f"Interrupted action {uuid}: no -act record in {act_dir}; "
                 "evicting its journal entry."
             )
             self.run_journal.append(uuid, "action", "done", rec["path"])
@@ -1480,8 +1472,9 @@ class ActionHost(HelaoFastAPI):
         The yml written at action start has ``files: []``; the finalizer fills
         it in memory, which an interrupted run never reached. The syncer ships
         only registered files, so without this the partial data is dropped.
-        Skips what the finalizer never registers: ymls, locks, staging and
-        other dotfiles. ``data_keys`` and sample labels are unknown here.
+        Skips what the finalizer never registers: records (``.json``/``.yml``),
+        data headers (``.meta.json``), locks, staging and other dotfiles.
+        ``data_keys`` and sample labels are unknown here.
         """
         known = {str(f.file_name) for f in action.files}
         for path in sorted(Path(act_dir).rglob("*")):
@@ -1489,12 +1482,14 @@ class ActionHost(HelaoFastAPI):
                 not path.is_file()
                 or path.name.startswith(".")
                 or path.suffix in (".yml", ".lock", ".tmp", ".prg")
+                or path.name.endswith(HEADER_SUFFIX)
+                or meta_kind(path) is not None
             ):
                 continue
             name = _relative_file_name(str(path), act_dir)
             if name in known:
                 continue
-            is_hlo = path.suffix == ".hlo"
+            is_hlo = path.suffix in (".hlo", DATA_SUFFIX)
             if is_hlo:
                 file_type = f"{self.server_key.lower()}_helao__file"
             elif path.suffix == ".csv":
@@ -1543,6 +1538,29 @@ class ActionHost(HelaoFastAPI):
                     # so this is not a migration stopgap.
                     if issubclass(driver_class, HelaoDriver):
                         inst = driver_class(config=self.server_params)
+                        inst._base_hook = self
+                        if driver_class.connect_on_startup:
+                            name = driver_class.__name__
+                            try:
+                                resp = inst.connect()
+                            except (
+                                Exception
+                            ) as exc:  # start with the driver disconnected
+                                LOGGER.error(
+                                    f"{name}.connect() at startup raised; "
+                                    "continuing with the driver disconnected",
+                                    exc_info=True,
+                                )
+                                LOGGER.alert(
+                                    f"{self.server_key}: {name}.connect() at startup "
+                                    f"raised {exc!r}"
+                                )
+                            else:
+                                LOGGER.info(
+                                    f"{name}.connect() at startup: "
+                                    f"response={getattr(resp, 'response', None)} "
+                                    f"status={getattr(resp, 'status', None)}"
+                                )
                         if i == 0 and self._poller_class is not None:
                             self.poller = self._poller_class(
                                 inst, self.server_cfg.get("polling_time", 0.1)
@@ -1637,10 +1655,23 @@ class ActionHost(HelaoFastAPI):
         retvals: dict = {}
         shutdown = getattr(self.driver, "shutdown", None)
         async_shutdown = getattr(self.driver, "async_shutdown", None)
-        retvals["shutdown"] = shutdown() if callable(shutdown) else None
-        retvals["async_shutdown"] = (
-            await async_shutdown() if callable(async_shutdown) else None
-        )
+        # A raising hook must not abort teardown: a driver whose startup connect
+        # raised is still hosted, and its hooks may fail on the closed device.
+        # The remaining hook and the fault-file close below always run.
+        retvals["shutdown"] = None
+        if callable(shutdown):
+            try:
+                retvals["shutdown"] = shutdown()
+            except Exception:
+                LOGGER.error("driver shutdown() raised; continuing", exc_info=True)
+        retvals["async_shutdown"] = None
+        if callable(async_shutdown):
+            try:
+                retvals["async_shutdown"] = await async_shutdown()
+            except Exception:
+                LOGGER.error(
+                    "driver async_shutdown() raised; continuing", exc_info=True
+                )
 
         if self.fault_file is not None:
             faulthandler.disable()

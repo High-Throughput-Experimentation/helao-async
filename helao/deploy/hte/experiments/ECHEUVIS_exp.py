@@ -92,6 +92,98 @@ def ECHEUVIS_sub_shutdown() -> list:
     return apm.planned_actions  # returns complete action list to orch
 
 
+def _echeuvis_led_prelude(
+    apm,
+    duration_sec,
+    cam_start,
+    calibrated_int_time,
+    *,
+    toggle_illum_time,
+    toggle2_time,
+    illumination_source,
+    toggle2_source,
+    toggle_dark_time_init,
+    toggle2_init_delay,
+    toggle_illum_duty,
+    toggle2_duty,
+    toggle_illum_period,
+    toggle2_period,
+    spec_n_avg,
+    spec_int_time_ms,
+    spec_technique,
+):
+    """Shared head of the ECHEUVIS *_led experiments: query the cell sample, start
+    the two-channel (illumination + spectrometer) TTL cycle, grab camera frames and
+    arm every spectrometer for external triggering."""
+    if int(round(toggle_illum_time)) == -1:
+        toggle_illum_time = duration_sec
+    if int(round(toggle2_time)) == -1:
+        toggle2_time = duration_sec
+    apm.add(
+        SAMPLE_server,
+        "archive_custom_query_sample",
+        {"custom": "cell1_we"},
+        to_global_params=["_fast_samples_in"],
+        start_condition=ActionStartCondition.wait_for_all,
+    )
+    apm.add(
+        IO_server,
+        "set_digital_cycle",
+        {
+            "trigger_name": "gamry_ttl0",
+            "triggertype": TOGGLE_TRIGGERTYPE,
+            "out_name": [illumination_source, toggle2_source],
+            "toggle_init_delay": [toggle_dark_time_init, toggle2_init_delay],
+            "toggle_duty": [toggle_illum_duty, toggle2_duty],
+            "toggle_period": [toggle_illum_period, toggle2_period],
+            "toggle_duration": [toggle_illum_time, toggle2_time],
+        },
+        start_condition=ActionStartCondition.wait_for_all,
+        process_finish=False,
+        process_contrib=[ProcessContrib.files, ProcessContrib.samples_out],
+    )
+    apm.add(
+        CAM_server,
+        "acquire_image",
+        {"duration": min(duration_sec, 10), "acqusition_rate": 0.5},
+        start_condition=cam_start,
+        nonblocking=True,
+    )
+    from_global = {"_fast_samples_in": "fast_samples_in"}
+    spec_params = {"n_avg": spec_n_avg, "duration": toggle2_time}
+    if calibrated_int_time:
+        from_global["calibrated_int_time_ms"] = "int_time"
+    else:
+        spec_params = {"int_time": spec_int_time_ms, **spec_params}
+    for ss in SPECSRV_MAP[spec_technique]:
+        apm.add(
+            ss,
+            "acquire_spec_extrig",
+            dict(spec_params),
+            from_global_act_params=dict(from_global),
+            start_condition=ActionStartCondition.wait_for_all,
+            technique_name=spec_technique,
+            process_contrib=[ProcessContrib.files, ProcessContrib.samples_out],
+        )
+
+
+def _echeuvis_run_pstat(apm, endpoint, params, technique):
+    apm.add(
+        PSTAT_server,
+        endpoint,
+        params,
+        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
+        start_condition=ActionStartCondition.wait_for_server,
+        technique_name=technique,
+        process_finish=True,
+        process_contrib=[
+            ProcessContrib.files,
+            ProcessContrib.samples_in,
+            ProcessContrib.samples_out,
+        ],
+    )
+
+
 @experiment(version=6)
 def ECHEUVIS_sub_CV_led(
     Vinit_vsRHE: float = 0.0,  # Initial value in volts or amps.
@@ -181,118 +273,33 @@ def ECHEUVIS_sub_CV_led(
     """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
     CV_duration_sec = abs(Vapex1_vsRHE - Vinit_vsRHE) / scanrate_voltsec
     CV_duration_sec += abs(Vfinal_vsRHE - Vapex2_vsRHE) / scanrate_voltsec
     CV_duration_sec += abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec
     CV_duration_sec += (
         abs(Vapex2_vsRHE - Vapex1_vsRHE) / scanrate_voltsec * 2.0 * (cycles - 1)
     )
-
-    if int(round(toggle_illum_time)) == -1:
-        toggle_illum_time = CV_duration_sec
-    if int(round(toggle2_time)) == -1:
-        toggle2_time = CV_duration_sec
-
-    # get sample for gamry
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {
-            "custom": "cell1_we",
-        },
-        to_global_params=[
-            "_fast_samples_in"
-        ],  # save new liquid_sample_no of eche cell to globals
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+    _echeuvis_led_prelude(
+        apm,
+        CV_duration_sec,
+        ActionStartCondition.no_wait,
+        False,
+        toggle_illum_time=toggle_illum_time,
+        toggle2_time=toggle2_time,
+        illumination_source=illumination_source,
+        toggle2_source=toggle2_source,
+        toggle_dark_time_init=toggle_dark_time_init,
+        toggle2_init_delay=toggle2_init_delay,
+        toggle_illum_duty=toggle_illum_duty,
+        toggle2_duty=toggle2_duty,
+        toggle_illum_period=toggle_illum_period,
+        toggle2_period=toggle2_period,
+        spec_n_avg=spec_n_avg,
+        spec_int_time_ms=spec_int_time_ms,
+        spec_technique=spec_technique,
     )
-
-    # setup toggle on galil_io
-    apm.add(
-        IO_server,
-        "set_digital_cycle",
-        {
-            "trigger_name": "gamry_ttl0",
-            "triggertype": TOGGLE_TRIGGERTYPE,
-            "out_name": [illumination_source, toggle2_source],
-            "toggle_init_delay": [
-                toggle_dark_time_init,
-                toggle2_init_delay,
-            ],
-            "toggle_duty": [toggle_illum_duty, toggle2_duty],
-            "toggle_period": [
-                toggle_illum_period,
-                toggle2_period,
-            ],
-            "toggle_duration": [toggle_illum_time, toggle2_time],
-        },
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        process_finish=False,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_out,
-        ],
-    )
-
-    # apm.add(ORCH_server, "wait", {"waittime": 5})
-
-    # apm.add(
-    #     IO_server,
-    #     "set_digital_out",
-    #     {
-    #         "do_item": illumination_source,
-    #         "on": True,
-    #     },
-    # )
-
-    apm.add(
-        CAM_server,
-        "acquire_image",
-        {"duration": min(CV_duration_sec, 10), "acqusition_rate": 0.5},
-        start_condition=ActionStartCondition.no_wait,
-        nonblocking=True,
-    )
-
-    for ss in SPECSRV_MAP[spec_technique]:
-        apm.add(
-            ss,
-            "acquire_spec_extrig",
-            {
-                "int_time": spec_int_time_ms,
-                "n_avg": spec_n_avg,
-                "duration": toggle2_time,
-            },
-            from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-            start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            technique_name=spec_technique,
-            process_contrib=[
-                ProcessContrib.files,
-                ProcessContrib.samples_out,
-            ],
-        )
-        # apm.add(
-        #     ss,
-        #     "acquire_spec_adv",
-        #     {
-        #         "int_time_ms": spec_int_time_ms,
-        #         "n_avg": spec_n_avg,
-        #         "duration_sec": toggle2_time,
-        #     },
-        #     from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        #     run_use="data",
-        #     technique_name=spec_technique,
-        #     process_finish=False,
-        #     process_contrib=[
-        #         ProcessContrib.files,
-        #         ProcessContrib.samples_out,
-        #     ],
-        #     start_condition=ActionStartCondition.no_wait,
-        #     nonblocking=True,
-        # )
-
-    # apply potential
-    apm.add(
-        PSTAT_server,
+    _echeuvis_run_pstat(
+        apm,
         "run_CV",
         {
             "Vinit__V": Vinit_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph,
@@ -302,31 +309,13 @@ def ECHEUVIS_sub_CV_led(
             "ScanRate__V_s": scanrate_voltsec,
             "AcqInterval__s": samplerate_sec,
             "Cycles": cycles,
-            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "TTLwait": gamrychannelwait,
+            "TTLsend": gamrychannelsend,
             "IErange": gamry_i_range,
         },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_server,
-        technique_name="CV",
-        process_finish=True,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+        "CV",
     )
-
-    # apm.add(
-    #     IO_server,
-    #     "set_digital_out",
-    #     {
-    #         "do_item": illumination_source,
-    #         "on": False,
-    #     },
-    # )
-
-    return apm.planned_actions  # returns complete action list to orch
+    return apm.planned_actions
 
 
 @experiment(version=6)
@@ -403,147 +392,41 @@ def ECHEUVIS_sub_CA_led(
     """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
-    if int(round(toggle_illum_time)) == -1:
-        toggle_illum_time = CA_duration_sec
-    if int(round(toggle2_time)) == -1:
-        toggle2_time = CA_duration_sec
-
-    # get sample for gamry
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {
-            "custom": "cell1_we",
-        },
-        to_global_params=[
-            "_fast_samples_in"
-        ],  # save new liquid_sample_no of eche cell to globals
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+    _echeuvis_led_prelude(
+        apm,
+        CA_duration_sec,
+        ActionStartCondition.no_wait,
+        True,
+        toggle_illum_time=toggle_illum_time,
+        toggle2_time=toggle2_time,
+        illumination_source=illumination_source,
+        toggle2_source=toggle2_source,
+        toggle_dark_time_init=toggle_dark_time_init,
+        toggle2_init_delay=toggle2_init_delay,
+        toggle_illum_duty=toggle_illum_duty,
+        toggle2_duty=toggle2_duty,
+        toggle_illum_period=toggle_illum_period,
+        toggle2_period=toggle2_period,
+        spec_n_avg=spec_n_avg,
+        spec_int_time_ms=spec_int_time_ms,
+        spec_technique=spec_technique,
     )
-
-    # setup toggle on galil_io
-    apm.add(
-        IO_server,
-        "set_digital_cycle",
-        {
-            "trigger_name": "gamry_ttl0",
-            "triggertype": TOGGLE_TRIGGERTYPE,
-            "out_name": [illumination_source, toggle2_source],
-            "toggle_init_delay": [
-                toggle_dark_time_init,
-                toggle2_init_delay,
-            ],
-            "toggle_duty": [toggle_illum_duty, toggle2_duty],
-            "toggle_period": [
-                toggle_illum_period,
-                toggle2_period,
-            ],
-            "toggle_duration": [toggle_illum_time, toggle2_time],
-        },
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        process_finish=False,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_out,
-        ],
-    )
-
-    # apm.add(ORCH_server, "wait", {"waittime": 5})
-
-    # apm.add(
-    #     IO_server,
-    #     "set_digital_out",
-    #     {
-    #         "do_item": illumination_source,
-    #         "on": True,
-    #     },
-    # )
-
-    apm.add(
-        CAM_server,
-        "acquire_image",
-        {"duration": min(CA_duration_sec, 10), "acqusition_rate": 0.5},
-        start_condition=ActionStartCondition.no_wait,
-        nonblocking=True,
-    )
-
-    for ss in SPECSRV_MAP[spec_technique]:
-        apm.add(
-            ss,
-            "acquire_spec_extrig",
-            {
-                # "int_time": spec_int_time_ms,
-                "n_avg": spec_n_avg,
-                "duration": toggle2_time,
-            },
-            from_global_act_params={
-                "_fast_samples_in": "fast_samples_in",
-                "calibrated_int_time_ms": "int_time",
-            },
-            start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            technique_name=spec_technique,
-            process_contrib=[
-                ProcessContrib.files,
-                ProcessContrib.samples_out,
-            ],
-        )
-        # apm.add(
-        #     ss,
-        #     "acquire_spec_adv",
-        #     {
-        #         "int_time_ms": spec_int_time_ms,
-        #         "n_avg": spec_n_avg,
-        #         "duration_sec": toggle2_time,
-        #     },
-        #     from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        #     run_use="data",
-        #     technique_name=spec_technique,
-        #     process_finish=False,
-        #     process_contrib=[
-        #         ProcessContrib.files,
-        #         ProcessContrib.samples_out,
-        #     ],
-        #     start_condition=ActionStartCondition.no_wait,
-        #     nonblocking=True,
-        # )
-
-    # apply potential
     potential = CA_potential_vsRHE - 1.0 * ref_vs_nhe - 0.059 * solution_ph
     print(f"ECHE_sub_CA potential: {potential}")
-
-    apm.add(
-        PSTAT_server,
+    _echeuvis_run_pstat(
+        apm,
         "run_CA",
         {
             "Vval__V": potential,
             "Tval__s": CA_duration_sec,
             "AcqInterval__s": samplerate_sec,
-            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "TTLwait": gamrychannelwait,
+            "TTLsend": gamrychannelsend,
             "IErange": gamry_i_range,
         },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_server,
-        technique_name="CA",
-        process_finish=True,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+        "CA",
     )
-
-    # apm.add(
-    #     IO_server,
-    #     "set_digital_out",
-    #     {
-    #         "do_item": illumination_source,
-    #         "on": False,
-    #     },
-    # )
-
-    return apm.planned_actions  # returns complete action list to orch
+    return apm.planned_actions
 
 
 @experiment(version=6)
@@ -620,140 +503,39 @@ def ECHEUVIS_sub_CP_led(
     """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
-    if int(round(toggle_illum_time)) == -1:
-        toggle_illum_time = CP_duration_sec
-    if int(round(toggle2_time)) == -1:
-        toggle2_time = CP_duration_sec
-
-    # get sample for gamry
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {
-            "custom": "cell1_we",
-        },
-        to_global_params=[
-            "_fast_samples_in"
-        ],  # save new liquid_sample_no of eche cell to globals
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+    _echeuvis_led_prelude(
+        apm,
+        CP_duration_sec,
+        ActionStartCondition.no_wait,
+        False,
+        toggle_illum_time=toggle_illum_time,
+        toggle2_time=toggle2_time,
+        illumination_source=illumination_source,
+        toggle2_source=toggle2_source,
+        toggle_dark_time_init=toggle_dark_time_init,
+        toggle2_init_delay=toggle2_init_delay,
+        toggle_illum_duty=toggle_illum_duty,
+        toggle2_duty=toggle2_duty,
+        toggle_illum_period=toggle_illum_period,
+        toggle2_period=toggle2_period,
+        spec_n_avg=spec_n_avg,
+        spec_int_time_ms=spec_int_time_ms,
+        spec_technique=spec_technique,
     )
-
-    # setup toggle on galil_io
-    apm.add(
-        IO_server,
-        "set_digital_cycle",
-        {
-            "trigger_name": "gamry_ttl0",
-            "triggertype": TOGGLE_TRIGGERTYPE,
-            "out_name": [illumination_source, toggle2_source],
-            "toggle_init_delay": [
-                toggle_dark_time_init,
-                toggle2_init_delay,
-            ],
-            "toggle_duty": [toggle_illum_duty, toggle2_duty],
-            "toggle_period": [
-                toggle_illum_period,
-                toggle2_period,
-            ],
-            "toggle_duration": [toggle_illum_time, toggle2_time],
-        },
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        process_finish=False,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_out,
-        ],
-    )
-
-    # apm.add(ORCH_server, "wait", {"waittime": 5})
-
-    # apm.add(
-    #     IO_server,
-    #     "set_digital_out",
-    #     {
-    #         "do_item": illumination_source,
-    #         "on": True,
-    #     },
-    # )
-
-    apm.add(
-        CAM_server,
-        "acquire_image",
-        {"duration": min(CP_duration_sec, 10), "acqusition_rate": 0.5},
-        start_condition=ActionStartCondition.no_wait,
-        nonblocking=True,
-    )
-
-    for ss in SPECSRV_MAP[spec_technique]:
-        apm.add(
-            ss,
-            "acquire_spec_extrig",
-            {
-                "int_time": spec_int_time_ms,
-                "n_avg": spec_n_avg,
-                "duration": toggle2_time,
-            },
-            from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-            start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            technique_name=spec_technique,
-            process_contrib=[
-                ProcessContrib.files,
-                ProcessContrib.samples_out,
-            ],
-        )
-        # apm.add(
-        #     ss,
-        #     "acquire_spec_adv",
-        #     {
-        #         "int_time_ms": spec_int_time_ms,
-        #         "n_avg": spec_n_avg,
-        #         "duration_sec": toggle2_time,
-        #     },
-        #     from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        #     run_use="data",
-        #     technique_name=spec_technique,
-        #     process_finish=False,
-        #     process_contrib=[
-        #         ProcessContrib.files,
-        #         ProcessContrib.samples_out,
-        #     ],
-        #     start_condition=ActionStartCondition.no_wait,
-        #     nonblocking=True,
-        # )
-
-    apm.add(
-        PSTAT_server,
+    _echeuvis_run_pstat(
+        apm,
         "run_CP",
         {
             "Ival__A": CP_current,
             "Tval__s": CP_duration_sec,
             "AcqInterval__s": samplerate_sec,
-            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "TTLwait": gamrychannelwait,
+            "TTLsend": gamrychannelsend,
             "IErange": gamry_i_range,
         },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_server,
-        technique_name="CP",
-        process_finish=True,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+        "CP",
     )
-
-    # apm.add(
-    #     IO_server,
-    #     "set_digital_out",
-    #     {
-    #         "do_item": illumination_source,
-    #         "on": False,
-    #     },
-    # )
-
-    return apm.planned_actions  # returns complete action list to orch
+    return apm.planned_actions
 
 
 @experiment(version=1)
@@ -845,142 +627,39 @@ def ECHEUVIS_sub_OCV_led(
     """
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-
-    if int(round(toggle_illum_time)) == -1:
-        toggle_illum_time = OCV_duration_sec
-    if int(round(toggle2_time)) == -1:
-        toggle2_time = OCV_duration_sec
-
-    # get sample for gamry
-    apm.add(
-        SAMPLE_server,
-        "archive_custom_query_sample",
-        {
-            "custom": "cell1_we",
-        },
-        to_global_params=[
-            "_fast_samples_in"
-        ],  # save new liquid_sample_no of eche cell to globals
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
+    _echeuvis_led_prelude(
+        apm,
+        OCV_duration_sec,
+        ActionStartCondition.wait_for_orch,
+        True,
+        toggle_illum_time=toggle_illum_time,
+        toggle2_time=toggle2_time,
+        illumination_source=illumination_source,
+        toggle2_source=toggle2_source,
+        toggle_dark_time_init=toggle_dark_time_init,
+        toggle2_init_delay=toggle2_init_delay,
+        toggle_illum_duty=toggle_illum_duty,
+        toggle2_duty=toggle2_duty,
+        toggle_illum_period=toggle_illum_period,
+        toggle2_period=toggle2_period,
+        spec_n_avg=spec_n_avg,
+        spec_int_time_ms=spec_int_time_ms,
+        spec_technique=spec_technique,
     )
-
-    # setup toggle on galil_io
-    apm.add(
-        IO_server,
-        "set_digital_cycle",
-        {
-            "trigger_name": "gamry_ttl0",
-            "triggertype": TOGGLE_TRIGGERTYPE,
-            "out_name": [illumination_source, toggle2_source],
-            "toggle_init_delay": [
-                toggle_dark_time_init,
-                toggle2_init_delay,
-            ],
-            "toggle_duty": [toggle_illum_duty, toggle2_duty],
-            "toggle_period": [
-                toggle_illum_period,
-                toggle2_period,
-            ],
-            "toggle_duration": [toggle_illum_time, toggle2_time],
-        },
-        start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-        process_finish=False,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_out,
-        ],
-    )
-
-    # apm.add(ORCH_server, "wait", {"waittime": 2})
-
-    # apm.add(
-    #     IO_server,
-    #     "set_digital_out",
-    #     {
-    #         "do_item": illumination_source,
-    #         "on": True,
-    #     },
-    # )
-
-    apm.add(
-        CAM_server,
-        "acquire_image",
-        {"duration": min(OCV_duration_sec, 10), "acqusition_rate": 0.5},
-        start_condition=ActionStartCondition.wait_for_orch,
-        nonblocking=True,
-    )
-
-    for ss in SPECSRV_MAP[spec_technique]:
-        apm.add(
-            ss,
-            "acquire_spec_extrig",
-            {
-                # "int_time": spec_int_time_ms,
-                "n_avg": spec_n_avg,
-                "duration": toggle2_time,
-            },
-            from_global_act_params={
-                "_fast_samples_in": "fast_samples_in",
-                "calibrated_int_time_ms": "int_time",
-            },
-            start_condition=ActionStartCondition.wait_for_all,  # orch is waiting for all action_dq to finish
-            technique_name=spec_technique,
-            process_contrib=[
-                ProcessContrib.files,
-                ProcessContrib.samples_out,
-            ],
-        )
-        # apm.add(
-        #     ss,
-        #     "acquire_spec_adv",
-        #     {
-        #         "int_time_ms": spec_int_time_ms,
-        #         "n_avg": spec_n_avg,
-        #         "duration_sec": toggle2_time,
-        #     },
-        #     from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        #     run_use="data",
-        #     technique_name=spec_technique,
-        #     process_finish=False,
-        #     process_contrib=[
-        #         ProcessContrib.files,
-        #         ProcessContrib.samples_out,
-        #     ],
-        #     start_condition=ActionStartCondition.no_wait,
-        #     nonblocking=True,
-        # )
-
-    apm.add(
-        PSTAT_server,
+    _echeuvis_run_pstat(
+        apm,
         "run_OCV",
         {
             "Tval__s": OCV_duration_sec,
             "AcqInterval__s": samplerate_sec,
-            "TTLwait": gamrychannelwait,  # -1 disables, else select TTL 0-3
-            "TTLsend": gamrychannelsend,  # -1 disables, else select TTL 0-3
+            "TTLwait": gamrychannelwait,
+            "TTLsend": gamrychannelsend,
             "IErange": gamry_i_range,
         },
-        from_global_act_params={"_fast_samples_in": "fast_samples_in"},
-        start_condition=ActionStartCondition.wait_for_server,
-        technique_name="OCV",
-        process_finish=True,
-        process_contrib=[
-            ProcessContrib.files,
-            ProcessContrib.samples_in,
-            ProcessContrib.samples_out,
-        ],
+        "OCV",
     )
-
-    apm.add(
-        IO_server,
-        "set_digital_out",
-        {
-            "do_item": illumination_source,
-            "on": False,
-        },
-    )
-
-    return apm.planned_actions  # returns complete action list to orch
+    apm.add(IO_server, "set_digital_out", {"do_item": illumination_source, "on": False})
+    return apm.planned_actions
 
 
 @experiment(version=1)
@@ -1030,7 +709,7 @@ def ECHEUVIS_sub_disengage(
     return apm.planned_actions  # returns complete action list to orch
 
 
-@experiment(version=1)
+@experiment(version=2)
 def ECHEUVIS_sub_engage(
     flow_we: bool = True,
     flow_ce: bool = True,
@@ -1039,6 +718,7 @@ def ECHEUVIS_sub_engage(
     calibrate_intensity: bool = False,
     max_integration_time: int = 150,
     illumination_source: str = "doric_wled",
+    unload_first: bool = False,
 ) -> list:
     """Raise Z to engage, pull electrolyte through WE/CE chambers, optionally calibrate the spec.
 
@@ -1050,12 +730,15 @@ def ECHEUVIS_sub_engage(
         calibrate_intensity: Run a spec intensity calibration when True.
         max_integration_time: Maximum integration time for the calibration (ms).
         illumination_source: IO output name driving the LED during calibration.
+        unload_first: Prepend the PAL custom-position unloadall (folded ``ECHE_sub_unloadall_customs``).
 
     Returns:
         List of planned actions for the orchestrator.
     """
     # raise z (engage)
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    if unload_first:
+        apm.add(SAMPLE_server, "archive_custom_unloadall", {"destroy_liquid": True})
     apm.add(KMOTOR_server, "kmove", {"move_mode": "absolute", "value_mm": z_height})
     # close vent valves
     for item in ("we_vent", "ce_vent"):

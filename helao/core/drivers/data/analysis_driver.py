@@ -1,6 +1,6 @@
 """Consolidated analysis driver, executor, and FastAPI app builder.
 
-Provides a single :class:`AnalysisSyncer` (a :class:`HelaoSyncer` subclass) that
+Provides a single :class:`AnalysisSyncer` (a :class:`NativeSyncer` subclass) that
 maintains a queue of analysis tuples, runs each analysis in parallel worker
 coroutines, writes the resulting model and outputs to the local ANALYSES tree,
 and (unless ``local_only`` is set) uploads them to S3. The set of analysis
@@ -81,16 +81,16 @@ from helao.core.drivers.data.analysis_layout import (
     parse_analysis_timestamp,
     publish_outputs,
     sequence_part_of,
-    write_model_yml,
+    write_model_json,
 )
-from helao.core.drivers.data.loaders import pgs3
+from helao.core.drivers.data.loaders.helao_loader import HelaoLoader
 from helao.core.drivers.data.loaders.localfs import LocalLoader
-from helao.core.drivers.data.sync_driver import HelaoSyncer
 from helao.core.error import ErrorCodes
 from helao.helpers import config_loader
 from helao.helpers import helao_logging as logging
 from helao.helpers.executor import Executor
 from helao.helpers.param_alias import resolve_sequence_path
+from helao.hexagon.adapters.native.native_syncer import NativeSyncer
 from helao.hexagon.app.action_context import ActionContext
 from helao.hexagon.app.action_host import ActionHost
 
@@ -347,11 +347,8 @@ def analysis_journal_key(target: str, process_uuid, analysis_class_name: str) ->
     instead of accumulating a second one. That matters on the recovery path,
     which re-enqueues an entry and thereby re-journals it.
 
-    The uuid leads the name, unhyphenated separator ``__``, because
-    :meth:`AnalysisSyncer.journal_clear_by_process` can only match on a process
-    uuid (see its docstring) and does so by this prefix. ``target`` is folded
-    into a short digest rather than spelled out: it is an absolute path, so it
-    carries separators and is far too long for a file name.
+    ``target`` is folded into a short digest rather than spelled out: it is an
+    absolute path, so it carries separators and is far too long for a file name.
 
     Args:
         target: ``LocalLoader.target`` -- the absolute zip/tree path.
@@ -470,7 +467,7 @@ def remove_journal_entry(path: str) -> None:
         LOGGER.warning(f"could not remove analysis journal entry {path}")
 
 
-class AnalysisSyncer(HelaoSyncer):
+class AnalysisSyncer(NativeSyncer):
     """Queue-based worker that runs analyses and syncs outputs to S3.
 
     Pulls ``(process_uuid, data_loader, params, analysis_class,
@@ -484,7 +481,7 @@ class AnalysisSyncer(HelaoSyncer):
     :func:`make_analysis_app` from the server config ``params.analyses`` list.
 
     Attributes:
-        base: Owning action server.
+        host: Owning action server.
         running_tasks: Mapping from process UUID string to the worker
             asyncio.Task currently processing it.
         config_dict: ``params`` block from the server config.
@@ -497,14 +494,14 @@ class AnalysisSyncer(HelaoSyncer):
         syncer_loops: Mapping from worker index to its asyncio.Task.
         journal_dir: Directory holding the durable request journal, or ``None``
             when journalling is disabled (no resolvable ``STATES`` root).
-        loader: S3/metadata loader shared with analysis classes via ``pgs3.LOADER``.
+        loader: S3/metadata :class:`HelaoLoader`.
         s3: S3 client from the loader.
         s3r: S3 resource from the loader.
         bucket: S3 bucket name.
         region: S3 region.
     """
 
-    base: "ActionHost"
+    host: "ActionHost"
     running_tasks: dict
 
     def __init__(self, action_serv: "ActionHost"):
@@ -514,7 +511,7 @@ class AnalysisSyncer(HelaoSyncer):
             action_serv: Hosting action server, used for its ``server_cfg``
                 ``params`` and the ``world_cfg``.
         """
-        self.base = action_serv
+        self.host = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
         self.env_file = (
@@ -655,9 +652,7 @@ class AnalysisSyncer(HelaoSyncer):
         """Drop ``calc_tup``'s journal entry, its worker having finished with it.
 
         Keyed by recomputing :meth:`_journal_key` from the tuple, so the entry
-        removed is exactly the one :meth:`journal_write` created -- see
-        :meth:`journal_clear_by_process` for why the task-name route cannot be
-        that precise.
+        removed is exactly the one :meth:`journal_write` created.
 
         Removed on **success only**. It used to be removed on completion of
         either kind, to stop a permanently-failing analysis re-running at every
@@ -715,23 +710,6 @@ class AnalysisSyncer(HelaoSyncer):
             LOGGER.warning(
                 "Failed to quarantine an analysis journal entry.", exc_info=True
             )
-
-    def journal_clear_by_process(self, process_uuid_str: str) -> None:
-        """Drop every journal entry for one process uuid. Best effort.
-
-        The seam for a caller that has only a task *name* -- which is the process
-        uuid, and therefore not the journal key: the key also carries the loader
-        target and the analysis class, so one process uuid can in principle own
-        several entries. Matching by the name prefix removes all of them, which
-        is a superset of what such a caller means. :meth:`syncer` uses the exact
-        :meth:`journal_clear` instead and does not go through here.
-        """
-        if not self.journal_dir:
-            return
-        prefix = f"{process_uuid_str}__"
-        for name in list_journal_entries(self.journal_dir):
-            if name.startswith(prefix):
-                remove_journal_entry(journal_entry_path(self.journal_dir, name))
 
     def journal_pending_keys(self) -> list:
         """Journal entry file names currently on disk, for the status endpoint."""
@@ -1061,56 +1039,16 @@ class AnalysisSyncer(HelaoSyncer):
         return bool(self.task_set) or bool(self.running_tasks)
 
     def get_loader(self):
-        """Install the shared :class:`pgs3.EcheUvisLoader` and cache its handles.
-
-        Populates ``pgs3.LOADER`` so that :meth:`batch_calc` and analysis classes
-        share one configured loader, then stores its S3 client, resource, bucket
-        and region on ``self``.
-        """
-        pgs3.LOADER = pgs3.EcheUvisLoader(
+        """Build the :class:`HelaoLoader` and cache its S3 handles on ``self``."""
+        self.loader = HelaoLoader(
             self.env_file,
             cache_s3=False,
             cache_json=False,
-            cache_sql=False,
         )
-        self.loader = pgs3.LOADER
         self.s3 = self.loader.cli
         self.s3r = self.loader.res
         self.bucket = self.loader.s3_bucket
         self.region = self.loader.s3_region
-
-    def sync_exit_callback(self, task: asyncio.Task):
-        """Drop the completed ``task`` from ``running_tasks`` and ``task_set``.
-
-        **Not on this class's completion path, for two independent reasons.**
-        Nothing in the tree calls it -- :meth:`syncer` does its own ``finally``
-        cleanup instead, and clears the journal there by the exact key. And the
-        identifier it keys on could not match anyway: ``task.get_name()`` returns
-        the *asyncio task* name, which for the only tasks this class creates is
-        ``syncer_loop__<i>`` (set in :meth:`__init__`), while ``running_tasks`` is
-        keyed by **process uuid** -- ``syncer`` registers
-        ``asyncio.current_task()``, the long-lived worker loop, under the uuid of
-        whichever item it is handling. So the body below is inert here; it is the
-        inherited :class:`HelaoSyncer` seam, where tasks *are* named per uuid.
-
-        Kept, and taught to clear the journal, so that seam stays coherent if it
-        is ever wired: by process uuid, which is all a task name can offer, and
-        therefore a superset of one request (see
-        :meth:`journal_clear_by_process`). The precise clear lives in
-        :meth:`journal_clear`, which recomputes the key from the tuple itself.
-
-        Args:
-            task: The completed :class:`asyncio.Task` whose name is used as the
-                lookup key.
-        """
-        task_name = task.get_name()
-        if task_name in self.running_tasks:
-            self.running_tasks.pop(task_name)
-            try:
-                self.task_set.remove(task_name)
-            except KeyError:
-                pass
-            self.journal_clear_by_process(task_name)
 
     async def enqueue_calc(
         self,
@@ -1203,7 +1141,7 @@ class AnalysisSyncer(HelaoSyncer):
         self,
         calc_tup: tuple[UUID, LocalLoader, dict, BaseAnalysis, Optional[UUID]],
     ) -> tuple:
-        """Run one analysis and write its model yml. Synchronous -- run in a thread.
+        """Run one analysis and write its model JSON. Synchronous -- run in a thread.
 
         This is the blocking half of :meth:`sync_ana`, split out so it can be
         handed to :func:`asyncio.to_thread` instead of being executed on the
@@ -1253,14 +1191,13 @@ class AnalysisSyncer(HelaoSyncer):
                 model_dict.get("global_sample_label", ""),
             ),
         )
-        write_model_yml(local_ana_dir, eua.analysis_uuid, model_dict)
+        write_model_json(local_ana_dir, eua.analysis_uuid, model_dict)
 
         return eua, model_dict, output_dict, local_ana_dir
 
     async def sync_ana(
         self,
         calc_tup: tuple[UUID, LocalLoader, dict, BaseAnalysis, Optional[UUID]],
-        retries: int = 3,
     ) -> bool:
         """Run one analysis and push its model and outputs to disk and S3.
 
@@ -1277,15 +1214,13 @@ class AnalysisSyncer(HelaoSyncer):
 
         Args:
             calc_tup: Analysis tuple as accepted by :meth:`enqueue_calc`.
-            retries: Number of retry attempts available for downstream uploads.
-                Unused for this method's own logic but kept for signature symmetry.
 
         Returns:
             ``True`` when the analysis and all uploads succeed, otherwise ``False``.
         """
         process_uuid = calc_tup[0]
         # The analysis proper -- instantiation, calc_output, export_analysis, the
-        # process metadata fetch and the model yml write -- is synchronous and
+        # process metadata fetch and the model JSON write -- is synchronous and
         # takes seconds, with no await point anywhere in it. Running it inline
         # pinned the server's event loop for its entire duration (measured: a
         # 24-analysis batch stalled the loop for the full 8.3s), so the

@@ -28,7 +28,6 @@ can resolve the callback endpoint with the same offset rule used by
 from __future__ import annotations
 
 import asyncio
-import glob as glob_module
 import inspect
 import os
 import zipfile
@@ -52,10 +51,11 @@ from helao.core.models.server import ActionServerModel
 from helao.core.rpc import RPCClient, RPCDispatcher, RPCError, derive_rpc_port
 from helao.helpers import helao_logging as logging
 from helao.helpers.file_utils import replace_when_free, staging_path
+from helao.helpers.meta_io import dumps_meta, meta_glob, resolve_meta_path
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.server_keys import get_sync_server_cfg
 from helao.helpers.time_utils import gen_uuid, set_time
-from helao.helpers.yml_tools import yml_dumps, yml_finisher
+from helao.helpers.yml_tools import yml_finisher
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -192,14 +192,14 @@ class MicroOrch:
         bound, and never degrade to "no hooks" (spec §3.3).
         """
         self.experiment_hooks = self._load_prefinish(
-            "prefinish_experiment_hooks", "exp_postprocess_libs", "experiment"
+            "prefinish_experiment_hooks", "experiment"
         )
         self.sequence_hooks = self._load_prefinish(
-            "prefinish_sequence_hooks", "seq_postprocess_libs", "sequence"
+            "prefinish_sequence_hooks", "sequence"
         )
         await self.dispatcher.serve(self.host, derive_rpc_port(self.port))
 
-    def _load_prefinish(self, key: str, alias: str, level: str) -> HookSet:
+    def _load_prefinish(self, key: str, level: str) -> HookSet:
         override = self._prefinish_overrides[key]
         source = (
             {key: override}
@@ -207,7 +207,7 @@ class MicroOrch:
             else find_orchestrator_entry(self.world_cfg)
         )
         return load_hook_set(
-            prefinish_config(source, key, alias, self.server_key),
+            prefinish_config(source, key, self.server_key),
             phase="prefinish",
             level=level,
         )
@@ -1020,13 +1020,13 @@ class MicroOrch:
         await replace_when_free(tmp_file, output_file)
 
     async def _write_exp(self, experiment: Experiment) -> str:
-        """Write ``<record_root>/<exp_dir>/<ts>-exp.yml`` and return its path."""
+        """Write ``<record_root>/<exp_dir>/<ts>-exp.json`` (or an in-flight ``.yml``); return its path."""
         exp_dict = experiment.get_exp().clean_dict()
         root = self._record_root(manual=bool(experiment.manual_action))
         output_path = os.path.join(root, experiment.get_experiment_dir())
         output_file = os.path.join(
             output_path,
-            f"{experiment.experiment_timestamp.strftime('%y%m%d.%H%M%S%f')}-exp.yml",
+            f"{experiment.experiment_timestamp.strftime('%y%m%d.%H%M%S%f')}-exp.json",
         )
         output_dict = {"file_type": "experiment"}
         output_dict.update(exp_dict)
@@ -1034,24 +1034,26 @@ class MicroOrch:
         # ``experiment_params`` strictly; keep an empty mapping so read-back
         # of a no-param experiment doesn't KeyError.
         output_dict.setdefault("experiment_params", {})
-        await self._write_meta_atomic(output_file, yml_dumps(output_dict))
-        return output_file
+        target = resolve_meta_path(output_file)
+        await self._write_meta_atomic(str(target), dumps_meta(output_dict, target))
+        return str(target)
 
     async def _write_seq(self, sequence: Sequence) -> str:
-        """Write ``<record_root>/<seq_dir>/<ts>-seq.yml`` and return its path."""
+        """Write ``<record_root>/<seq_dir>/<ts>-seq.json`` (or an in-flight ``.yml``); return its path."""
         seq_dict = sequence.get_seq().clean_dict()
         root = self._record_root(manual=bool(sequence.manual_action))
         output_path = os.path.join(root, sequence.get_sequence_dir())
         output_file = os.path.join(
             output_path,
-            f"{sequence.sequence_timestamp.strftime('%y%m%d.%H%M%S%f')}-seq.yml",
+            f"{sequence.sequence_timestamp.strftime('%y%m%d.%H%M%S%f')}-seq.json",
         )
         output_dict = {"file_type": "sequence"}
         output_dict.update(seq_dict)
         # See _write_exp: keep an empty sequence_params for strict read-back.
         output_dict.setdefault("sequence_params", {})
-        await self._write_meta_atomic(output_file, yml_dumps(output_dict))
-        return output_file
+        target = resolve_meta_path(output_file)
+        await self._write_meta_atomic(str(target), dumps_meta(output_dict, target))
+        return str(target)
 
     # ------------------------------------------------------------------
     # finished-artifact read-back
@@ -1061,19 +1063,18 @@ class MicroOrch:
     _LOADER_GETTERS = {"act": "get_act", "exp": "get_exp", "seq": "get_seq"}
 
     def _candidate_yml(self, rel_dir: str, suffix: str) -> Optional[str]:
-        """Return the first matching ``*-<suffix>.yml`` under RUNS or DIAG."""
+        """Return the first matching ``*-<suffix>.json|.yml`` under RUNS or DIAG."""
         root = self.world_cfg.get("root")
         if not root:
             raise RuntimeError("world_cfg['root'] is required to read back artifacts")
         for state_root in (run_root(root), diag_root(root)):
-            pattern = os.path.join(str(state_root), rel_dir, f"*-{suffix}.yml")
-            matches = sorted(glob_module.glob(pattern))
+            matches = meta_glob(os.path.join(str(state_root), rel_dir), suffix)
             if matches:
-                return matches[0]
+                return str(matches[0])
         return None
 
     async def _await_finished(self, rel_dir: str, suffix: str) -> str:
-        """Poll until ``*-<suffix>.yml`` exists under ``rel_dir`` in RUNS/DIAG.
+        """Poll until ``*-<suffix>.json|.yml`` exists under ``rel_dir`` in RUNS/DIAG.
 
         Raises:
             TimeoutError: If nothing appears within ``self.finished_timeout``.
@@ -1087,7 +1088,7 @@ class MicroOrch:
             if loop.time() >= deadline:
                 raise TimeoutError(
                     f"timed out after {self.finished_timeout}s waiting for "
-                    f"*-{suffix}.yml under {rel_dir!r} in RUNS/DIAG"
+                    f"*-{suffix}.json|.yml under {rel_dir!r} in RUNS/DIAG"
                 )
             await asyncio.sleep(self.poll_interval)
 

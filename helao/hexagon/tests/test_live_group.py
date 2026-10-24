@@ -30,9 +30,9 @@ async def test_live_group_runs_one_experiment_to_finished(tmp_path):
         # Records are written once under RUNS and never move (spec §2), so
         # this is the same directory they were created in.
         finished_dir = tmp_path / "RUNS"
-        finished = await wait_for_glob(str(finished_dir), "*-seq.yml", timeout_s=60.0)
+        finished = await wait_for_glob(str(finished_dir), "*-seq.json", timeout_s=60.0)
         assert finished, "sequence yml missing from RUNS"
-        exp_ymls = await wait_for_glob(str(finished_dir), "*-exp.yml", timeout_s=60.0)
+        exp_ymls = await wait_for_glob(str(finished_dir), "*-exp.json", timeout_s=60.0)
         assert len(exp_ymls) == 1
         # B3b: the HOST is the drainer, so its own runtime is the one the
         # loop runs on. There is no graft to look through any more -- and

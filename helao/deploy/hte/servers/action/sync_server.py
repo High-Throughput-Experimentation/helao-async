@@ -1,7 +1,8 @@
 # shell: uvicorn motion_server:app --reload
 """Data packaging server.
 
-Wraps :class:`HelaoSyncer` and exposes private endpoints used by other servers
+Wraps :class:`NativeSyncer`, reached through the ``SyncPort`` bound at startup
+(``app.hexagon_wiring.sync``), and exposes private endpoints used by other servers
 (and operators) to enqueue finished YAML records for upload to S3 / the API,
 inspect the syncer's pending queue and progress, and reset partially synced
 runs.
@@ -17,9 +18,11 @@ import contextlib
 import time
 from typing import Any, Optional
 
-from helao.core.drivers.data.sync_driver import HelaoSyncer
+from helao.hexagon.adapters.native.native_syncer import NativeSyncer
+from helao.hexagon.adapters.native.sync_adapter import NativeSyncAdapter
 from helao.hexagon.app.action_context import ActionContext
 from helao.hexagon.app.action_host import ActionHost
+from helao.hexagon.domain.naming import meta_kind
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -31,15 +34,15 @@ SWEEP_PARAM = "sync_pending_on_startup"
 async def sweep_pending(driver: Any, enabled: bool = True, logger: Any = None) -> dict:
     """Enqueue everything still sitting in ``RUNS_FINISHED``, once, at startup.
 
-    **Why this is needed at all.** :class:`HelaoSyncer` keeps its work queue in
+    **Why this is needed at all.** :class:`NativeSyncer` keeps its work queue in
     an in-memory ``asyncio.PriorityQueue``, and action servers get no
-    ``--restore``, so the queue dies with the process — ``HelaoSyncer.shutdown``
+    ``--restore``, so the queue dies with the process — ``SyncDriver.shutdown``
     is a ``pass``, so even a *graceful* stop discards it. Anything queued but
     not yet uploaded is then simply forgotten: the ymls stay in
     ``RUNS_FINISHED`` and nothing ever looks at them again. The durable half of
     the mechanism has always worked (an unsynced yml stays in ``RUNS_FINISHED``,
-    where :meth:`HelaoSyncer.list_pending` finds it) and
-    :meth:`HelaoSyncer.finish_pending` has always been the recovery method —
+    where :meth:`SyncDriver.list_pending` finds it) and
+    :meth:`SyncDriver.finish_pending` has always been the recovery method —
     but nothing called it automatically, so recovery depended on someone
     noticing and POSTing ``/finish_pending`` by hand. On the production share
     that left 179 sequence ymls unswept.
@@ -78,21 +81,14 @@ async def sweep_pending(driver: Any, enabled: bool = True, logger: Any = None) -
     (``Progress`` writes ``.prg``), so it is dead for anything the current code
     produces.
 
-    **Why this lives in the server and not the driver.**
-    ``helao/hexagon/tests/test_native_sync_pins.py`` pins
-    ``SyncDriver.__init__``, ``syncer``, ``enqueue_yml``, ``finish_pending``,
-    ``shutdown`` and ``list_pending*`` to be *byte-identical* between
-    ``helao/core/drivers/data/sync_driver.py`` and
-    ``helao/hexagon/adapters/native/sync_driver.py``, plus a contiguous
-    verbatim-region check. Adding a startup hook to the driver would mean
-    mirroring both copies byte-for-byte, for a concern (server lifecycle) the
-    server already owns. So the sweep composes the driver's existing method
-    instead of changing it.
+    **Why this lives in the server and not the driver.** The sweep is server
+    lifecycle, which the server already owns, so it composes the driver's
+    existing ``finish_pending`` instead of adding a startup hook to the driver.
 
     Args:
-        driver: The :class:`HelaoSyncer` instance, or ``None`` when the server
-            has no driver (driver construction failed, or a composition that
-            never built one). ``None`` is a skip, not an error.
+        driver: The ``SyncPort`` (:attr:`app.hexagon_wiring.sync`), or ``None``
+            when the server has no bound port (a composition that never built a
+            driver). ``None`` is a skip, not an error.
         enabled: ``False`` when the server's ``params`` set
             ``sync_pending_on_startup: false``. The sweep then does nothing but
             say so; ``/finish_pending`` remains available for a manual pass.
@@ -185,8 +181,11 @@ async def wait_until_listening(
 def makeApp(server_key) -> ActionHost:
     """Build the data-packaging FastAPI app.
 
-    Constructs an :class:`ActionHost` backed by :class:`HelaoSyncer` and
-    registers the private syncer-management endpoints.
+    Constructs an :class:`ActionHost` backed by :class:`NativeSyncer` and
+    registers the private syncer-management endpoints. Every route reads
+    ``app.hexagon_wiring.sync`` at call time: the port is bound by a startup
+    handler, after this function has returned, so a value captured here would
+    always be ``None``.
 
     Args:
         server_key: Key identifying this server in the orchestration group.
@@ -200,7 +199,7 @@ def makeApp(server_key) -> ActionHost:
         server_title=server_key,
         description="Data packaging server",
         version=0.1,
-        driver_classes=[HelaoSyncer],
+        driver_classes=[NativeSyncer],
     )
 
     # ``None`` until the startup sweep finishes, which is what keeps "never ran"
@@ -212,28 +211,22 @@ def makeApp(server_key) -> ActionHost:
     async def finish_yml(yml_path: str) -> str:
         """Enqueue a finished YAML for upload, releasing it from sync quarantine.
 
-        Determines the rank from the file suffix (``-seq.yml``, ``-exp.yml``,
-        ``-act.yml``) and forwards to :meth:`HelaoSyncer.enqueue_yml`.
+        Determines the rank from the file suffix (``-seq``/``-exp``/``-act``,
+        ``.json`` or legacy ``.yml``) and forwards to the port's ``enqueue_yml``.
         """
         clean_path = yml_path.strip('"').strip("'")
-        if clean_path.endswith("-seq.yml"):
-            rank = 2
-        elif clean_path.endswith("-exp.yml"):
-            rank = 1
-        elif clean_path.endswith("-act.yml"):
-            rank = 0
-        else:
-            rank = -1
+        rank = {"seq": 2, "exp": 1, "act": 0}.get(meta_kind(clean_path) or "", -1)
         # Sync quarantine: a hand-POSTed path is the operator's re-queue, so it
         # releases the record first; enqueue_yml would otherwise skip it.
-        await asyncio.to_thread(app.driver.release_quarantine, clean_path)
-        await app.driver.enqueue_yml(clean_path, rank)
+        sync = app.hexagon_wiring.sync
+        await asyncio.to_thread(sync.release_quarantine, clean_path)  # type: ignore[union-attr]
+        await sync.enqueue_yml(clean_path, rank)  # type: ignore[union-attr]
         return yml_path
 
     @app.post("/list_pending", tags=["private"])
     def list_pending():
         """List sequence YAML files in ``RUNS_FINISHED`` awaiting sync."""
-        return app.driver.list_pending()
+        return app.hexagon_wiring.sync.list_pending()  # type: ignore[union-attr]
 
     @app.post("/finish_pending", tags=["private"])
     async def finish_pending(actions_first: bool = True):
@@ -243,12 +236,14 @@ def makeApp(server_key) -> ActionHost:
             actions_first: When ``True`` queue action YAMLs before experiment
                 and sequence YAMLs.
         """
-        return await app.driver.finish_pending(actions_first=actions_first)
+        return await app.hexagon_wiring.sync.finish_pending(  # type: ignore[union-attr]
+            actions_first=actions_first
+        )
 
     @app.post("/reset_sync", tags=["private"])
     def reset_sync(sync_path: str) -> str:
         """Reset a synced sequence zip or a partially-synced folder for re-sync."""
-        app.driver.reset_sync(sync_path.strip('"').strip("'"))
+        app.hexagon_wiring.sync.reset_sync(sync_path.strip('"').strip("'"))  # type: ignore[union-attr]
         return sync_path
 
     @app.post("/write_off", tags=["private"])
@@ -260,7 +255,7 @@ def makeApp(server_key) -> ActionHost:
         dispatcher fallback cannot replay it. Idempotent: see
         ``SyncDriver.write_off``.
         """
-        return await app.driver.write_off(
+        return await app.hexagon_wiring.sync.write_off(  # type: ignore[union-attr]
             yml_path.strip('"').strip("'"), reason, operator
         )
 
@@ -279,11 +274,12 @@ def makeApp(server_key) -> ActionHost:
 
         ``quarantined`` lists records the syncer has stopped retrying (sync quarantine spec); POST ``/finish_yml`` with a listed ``yml`` to release one.
         """
+        sync = app.hexagon_wiring.sync
         return {
-            "running": list(app.driver.running_tasks.keys()),
-            "num_queued": (app.driver.task_queue.qsize()),
+            "running": list(sync.running_tasks().keys()),  # type: ignore[union-attr]
+            "num_queued": sync.n_queue(),  # type: ignore[union-attr]
             "last_startup_sweep": app.last_startup_sweep,  # type: ignore[attr-defined]
-            "quarantined": await asyncio.to_thread(app.driver.quarantined),
+            "quarantined": await asyncio.to_thread(sync.quarantined),  # type: ignore[union-attr]
         }
 
     @app.post("/list_exceptions", tags=["private"])
@@ -291,28 +287,38 @@ def makeApp(server_key) -> ActionHost:
         """Return exceptions captured on currently running sync tasks."""
         return {
             k: repr(t.exception())
-            for k, t in app.driver.running_tasks.items()
+            for k, t in app.hexagon_wiring.sync.running_tasks().items()  # type: ignore[union-attr]
             if t.done() and not t.cancelled()
         }
 
     @app.post("/n_queue", tags=["private"])
     async def n_queue() -> int:
         """Return the number of items waiting in the sync task queue."""
-        return app.driver.task_queue.qsize()
+        return app.hexagon_wiring.sync.n_queue()  # type: ignore[union-attr]
 
     @app.post("/current_progress", tags=["private"])
     async def current_progress():
         """Return the syncer's progress dictionary."""
         return app.driver.progress
 
+    # Bind the SyncPort. ``app.driver`` is created in the host's own startup
+    # event, so this runs from a startup handler registered after the host's
+    # (hence run after it). Bound only when a driver exists: with none, the port
+    # stays ``None`` and the routes below fail the way they always did without
+    # a driver.
+    @app.on_event("startup")
+    def _bind_sync_port():
+        if app.driver is not None:
+            app.hexagon_wiring.sync = NativeSyncAdapter(app.driver)
+
     # Hot-reload safety: defer restart while the syncer has queued or running
-    # tasks. ``app.driver`` is created in the host's own startup event, so wire
-    # the hook from a startup handler (registered after the host's, hence run
-    # after it). The hook still reads app.driver lazily.
+    # tasks. Wired from a startup handler for the same ordering reason; the
+    # hook reads the port lazily, and an unbound port is "not busy".
     @app.on_event("startup")
     def _wire_hotreload_busy():
         app.hotreload_busy_hook = lambda: (
-            app.driver is not None and app.driver.has_pending_work()
+            app.hexagon_wiring.sync is not None
+            and app.hexagon_wiring.sync.has_pending_work()
         )
 
     async def _startup_sweep(enabled: bool) -> None:
@@ -324,7 +330,7 @@ def makeApp(server_key) -> ActionHost:
                 "running the startup sweep anyway"
             )
         app.last_startup_sweep = await sweep_pending(  # type: ignore[attr-defined]
-            app.driver, enabled=enabled
+            app.hexagon_wiring.sync, enabled=enabled
         )
 
     # Startup recovery: enqueue whatever the last process left in

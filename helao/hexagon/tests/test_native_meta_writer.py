@@ -10,6 +10,7 @@ from uuid import UUID
 import pytest
 
 from helao.core.models.run_dir import RunDir
+from helao.helpers.meta_io import read_meta
 from helao.hexagon.adapters.native.meta_writer import NativeMetaFileWriter
 from helao.hexagon.tests.native_fixtures import make_base, mk_action
 
@@ -26,10 +27,10 @@ async def test_write_act_layout(tmp_path):
     action = mk_action(save_act=True)
     await base.write_act(action)
     out_dir = os.path.join(save_root, str(action.action_output_dir))
-    files = [f for f in os.listdir(out_dir) if f.endswith("-act.yml")]
-    assert files == ["260102.030405678901-act.yml"]
+    files = [f for f in os.listdir(out_dir) if f.endswith("-act.json")]
+    assert files == ["260102.030405678901-act.json"]
     text = open(os.path.join(out_dir, files[0]), encoding="utf-8").read()
-    assert text.startswith("file_type: action\n")  # file_type first key
+    assert text.startswith('{\n  "file_type": "action",')  # file_type first key
     assert text.endswith("\n")  # trailing newline
     assert not [f for f in os.listdir(out_dir) if f.endswith(".tmp")]
 
@@ -90,7 +91,7 @@ async def test_manual_action_diag_swap(tmp_path):
     await base.write_act(action)
     out_dir = os.path.join(diag_root, str(action.action_output_dir))
     assert os.path.isdir(out_dir)
-    assert [f for f in os.listdir(out_dir) if f.endswith("-act.yml")]
+    assert [f for f in os.listdir(out_dir) if f.endswith("-act.json")]
 
 
 @pytest.mark.asyncio
@@ -102,15 +103,33 @@ async def test_write_exp_and_seq(tmp_path):
     await base.write_seq(action)
     exp_dir = os.path.join(save_root, str(action.get_experiment_dir()))
     seq_dir = os.path.join(save_root, str(action.get_sequence_dir()))
-    assert [f for f in os.listdir(exp_dir) if f.endswith("-exp.yml")]
-    assert [f for f in os.listdir(seq_dir) if f.endswith("-seq.yml")]
+    assert [f for f in os.listdir(exp_dir) if f.endswith("-exp.json")]
+    assert [f for f in os.listdir(seq_dir) if f.endswith("-seq.json")]
     exp_text = open(
         os.path.join(
-            exp_dir, [f for f in os.listdir(exp_dir) if f.endswith("-exp.yml")][0]
+            exp_dir, [f for f in os.listdir(exp_dir) if f.endswith("-exp.json")][0]
         ),
         encoding="utf-8",
     ).read()
-    assert exp_text.startswith("file_type: experiment\n")
+    assert exp_text.startswith('{\n  "file_type": "experiment",')
+
+
+@pytest.mark.asyncio
+async def test_write_act_keeps_an_in_flight_yml(tmp_path):
+    """Review Focus 1: a record begun as YAML is finished as YAML, no twin."""
+    save_root = str(tmp_path / "RUNS_ACTIVE")
+    base = _swap(make_base(save_root), tmp_path)
+    action = mk_action(save_act=True)
+    out_dir = os.path.join(save_root, str(action.action_output_dir))
+    os.makedirs(out_dir)
+    legacy = os.path.join(out_dir, "260102.030405678901-act.yml")
+    with open(legacy, "w", encoding="utf-8") as f:
+        f.write("action_status: [active]\n")
+    await base.write_act(action)
+    assert sorted(f for f in os.listdir(out_dir) if not f.startswith(".")) == [
+        "260102.030405678901-act.yml"
+    ]
+    assert read_meta(legacy)["file_type"] == "action"
 
 
 def test_conn_keys_md5(tmp_path):

@@ -42,12 +42,3 @@ class BokehServerUiHost:
 
     def stop(self, handle: object) -> None:
         handle.stop()  # type: ignore[attr-defined]
-
-    def build_ui_app(self, config: dict) -> object:
-        """P7f's Reflex hosting seam consumes this; not exercised until
-        then (Amendment §6 gate item for the Reflex half is P7f's)."""
-        from helao.hexagon.adapters.errors import HexagonDeferred
-
-        raise HexagonDeferred(
-            "BokehServerUiHost.build_ui_app: Reflex hosting lands in P7f"
-        )

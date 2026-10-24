@@ -170,17 +170,4 @@ def makeApp(server_key) -> ActionHost:
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.action()
-    async def get_rcp_plateid(
-        ctx: ActionContext,
-        plateid: Optional[int] = None,
-    ):
-        """Return the RCP (recipe) record associated with ``plateid``."""
-        active = await ctx.begin()
-        await active.enqueue_data_dflt(
-            datadict={"rcp": app.driver.get_rcp_plateid(**active.action.action_params)}
-        )
-        finished_action = await active.finish()
-        return finished_action.as_dict()
-
     return app

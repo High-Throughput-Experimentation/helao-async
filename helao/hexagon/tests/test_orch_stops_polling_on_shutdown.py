@@ -100,7 +100,9 @@ async def test_shutdown_exports_a_parked_head_when_every_deque_is_empty(
     import pickle
     from types import SimpleNamespace
 
+    from helao.hexagon.adapters.shared.state_persistence import QueuePckStore
     from helao.hexagon.app.orch_persist import QueuePersister
+    from helao.hexagon.app.wiring import PortWiring
 
     async def _host_shutdown(self):
         return {}
@@ -127,6 +129,9 @@ async def test_shutdown_exports_a_parked_head_when_every_deque_is_empty(
             )
             orch = SimpleNamespace(
                 world_cfg={"root": str(tmp_path)},
+                hexagon_wiring=PortWiring(
+                    state_persistence=QueuePckStore(str(tmp_path))
+                ),
                 sequence_dq=self.sequence_dq,
                 experiment_dq=self.experiment_dq,
                 action_dq=self.action_dq,

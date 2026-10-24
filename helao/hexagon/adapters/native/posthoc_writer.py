@@ -30,8 +30,8 @@ What this face changes relative to the fork it replaces:
   the same directory plus ``os.replace``. They are never appended to. The fork
   appended the new payload with no ``%%`` separator, which makes a reader parse
   two payloads as one body; this face replaces the target instead.
-* Meta ymls are written atomically (temp file + ``os.replace``) with the
-  default YAML dumper, matching the core writers.
+* Records are written atomically (temp file + ``os.replace``) as pretty JSON,
+  matching the core writers.
 * ``track_file`` copies at call time, to the record-relative name the
   ``FileInfo`` carries -- nothing relocates a file later on any path.
 * ``write_act`` accepts ``manual=`` like the other two writers, and returns
@@ -62,9 +62,11 @@ from helao.core.models.sample import (
 )
 from helao.helpers import helao_logging as logging
 from helao.helpers.file_utils import staging_path
+from helao.helpers.meta_io import resolve_meta_path, write_meta
 from helao.helpers.premodels import Action, Experiment, Sequence
+from helao.hexagon.domain.naming import HEADER_SUFFIX, data_sibling
 
-from .data_file import NativeDataFileWriter
+from .data_file import NativeDataFileWriter, _rows
 from .meta_writer import NativeMetaFileWriter
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -284,7 +286,7 @@ class PostHocRunWriter:
         index from ``action.file_conn_keys`` -- an ordering a post-hoc caller
         does not have. Format is otherwise identical.
         """
-        ext = "hlo" if file_group == HloFileGroup.helao_files else "csv"
+        ext = "jsonl" if file_group == HloFileGroup.helao_files else "csv"
         return (
             f"{action.action_abbr}-{action.orch_submit_order}"
             f".{action.action_order}.{action.action_retry}"
@@ -309,8 +311,10 @@ class PostHocRunWriter:
     ) -> Optional[str]:
         """Write one complete data file and record it on ``action``.
 
-        The file is ``header`` (if any) + ``%%\\n`` + ``output_str``, and a
-        matching ``FileInfo`` is appended to ``action.files``.
+        The ``helao_files`` file is ``X.jsonl`` (rows) plus ``X.meta.json``
+        (header, when there is one); an ``aux_files`` file is header +
+        ``%%\\n`` + payload. A matching ``FileInfo`` is appended to
+        ``action.files``.
 
         Args:
             action: Action the file belongs to; must already be ``init_act``-ed.
@@ -320,7 +324,7 @@ class PostHocRunWriter:
                 omitted.
             filenum: File index for the generated name. Required -- see the
                 module docstring.
-            file_group: Selects ``.hlo`` (helao) or ``.csv`` (aux). Required.
+            file_group: Selects ``.jsonl`` (helao) or ``.csv`` (aux). Required.
             header: Header content as a dict, list of lines, string or ``None``.
             json_data_keys: Column keys recorded on the ``FileInfo``.
             file_sample_label: Sample global label(s) for the file.
@@ -375,11 +379,20 @@ class PostHocRunWriter:
                 "conversion attempt)"
             )
 
-        body = (
-            f"{resolved_header}%%\n{output_str}"
-            if resolved_header
-            else f"%%\n{output_str}"
-        )
+        if isinstance(resolved_header, dict):
+            header_file = data_sibling(output_file, HEADER_SUFFIX)
+            if resolved_header:
+                write_meta(header_file, resolved_header)
+            elif os.path.exists(header_file):
+                # A rerun without a header must not keep the failed run's one.
+                os.remove(header_file)
+            body = _rows(output_str)
+        else:
+            body = (
+                f"{resolved_header}%%\n{output_str}"
+                if resolved_header
+                else f"%%\n{output_str}"
+            )
         _atomic_write_text(output_file, body)
         self._written.add(output_file)
 
@@ -451,7 +464,7 @@ class PostHocRunWriter:
     # -- meta files --------------------------------------------------------
 
     def write_act(self, action: Action, manual: bool = False) -> Optional[str]:
-        """Write the action's ``-act.yml``.
+        """Write the action's ``-act.json`` (an existing ``-act.yml`` is rewritten in place).
 
         Args:
             action: Action to persist.
@@ -467,19 +480,19 @@ class PostHocRunWriter:
             return None
         base = _PostHocBase(self._root_for(action, manual))
         _run_sync(base.meta_writer.write_act(action))
-        return self._act_path(action, manual)
+        return str(resolve_meta_path(self._act_path(action, manual)))
 
     def write_exp(self, experiment: Experiment, manual: bool = False) -> str:
-        """Write the experiment's ``-exp.yml`` and return its path."""
+        """Write the experiment's ``-exp.json`` (an existing ``-exp.yml`` is rewritten in place); return its path."""
         base = _PostHocBase(self._root_for(experiment, manual))
         _run_sync(base.meta_writer.write_exp(experiment))
-        return self._exp_path(experiment, manual)
+        return str(resolve_meta_path(self._exp_path(experiment, manual)))
 
     def write_seq(self, sequence: Sequence, manual: bool = False) -> str:
-        """Write the sequence's ``-seq.yml`` and return its path."""
+        """Write the sequence's ``-seq.json`` (an existing ``-seq.yml`` is rewritten in place); return its path."""
         base = _PostHocBase(self._root_for(sequence, manual))
         _run_sync(base.meta_writer.write_seq(sequence))
-        return self._seq_path(sequence, manual)
+        return str(resolve_meta_path(self._seq_path(sequence, manual)))
 
     @staticmethod
     def _stamp(timestamp, init_call: str) -> str:
@@ -501,7 +514,7 @@ class PostHocRunWriter:
         return os.path.join(
             self._root_for(action, manual),
             str(action.action_output_dir),
-            f"{stamp}-act.yml",
+            f"{stamp}-act.json",
         )
 
     def _exp_path(self, experiment: Experiment, manual: bool) -> str:
@@ -509,7 +522,7 @@ class PostHocRunWriter:
         return os.path.join(
             self._root_for(experiment, manual),
             experiment.get_experiment_dir(),
-            f"{stamp}-exp.yml",
+            f"{stamp}-exp.json",
         )
 
     def _seq_path(self, sequence: Sequence, manual: bool) -> str:
@@ -517,7 +530,7 @@ class PostHocRunWriter:
         return os.path.join(
             self._root_for(sequence, manual),
             sequence.get_sequence_dir(),
-            f"{stamp}-seq.yml",
+            f"{stamp}-seq.json",
         )
 
 

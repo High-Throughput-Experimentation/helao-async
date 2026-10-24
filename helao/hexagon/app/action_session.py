@@ -250,6 +250,10 @@ class ActionSession:
         """Drain the action's data queue into its files."""
         return await self.data_stream.log_data_task()
 
+    async def drain_data(self, timeout_s: float) -> bool:
+        """Wait until everything queued so far is written, or ``timeout_s``."""
+        return await self.data_stream.drain(timeout_s)
+
     async def update_act_file(self) -> None:
         """Rewrite the action's meta YAML to reflect the current state."""
         return await self.data_file_writer.update_act_file()

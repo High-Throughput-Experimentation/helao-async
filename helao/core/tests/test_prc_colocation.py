@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from helao.core.drivers.data.sync_driver import ABR_MAP, HelaoYml
+from helao.hexagon.adapters.native.sync_driver import ABR_MAP, HelaoYml
 
 
 def _tree(tmp_path: Path) -> Path:
@@ -60,7 +60,7 @@ class _StubSyncer:
         self.running_tasks = {}
         self.run_journal = None
 
-    from helao.core.drivers.data.sync_driver import SyncDriver
+    from helao.hexagon.adapters.native.sync_driver import SyncDriver
 
     enqueue_yml = SyncDriver.enqueue_yml
     _journal = SyncDriver._journal
@@ -95,7 +95,7 @@ def test_sync_yml_refuses_a_process_yml(tmp_path):
     it (and the sync_yml call under test, and its teardown) must run inside a
     single running event loop rather than across separate asyncio.run() calls.
     """
-    from helao.core.drivers.data.sync_driver import SyncDriver
+    from helao.hexagon.adapters.native.sync_driver import SyncDriver
     from helao.hexagon.tests.sync_fixtures import make_sync_driver, teardown_driver
 
     exp_dir = _tree(tmp_path)
@@ -176,7 +176,7 @@ def test_sync_process_writes_beside_the_exp_yml(tmp_path):
     event loop rather than across separate asyncio.run() calls -- the same
     constraint test_sync_yml_refuses_a_process_yml above works around.
     """
-    from helao.core.drivers.data.sync_driver import SyncDriver
+    from helao.hexagon.adapters.native.sync_driver import SyncDriver
     from helao.hexagon.tests.sync_fixtures import (
         make_action,
         make_exp_tree,
@@ -206,10 +206,10 @@ def test_sync_process_writes_beside_the_exp_yml(tmp_path):
 
     asyncio.run(_run())
 
-    written = list(exp_yml.parent.glob("*-prc.yml"))
+    written = list(exp_yml.parent.glob("*-prc.json"))
     assert len(written) == 1, f"expected one prc beside the exp yml, got {written}"
     assert not list(
-        (tmp_path / "PROCESSES").rglob("*-prc.yml")
+        (tmp_path / "PROCESSES").rglob("*-prc.*")
     ), "nothing may be written under process_root"
 
 
@@ -223,7 +223,7 @@ def test_the_prc_stays_beside_its_experiment_through_a_sync(tmp_path):
     beside its own exp yml once the sync has run, and no RUNS_SYNCED tree is
     created at all.
     """
-    from helao.core.drivers.data.sync_driver import SyncDriver
+    from helao.hexagon.adapters.native.sync_driver import SyncDriver
     from helao.core.models.run_dir import RunDir
     from helao.hexagon.tests.sync_fixtures import (
         make_action,
@@ -250,7 +250,7 @@ def test_the_prc_stays_beside_its_experiment_through_a_sync(tmp_path):
             # the precondition that the prc exists beside the exp yml before
             # anything moves it.
             await driver.sync_yml(yml_path=act_yml)
-            written.extend(exp_yml.parent.glob("*-prc.yml"))
+            written.extend(exp_yml.parent.glob("*-prc.json"))
 
             await driver.sync_yml(yml_path=exp_yml)
         finally:
@@ -260,7 +260,7 @@ def test_the_prc_stays_beside_its_experiment_through_a_sync(tmp_path):
 
     assert len(written) == 1
 
-    in_place = list(exp_yml.parent.glob("*-prc.yml"))
+    in_place = list(exp_yml.parent.glob("*-prc.json"))
     assert in_place == written, f"the prc did not stay beside its exp yml: {in_place}"
     assert not (
         tmp_path / RunDir.SYNCED.value
@@ -283,7 +283,7 @@ def test_the_zip_carries_the_prc_and_reset_sync_restores_it(tmp_path):
     """
     import zipfile
 
-    from helao.core.drivers.data.sync_driver import SyncDriver
+    from helao.hexagon.adapters.native.sync_driver import SyncDriver
     from helao.helpers.file_utils import zip_dir
     from helao.hexagon.tests.sync_fixtures import make_sync_driver, teardown_driver
 
@@ -348,7 +348,7 @@ def test_the_process_s3_key_is_unchanged(tmp_path):
     (sync_driver.py:1879), rather than a restated literal, so this breaks if
     either the seed string or the hash function moves.
     """
-    from helao.core.drivers.data.sync_driver import SyncDriver
+    from helao.hexagon.adapters.native.sync_driver import SyncDriver
     from helao.core.models.run_dir import RunDir
     from helao.helpers.time_utils import gen_uuid
     from helao.hexagon.tests.sync_fixtures import (
@@ -404,7 +404,7 @@ def test_list_pending_exps_does_not_return_a_colocated_prc(tmp_path):
     suffix and by nothing else, so loosening that pattern to *.yml would feed
     process artifacts straight into the sync queue. This pins the suffix.
     """
-    from helao.core.drivers.data.sync_driver import SyncDriver
+    from helao.hexagon.adapters.native.sync_driver import SyncDriver
     from helao.hexagon.tests.sync_fixtures import make_sync_driver, teardown_driver
 
     exp_dir = tmp_path / "RUNS_FINISHED" / "26.35" / "0828" / "seqdir" / "expdir"
@@ -472,10 +472,12 @@ def test_finish_yml_route_drops_a_process_path(tmp_path, monkeypatch):
         },
     )
     app = sync_server.makeApp("DB")
-    # BaseAPI builds the real HelaoSyncer in its own startup event, which
+    # BaseAPI builds the real syncer in its own startup event, which
     # this test never runs; a stub standing in for it is enough to exercise
     # the route's suffix-to-rank branch and enqueue_yml's guard together.
     app.driver = _StubSyncer()
+    # the route reads the SyncPort; bind it the way startup does, after the driver
+    next(h for h in app.router.on_startup if h.__name__ == "_bind_sync_port")()
 
     route = next(r for r in app.routes if r.path == "/finish_yml")
     asyncio.run(route.endpoint(yml_path=str(prc)))

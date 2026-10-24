@@ -37,7 +37,6 @@ from helao.hexagon.app.action_host import ActionHost
 from helao.helpers import helao_logging as logging  # get LOGGER from the host instance
 from helao.helpers.bubble_detection import bubble_detection
 from helao.helpers.executor import Executor
-from helao.helpers.yml_tools import yml_dumps
 
 # P3a gamry COM cut-over (2026-07-23): the gamry server is backed by the
 # hexagon GamryComAdapter (single COM-owning worker thread + single PumpEvents),
@@ -82,9 +81,9 @@ async def measure_init_ocv(active, driver, action_params: dict) -> float:
     await active.write_file(
         output_str=json.dumps(ocv_data),
         file_type="pstat_helao__file",
-        filename="init_ocv.hlo",
+        filename="init_ocv.jsonl",
         file_group=HloFileGroup.helao_files,
-        header=yml_dumps({"mean_ocv": mean_ocv}),
+        header={"mean_ocv": mean_ocv},
         json_data_keys=list(ocv_data.keys()),
     )
     LOGGER.info(f"OCV result: {mean_ocv:.3f} V")
@@ -656,11 +655,14 @@ async def gamry_dyn_endpoints(app: ActionHost):
     server_key = app.server.server_name
     app.server_params["allow_concurrent_actions"] = False
 
-    # P3a gamry COM cut-over: GamryComAdapter is disconnected-construct (the COM
-    # thread + wrapped driver are built here, not in __init__), so connect at
-    # startup before reading ready/model.
-    app.driver.connect()
-
+    # The host connects the driver before this runs (``connect_on_startup``;
+    # GamryComAdapter.connect() builds and connects the COM driver on its thread).
+    # After a failed but non-raising connect the wrapped GamryDriver exists and
+    # ``GamryDriver.__init__`` has already set ``ready = True``, so this does NOT
+    # park: the next line raises AttributeError on ``app.driver.model`` (None) and
+    # the host logs "endpoint status init failed" with no routes registered, as
+    # before. If connect() raises, the adapter never builds a driver and ``ready``
+    # stays False, so this waits.
     while not app.driver.ready:
         LOGGER.info("waiting for gamry init")
         await asyncio.sleep(1)

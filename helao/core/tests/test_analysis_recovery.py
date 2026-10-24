@@ -272,7 +272,7 @@ async def test_completion_removes_the_entry(tmp_path, logger):
     zip_path = _zip(tmp_path)
     calls = []
 
-    async def _fake_sync_ana(calc_tup, retries=3):
+    async def _fake_sync_ana(calc_tup):
         calls.append(calc_tup[0])
         return True
 
@@ -341,44 +341,6 @@ async def test_the_key_written_is_the_key_cleared(tmp_path, logger):
 
 
 @pytest.mark.asyncio
-async def test_sync_exit_callback_keys_on_the_task_name_not_the_journal_key(
-    tmp_path, logger
-):
-    """What the done-callback seam actually receives, pinned both ways.
-
-    ``task.get_name()`` is an *asyncio task* name. For the only tasks this class
-    creates it is ``syncer_loop__<i>``, which is not in ``running_tasks`` (keyed
-    by process uuid), so the callback is inert on the live path -- the real clear
-    is :meth:`journal_clear` from ``syncer``'s ``finally``. Handed a task named
-    for a process uuid, as :class:`HelaoSyncer` names them, it does clear.
-    """
-    journal = tmp_path / "ana_pending"
-    syncer = _syncer(journal)
-    tup = _tup(_zip(tmp_path))
-    await syncer.enqueue_calc(tup)
-
-    async def _noop():
-        return None
-
-    # The live shape: a worker-loop task name, with running_tasks keyed by uuid.
-    loop_task = asyncio.create_task(_noop(), name="syncer_loop__0")
-    await loop_task
-    syncer.running_tasks = {str(PROC_A): loop_task}
-    syncer.sync_exit_callback(loop_task)
-    assert m.list_journal_entries(str(journal)) == [syncer._journal_key(tup)]
-    assert syncer.running_tasks == {str(PROC_A): loop_task}
-
-    # The inherited shape: a task named for the process uuid.
-    uuid_task = asyncio.create_task(_noop(), name=str(PROC_A))
-    await uuid_task
-    syncer.running_tasks = {str(PROC_A): uuid_task}
-    syncer.task_set = {str(PROC_A)}
-    syncer.sync_exit_callback(uuid_task)
-    assert m.list_journal_entries(str(journal)) == []
-    assert syncer.running_tasks == {}
-
-
-@pytest.mark.asyncio
 async def test_clearing_one_request_leaves_the_other_entries_alone(tmp_path, logger):
     """Keyed by the journal key, not the task name.
 
@@ -398,24 +360,6 @@ async def test_clearing_one_request_leaves_the_other_entries_alone(tmp_path, log
 
     remaining = m.list_journal_entries(str(journal))
     assert remaining == [m.analysis_journal_key(str(zip_path), PROC_A, "_AnaB")]
-
-
-@pytest.mark.asyncio
-async def test_clear_by_process_removes_every_entry_for_that_uuid(tmp_path, logger):
-    """The done-callback seam's best-effort route, pinned as the superset it is."""
-    journal = tmp_path / "ana_pending"
-    syncer = _syncer(journal)
-    zip_path = _zip(tmp_path)
-
-    await syncer.enqueue_calc(_tup(zip_path, ana_cls=_AnaA))
-    await syncer.enqueue_calc(_tup(zip_path, ana_cls=_AnaB))
-    await syncer.enqueue_calc(_tup(zip_path, process_uuid=PROC_B))
-
-    syncer.journal_clear_by_process(str(PROC_A))
-
-    remaining = m.list_journal_entries(str(journal))
-    assert len(remaining) == 1
-    assert remaining[0].startswith(str(PROC_B))
 
 
 # ---------------------------------------------------------------------------
@@ -784,7 +728,7 @@ async def test_restart_round_trip_runs_the_lost_analysis(tmp_path, logger, monke
     second = _syncer(journal)
     ran = []
 
-    async def _fake_sync_ana(calc_tup, retries=3):
+    async def _fake_sync_ana(calc_tup):
         ran.append((calc_tup[0], calc_tup[1].target, calc_tup[3]))
         return True
 
@@ -833,7 +777,7 @@ async def test_a_replay_interrupted_partway_recovers_only_what_is_outstanding(
     started = []
     third_in_flight = asyncio.Event()
 
-    async def _fake_sync_ana(calc_tup, retries=3):
+    async def _fake_sync_ana(calc_tup):
         started.append(calc_tup[0])
         if len(started) == 3:
             third_in_flight.set()
@@ -1130,8 +1074,7 @@ async def test_successive_starts_drain_the_backlog(tmp_path, logger, monkeypatch
         summary = await syncer.recover_journal(_classes(_AnaA))
         seen += summary["recovered"]
         while not syncer.task_queue.empty():
-            pu, *_ = syncer.task_queue.get_nowait()
-            syncer.journal_clear_by_process(pu)
+            syncer.journal_clear(syncer.task_queue.get_nowait())
         if not m.list_journal_entries(str(journal)):
             break
     assert seen == 7

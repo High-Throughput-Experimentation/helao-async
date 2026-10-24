@@ -375,3 +375,52 @@ def test_a_line_readback_cannot_read_falls_back_to_the_mirror():
     # neither knows -> unknown, not off
     assert resolve(None, "never_written") is None
     print("test_a_line_readback_cannot_read_falls_back_to_the_mirror PASS")
+
+
+# --------------------------------------------------------------------------
+# galil_io: a raising host connect keeps the server up
+# --------------------------------------------------------------------------
+
+
+def test_a_raising_connect_keeps_galil_io_up_with_no_gated_routes(
+    monkeypatch, tmp_path, caplog
+):
+    from helao.deploy.hte.drivers.io.galil_io_driver import Galil
+    from helao.hexagon.tests.hosted_server import start_with_raising_connect
+
+    out = start_with_raising_connect(
+        monkeypatch,
+        tmp_path,
+        caplog,
+        module="galil_io",
+        prefix="anec",
+        server_key="IO",
+        driver_class=Galil,
+        ready=lambda app: False,  # no late routes register; wait out the window
+        wait_s=1.5,
+    )
+    assert len(out.startup_errors) == 1
+    assert out.get_status_code == 200
+    # galil_enabled is never set True, so the gated action routes do not register
+    assert not any(p.endswith("/get_digital_in") for p in out.route_paths if p)
+
+
+def test_a_raising_connect_keeps_nidaqmx_up(monkeypatch, tmp_path, caplog):
+    from helao.deploy.hte.drivers.io.nidaqmx_driver import cNIMAX
+    from helao.hexagon.tests.hosted_server import start_with_raising_connect
+
+    out = start_with_raising_connect(
+        monkeypatch,
+        tmp_path,
+        caplog,
+        module="nidaqmx_server",
+        prefix="adss3",
+        server_key="NI",
+        driver_class=cNIMAX,
+        ready=lambda app: hasattr(app, "unified_db"),  # dyn_endpoints has run
+        probe=lambda app: hasattr(app, "unified_db"),
+    )
+    assert len(out.startup_errors) == 1
+    assert "cNIMAX" in out.startup_errors[0].getMessage()
+    assert out.get_status_code == 200
+    assert out.probe is True

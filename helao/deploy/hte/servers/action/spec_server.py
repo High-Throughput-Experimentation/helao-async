@@ -167,9 +167,7 @@ class SM303Exec(Executor):
 async def sm303_dyn_endpoints(app: ActionHost):
     """Register SM303 spectrometer endpoints.
 
-    Disables concurrent actions on this server, opens the vendor DLL
-    connection (``connect()``, moved out of ``__init__`` per the
-    HelaoDriver ABC's no-device-I/O-at-construction rule), constructs the
+    Disables concurrent actions on this server, constructs the
     shared ``UnifiedSampleDataAPI`` instance used for sample validation, and
     attaches private and action endpoints for wavelength retrieval,
     single/averaged acquisition, intensity calibration, and external trigger
@@ -181,9 +179,9 @@ async def sm303_dyn_endpoints(app: ActionHost):
     server_key = app.server.server_name
     app.server_params["allow_concurrent_actions"] = False
 
+    # The host has already connected the driver (``connect_on_startup``), before
+    # this runs; a failed connect leaves it disconnected and the routes still register.
     app.driver: SM303
-    connect_resp = app.driver.connect()
-    LOGGER.info(f"SM303 connect() returned status={connect_resp.status}")
 
     app.unified_db = UnifiedSampleDataAPI(app.base)
     await app.unified_db.init_db()

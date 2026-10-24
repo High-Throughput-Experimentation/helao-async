@@ -105,21 +105,6 @@
     ]
   },
   {
-    "path": "/{server_key}/get_rcp_plateid",
-    "method": "post",
-    "tags": [
-      "action"
-    ],
-    "handler": "get_rcp_plateid",
-    "params": [
-      {
-        "name": "plateid",
-        "annotation": "Optional[int]",
-        "default": "None"
-      }
-    ]
-  },
-  {
     "path": "/{server_key}/save_platexycalibration",
     "method": "post",
     "tags": [

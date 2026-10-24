@@ -700,6 +700,37 @@ def test_read_normalises_the_rpc_tuple_shape(dispatched):
     print("test_read_normalises_the_rpc_tuple_shape PASS")
 
 
+def test_motion_calls_use_the_panel_timeout_and_the_read_write_retry_counts(
+    dispatched,
+):
+    calls, _ = dispatched
+    asyncio.run(read_axis_positions("MOTOR", "127.0.0.1", 8003))
+    asyncio.run(move_axis("MOTOR", "127.0.0.1", 8003, axis="x", value=0.0))
+    asyncio.run(stop_motion("MOTOR", "127.0.0.1", 8003))
+
+    # 5 s, not the dispatcher's 60: these run on a UI callback.
+    assert [c["timeout"] for c in calls] == [motion_control.CALL_TIMEOUT] * 3
+    assert motion_control.CALL_TIMEOUT == 5
+    assert [c["retries"] for c in calls] == [
+        motion_control.READ_RETRIES,
+        motion_control.WRITE_RETRIES,
+        motion_control.WRITE_RETRIES,
+    ]
+    print(
+        "test_motion_calls_use_the_panel_timeout_and_the_read_write_retry_counts PASS"
+    )
+
+
+def test_a_non_finite_coordinate_degrades_to_unknown(dispatched):
+    _, reply = dispatched
+    reply["value"] = ({"x": {"mm": float("nan"), "counts": "?"}}, ErrorCodes.none)
+
+    positions = asyncio.run(read_axis_positions("MOTOR", "127.0.0.1", 8003))
+
+    assert positions["x"] == {"mm": None, "counts": None, "moving": None}
+    print("test_a_non_finite_coordinate_degrades_to_unknown PASS")
+
+
 def test_read_normalises_the_http_list_shape(dispatched):
     # The HTTP fallback JSON-decodes the endpoint's tuple to a two-element
     # list, so both shapes reach this layer and both must unwrap.
@@ -1087,7 +1118,7 @@ def test_the_ceiling_outlasts_any_move_the_hardware_can_actually_perform():
 
     # The driver waits for its own moves up to its cap; the follow-up must not be
     # shorter than that cap (equal is fine), or it abandons live motion.
-    from helao.deploy.hte.drivers.motion.galil_motion_driver import MOVE_WAIT_CAP_S
+    MOVE_WAIT_CAP_S = 30 * 60  # NativeGalilMotion's per-move wait cap
 
     assert motion_control.FOLLOWUP_CEILING_S >= MOVE_WAIT_CAP_S
     print(

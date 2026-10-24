@@ -1,7 +1,7 @@
 """Remote HELAO data loader backed by S3 (HLO/JSON) and PostgreSQL (metadata).
 
-Provides ``HelaoLoader`` with optional in-memory caches for S3 objects, JSON
-metadata, and SQL rows, plus thin wrapper classes (``HelaoAction`` /
+Provides ``HelaoLoader`` with optional in-memory caches for S3 objects and JSON
+metadata, plus thin wrapper classes (``HelaoAction`` /
 ``HelaoExperiment`` / ``HelaoSequence`` / ``HelaoProcess``) that lazily fetch
 their metadata and primary HLO file via a module-level ``LOADER`` instance.
 """
@@ -15,15 +15,16 @@ from uuid import UUID
 
 import boto3
 import pandas as pd
-from sqlmodel import Session, create_engine, text
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import Session
 
 from helao.core.drivers.data.loaders.model_base import (
-    HelaoArtifact,
     HelaoDataModelMixin,
     HloPayload,
 )
 from helao.core.models.credentials import HelaoCredentials
 from helao.helpers import helao_logging as logging
+from helao.hexagon.domain.naming import data_stem
 
 #: The SQL metadata backend is being retired and no deployment queries it.
 _SQL_DEPRECATED = (
@@ -51,19 +52,12 @@ def _as_datetime(value):
     return value
 
 
-class HelaoSolid:
-    """Lightweight handle to a solid sample identified by its global label."""
-
-    sample_label: str
-    # composition: dict
-
-    def __init__(self, sample_label):
-        """Store the sample's global label.
-
-        Args:
-            sample_label: Global sample label.
-        """
-        self.sample_label = sample_label
+def _mirror_identity(model) -> None:
+    """Also expose name/uuid/timestamp/params as ``<helao_type>_*`` (``technique_name`` for processes)."""
+    t = model.helao_type
+    setattr(model, "technique_name" if t == "process" else f"{t}_name", model.name)
+    for attr in ("uuid", "timestamp", "params"):
+        setattr(model, f"{t}_{attr}", getattr(model, attr))
 
 
 class HelaoModel:
@@ -113,36 +107,21 @@ class HelaoModel:
         else:
             self.meta_dict = self.json
         self.timestamp = _as_datetime(self.meta_dict.get(f"{helao_type}_timestamp"))
-        self.params = self.meta_dict.get(
-            f"{helao_type}_params", self.meta_dict.get(f"{helao_type}_params", {})
-        )
-        if helao_type == "process":
-            self.name = self.meta_dict.get(
-                "technique_name", self.meta_dict.get("technique_name", None)
-            )
-        else:
-            self.name = self.meta_dict.get(
-                f"{helao_type}_name", self.meta_dict.get(f"{helao_type}_name", None)
-            )
+        self.params = self.meta_dict.get(f"{helao_type}_params", {})
+        key = "technique_name" if helao_type == "process" else f"{helao_type}_name"
+        self.name = self.meta_dict.get(key)
+        _mirror_identity(self)
 
     @property
     def json(self) -> dict:
         """Remote JSON metadata for this record, fetched via the module ``LOADER``."""
         return LOADER.get_json(self.helao_type, self.uuid)
 
-    @property
-    def _meta_dict(self) -> dict:
-        """SQL row for this record fetched via the module ``LOADER``. Deprecated."""
-        _warn_sql()
-        return LOADER._get_sql(self.helao_type, self.uuid)
-
 
 class HelaoDataModel(HelaoDataModelMixin, HelaoModel):
     """``HelaoModel`` mixed with HLO-data accessors for action and process records.
 
-    Adds two parallel views over the record's ``files``: :attr:`files` (legacy
-    ``(s3_key, file_type, run_use)`` tuples) and :attr:`artifacts`
-    (:class:`HelaoArtifact` objects that can fetch their own bytes from S3). The
+    Adds :attr:`files` (legacy ``(s3_key, file_type, run_use)`` tuples). The
     dict-based accessors from the mixin (``data_files``/``hlo_file``/``hlo``)
     are left unchanged.
     """
@@ -157,14 +136,6 @@ class HelaoDataModel(HelaoDataModelMixin, HelaoModel):
         """``(s3_key, file_type, run_use)`` tuples for every file in the record."""
         return [
             (self._s3_key(x), x.get("file_type"), x.get("run_use"))
-            for x in self.json.get("files", [])
-        ]
-
-    @property
-    def artifacts(self) -> list:
-        """Record ``files`` as :class:`HelaoArtifact` objects bound to ``LOADER``."""
-        return [
-            HelaoArtifact.from_meta(x, loader=LOADER, locator=self._s3_key(x))
             for x in self.json.get("files", [])
         ]
 
@@ -192,10 +163,6 @@ class HelaoAction(HelaoDataModel):
             query_df: Optional SQL result frame.
         """
         super().__init__(helao_type="action", uuid=uuid, query_df=query_df)
-        self.action_name = self.name
-        self.action_uuid = self.uuid
-        self.action_timestamp = self.timestamp
-        self.action_params = self.params
 
 
 class HelaoExperiment(HelaoModel):
@@ -214,10 +181,6 @@ class HelaoExperiment(HelaoModel):
             query_df: Optional SQL result frame.
         """
         super().__init__(helao_type="experiment", uuid=uuid, query_df=query_df)
-        self.experiment_name = self.name
-        self.experiment_uuid = self.uuid
-        self.experiment_timestamp = self.timestamp
-        self.experiment_params = self.params
 
 
 class HelaoSequence(HelaoModel):
@@ -236,10 +199,6 @@ class HelaoSequence(HelaoModel):
             query_df: Optional SQL result frame.
         """
         super().__init__(helao_type="sequence", uuid=uuid, query_df=query_df)
-        self.sequence_name = self.name
-        self.sequence_uuid = self.uuid
-        self.sequence_timestamp = self.timestamp
-        self.sequence_params = self.params
 
 
 class HelaoProcess(HelaoDataModel):
@@ -258,10 +217,6 @@ class HelaoProcess(HelaoDataModel):
             query_df: Optional SQL result frame.
         """
         super().__init__(helao_type="process", uuid=uuid, query_df=query_df)
-        self.technique_name = self.name
-        self.process_uuid = self.uuid
-        self.process_timestamp = self.timestamp
-        self.process_params = self.params
 
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -272,9 +227,9 @@ DEFAULT_READ_BUCKET = "helao.data"
 class HelaoLoader:
     """Cached access layer over the HELAO S3 bucket and metadata SQL database.
 
-    Manages a boto3 session, an S3 client/resource, and a sqlmodel engine
+    Manages a boto3 session, an S3 client/resource, and a SQLAlchemy engine
     pointing at the credentials defined in ``env_file``. Supports optional
-    caches for raw S3 bytes, decoded JSON metadata, and SQL rows.
+    caches for raw S3 bytes and decoded JSON metadata.
     """
 
     def __init__(
@@ -282,7 +237,6 @@ class HelaoLoader:
         env_file: str = ".env",
         cache_s3: bool = False,
         cache_json: bool = False,
-        cache_sql: bool = False,
     ):
         """Open the S3 and SQL connections using credentials from ``env_file``.
 
@@ -290,18 +244,15 @@ class HelaoLoader:
             env_file: Path to the ``.env`` file with HELAO credentials.
             cache_s3: Cache raw S3 HLO payloads in memory.
             cache_json: Cache fetched JSON metadata in memory.
-            cache_sql: Cache SQL query rows in memory.
         """
         self.env_file = env_file
         self.cache_s3 = cache_s3
         self.cache_json = cache_json
-        self.cache_sql = cache_sql
         self.act_cache = {}  # {uuid: json_dict}
         self.exp_cache = {}
         self.seq_cache = {}
         self.pro_cache = {}
         self.s3_cache = {}  # {s3_path: hlo_dict}
-        self.sql_cache = {}  # {(uuid, type): json_dict}
         self.last_seq_uuid = ""
         self.connect()
 
@@ -349,16 +300,15 @@ class HelaoLoader:
 
     def _query(self, query: str) -> list:
         with Session(self.engine) as session:
-            return session.exec(text(query)).all()
+            return list(session.execute(text(query)).all())
 
     def clear_cache(self):
-        """Drop every in-memory cache (action/experiment/sequence/process/S3/SQL)."""
+        """Drop every in-memory cache (action/experiment/sequence/process/S3)."""
         self.act_cache = {}  # {uuid: json_dict}
         self.exp_cache = {}
         self.seq_cache = {}
         self.pro_cache = {}
         self.s3_cache = {}  # {s3_path: hlo_dict}
-        self.sql_cache = {}  # {(uuid, type): json_dict}
 
     _warned_empty_bucket = False
 
@@ -380,10 +330,6 @@ class HelaoLoader:
         obj = self.res.Object(bucket_name=s3_bucket, key=s3_key)
         obytes = io.BytesIO(obj.get()["Body"].read())
         return obytes
-
-    def read_artifact_bytes(self, artifact: HelaoArtifact) -> io.BytesIO:
-        """Fetch a :class:`HelaoArtifact`'s body from S3 (locator is the S3 key)."""
-        return self.get_bytes(s3_bucket=self.read_bucket, s3_key=artifact.locator)
 
     def get_json(self, helao_type: str, uuid: UUID) -> dict:
         """Fetch and decode ``s3://<s3_bucket>/<helao_type>/<uuid>.json``."""
@@ -461,8 +407,8 @@ class HelaoLoader:
             :class:`HloPayload` of the ``.hlo.json``; empty if the file name is
             not a valid HLO.
         """
-        if hlo_fn.endswith(".hlo"):
-            keystr = f"raw_data/{str(action_uuid)}/{hlo_fn}.json"
+        if hlo_fn.endswith((".hlo", ".jsonl")):
+            keystr = f"raw_data/{str(action_uuid)}/{data_stem(hlo_fn)}.hlo.json"
         elif hlo_fn.endswith(".json"):
             if not hlo_fn.endswith(".hlo.json"):
                 keystr = f"raw_data/{str(action_uuid)}/{hlo_fn.replace('.json', '.hlo.json')}"
@@ -481,31 +427,6 @@ class HelaoLoader:
         if self.cache_s3:
             self.s3_cache[keystr] = jd
         return jd
-
-    def get_sql(self, helao_type: str, obj_uuid: UUID) -> dict:
-        """Return the metadata DB row for ``(helao_type, obj_uuid)``. Deprecated."""
-        _warn_sql()
-        return self._get_sql(helao_type, obj_uuid)
-
-    def _get_sql(self, helao_type: str, obj_uuid: UUID) -> dict:
-        cache_key = (helao_type, obj_uuid)
-        if self.cache_sql and cache_key in self.sql_cache:
-            return self.sql_cache[cache_key]
-
-        sql_command = f"""
-            SELECT *
-            FROM helao_{helao_type} ht
-            WHERE ht.{helao_type}_uuid = '{obj_uuid}'
-            LIMIT 1
-        """
-        resp = self._query(sql_command)
-        row = resp[0]._asdict() if resp else {}
-        # Only retain the row when caching is on: the previous version wrote
-        # every result into sql_cache even with cache_sql=False, so the dict
-        # grew without bound while never being read from.
-        if self.cache_sql:
-            self.sql_cache[cache_key] = row
-        return row
 
 
 LOADER: HelaoLoader = None

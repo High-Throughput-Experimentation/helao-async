@@ -41,10 +41,8 @@ import asyncio
 import os
 import sys
 from functools import partial
-from glob import glob
 from importlib import import_module
 
-import colorama
 from bokeh.server.server import Server
 
 # pyzmq's zmq.asyncio (helao.core.rpc.zmq_rpc) requires the add_reader event-loop
@@ -60,10 +58,12 @@ from bokeh.server.server import Server
 if sys.platform == "win32":
     asyncio.set_event_loop(asyncio.SelectorEventLoop())
 from helao.core.version import get_hlo_version, hlo_version
-from helao.helpers import config_loader
-from helao.helpers import helao_logging as logging
+from helao.helpers.launcher_bootstrap import (
+    init_colorama,
+    launcher_bootstrap,
+    resolve_app_deployment,
+)
 from helao.helpers.parent_death import arm_parent_death_signal
-from helao.helpers.yml_tools import yml_load
 
 if __name__ == "__main__":
     # Die with launch.py rather than orphaning and holding this server's port if
@@ -71,41 +71,11 @@ if __name__ == "__main__":
     # before anything binds a port, and from the child rather than a
     # preexec_fn (see helao.helpers.parent_death).
     arm_parent_death_signal()
-    log_root = "."
-    # launch.py sets HELAO_FORCE_COLOR when it pumps our output through its own
-    # tty stdout: emit raw ANSI so the launcher's colorama translates it (which
-    # on Windows must happen against a real console handle, not our pipe),
-    # instead of stripping just because our own stdout is a pipe.
-    if os.environ.get("HELAO_FORCE_COLOR") == "1":
-        colorama.init(strip=False, convert=False)
-    else:
-        colorama.init(
-            strip=not sys.stdout.isatty()
-        )  # strip colors if stdout is redirected
+    init_colorama()
     helao_repo_root = os.path.dirname(os.path.realpath(__file__))
     server_key = sys.argv[2]
     confArg = sys.argv[1]
-    if config_loader.CONFIG is None:
-        config_dict, _validated = config_loader.read_validated_config(confArg)
-        config_loader.install_global_config(config_dict)
-    CONFIG = config_loader.CONFIG
-
-    all_servers_config = CONFIG["servers"]
-    server_config = all_servers_config[server_key]
-    log_root = os.path.join(CONFIG["root"], "LOGS") if "root" in CONFIG else None
-    if CONFIG.get("alert_config_path", False):
-        email_config = yml_load(CONFIG["alert_config_path"])
-    else:
-        email_config = {}
-    if logging.LOGGER is None:
-        logging.LOGGER = logging.make_logger(
-            logger_name=server_key,
-            log_dir=log_root,
-            email_config=email_config,
-            log_level=server_config.get("log_level", CONFIG.get("log_level", 20)),
-        )
-    LOGGER = logging.LOGGER
-    LOGGER.info(f"Loaded config from: {CONFIG['loaded_config_path']}")
+    CONFIG, server_config, LOGGER = launcher_bootstrap(confArg, server_key)
 
     servHost = server_config["host"]
     servPort = server_config["port"]
@@ -113,65 +83,20 @@ if __name__ == "__main__":
     launch_browser = server_config.get("params", {}).get("launch_browser", False)
 
     config_path = CONFIG["loaded_config_path"]
-    detected_deployment = os.path.basename(
-        os.path.dirname(os.path.dirname(config_path))
-    )
     # `app_deployment` is where the bokeh app module physically lives; it may
     # differ from the config's own deployment when a generic app (e.g.
     # action_visualizer / live_visualizer) is reused across deployments.
-    app_deployment = server_config.get("deployment", detected_deployment)
-    if "deployment" not in server_config:
-        possible_deployments = sorted(
-            glob(
-                os.path.join(
-                    os.path.dirname(os.path.dirname(os.path.dirname(config_path))),
-                    "*",
-                    "servers",
-                    server_config["group"],
-                    f"{server_config['bokeh']}.py",
-                )
-            )
-        )
-        if len(possible_deployments) == 1:
-            app_deployment = os.path.basename(
-                os.path.dirname(
-                    os.path.dirname(os.path.dirname(possible_deployments[0]))
-                )
-            )
-            LOGGER.info(f"Auto-detected deployment: {app_deployment}")
-        elif len(possible_deployments) > 1:
-            # Prefer the deployment matching the config's own path. If none
-            # match (e.g. a derived/private config that reuses another
-            # deployment's generic app), fall back to the first match and warn
-            # rather than crashing on an empty filter.
-            config_dep_dir = os.path.dirname(os.path.dirname(config_path))
-            filter_possible = [
-                x for x in possible_deployments if x.startswith(config_dep_dir)
-            ]
-            chosen = filter_possible[0] if filter_possible else possible_deployments[0]
-            app_deployment = os.path.basename(
-                os.path.dirname(os.path.dirname(os.path.dirname(chosen)))
-            )
-            if filter_possible:
-                LOGGER.info(
-                    f"Auto-detected deployment from multiple options: {app_deployment}"
-                )
-            else:
-                LOGGER.warning(
-                    f"No deployment under the config path matched "
-                    f"{server_config['bokeh']} in {server_config['group']}; "
-                    f"falling back to '{app_deployment}'. Set an explicit "
-                    f"'deployment:' key on this server to disambiguate."
-                )
-        else:
-            raise FileNotFoundError(
-                f"Could not find deployment for {server_config['bokeh']} in {server_config['group']}"
-            )
+    app_deployment = resolve_app_deployment(server_config, servPy, config_path, LOGGER)
     # CONFIG["deployment"] tracks the config's own deployment so generic
     # visualizers resolve per-server vis modules starting from the right place.
-    CONFIG["deployment"] = server_config.get("deployment", detected_deployment)
+    CONFIG["deployment"] = server_config.get(
+        "deployment",
+        os.path.basename(os.path.dirname(os.path.dirname(config_path))),
+    )
     CONFIG["hlo_version"] = hlo_version
-    deploy_git_path = os.path.join(helao_repo_root, "helao", "deploy", CONFIG["deployment"], ".git")
+    deploy_git_path = os.path.join(
+        helao_repo_root, "helao", "deploy", CONFIG["deployment"], ".git"
+    )
     deploy_worktree_path = os.path.dirname(deploy_git_path)
     if os.path.exists(deploy_git_path):
         CONFIG["deployment_version"] = get_hlo_version(deploy_worktree_path)

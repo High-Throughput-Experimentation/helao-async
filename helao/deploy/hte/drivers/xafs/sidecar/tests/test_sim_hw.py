@@ -1,4 +1,5 @@
 """Python 3.9 sim env: install_sim fakes let the vendor easyxafs scan loop run."""
+
 import json
 import zipfile
 from pathlib import Path
@@ -6,6 +7,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+
+pytest.importorskip("easyxafs")  # vendor package; absent from the main helao env
 
 from helao.deploy.hte.drivers.xafs.sidecar import sim_hw
 
@@ -24,9 +27,15 @@ def test_normalscan_runs_and_saves(tmp_path, monkeypatch):
     import easyxafs.scan as scan
 
     s = scan.NormalScan(
-        crystal2d="Si(5,5,3)", beta_offset=0, theta_offset=0, analyzer_radius=500,
-        roi_bragg=80, roi_min=800, roi_max=1000,
-        measurement_mode="XAFS_Fluorescence", saveaftercomplete=True,
+        crystal2d="Si(5,5,3)",
+        beta_offset=0,
+        theta_offset=0,
+        analyzer_radius=500,
+        roi_bragg=80,
+        roi_min=800,
+        roi_max=1000,
+        measurement_mode="XAFS_Fluorescence",
+        saveaftercomplete=True,
         savename=str(tmp_path / "Zn_Scan0000_Sample1_X0.000_Y0.000"),
     )
     s.create_zone_constant_step(9600, 9620, 5, 0.01)

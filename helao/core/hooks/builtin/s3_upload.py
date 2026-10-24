@@ -1,11 +1,11 @@
 """Built-in post-finish hook: today's S3 leg of ``sync_yml``, moved verbatim.
 
 Blocking (spec §6.1). For an action: push every file the record names
-(``.hlo`` -> ``.hlo.json`` under 1 GB, parquet above; anything else as-is),
+(``.hlo``/``.jsonl`` -> ``X.hlo.json`` under 1 GB, parquet above; anything else as-is),
 record ``files_s3``/``files_pending`` as it goes so a partial upload resumes,
 and rename the uploaded entries in the meta it is about to ship. For an
 experiment: finish its pending processes (``sync_process`` writes the local
-``-prc.yml`` and uploads ``process/<uuid>.json``) and set ``process_list``.
+``-prc.json`` and uploads ``process/<uuid>.json``) and set ``process_list``.
 Then patch the meta through the pydantic model, split a list
 ``technique_name``, upload ``<type>/<uuid>.json`` and set the ``s3``/``api``
 flags. For an action that contributes to a process, fold it into its parent's
@@ -27,6 +27,7 @@ from helao.core.models.process import ProcessModel
 from helao.helpers import helao_logging as logging
 from helao.helpers.hlo_data import hlo_to_parquet, read_hlo
 from helao.helpers.premodels import Action, Experiment, Sequence
+from helao.hexagon.domain.naming import data_stem
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -100,11 +101,9 @@ class Hook(FinishHook):
                         prog.write_dict()
                         continue
                     LOGGER.debug(f"Pushing {sp} to S3 for {prog.yml.target.name}")
-                    if fp.suffix == ".hlo":
+                    if fp.suffix in (".hlo", ".jsonl"):
                         if fp.stat().st_size < 1024**3:  # 1GB
-                            file_s3_key = (
-                                f"raw_data/{meta['action_uuid']}/{fp.name}.json"
-                            )
+                            file_s3_key = f"raw_data/{meta['action_uuid']}/{data_stem(fp)}.hlo.json"
                             if compress:
                                 file_s3_key += ".gz"
                             LOGGER.debug("Parsing hlo dicts.")
@@ -135,11 +134,11 @@ class Hook(FinishHook):
                             LOGGER.debug(
                                 "hlo file larger than 1GB, converting to parquet."
                             )
-                            file_s3_key = (
-                                f"raw_data/{meta['action_uuid']}/{fp.stem}.parquet"
-                            )
+                            file_s3_key = f"raw_data/{meta['action_uuid']}/{data_stem(fp)}.parquet"
                             try:
-                                parquet_path = str(fp).replace(".hlo", ".parquet")
+                                parquet_path = str(
+                                    fp.with_name(data_stem(fp) + ".parquet")
+                                )
                                 await asyncio.to_thread(
                                     hlo_to_parquet, fp, parquet_path
                                 )

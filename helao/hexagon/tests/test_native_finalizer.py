@@ -74,14 +74,14 @@ async def test_finish_join_drain_close_chain(tmp_path, monkeypatch):
     out_dir = os.path.join(
         str(base.helaodirs.save_root), str(active.action.action_output_dir)
     )
-    hlo = [f for f in os.listdir(out_dir) if f.endswith(".hlo")]
+    hlo = [f for f in os.listdir(out_dir) if f.endswith(".jsonl")]
     text = open(os.path.join(out_dir, hlo[0]), encoding="utf-8").read()
     # hlo_json_dumps compact separators (no spaces)
     assert '{"t_s":2,"value":3.0}' in text  # late row landed before close
     assert active.file_conn_dict == {}  # close-all cleared the dict
     assert active.data_logger is not None
     assert active.data_logger.cancelled() or active.data_logger.done()
-    assert [f for f in os.listdir(out_dir) if f.endswith("-act.yml")]
+    assert [f for f in os.listdir(out_dir) if f.endswith("-act.json")]
     assert moved == [active.action.action_uuid]
     assert active.action.action_uuid not in base.actives
     assert active.action.action_uuid in base.history
@@ -194,11 +194,10 @@ async def test_split_keep_active_then_finish_all_finishes_the_chain(
     rows = []
     for dirpath, _dirs, files in os.walk(str(base.helaodirs.save_root)):
         for fn in files:
-            if fn.endswith(".hlo"):
+            if fn.endswith(".jsonl"):
                 rows += (
                     open(os.path.join(dirpath, fn), encoding="utf-8")
                     .read()
-                    .split("%%\n", 1)[1]
                     .splitlines()
                 )
     assert '{"t_s":999}' in rows
@@ -234,5 +233,5 @@ async def test_manual_action_calls_move_dir_and_writes_exp_seq(tmp_path, monkeyp
     )
     exp_dir = os.path.join(diag_root, str(active.action.get_experiment_dir()))
     seq_dir = os.path.join(diag_root, str(active.action.get_sequence_dir()))
-    assert [f for f in os.listdir(exp_dir) if f.endswith("-exp.yml")]
-    assert [f for f in os.listdir(seq_dir) if f.endswith("-seq.yml")]
+    assert [f for f in os.listdir(exp_dir) if f.endswith("-exp.json")]
+    assert [f for f in os.listdir(seq_dir) if f.endswith("-seq.json")]

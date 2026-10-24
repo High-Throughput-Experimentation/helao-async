@@ -157,3 +157,34 @@ def test_fileinfo_rename_rule_is_asserted():
 
     bad_technique = dict(good_s3, technique_name=["t1", "t2"])
     assert assert_s3_meta_rules(disk_act, bad_technique) != []
+
+
+def test_s3_manifest_jsonl_keeps_its_name_through_snapshot_and_compare(tmp_path):
+    from harness.parity import compare_file
+    from harness.tests.test_hlo_pass import make_manifest
+    from harness.treepass import seed_mapper, snapshot
+
+    def entry(u):
+        return json.dumps(
+            {"bucket": "b", "key": f"action/{u}.json", "mode": "fileobj", "gzip": False}
+        )
+
+    def tree(name, uuids):
+        root = tmp_path / name
+        (root / "S3_SIM").mkdir(parents=True)
+        (root / "S3_SIM" / "manifest.jsonl").write_text(
+            "".join(entry(u) + "\n" for u in uuids), encoding="utf-8"
+        )
+        m = UuidMapper()
+        seed_mapper(root, m)
+        return snapshot(root, m), m
+
+    g, mg = tree("g", [U1, U2])
+    c, mc = tree("c", [U2, U1])
+    key = "S3_SIM/manifest.jsonl"
+    assert key in g.files and key in c.files
+    manifest = make_manifest({}, {})
+    row = g.files[key][1]
+    assert (
+        compare_file(row, key, g.files[key][0], c.files[key][0], mg, mc, manifest) == []
+    )

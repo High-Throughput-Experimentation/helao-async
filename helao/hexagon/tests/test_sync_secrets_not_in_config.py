@@ -13,7 +13,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from helao.core.drivers.data.sync_driver import SyncDriver as LegacySyncDriver
 from helao.core.models.helaodirs import HelaoDirs
 from helao.core.models.run_dir import RunDir
 from helao.hexagon.adapters.native.sync_driver import SyncDriver as NativeSyncDriver
@@ -53,7 +52,7 @@ def _assert_clean(world_cfg, ini):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("cls", [LegacySyncDriver, NativeSyncDriver])
+@pytest.mark.parametrize("cls", [NativeSyncDriver])
 async def test_driver_keeps_secrets_out_of_params(cls, tmp_path, aws_ini):
     params = {"max_tasks": 1}
     world_cfg = {"servers": {"SYNC": {"params": params}}}

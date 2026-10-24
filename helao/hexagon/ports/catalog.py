@@ -25,8 +25,7 @@ are handed back exactly as the underlying table yields them (per-column
 Boundary note (spec §4.1, locked): ports/ may only import stdlib +
 `helao.hexagon.domain`/`ports` + the declared `helao_driver` exception. Row
 mappings are typed with plain generics rather than a pandas type -- pandas is
-an adapter-layer third party, per the `PlateInfoPort` precedent in
-`auxiliary.py`.
+an adapter-layer third party.
 """
 
 from collections.abc import Mapping, Sequence

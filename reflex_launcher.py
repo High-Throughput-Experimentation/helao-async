@@ -25,7 +25,6 @@ __all__ = [
     "BUNDLE_DIRNAME",
     "backend_port",
     "build_env",
-    "install_pdeathsig",
     "may_build_at_launch",
     "may_build_locally",
     "parent_is_gone",
@@ -163,33 +162,6 @@ def parent_is_gone(watch, probe=process_start_time) -> bool:
         return False
     pid, created = watch
     return probe(pid) != created
-
-
-def install_pdeathsig(sig=signal.SIGTERM) -> bool:
-    """Ask the kernel to signal this process when its parent dies.
-
-    Linux-only (``prctl(PR_SET_PDEATHSIG)``). Instant and immune to a parent
-    that dies uncatchably, which polling cannot match -- but it is a
-    best-effort optimization, not the mechanism: :func:`watch_parent` is what
-    every platform relies on, and it also covers the race where the parent dies
-    before this call lands.
-
-    Args:
-        sig: Signal the kernel should deliver on parent death.
-
-    Returns:
-        bool: ``True`` if installed.
-    """
-    if not sys.platform.startswith("linux"):
-        return False
-    try:
-        import ctypes
-
-        pr_set_pdeathsig = 1
-        libc = ctypes.CDLL("libc.so.6", use_errno=True)
-        return libc.prctl(pr_set_pdeathsig, int(sig), 0, 0, 0) == 0
-    except Exception:
-        return False
 
 
 def watch_parent(
@@ -497,16 +469,18 @@ if __name__ == "__main__":
         asyncio.set_event_loop(asyncio.SelectorEventLoop())
 
     from helao.core.version import get_hlo_version, hlo_version
-    from helao.helpers import config_loader
-    from helao.helpers import helao_logging as logging
-    from helao.helpers.parent_death import arm_parent_death_signal, monitor_detached
-    from helao.helpers.yml_tools import yml_load
+    from helao.helpers.launcher_bootstrap import launcher_bootstrap
+    from helao.helpers.parent_death import (
+        _set_pdeathsig,
+        arm_parent_death_signal,
+        monitor_detached,
+    )
 
     # Die with launch.py rather than orphaning and holding this server's two
     # ports. Armed here, at the top, so it also covers the port-preflight and
     # backend-spawn phases below. The kernel keeps exactly one PDEATHSIG per
     # process, so this is the *only* self-arming call in this launcher -- the
-    # separate install_pdeathsig() call under the backend's Popen arms the
+    # separate _set_pdeathsig() call under the backend's Popen arms the
     # backend, which is a different process.
     arm_parent_death_signal()
 
@@ -514,28 +488,8 @@ if __name__ == "__main__":
     confArg = sys.argv[1]
     server_key = sys.argv[2]
 
-    if config_loader.CONFIG is None:
-        config_dict, _validated = config_loader.read_validated_config(confArg)
-        config_loader.install_global_config(config_dict)
-    CONFIG = config_loader.CONFIG
-
-    server_config = CONFIG["servers"][server_key]
+    CONFIG, server_config, LOGGER = launcher_bootstrap(confArg, server_key)
     root = CONFIG.get("root", None)
-    log_root = os.path.join(root, "LOGS") if root else None
-    email_config = (
-        yml_load(CONFIG["alert_config_path"])
-        if CONFIG.get("alert_config_path", False)
-        else {}
-    )
-    if logging.LOGGER is None:
-        logging.LOGGER = logging.make_logger(
-            logger_name=server_key,
-            log_dir=log_root,
-            email_config=email_config,
-            log_level=server_config.get("log_level", CONFIG.get("log_level", 20)),
-        )
-    LOGGER = logging.LOGGER
-    LOGGER.info(f"Loaded config from: {CONFIG['loaded_config_path']}")
 
     servHost = server_config["host"]
     servPort = server_config["port"]
@@ -708,7 +662,7 @@ if __name__ == "__main__":
         stdin=subprocess.DEVNULL,
         start_new_session=(os.name == "posix"),
         preexec_fn=(
-            (lambda: install_pdeathsig(signal.SIGTERM))
+            (lambda: _set_pdeathsig(signal.SIGTERM))
             if sys.platform.startswith("linux")
             else None
         ),

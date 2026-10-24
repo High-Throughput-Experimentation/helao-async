@@ -9,10 +9,10 @@ __all__ = ["HloPostProcessor", "MetaProcessor"]
 
 import os
 from abc import ABC, abstractmethod
-from glob import glob
 
 from helao.core.models.file import FileInfo
 from helao.core.models.run_dir import redirect_manual_dir
+from helao.helpers.meta_io import meta_glob
 
 from .premodels import Action
 
@@ -45,21 +45,11 @@ class HloPostProcessor(ABC):
             save_root = redirect_manual_dir(str(save_root))
         self.output_dir = os.path.join(save_root, action.action_output_dir)
         exp_dir = os.path.dirname(self.output_dir)
-        # Record suffixes only. exp_dir is where a -prc.yml now lands, and its
-        # {pidx}__ filename sorts ahead of a timestamped -exp.yml.
-        exp_yml_paths = [
-            x
-            for x in sorted(glob(os.path.join(exp_dir, "*.yml")))
-            if x.endswith("-exp.yml")
-        ]
-        self.exp_yml_path = exp_yml_paths[0] if exp_yml_paths else None
+        exp_yml_paths = meta_glob(exp_dir, "exp")
+        self.exp_yml_path = str(exp_yml_paths[0]) if exp_yml_paths else None
         seq_dir = os.path.dirname(exp_dir)
-        seq_yml_paths = [
-            x
-            for x in sorted(glob(os.path.join(seq_dir, "*.yml")))
-            if x.endswith("-seq.yml")
-        ]
-        self.seq_yml_path = seq_yml_paths[0] if seq_yml_paths else None
+        seq_yml_paths = meta_glob(seq_dir, "seq")
+        self.seq_yml_path = str(seq_yml_paths[0]) if seq_yml_paths else None
         self.files = action.files
 
     @abstractmethod

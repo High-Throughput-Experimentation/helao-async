@@ -1,10 +1,10 @@
-"""Native meta-yml writer (hexagon P2b-1).
+"""Native record-metadata writer (hexagon P2b-1).
 
 Verbatim re-body of the CARDS-P6 ``MetaFileWriter`` collaborator
 (``helao/core/servers/base_meta_writer.py``): the atomic
 temp-file-then-``os.replace`` write, the three ``write_act``/``write_exp``/
-``write_seq`` writers (``file_type`` first key, trailing newline,
-manual runs resolved to the ``DIAG`` tree), and the file-connection-key
+``write_seq`` writers (``file_type`` first key, pretty JSON or an in-flight
+YAML rewrite, trailing newline, manual runs resolved to the ``DIAG`` tree), and the file-connection-key
 helpers. Method bodies were byte-identical to the legacy engine
 (source-parity-pinned by ``test_native_meta_writer.py``) when B7b deleted it;
 black left them unchanged.
@@ -23,7 +23,6 @@ it at call time (cache-nothing rule). ``ActionHost`` constructs it as its
 # suppressed at file scope rather than fixed in the bodies.
 # pyright: reportCallIssue=false, reportArgumentType=false, reportOptionalMemberAccess=false
 
-import hashlib
 import os
 from uuid import UUID
 
@@ -33,7 +32,8 @@ from helao.core.models.run_dir import redirect_manual_dir
 from helao.helpers import helao_logging as logging
 from helao.helpers.file_utils import replace_when_free, staging_path
 from helao.helpers.premodels import Action, Experiment, Sequence
-from helao.helpers.yml_tools import yml_dumps
+from helao.helpers.meta_io import dumps_meta, resolve_meta_path
+from helao.hexagon.domain.naming import new_file_conn_key
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -74,7 +74,7 @@ class NativeMetaFileWriter:
         await replace_when_free(tmp_file, output_file)
 
     async def write_act(self, action: Action):
-        """Write the action's metadata to ``<output_dir>/<timestamp>-act.yml`` if ``save_act``.
+        """Write ``<output_dir>/<timestamp>-act.json`` (or the existing ``-act.yml`` it rewrites in place) if ``save_act``.
 
         Args:
             action: ``Action`` whose metadata should be persisted.
@@ -87,21 +87,24 @@ class NativeMetaFileWriter:
             output_path = os.path.join(save_root, action.action_output_dir)
             output_file = os.path.join(
                 output_path,
-                f"{action.action_timestamp.strftime('%y%m%d.%H%M%S%f')}-act.yml",
+                f"{action.action_timestamp.strftime('%y%m%d.%H%M%S%f')}-act.json",
             )
 
             LOGGER.info(f"writing to act meta file: {output_path}")
 
             output_dict = {"file_type": "action"}
             output_dict.update(act_dict)
-            await self.base._write_meta_atomic(output_file, yml_dumps(output_dict))
+            target = resolve_meta_path(output_file)
+            await self.base._write_meta_atomic(
+                str(target), dumps_meta(output_dict, target)
+            )
         else:
             LOGGER.info(
                 f"writing meta file for action '{action.action_name}' is disabled."
             )
 
     async def write_exp(self, experiment: Experiment):
-        """Write the experiment's metadata to ``<experiment_dir>/<timestamp>-exp.yml``.
+        """Write ``<experiment_dir>/<timestamp>-exp.json`` (or the existing ``-exp.yml`` it rewrites in place).
 
         Args:
             experiment: ``Experiment`` whose metadata should be persisted.
@@ -113,16 +116,17 @@ class NativeMetaFileWriter:
         output_path = os.path.join(save_root, experiment.get_experiment_dir())
         output_file = os.path.join(
             output_path,
-            f"{experiment.experiment_timestamp.strftime('%y%m%d.%H%M%S%f')}-exp.yml",
+            f"{experiment.experiment_timestamp.strftime('%y%m%d.%H%M%S%f')}-exp.json",
         )
 
         LOGGER.info(f"writing to exp meta file: {output_file}")
         output_dict = {"file_type": "experiment"}
         output_dict.update(exp_dict)
-        await self.base._write_meta_atomic(output_file, yml_dumps(output_dict))
+        target = resolve_meta_path(output_file)
+        await self.base._write_meta_atomic(str(target), dumps_meta(output_dict, target))
 
     async def write_seq(self, sequence: Sequence):
-        """Write the sequence's metadata to ``<sequence_dir>/<timestamp>-seq.yml``.
+        """Write ``<sequence_dir>/<timestamp>-seq.json`` (or the existing ``-seq.yml`` it rewrites in place).
 
         Args:
             sequence: ``Sequence`` whose metadata should be persisted.
@@ -135,13 +139,14 @@ class NativeMetaFileWriter:
         output_path = os.path.join(save_root, sequence_dir)
         output_file = os.path.join(
             output_path,
-            f"{sequence.sequence_timestamp.strftime('%y%m%d.%H%M%S%f')}-seq.yml",
+            f"{sequence.sequence_timestamp.strftime('%y%m%d.%H%M%S%f')}-seq.json",
         )
 
         LOGGER.info(f"writing to seq meta file: {output_file}")
         output_dict = {"file_type": "sequence"}
         output_dict.update(seq_dict)
-        await self.base._write_meta_atomic(output_file, yml_dumps(output_dict))
+        target = resolve_meta_path(output_file)
+        await self.base._write_meta_atomic(str(target), dumps_meta(output_dict, target))
 
     def new_file_conn_key(self, key: str) -> UUID:
         """Return a UUID derived from the MD5 hash of ``key``.
@@ -149,15 +154,7 @@ class NativeMetaFileWriter:
         Args:
             key: Arbitrary string used to seed the hash.
         """
-        # return shortuuid.decode(key)
-        # Instansiate new md5_hash
-        md5_hash = hashlib.md5()
-        # Pass the_string to the md5_hash as bytes
-        md5_hash.update(key.encode("utf-8"))
-        # Generate the hex md5 hash of all the read bytes
-        the_md5_hex_str = md5_hash.hexdigest()
-        # Return a String repersenation of the uuid of the md5 hash
-        return UUID(the_md5_hex_str)
+        return new_file_conn_key(key)
 
     def dflt_file_conn_key(self) -> UUID:
         """Return the default file-connection key (``md5(str(None))``)."""

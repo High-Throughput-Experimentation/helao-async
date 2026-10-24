@@ -4,11 +4,10 @@ extracted from ``Orch`` (CARDS P5, Stage S5).
 ``Orch.register_obj_uuid``/``register_action_uuid``/``track_action_uuid``,
 the run-id/meta helpers (``_prep_sequence_meta``/``_ensure_run_id``/
 ``_resolve_active_run_id``), the add/rebuild/move/remove/list/get methods for
-the sequence/experiment/action deques, and the action-edit helpers
-(``supplement_error_action``/``replace_action``/``append_action``) plus the
+the sequence/experiment/action deques, plus the
 ``clear_sequences``/``clear_experiments``/``clear_actions`` trio implement the
 orchestrator's "cluster A": CRUD over the three run queues and the uuid
-history maps. This module moves those 32 method bodies into a ``RunQueues``
+history maps. This module moves those 29 method bodies into a ``RunQueues``
 collaborator that ``Orch`` delegates to.
 
 Per the P5 constraints (:doc:`CARDS_REFACTOR_P5.md` sec 3.1 rule 3):
@@ -36,9 +35,8 @@ from typing import Optional
 from uuid import UUID
 
 from helao.core.models.experiment import ExperimentModel, ShortExperimentModel
-from helao.core.models.hlostatus import HloStatus
 from helao.helpers import helao_logging as logging
-from helao.helpers.premodels import Action, Experiment, Sequence
+from helao.helpers.premodels import Experiment, Sequence
 from helao.helpers.time_utils import gen_uuid
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -479,90 +477,3 @@ class RunQueues:
             offset: Index of the first action to return.
         """
         return _dq_page(self.orch.action_dq, limit, offset, lambda d: d.get_act())
-
-    def supplement_error_action(self, check_uuid: UUID, sup_action: Action):
-        """Retry an errored action by appending ``sup_action`` to the front of ``action_dq``.
-
-        Args:
-            check_uuid: UUID of the previously errored action.
-            sup_action: Replacement action whose order/retry counters get adjusted.
-        """
-        orch = self.orch
-
-        error_uuids = orch.globalstatusmodel.find_hlostatus_in_finished(
-            hlostatus=HloStatus.errored,
-        )
-        if not error_uuids:
-            LOGGER.info("There are no error statuses to replace")
-        else:
-            if check_uuid in error_uuids:
-                EA_act = error_uuids[check_uuid]
-                # sup_action can be a differnt one,
-                # but for now we treat it thats a retry of the errored one
-                new_action = sup_action
-                new_action.action_order = EA_act.action_order
-                # will be updated again once its dispatched again
-                new_action.action_actual_order = EA_act.action_actual_order
-                new_action.action_retry = EA_act.action_retry + 1
-                new_action.action_server.machine_name = orch.server.machine_name
-                orch.action_dq.appendleft(new_action)
-            else:
-                LOGGER.info(f"uuid {check_uuid} not found in list of error statuses:")
-                LOGGER.info(", ")
-
-    def replace_action(
-        self,
-        sup_action: Action,
-        by_index: Optional[int] = None,
-        by_uuid: Optional[UUID] = None,
-        by_action_order: Optional[int] = None,
-    ):
-        """Replace a queued action selected by index, UUID, or action order with ``sup_action``."""
-        orch = self.orch
-        if by_index:
-            i = by_index
-        elif by_uuid:
-            i = [
-                i
-                for i, A in enumerate(list(orch.action_dq))
-                if A.action_uuid == by_uuid
-            ][0]
-        elif by_action_order:
-            i = [
-                i
-                for i, A in enumerate(list(orch.action_dq))
-                if A.action_order == by_action_order
-            ][0]
-        else:
-            LOGGER.info("No arguments given for locating existing action to replace.")
-            return None
-        # get action_order of selected action which gets replaced
-        current_action_order = orch.action_dq[i].action_order
-        new_action = sup_action
-        new_action.action_order = current_action_order
-        new_action.action_server.machine_name = orch.server.machine_name
-        orch.action_dq.insert(i, new_action)
-        del orch.action_dq[i + 1]
-
-    def append_action(self, sup_action: Action):
-        """Append ``sup_action`` to ``action_dq`` and assign it the next action order."""
-        orch = self.orch
-        if len(orch.action_dq) == 0:
-            last_action_order = (
-                orch.globalstatusmodel.counter_dispatched_actions[
-                    orch.active_experiment.experiment_uuid
-                ]
-                - 1
-            )
-            if last_action_order < 0:
-                # no action was dispatched yet
-                last_action_order = 0
-        else:
-            last_action_order = orch.action_dq[-1].action_order
-
-        new_action_order = last_action_order + 1
-        new_action = sup_action
-        new_action.action_uuid = gen_uuid()
-        new_action.action_order = new_action_order
-        new_action.action_server.machine_name = orch.server.machine_name
-        orch.action_dq.append(new_action)

@@ -2,7 +2,7 @@
 
 Pairs a ``GamryDtaq`` (data acquisition class) with a ``GamrySignal``
 (excitation waveform) plus range-handling flags to fully describe a single
-electrochemical technique. Pre-built instances cover LSV, LSA, CA, CP, CV,
+electrochemical technique. Pre-built instances cover LSV, CA, CP, CV,
 OCV, and RCA.
 """
 
@@ -86,18 +86,6 @@ TECH_LSV = GamryTechnique(
         "Vinit__V",
         "Vfinal__V",
     ],  # max absolute value of these params to set range
-)
-
-TECH_LSA = GamryTechnique(
-    name="LSA",
-    on_method=OnMethod.CellOn,
-    dtaq=DTAQ_CPIV,
-    signal=ISIGNAL_RAMP,
-    set_ierangemode=False,
-    ierange_keys=[
-        "Iinit__A",
-        "Ifinal__A",
-    ],  # max absolute value of these params to set rang
 )
 
 TECH_CA = GamryTechnique(

@@ -6,8 +6,8 @@ import pytest
 
 from helao.deploy.hte.experiments import (
     ANEC_exp,
-    CCSI_exp,
     CLAD_exp,
+    CSIL_exp,
     ECHE_exp,
     ECMS_exp,
     HISPEC_exp,
@@ -34,16 +34,6 @@ def test_clad_gas_only_load():
     assert len(gas) == 1 and gas[0].action_params["source_gas_in"]["sample_no"] == 3
     acts = CLAD_exp.CLAD_sub_load_sample(liquid_sample_no=1, gas_volume_ml=5.0)
     assert not _by(acts, name="archive_custom_add_gas")
-
-
-def test_ccsi_n2drain_always_closes_n2_supply():
-    acts = CCSI_exp.CCSI_sub_n2drain(drain_recirculation=False)
-    n2 = [
-        a.action_params["on"]
-        for a in _by(acts, "NI", "gasvalve")
-        if a.action_params["gasvalve"] == "11-n2supply"
-    ]
-    assert n2 == [1, 0]
 
 
 def test_ecms_volume_ul_converted_to_ml():
@@ -171,18 +161,15 @@ def test_adss_cv_rhe_reference_has_no_ph_term():
 
 
 def test_ccsi_load_gas_uses_custom_load_without_volume():
-    acts = CCSI_exp.CCSI_sub_load_gas(reservoir_gas_sample_no=2, volume_ul_cell_gas=500)
+    acts = CSIL_exp.CCSI_sub_load_gas(reservoir_gas_sample_no=2, volume_ul_cell_gas=500)
     assert not _by(acts, name="archive_custom_add_gas")
     p = _by(acts, name="archive_custom_load")[0].action_params
     assert "volume_ml" not in p and p["load_sample_in"]["sample_no"] == 2
 
 
 def test_ccsi_pressure_technique_name_spelling():
-    from helao.deploy.hte.experiments import CSIL_exp
-
-    for mod in (CCSI_exp, CSIL_exp):
-        src = inspect.getsource(mod)
-        assert "pressure_measurre" not in src and "pressure_measure" in src
+    src = inspect.getsource(CSIL_exp)
+    assert "pressure_measurre" not in src and "pressure_measure" in src
 
 
 def test_clad_seq_reference_position_override_reaches_experiment():

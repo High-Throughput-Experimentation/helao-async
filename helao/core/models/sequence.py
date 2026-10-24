@@ -18,7 +18,7 @@ from .experiment import (
 from .file import FileInfo
 from .hlostatus import HloStatus
 from .machine import MachineModel
-from .status_transitions import guarded_append, guarded_replace, guarded_reset
+from .status_transitions import guarded_replace, guarded_reset
 
 
 class ShortSequenceModel(BaseModel, HelaoDict):
@@ -134,14 +134,6 @@ class SequenceModel(ShortSequenceModel):
     # §5.2). clean_dict drops the empty default, so ymls without failures are
     # byte-identical to before the field existed.
     prefinish_errors: list[dict] = Field(default=[])
-
-    def append_sequence_status(self, s: HloStatus) -> None:
-        """Guarded append onto ``sequence_status`` (see status_transitions.guarded_append)."""
-        guarded_append(
-            self.sequence_status,
-            s,
-            owner=f"sequence {self.sequence_uuid}/{self.sequence_name}",
-        )
 
     def replace_sequence_status(self, old: HloStatus, new: HloStatus) -> None:
         """Guarded swap-or-append onto ``sequence_status`` (see status_transitions.guarded_replace)."""

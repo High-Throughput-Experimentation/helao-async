@@ -10,6 +10,7 @@ mask/value pairs passed to ``SetDigitalOut`` to assert or clear each TTL line.
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Optional
 
 from .range import (
     Gamry_IErange_dflt,
@@ -44,55 +45,66 @@ class GamryPstat:
         device: GamryCOM ProgID used to create the COM object (e.g.
             ``"GamryCOM.GamryPC6Pstat"``).
         ierange: Current-range ``StrEnum`` class appropriate for the model.
-        set_sensemode: Value passed to ``SetSenseSpeedMode`` during setup.
-        set_rangemode: Value passed to ``SetIERangeMode`` when auto-ranging.
+        set_sensemode: Value passed to ``SetSenseSpeedMode`` during setup;
+            ``None`` makes no call and leaves the instrument's own setting.
+        set_rangemode: Value passed to ``SetIERangeMode`` for an ``auto``
+            IErange; a fixed IErange passes ``False``. ``None`` makes no call
+            for either.
+
+    The IFC1010 makes no ``SetSenseSpeedMode`` call, as in the legacy driver
+    (2022). Its range mode is set on every run: with ``None`` an ``auto`` run
+    kept whatever mode the last CP/LSA/EIS run left (off), and the 2024
+    refactor's ``False`` switched auto-ranging off on every ``auto`` run.
+    REF30K postdates the legacy driver and keeps its own ``False``/``False``
+    ("does not support range mode", 0930d78d).
     """
 
     device: str
     ierange: StrEnum
-    set_sensemode: bool
-    set_rangemode: bool
+    set_sensemode: Optional[bool]
+    set_rangemode: Optional[bool]
 
 
 IFC1010 = GamryPstat(
     device="GamryCOM.GamryPC6Pstat",
     ierange=Gamry_IErange_IFC1010,
-    set_sensemode=True,
-    set_rangemode=False,
+    set_sensemode=None,
+    # accepts SetIERangeMode: CP/LSA and EIS already send it False on this model
+    set_rangemode=True,
 )
 
 REF600 = GamryPstat(
     device="GamryCOM.GamryPC5Pstat",
     ierange=Gamry_IErange_REF600,
-    set_sensemode=False,
+    set_sensemode=True,
     set_rangemode=True,
 )
 
 PCI4G300 = GamryPstat(
     device="GamryCOM.GamryPstat",
     ierange=Gamry_IErange_PCI4G300,
-    set_sensemode=False,
+    set_sensemode=True,
     set_rangemode=True,
 )
 
 PCI4G750 = GamryPstat(
     device="GamryCOM.GamryPstat",
     ierange=Gamry_IErange_PCI4G750,
-    set_sensemode=False,
+    set_sensemode=True,
     set_rangemode=True,
 )
 
 DEFAULT = GamryPstat(
     device="GamryCOM.GamryPC5Pstat",
     ierange=Gamry_IErange_dflt,
-    set_sensemode=False,
+    set_sensemode=True,
     set_rangemode=True,
 )
 
 REF30K = GamryPstat(
     device="GamryCOM.GamryPstat",
     ierange=Gamry_IErange_REF30K,
-    set_sensemode=False,
+    set_sensemode=False,  # never sent True by any setup(); unverified on station
     set_rangemode=False,
 )
 

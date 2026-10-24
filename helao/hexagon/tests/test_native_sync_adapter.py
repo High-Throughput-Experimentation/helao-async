@@ -1,6 +1,6 @@
-"""NativeSyncer (D2: HelaoSyncer config resolution sans Base) +
-NativeSyncAdapter (SyncPort conformance + delegation) + the D4 negative:
-sync stays OUT of the REQUIRED wiring sets until P2e."""
+"""NativeSyncer (D2: the syncer's config resolution sans Base) +
+NativeSyncAdapter (SyncPort conformance + delegation) + the negative: sync stays
+OUT of the REQUIRED wiring sets, because it is bound at startup."""
 
 from pathlib import Path
 from types import SimpleNamespace
@@ -36,7 +36,7 @@ def _host(tmp_path, local_params, world_db_params):
 
 @pytest.mark.asyncio
 async def test_falls_back_to_db_params_without_aws_config_path(tmp_path):
-    """HelaoSyncer semantics (sync_driver.py:2084-2091): local params lacking
+    """The syncer's config semantics (NativeSyncer.__init__): local params lacking
     aws_config_path + DB present in world servers -> DB params win."""
     host = _host(
         tmp_path,
@@ -92,11 +92,12 @@ async def test_adapter_is_sync_port_and_delegates(tmp_path):
     assert adapter.n_queue() == 0
     await adapter.enqueue_yml(tmp_path / "RUNS_FINISHED" / "a-seq.yml", rank=2)
     assert adapter.n_queue() == 1
-    assert (await adapter.reset_sync(str(tmp_path / "nope"))) is False
+    assert adapter.reset_sync(str(tmp_path / "nope")) is False
     assert adapter.list_pending() == []
 
 
-def test_sync_stays_unwired_until_p2e():
-    """D4: no live hexagon consumer until the P2e DB cut-over."""
+def test_sync_is_not_a_required_port():
+    """Bound at startup (the syncer needs a running loop), and an orchestrator
+    with no SYNC server runs without one."""
     assert "sync" not in ORCH_REQUIRED
     assert "sync" not in ACTION_REQUIRED

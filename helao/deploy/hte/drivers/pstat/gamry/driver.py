@@ -54,12 +54,16 @@ class GamryDriver(HelaoDriver):
         model: ``GamryPstat`` descriptor selected based on ``device_name``.
     """
 
+    connect_on_startup = (
+        True  # the host connects after _base_hook, before dyn_endpoints
+    )
+
     dtaqsink: GamryDtaqSink
     device_name: str
     model: GamryPstat
 
     def __init__(self, config: dict = {}):
-        """Initialize the driver and open the GamryCOM connection.
+        """Initialize the driver; the host opens the GamryCOM connection via :meth:`connect`.
 
         Args:
             config: Driver configuration. Recognized keys are ``dev_id``
@@ -85,8 +89,6 @@ class GamryDriver(HelaoDriver):
         self.grounded = int(self.config.get("grounded", True))
         self.connection_raised = False
         self.stopping = False
-        self.connect()
-        LOGGER.debug(f"connected to {self.device_name} on device_id {self.device_id}")
 
     def _create_and_open_pstat(self, client) -> None:
         """Load the type library, enumerate the device, create + Open the pstat.
@@ -240,6 +242,7 @@ class GamryDriver(HelaoDriver):
         import comtypes.client as client
 
         try:
+            assert self.pstat is not None, "setup() before connect()"
             # check for ongoing measurement via dtaqsink
             if not isinstance(self.dtaqsink, DummySink):
                 raise TypeError(
@@ -250,7 +253,8 @@ class GamryDriver(HelaoDriver):
             # self.pstat.SetCell(self.GamryCOM.CellOff)
             self.pstat.SetPosFeedEnable(False)
             self.pstat.SetIEStability(self.GamryCOM.StabilityFast)
-            self.pstat.SetSenseSpeedMode(self.model.set_sensemode)
+            if self.model.set_sensemode is not None:
+                self.pstat.SetSenseSpeedMode(self.model.set_sensemode)
             self.pstat.SetIConvention(self.GamryCOM.Anodic)
             self.pstat.SetGround(self.config.get("grounded", True))
 
@@ -290,9 +294,15 @@ class GamryDriver(HelaoDriver):
             self.pstat.SetIERange(0.03)  # default range
             range_enum = get_range(ierange, self.model.ierange)
             if range_enum == self.model.ierange.auto:
-                self.pstat.SetIERangeMode(self.model.set_rangemode)
+                if self.model.set_rangemode is not None:
+                    self.pstat.SetIERangeMode(self.model.set_rangemode)
             else:
                 self.pstat.SetIERange(RANGES[range_enum.name])
+                # auto-ranging persists on the open pstat (an earlier auto run
+                # leaves it on), so a fixed range must switch it off or the
+                # current is not clipped at the range limit
+                if self.model.set_rangemode is not None:
+                    self.pstat.SetIERangeMode(False)
 
             # override device-specific ranges with technique ranges if given
             self.pstat.SetCtrlMode(getattr(self.GamryCOM, technique.signal.mode.value))
@@ -312,6 +322,14 @@ class GamryDriver(HelaoDriver):
                 )
                 ierangeval = self.pstat.TestIERange(setpointie)
                 self.pstat.SetIERange(ierangeval)
+            try:
+                LOGGER.info(
+                    f"IE range requested {range_enum.name}; instrument reports "
+                    f"auto-range {self.pstat.IERangeMode()}, "
+                    f"range {self.pstat.IERange()}"
+                )
+            except Exception:
+                LOGGER.warning("IE range readback failed", exc_info=True)
 
             # initialize dtaq
             self.dtaq = client.CreateObject(technique.dtaq.name)

@@ -13,6 +13,7 @@ from copy import copy
 import pandas as pd
 
 from helao.core.models.file import FileInfo
+from helao.hexagon.domain.naming import data_sibling
 from helao.helpers import helao_logging as logging
 from helao.helpers.hlo_data import read_hlo
 from helao.helpers.processors import HloPostProcessor
@@ -21,10 +22,10 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 class PostProcess(HloPostProcessor):
-    """Convert HLO data files to CSV and register the new files."""
+    """Convert HLO/JSONL data files to CSV and register the new files."""
 
     def process(self) -> list[FileInfo]:
-        """Write a CSV copy of each ``.hlo`` data file in the action output.
+        """Write a CSV copy of each ``.hlo``/``.jsonl`` data file in the action output.
 
         Returns:
             list[FileInfo]: Original files plus one ``*_csv__file``
@@ -35,12 +36,12 @@ class PostProcess(HloPostProcessor):
             try:
                 if act_file.file_type.endswith(
                     "helao__file"
-                ) and act_file.file_name.endswith(".hlo"):
+                ) and act_file.file_name.endswith((".hlo", ".jsonl")):
                     file_path = os.path.join(self.output_dir, act_file.file_name)
                     _, data = read_hlo(file_path)
                     df = pd.DataFrame(data)
                     action_comment = self.action.action_params.get("comment", "")
-                    new_file_path = file_path.replace(".hlo", ".csv")
+                    new_file_path = data_sibling(file_path, ".csv")
                     if action_comment:
                         new_file_path = new_file_path.replace(
                             ".csv", f"_{action_comment}.csv"

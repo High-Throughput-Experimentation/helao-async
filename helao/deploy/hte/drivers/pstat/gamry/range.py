@@ -154,19 +154,17 @@ class Gamry_IErange_dflt(StrEnum):
 
 
 class Gamry_IErange_REF30K(StrEnum):
-    """Current ranges for Reference 30K booster potentiostats (300 pA to 30 A)."""
+    """Current ranges for the Reference 3000 with the 30K booster.
+
+    The booster allows only 30 mA, 300 mA, 3 A and 30 A (Reference 30k
+    Booster Operator's Manual, 988-00104); the toolkit's Ref 3000 column puts
+    them at indices 10-13. A smaller index is a Parameter Error from
+    ``SetIERange``, so a request below 30 mA resolves to ``mode10``. ``auto``
+    stays: the booster has no auto-ranging (``set_rangemode=False``), and
+    setup()'s default ``SetIERange(0.03)`` leaves it on the 30 mA range.
+    """
 
     auto = "auto"
-    # mode0 = "mode0"
-    # mode1 = "mode1"
-    mode2 = "300pA"
-    mode3 = "3nA"
-    mode4 = "30nA"
-    mode5 = "300nA"
-    mode6 = "3uA"
-    mode7 = "30uA"
-    mode8 = "300uA"
-    mode9 = "3mA"
     mode10 = "30mA"
     mode11 = "300mA"
     mode12 = "3A"

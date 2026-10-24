@@ -71,14 +71,14 @@ MODEL_SPECS = [
     (
         ExperimentModel,
         "experiment_status",
-        "append_experiment_status",
+        None,
         "replace_experiment_status",
         "reset_experiment_status",
     ),
     (
         SequenceModel,
         "sequence_status",
-        "append_sequence_status",
+        None,
         "replace_sequence_status",
         "reset_sequence_status",
     ),
@@ -209,8 +209,11 @@ def status_transitions_unit_test() -> bool:
             replace_method,
             reset_method,
         ) in MODEL_SPECS:
-            reporter.section(f"{model_cls.__name__}.{append_method} (guarded_append)")
-            _check_append(reporter, model_cls, field, append_method)
+            if append_method:  # only the action model has an append method
+                reporter.section(
+                    f"{model_cls.__name__}.{append_method} (guarded_append)"
+                )
+                _check_append(reporter, model_cls, field, append_method)
 
             reporter.section(f"{model_cls.__name__}.{replace_method} (guarded_replace)")
             _check_replace(reporter, model_cls, field, replace_method)

@@ -405,6 +405,7 @@ def snapshot(root: Path, mapper: UuidMapper) -> TreeSnapshot:
         if row in (ArtifactRow.IGNORE, ArtifactRow.LOCK):
             continue
         parts = f.relative_to(root).parts
+        collapse = row is not ArtifactRow.S3_RECORD
         if row is ArtifactRow.PRC_YML:
             # A process artifact is keyed by its filename alone, never by its
             # full path. The write moved from root/PROCESSES into the RUNS_*
@@ -452,14 +453,17 @@ def snapshot(root: Path, mapper: UuidMapper) -> TreeSnapshot:
                 if tok.endswith(".origdir"):
                     container = tok
             prefix = f"{container}/" if container else ""
-            norm = mapper.sub(f"PRC/{prefix}{normalize_name(parts[-1])}", strict=True)
+            norm = mapper.sub(
+                f"PRC/{prefix}{normalize_name(parts[-1], collapse_new_suffixes=collapse)}",
+                strict=True,
+            )
         else:
             norm_parts = []
             cur = root
             for name in parts[:-1]:
                 cur = cur / name
                 norm_parts.append(token_of[cur])
-            norm_parts.append(normalize_name(parts[-1]))
+            norm_parts.append(normalize_name(parts[-1], collapse_new_suffixes=collapse))
             norm = mapper.sub("/".join(norm_parts), strict=True)
         if norm in snap.files:
             raise ValueError(f"normalized-name collision: {norm} ({rel})")

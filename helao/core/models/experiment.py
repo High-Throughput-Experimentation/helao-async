@@ -18,7 +18,7 @@ from .hlostatus import HloStatus
 from .machine import MachineModel
 from .run_use import RunUse
 from .sample import SampleUnion
-from .status_transitions import guarded_append, guarded_replace, guarded_reset
+from .status_transitions import guarded_replace, guarded_reset
 
 
 class ShortExperimentModel(BaseModel, HelaoDict):
@@ -134,14 +134,6 @@ class ExperimentModel(ShortExperimentModel):
     # §5.2). clean_dict drops the empty default, so ymls without failures are
     # byte-identical to before the field existed.
     prefinish_errors: list[dict] = Field(default=[])
-
-    def append_experiment_status(self, s: HloStatus) -> None:
-        """Guarded append onto ``experiment_status`` (see status_transitions.guarded_append)."""
-        guarded_append(
-            self.experiment_status,
-            s,
-            owner=f"experiment {self.experiment_uuid}/{self.experiment_name}",
-        )
 
     def replace_experiment_status(self, old: HloStatus, new: HloStatus) -> None:
         """Guarded swap-or-append onto ``experiment_status`` (see status_transitions.guarded_replace)."""

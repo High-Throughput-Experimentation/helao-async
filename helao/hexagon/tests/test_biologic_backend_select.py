@@ -168,6 +168,7 @@ def test_run_protocol_registers_only_on_the_ole_backend(with_config, monkeypatch
         )
         app = biologic_server.makeApp("BIOLOGIC")
         app.driver = biologic_server.BACKENDS[backend](config=app.server_params)
+        app.driver.connect()  # the host connects before dyn_endpoints runs
         asyncio.run(biologic_server.biologic_dyn_endpoints(app))
         return {route.path for route in app.routes}
 

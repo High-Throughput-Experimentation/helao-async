@@ -82,20 +82,6 @@ def makeApp(server_key) -> ActionHost:
     # ------------------------------------------------------------------
 
     @app.action()
-    async def convert_v1DB(ctx: ActionContext) -> dict:
-        """Convert the legacy liquid JSON database to the SQLite schema.
-
-        Args:
-            action: Action wrapper supplied by the orchestrator.
-
-        Returns:
-            An empty dictionary once the migration completes.
-        """
-        # await app.driver.convert_oldDB_to_sqllite()
-        await app.driver.unified_db.liquidAPI.old_jsondb_to_sqlitedb()
-        return {}
-
-    @app.action()
     async def archive_tray_query_sample(
         ctx: ActionContext,
         tray: Optional[int] = None,

@@ -135,28 +135,10 @@ def UVIS_sub_startup(
         },
         start_condition=ActionStartCondition.wait_for_server,
     )
-    # get sample plate coordinates
-    apm.add(
-        MOTOR_server,
-        "solid_get_samples_xy",
-        {
-            "plate_id": solid_plate_id,
-            "sample_no": solid_sample_no,
-        },
-        start_condition=ActionStartCondition.no_wait,
-        to_global_params=["_platexy"],  # save new liquid_sample_no of cell to globals
-    )
-    # move to position
-    apm.add(
-        MOTOR_server,
-        "move",
-        {
-            "axis": ["x", "y"],
-            "mode": MoveModes.absolute,
-            "transformation": TransformationModes.platexy,
-        },
-        start_condition=ActionStartCondition.wait_for_previous,
-        from_global_act_params={"_platexy": "d_mm"},
+    apm.add_actions(
+        UVIS_sub_movetosample(
+            solid_plate_id=solid_plate_id, solid_sample_no=solid_sample_no
+        )
     )
     return apm.planned_actions  # returns complete action list to orch
 

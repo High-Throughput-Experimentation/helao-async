@@ -15,7 +15,6 @@ import asyncio
 
 import pytest
 
-import helao.core.drivers.data.sync_driver as legacy_mod
 import helao.hexagon.adapters.native.sync_driver as native_mod
 from helao.hexagon.tests.sync_fixtures import (
     make_action,
@@ -26,7 +25,7 @@ from helao.hexagon.tests.sync_fixtures import (
 )
 
 
-@pytest.mark.parametrize("mod", [legacy_mod, native_mod])
+@pytest.mark.parametrize("mod", [native_mod])
 @pytest.mark.asyncio
 async def test_a_synced_action_requeues_its_experiment(tmp_path, mod):
     drv = make_sync_driver(tmp_path, mod.SyncDriver)

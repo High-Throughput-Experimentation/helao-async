@@ -40,7 +40,338 @@ from helao.helpers.lib_decorators import sequence
 from helao.helpers.premodels import ExperimentPlanMaker
 
 
-@sequence(version=2)
+def _anec_seq_cell(
+    tech,
+    loop,
+    sampling=None,
+    flush=True,
+    setheat=False,
+    heatoff=None,
+    alloff=None,
+    ready_prefix=False,
+    **p,
+):
+    """Shared body of the load -> [fill, technique, sample, drain] ANEC sequences.
+
+    ``p`` is the calling sequence's own parameters (its ``locals()``); the
+    keyword knobs select the variant:
+
+    tech: ``"CA"`` | ``"HeatCA"`` | ``"photo_CA"`` | ``"OCV"`` | ``"CV"`` | ``"photo_CV"``.
+    loop: ``"series"`` (zip WE_potential__V/CA_duration_sec lists), ``"repeat"``
+        (``num_repeats`` x scalar params) or ``"once"``.
+    sampling: ``None`` | ``"aliquot"`` | ``"aliquot_nomixing"`` |
+        ``"liquidarchive"`` | ``"GC_preparation"`` | ``"GC_headspacealiquot_nomixing"``.
+    flush: add ``ANEC_sub_flush_fill_cell`` each iteration
+        (flush time ``p["liquid_flush_time"]``, default 80 s).
+    setheat: add ``ANEC_sub_setheat`` at the top of each iteration.
+    heatoff: ``None`` | ``"end"`` (after the loop).
+    alloff: ``None`` | ``"always"`` | ``"multi"`` (only for >1 potential).
+    ready_prefix: prepend startup, normal_state and two cleanups.
+    """
+    epm = ExperimentPlanMaker()
+    if ready_prefix:
+        # move to solid sample, clean the cell & purge with CO2
+        epm.add(
+            "ANEC_sub_startup",
+            {
+                "solid_plate_id": p["plate_id"],
+                "solid_sample_no": p["solid_sample_no"],
+                "z_move_mm": p["z_move_mm"],
+            },
+        )
+        epm.add("ANEC_sub_normal_state", {})
+        epm.add("ANEC_sub_cleanup", {"reservoir_liquid_sample_no": 1})
+        epm.add("ANEC_sub_cleanup", {"reservoir_liquid_sample_no": 1})
+
+    # housekeeping
+    epm.add(
+        "ANEC_sub_load_solid_only",
+        {"solid_plate_id": p["plate_id"], "solid_sample_no": p["solid_sample_no"]},
+    )
+
+    scalar = (p.get("WE_potential__V"), p.get("CA_duration_sec"))
+    if loop == "series":
+        cycles = zip(p["WE_potential__V"], p["CA_duration_sec"])
+    elif loop == "repeat":
+        cycles = (scalar for _ in range(p["num_repeats"]))
+    else:
+        cycles = [scalar]
+
+    for cycle, (potential, time) in enumerate(cycles):
+        if loop == "series":
+            print(
+                f" ... cycle {cycle} potential:",
+                potential,
+                f" ... cycle {cycle} duration:",
+                time,
+            )
+        if setheat:
+            epm.add(
+                "ANEC_sub_setheat",
+                {"target_temperature_degc": p["target_temperature_degc"]},
+            )
+        if flush:
+            epm.add(
+                "ANEC_sub_flush_fill_cell",
+                {
+                    "liquid_flush_time": p.get("liquid_flush_time", 80),
+                    "co2_purge_time": 15,
+                    "equilibration_time": 1.0,
+                    "reservoir_liquid_sample_no": p["reservoir_liquid_sample_no"],
+                    "volume_ul_cell_liquid": p["volume_ul_cell_liquid"],
+                },
+            )
+
+        if tech == "CA":
+            epm.add(
+                "ANEC_sub_CA",
+                {
+                    "WE_potential__V": potential,
+                    "WE_versus": p["WE_versus"],
+                    "OCV_duration__s": p["OCV_duration__s"],
+                    "ref_type": p["ref_type"],
+                    "pH": p["pH"],
+                    "ref_offset__V": p["ref_offset__V"],
+                    "CA_duration_sec": time,
+                    "SampleRate": p["SampleRate"],
+                    "IErange": p["IErange"],
+                },
+            )
+        elif tech == "HeatCA":
+            epm.add(
+                "ANEC_sub_HeatCA",
+                {
+                    "WE_potential__V": potential,
+                    "WE_versus": p["WE_versus"],
+                    "OCV_duration__s": p["OCV_duration__s"],
+                    "ref_type": p["ref_type"],
+                    "pH": p["pH"],
+                    "ref_offset__V": p["ref_offset__V"],
+                    "CA_duration_sec": time,
+                    "SampleRate": p["SampleRate"],
+                    "IErange": p["IErange"],
+                    "target_temperature_degc": p["target_temperature_degc"],
+                },
+            )
+        elif tech == "photo_CA":
+            epm.add(
+                "ANEC_sub_photo_CA",
+                {
+                    "WE_potential__V": potential,
+                    "WE_versus": p["WE_versus"],
+                    "OCV_duration__s": p["OCV_duration__s"],
+                    "ref_type": p["ref_type"],
+                    "pH": p["pH"],
+                    "ref_offset__V": p["ref_offset__V"],
+                    "CA_duration_sec": time,
+                    "SampleRate": p["SampleRate"],
+                    "IErange": p["IErange"],
+                    "gamrychannelwait": p["gamrychannelwait"],
+                    "gamrychannelsend": p["gamrychannelsend"],
+                    "illumination_source": p["led_name_CA"],
+                    "illumination_wavelength": p["led_wavelengths_nm"],
+                    "illumination_intensity": p["led_intensities_mw"],
+                    "illumination_intensity_date": p["led_date"],
+                    "illumination_side": p["led_type"],
+                    "toggle_illum_duty": p["toggleCA_illum_duty"],
+                    "toggle_illum_period": p["toggleCA_illum_period"],
+                    "toggle_illum_time": p["toggleCA_illum_time"],
+                    "toggle_dark_time_init": p["toggleCA_dark_time_init"],
+                },
+            )
+        elif tech == "OCV":
+            epm.add(
+                "ANEC_sub_OCV",
+                {"Tval__s": p["Tval__s"], "IErange": p["IErange"]},
+            )
+        elif tech == "CV":
+            epm.add(
+                "ANEC_sub_CV",
+                {
+                    "WE_versus": p["WE_versus"],
+                    "OCV_duration__s": p["OCV_duration__s"],
+                    "ref_type": p["ref_type"],
+                    "ref_offset__V": p["ref_offset"],
+                    "pH": p["pH"],
+                    "WE_potential_init__V": p["WE_potential_init__V"],
+                    "WE_potential_apex1__V": p["WE_potential_apex1__V"],
+                    "WE_potential_apex2__V": p["WE_potential_apex2__V"],
+                    "WE_potential_final__V": p["WE_potential_final__V"],
+                    "ScanRate_V_s": p["ScanRate_V_s"],
+                    "Cycles": p["Cycles"],
+                    "SampleRate": p["SampleRate"],
+                    "IErange": p["IErange"],
+                },
+            )
+        elif tech == "photo_CV":
+            epm.add(
+                "ANEC_sub_photo_CV",
+                {
+                    "WE_versus": p["WE_versus"],
+                    "OCV_duration__s": p["OCV_duration__s"],
+                    "ref_type": p["ref_type"],
+                    "ref_offset__V": p["ref_offset"],
+                    "pH": p["pH"],
+                    "WE_potential_init__V": p["WE_potential_init__V"],
+                    "WE_potential_apex1__V": p["WE_potential_apex1__V"],
+                    "WE_potential_apex2__V": p["WE_potential_apex2__V"],
+                    "WE_potential_final__V": p["WE_potential_final__V"],
+                    "ScanRate_V_s": p["ScanRate_V_s"],
+                    "Cycles": p["Cycles"],
+                    "SampleRate": p["SampleRate"],
+                    "IErange": p["IErange"],
+                    "gamrychannelwait": p["gamrychannelwait"],
+                    "gamrychannelsend": p["gamrychannelsend"],
+                    "illumination_source": p["led_name_CA"],
+                    "illumination_wavelength": p["led_wavelengths_nm"],
+                    "illumination_intensity": p["led_intensities_mw"],
+                    "illumination_intensity_date": p["led_date"],
+                    "illumination_side": p["led_type"],
+                    "toggle_illum_duty": p["toggleCA_illum_duty"],
+                    "toggle_illum_period": p["toggleCA_illum_period"],
+                    "toggle_illum_time": p["toggleCA_illum_time"],
+                    "toggle_dark_time_init": p["toggleCA_dark_time_init"],
+                },
+            )
+        else:
+            raise ValueError(f"unknown ANEC technique {tech!r}")
+
+        # literal dicts throughout: test_sequence_param_keys.py only checks
+        # keys of a dict literal passed straight to epm.add
+        if sampling == "aliquot":
+            epm.add(
+                "ANEC_sub_aliquot",
+                {
+                    "toolGC": p["toolGC"],
+                    "toolarchive": p["toolarchive"],
+                    "volume_ul_GC": p["volume_ul_GC"],
+                    "volume_ul_archive": p["volume_ul_archive"],
+                    "wash1": p["wash1"],
+                    "wash2": p["wash2"],
+                    "wash3": p["wash3"],
+                    "wash4": p["wash4"],
+                },
+            )
+        elif sampling == "aliquot_nomixing":
+            epm.add(
+                "ANEC_sub_aliquot_nomixing",
+                {
+                    "toolGC": p["toolGC"],
+                    "toolarchive": p["toolarchive"],
+                    "volume_ul_GC": p["volume_ul_GC"],
+                    "volume_ul_archive": p["volume_ul_archive"],
+                    "wash1": p["wash1"],
+                    "wash2": p["wash2"],
+                    "wash3": p["wash3"],
+                    "wash4": p["wash4"],
+                },
+            )
+        elif sampling == "liquidarchive":
+            epm.add(
+                "ANEC_sub_liquidarchive",
+                {
+                    "toolarchive": p["toolarchive"],
+                    "volume_ul_archive": p["volume_ul_archive"],
+                    "wash1": p["wash1"],
+                    "wash2": p["wash2"],
+                    "wash3": p["wash3"],
+                    "wash4": p["wash4"],
+                },
+            )
+        elif sampling == "GC_preparation":
+            epm.add(
+                "ANEC_sub_GC_preparation",
+                {"toolGC": p["toolGC"], "volume_ul_GC": p["volume_ul_GC"]},
+            )
+        elif sampling == "GC_headspacealiquot_nomixing":
+            epm.add(
+                "ANEC_sub_GC_headspacealiquot_nomixing",
+                {"toolGC": p["toolGC"], "volume_ul_GC": p["volume_ul_GC"]},
+            )
+
+        epm.add("ANEC_sub_drain_cell", {"drain_time": p["liquidDrain_time"]})
+
+    if heatoff == "end":
+        epm.add("ANEC_sub_heatoff", {})
+    if alloff == "always" or (alloff == "multi" and len(p["WE_potential__V"]) > 1):
+        epm.add("ANEC_sub_alloff", {})
+    return epm.planned_experiments
+
+
+def _anec_seq_ferricyanide(simple, **p):
+    """Shared body of the two ferricyanide HeatCV(+HeatCA) protocols.
+
+    simple=True: ``num_repeats`` x [HeatCV, HeatCA] at one temperature, no
+    fill/drain. simple=False: fill once, then per temperature in
+    ``target_temperature_degc`` a HeatCV (+ HeatCA unless ``CV_only != "no"``),
+    then heatoff and drain.
+    """
+    epm = ExperimentPlanMaker()
+
+    # housekeeping
+    epm.add(
+        "ANEC_sub_load_solid_only",
+        {"solid_plate_id": p["plate_id"], "solid_sample_no": p["solid_sample_no"]},
+    )
+
+    if simple:
+        temps = (p["target_temperature_degc"] for _ in range(p["num_repeats"]))
+    else:
+        epm.add(
+            "ANEC_sub_flush_fill_cell",
+            {
+                "liquid_flush_time": 80,
+                "co2_purge_time": 15,
+                "equilibration_time": 1.0,
+                "reservoir_liquid_sample_no": p["reservoir_liquid_sample_no"],
+                "volume_ul_cell_liquid": p["volume_ul_cell_liquid"],
+            },
+        )
+        temps = p["target_temperature_degc"]
+
+    for temp in temps:
+        epm.add(
+            "ANEC_sub_HeatCV",
+            {
+                "WE_versus": p["WE_versus"],
+                "OCV_duration__s": p["OCV_duration__s"],
+                "ref_type": p["ref_type"],
+                "pH": p["pH"],
+                "WE_potential_init__V": p["WE_potential_init__V"],
+                "WE_potential_apex1__V": p["WE_potential_apex1__V"],
+                "WE_potential_apex2__V": p["WE_potential_apex2__V"],
+                "WE_potential_final__V": p["WE_potential_final__V"],
+                "ScanRate_V_s": p["ScanRate_V_s"],
+                "Cycles": p["Cycles"],
+                "SampleRate": p["SampleRate_CV"],
+                "IErange": p["IErange"],
+                "target_temperature_degc": temp,
+            },
+        )
+        if simple or p["CV_only"] == "no":
+            epm.add(
+                "ANEC_sub_HeatCA",
+                {
+                    "WE_potential__V": p["WE_potential__V"],
+                    "WE_versus": p["WE_versus"],
+                    "OCV_duration__s": p["OCV_duration__s"],
+                    "ref_type": p["ref_type"],
+                    "pH": p["pH"],
+                    "ref_offset__V": p["ref_offset__V"],
+                    "CA_duration_sec": p["CA_duration_sec"],
+                    "SampleRate": p["SampleRate_CA"],
+                    "IErange": p["IErange"],
+                    "target_temperature_degc": temp,
+                },
+            )
+
+    if not simple:
+        epm.add("ANEC_sub_heatoff", {})
+        epm.add("ANEC_sub_drain_cell", {"drain_time": p["liquidDrain_time"]})
+    return epm.planned_experiments
+
+
+@sequence(version=4)
 def ANEC_sample_ready(
     num_repeats: int = 1,
     plate_id: int = 4534,
@@ -57,6 +388,7 @@ def ANEC_sample_ready(
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
     liquidDrain_time: float = 80.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Sample-ready sequence: startup, clean cell, then loop fill/CA/drain.
 
@@ -80,70 +412,17 @@ def ANEC_sample_ready(
         IErange: Gamry current range string.
         ref_offset__V: Reference electrode offset (V).
         liquidDrain_time: Drain duration (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
     """
-
-    epm = ExperimentPlanMaker()
-
-    # move to solid sample
-    epm.add(
-        "ANEC_sub_startup",
-        {
-            "solid_plate_id": plate_id,
-            "solid_sample_no": solid_sample_no,
-            "z_move_mm": z_move_mm,
-        },
+    return _anec_seq_cell(
+        **locals(), tech="CA", loop="repeat", ready_prefix=True, liquid_flush_time=90
     )
 
-    # clean the cell & purge with CO2
-    epm.add("ANEC_sub_normal_state", {})
-    epm.add("ANEC_sub_cleanup", {"reservoir_liquid_sample_no": 1})
-    epm.add("ANEC_sub_cleanup", {"reservoir_liquid_sample_no": 1})
-    # housekeeping
-    epm.add("ANEC_sub_unload_cell", {})
 
-    # epm.add("ANEC_sub_normal_state", {})
-
-    epm.add(
-        "ANEC_sub_load_solid",
-        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
-    )
-
-    for _ in range(num_repeats):
-
-        epm.add(
-            "ANEC_sub_flush_fill_cell",
-            {
-                "liquid_flush_time": 90,
-                "co2_purge_time": 15,
-                "equilibration_time": 1.0,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "volume_ul_cell_liquid": volume_ul_cell_liquid,
-            },
-        )
-
-        epm.add(
-            "ANEC_sub_CA",
-            {
-                "WE_potential__V": WE_potential__V,
-                "WE_versus": WE_versus,
-                "ref_type": ref_type,
-                "pH": pH,
-                "ref_offset__V": ref_offset__V,
-                "CA_duration_sec": CA_duration_sec,
-                "SampleRate": SampleRate,
-                "IErange": IErange,
-            },
-        )
-
-        epm.add("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
-
-    return epm.planned_experiments
-
-
-@sequence(version=1)
+@sequence(version=3)
 def ANEC_series_CA(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -166,6 +445,7 @@ def ANEC_series_CA(
     wash2: bool = True,
     wash3: bool = True,
     wash4: bool = False,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """CA series at each potential in ``WE_potential__V`` with GC+archive aliquots.
 
@@ -197,78 +477,17 @@ def ANEC_series_CA(
         wash2: Enable wash position 2.
         wash3: Enable wash position 3.
         wash4: Enable wash position 4.
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
     """
-
-    epm = ExperimentPlanMaker()
-
-    # housekeeping
-    epm.add("ANEC_sub_unload_cell", {})
-
-    # epm.add("ANEC_sub_normal_state", {})
-
-    epm.add(
-        "ANEC_sub_load_solid",
-        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
+    return _anec_seq_cell(
+        **locals(), tech="CA", loop="series", sampling="aliquot", alloff="always"
     )
 
-    for cycle, (potential, time) in enumerate(zip(WE_potential__V, CA_duration_sec)):
-        print(
-            f" ... cycle {cycle} potential:",
-            potential,
-            f" ... cycle {cycle} duration:",
-            time,
-        )
 
-        epm.add(
-            "ANEC_sub_flush_fill_cell",
-            {
-                "liquid_flush_time": 80,
-                "co2_purge_time": 15,
-                "equilibration_time": 1.0,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "volume_ul_cell_liquid": volume_ul_cell_liquid,
-            },
-        )
-
-        epm.add(
-            "ANEC_sub_CA",
-            {
-                "WE_potential__V": potential,
-                "WE_versus": WE_versus,
-                "ref_type": ref_type,
-                "pH": pH,
-                "ref_offset__V": ref_offset__V,
-                "CA_duration_sec": time,
-                "SampleRate": SampleRate,
-                "IErange": IErange,
-            },
-        )
-
-        epm.add(
-            "ANEC_sub_aliquot",
-            {
-                "toolGC": toolGC,
-                "toolarchive": toolarchive,
-                "volume_ul_GC": volume_ul_GC,
-                "volume_ul_archive": volume_ul_archive,
-                "wash1": wash1,
-                "wash2": wash2,
-                "wash3": wash3,
-                "wash4": wash4,
-            },
-        )
-
-        epm.add("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
-
-    epm.add("ANEC_sub_alloff", {})
-
-    return epm.planned_experiments
-
-
-@sequence(version=1)
+@sequence(version=3)
 def ANEC_series_CAliquidOnly(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -289,6 +508,7 @@ def ANEC_series_CAliquidOnly(
     wash2: bool = True,
     wash3: bool = True,
     wash4: bool = False,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """CA series with liquid-only archive aliquots (no GC).
 
@@ -316,76 +536,17 @@ def ANEC_series_CAliquidOnly(
         wash2: Enable wash position 2.
         wash3: Enable wash position 3.
         wash4: Enable wash position 4.
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
     """
-
-    epm = ExperimentPlanMaker()
-
-    # housekeeping
-    epm.add("ANEC_sub_unload_cell", {})
-
-    # epm.add("ANEC_sub_normal_state", {})
-
-    epm.add(
-        "ANEC_sub_load_solid",
-        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
+    return _anec_seq_cell(
+        **locals(), tech="CA", loop="series", sampling="liquidarchive", alloff="always"
     )
 
-    for cycle, (potential, time) in enumerate(zip(WE_potential__V, CA_duration_sec)):
-        print(
-            f" ... cycle {cycle} potential:",
-            potential,
-            f" ... cycle {cycle} duration:",
-            time,
-        )
 
-        epm.add(
-            "ANEC_sub_flush_fill_cell",
-            {
-                "liquid_flush_time": 80,
-                "co2_purge_time": 15,
-                "equilibration_time": 1.0,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "volume_ul_cell_liquid": volume_ul_cell_liquid,
-            },
-        )
-
-        epm.add(
-            "ANEC_sub_CA",
-            {
-                "WE_potential__V": potential,
-                "WE_versus": WE_versus,
-                "ref_type": ref_type,
-                "pH": pH,
-                "ref_offset__V": ref_offset__V,
-                "CA_duration_sec": time,
-                "SampleRate": SampleRate,
-                "IErange": IErange,
-            },
-        )
-
-        epm.add(
-            "ANEC_sub_liquidarchive",
-            {
-                "toolarchive": toolarchive,
-                "volume_ul_archive": volume_ul_archive,
-                "wash1": wash1,
-                "wash2": wash2,
-                "wash3": wash3,
-                "wash4": wash4,
-            },
-        )
-
-        epm.add("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
-
-    epm.add("ANEC_sub_alloff", {})
-
-    return epm.planned_experiments
-
-
-@sequence(version=1)
+@sequence(version=2)
 def ANEC_OCV(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -421,55 +582,10 @@ def ANEC_OCV(
     Returns:
         List of planned experiments to dispatch.
     """
-
-    epm = ExperimentPlanMaker()
-
-    # housekeeping
-    epm.add("ANEC_sub_unload_cell", {})
-
-    # epm.add("ANEC_sub_normal_state", {})
-
-    epm.add(
-        "ANEC_sub_load_solid",
-        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
-    )
-
-    epm.add(
-        "ANEC_sub_flush_fill_cell",
-        {
-            "liquid_flush_time": 80,
-            "co2_purge_time": 15,
-            "equilibration_time": 1.0,
-            "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-            "volume_ul_cell_liquid": volume_ul_cell_liquid,
-        },
-    )
-
-    epm.add(
-        "ANEC_sub_OCV",
-        {
-            "Tval__s": Tval__s,
-            "IErange": IErange,
-        },
-    )
-
-    epm.add(
-        "ANEC_sub_liquidarchive",
-        {
-            "toolarchive": toolarchive,
-            "volume_ul_archive": volume_ul_archive,
-            "wash1": wash1,
-            "wash2": wash2,
-            "wash3": wash3,
-            "wash4": wash4,
-        },
-    )
-
-    epm.add("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
-    return epm.planned_experiments
+    return _anec_seq_cell(**locals(), tech="OCV", loop="once", sampling="liquidarchive")
 
 
-@sequence(version=3)
+@sequence(version=5)
 def ANEC_photo_CA(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -504,6 +620,7 @@ def ANEC_photo_CA(
     wash4: bool = False,
     liquid_flush_time: float = 60.0,
     liquidDrain_time: float = 80.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Photo-CA series: load sample, fill, run photo-CA at each potential with aliquots, then drain.
 
@@ -543,88 +660,17 @@ def ANEC_photo_CA(
         wash4: Whether to run wash step 4.
         liquid_flush_time: Duration of the liquid flush (s).
         liquidDrain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
     """
-
-    epm = ExperimentPlanMaker()
-
-    # housekeeping
-    epm.add("ANEC_sub_unload_cell", {})
-
-    # epm.add("ANEC_sub_normal_state", {})
-
-    epm.add(
-        "ANEC_sub_load_solid",
-        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
+    return _anec_seq_cell(
+        **locals(), tech="photo_CA", loop="series", sampling="aliquot", alloff="multi"
     )
 
-    for cycle, (potential, time) in enumerate(zip(WE_potential__V, CA_duration_sec)):
-        print(
-            f" ... cycle {cycle} potential:",
-            potential,
-            f" ... cycle {cycle} duration:",
-            time,
-        )
 
-        epm.add(
-            "ANEC_sub_flush_fill_cell",
-            {
-                "liquid_flush_time": liquid_flush_time,
-                "co2_purge_time": 15,
-                "equilibration_time": 1.0,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "volume_ul_cell_liquid": volume_ul_cell_liquid,
-            },
-        )
-
-        epm.add(
-            "ANEC_sub_photo_CA",
-            {
-                "WE_potential__V": potential,
-                "WE_versus": WE_versus,
-                "ref_type": ref_type,
-                "pH": pH,
-                "ref_offset__V": ref_offset__V,
-                "CA_duration_sec": time,
-                "SampleRate": SampleRate,
-                "IErange": IErange,
-                "gamrychannelwait": gamrychannelwait,
-                "gamrychannelsend": gamrychannelsend,
-                "illumination_source": led_name_CA,
-                "illumination_wavelength": led_wavelengths_nm,
-                "illumination_intensity": led_intensities_mw,
-                "illumination_intensity_date": led_date,
-                "illumination_side": led_type,
-                "toggle_illum_duty": toggleCA_illum_duty,
-                "toggle_illum_period": toggleCA_illum_period,
-                "toggle_illum_time": toggleCA_illum_time,
-                "toggle_dark_time_init": toggleCA_dark_time_init,
-            },
-        )
-
-        epm.add(
-            "ANEC_sub_aliquot",
-            {
-                "toolGC": toolGC,
-                "toolarchive": toolarchive,
-                "volume_ul_GC": volume_ul_GC,
-                "volume_ul_archive": volume_ul_archive,
-                "wash1": wash1,
-                "wash2": wash2,
-                "wash3": wash3,
-                "wash4": wash4,
-            },
-        )
-
-        epm.add("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
-    if len(WE_potential__V) > 1:
-        epm.add("ANEC_sub_alloff", {})
-    return epm.planned_experiments
-
-
-@sequence(version=3)
+@sequence(version=5)
 def ANEC_photo_CAgasonly(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -653,6 +699,7 @@ def ANEC_photo_CAgasonly(
     volume_ul_GC: int = 300,
     liquid_flush_time: float = 60.0,
     liquidDrain_time: float = 80.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Photo-CA series taking only the GC (headspace) aliquot per cycle.
 
@@ -686,82 +733,21 @@ def ANEC_photo_CAgasonly(
         volume_ul_GC: Volume sampled for gas chromatography (µL).
         liquid_flush_time: Duration of the liquid flush (s).
         liquidDrain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
     """
-
-    epm = ExperimentPlanMaker()
-
-    # housekeeping
-    epm.add("ANEC_sub_unload_cell", {})
-
-    # epm.add("ANEC_sub_normal_state", {})
-
-    epm.add(
-        "ANEC_sub_load_solid",
-        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
+    return _anec_seq_cell(
+        **locals(),
+        tech="photo_CA",
+        loop="series",
+        sampling="GC_preparation",
+        alloff="multi",
     )
 
-    for cycle, (potential, time) in enumerate(zip(WE_potential__V, CA_duration_sec)):
-        print(
-            f" ... cycle {cycle} potential:",
-            potential,
-            f" ... cycle {cycle} duration:",
-            time,
-        )
 
-        epm.add(
-            "ANEC_sub_flush_fill_cell",
-            {
-                "liquid_flush_time": liquid_flush_time,
-                "co2_purge_time": 15,
-                "equilibration_time": 1.0,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "volume_ul_cell_liquid": volume_ul_cell_liquid,
-            },
-        )
-
-        epm.add(
-            "ANEC_sub_photo_CA",
-            {
-                "WE_potential__V": potential,
-                "WE_versus": WE_versus,
-                "ref_type": ref_type,
-                "pH": pH,
-                "ref_offset__V": ref_offset__V,
-                "CA_duration_sec": time,
-                "SampleRate": SampleRate,
-                "IErange": IErange,
-                "gamrychannelwait": gamrychannelwait,
-                "gamrychannelsend": gamrychannelsend,
-                "illumination_source": led_name_CA,
-                "illumination_wavelength": led_wavelengths_nm,
-                "illumination_intensity": led_intensities_mw,
-                "illumination_intensity_date": led_date,
-                "illumination_side": led_type,
-                "toggle_illum_duty": toggleCA_illum_duty,
-                "toggle_illum_period": toggleCA_illum_period,
-                "toggle_illum_time": toggleCA_illum_time,
-                "toggle_dark_time_init": toggleCA_dark_time_init,
-            },
-        )
-
-        epm.add(
-            "ANEC_sub_GC_preparation",
-            {
-                "toolGC": toolGC,
-                "volume_ul_GC": volume_ul_GC,
-            },
-        )
-
-        epm.add("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
-    if len(WE_potential__V) > 1:
-        epm.add("ANEC_sub_alloff", {})
-    return epm.planned_experiments
-
-
-@sequence(version=2)
+@sequence(version=4)
 def ANEC_photo_CV(
     WE_versus: str = "ref",
     ref_type: str = "leakless",
@@ -793,6 +779,7 @@ def ANEC_photo_CV(
     toggleCA_illum_time: float = -1,
     liquid_flush_time: float = 60.0,
     liquidDrain_time: float = 80.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Photo-CV at the cell1_we position with optional LED toggle.
 
@@ -829,68 +816,12 @@ def ANEC_photo_CV(
         toggleCA_illum_time: Toggled chronoamperometry illumination time.
         liquid_flush_time: Duration of the liquid flush (s).
         liquidDrain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
     """
-
-    epm = ExperimentPlanMaker()
-
-    # housekeeping
-    epm.add("ANEC_sub_unload_cell", {})
-
-    # epm.add("ANEC_sub_normal_state", {})
-
-    epm.add(
-        "ANEC_sub_load_solid",
-        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
-    )
-
-    for _ in range(num_repeats):
-
-        epm.add(
-            "ANEC_sub_flush_fill_cell",
-            {
-                "liquid_flush_time": liquid_flush_time,
-                "co2_purge_time": 15,
-                "equilibration_time": 1.0,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "volume_ul_cell_liquid": volume_ul_cell_liquid,
-            },
-        )
-
-        epm.add(
-            "ANEC_sub_photo_CV",
-            {
-                "WE_versus": WE_versus,
-                "ref_type": ref_type,
-                "ref_offset__V": ref_offset,
-                "pH": pH,
-                "WE_potential_init__V": WE_potential_init__V,
-                "WE_potential_apex1__V": WE_potential_apex1__V,
-                "WE_potential_apex2__V": WE_potential_apex2__V,
-                "WE_potential_final__V": WE_potential_final__V,
-                "ScanRate_V_s": ScanRate_V_s,
-                "Cycles": Cycles,
-                "SampleRate": SampleRate,
-                "IErange": IErange,
-                "gamrychannelwait": gamrychannelwait,
-                "gamrychannelsend": gamrychannelsend,
-                "illumination_source": led_name_CA,
-                "illumination_wavelength": led_wavelengths_nm,
-                "illumination_intensity": led_intensities_mw,
-                "illumination_intensity_date": led_date,
-                "illumination_side": led_type,
-                "toggle_illum_duty": toggleCA_illum_duty,
-                "toggle_illum_period": toggleCA_illum_period,
-                "toggle_illum_time": toggleCA_illum_time,
-                "toggle_dark_time_init": toggleCA_dark_time_init,
-            },
-        )
-
-        epm.add("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
-
-    return epm.planned_experiments
+    return _anec_seq_cell(**locals(), tech="photo_CV", loop="repeat")
 
 
 @sequence(version=1)
@@ -915,7 +846,7 @@ def ANEC_cleanup_disengage() -> list:
     return epm.planned_experiments
 
 
-@sequence(version=1)
+@sequence(version=3)
 def ANEC_CA_pretreat(
     num_repeats: int = 1,
     plate_id: int = 4534,
@@ -932,6 +863,7 @@ def ANEC_CA_pretreat(
     ref_offset__V: float = 0.0,
     liquid_flush_time: float = 70.0,
     liquidDrain_time: float = 50.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Pre-treat the cell at a single CA potential then drain.
 
@@ -953,56 +885,15 @@ def ANEC_CA_pretreat(
         ref_offset__V: Reference-electrode potential offset (V).
         liquid_flush_time: Duration of the liquid flush (s).
         liquidDrain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
     """
-
-    epm = ExperimentPlanMaker()
-
-    # housekeeping
-    epm.add("ANEC_sub_unload_cell", {})
-
-    # epm.add("ANEC_sub_normal_state", {})
-
-    epm.add(
-        "ANEC_sub_load_solid",
-        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
-    )
-
-    for _ in range(num_repeats):
-
-        epm.add(
-            "ANEC_sub_flush_fill_cell",
-            {
-                "liquid_flush_time": liquid_flush_time,
-                "co2_purge_time": 15,
-                "equilibration_time": 1.0,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "volume_ul_cell_liquid": volume_ul_cell_liquid,
-            },
-        )
-
-        epm.add(
-            "ANEC_sub_CA",
-            {
-                "WE_potential__V": WE_potential__V,
-                "WE_versus": WE_versus,
-                "ref_type": ref_type,
-                "pH": pH,
-                "ref_offset__V": ref_offset__V,
-                "CA_duration_sec": CA_duration_sec,
-                "SampleRate": SampleRate,
-                "IErange": IErange,
-            },
-        )
-
-        epm.add("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
-
-    return epm.planned_experiments
+    return _anec_seq_cell(**locals(), tech="CA", loop="repeat")
 
 
-@sequence(version=1)
+@sequence(version=3)
 def ANEC_CA_DOE_demo(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -1023,6 +914,7 @@ def ANEC_CA_DOE_demo(
     wash3: bool = True,
     wash4: bool = False,
     liquidDrain_time: float = 60.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """DOE-style CA at a single point with optional headspace and archive aliquots.
 
@@ -1048,56 +940,17 @@ def ANEC_CA_DOE_demo(
         wash3: Whether to run wash step 3.
         wash4: Whether to run wash step 4.
         liquidDrain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
     """
-
-    epm = ExperimentPlanMaker()
-
-    # housekeeping
-    epm.add("ANEC_sub_unload_cell", {})
-
-    # epm.add("ANEC_sub_normal_state", {})
-
-    epm.add(
-        "ANEC_sub_load_solid",
-        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
+    return _anec_seq_cell(
+        **locals(), tech="CA", loop="once", sampling="aliquot_nomixing", flush=False
     )
 
-    epm.add(
-        "ANEC_sub_CA",
-        {
-            "WE_potential__V": WE_potential__V,
-            "WE_versus": WE_versus,
-            "ref_type": ref_type,
-            "pH": pH,
-            "ref_offset__V": ref_offset__V,
-            "CA_duration_sec": CA_duration_sec,
-            "SampleRate": SampleRate,
-            "IErange": IErange,
-        },
-    )
 
-    epm.add(
-        "ANEC_sub_aliquot_nomixing",
-        {
-            "toolGC": toolGC,
-            "toolarchive": toolarchive,
-            "volume_ul_GC": volume_ul_GC,
-            "volume_ul_archive": volume_ul_archive,
-            "wash1": wash1,
-            "wash2": wash2,
-            "wash3": wash3,
-            "wash4": wash4,
-        },
-    )
-    epm.add("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
-
-    return epm.planned_experiments
-
-
-@sequence(version=1)
+@sequence(version=3)
 def ANEC_CA_DOE_demo_headspace(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -1112,6 +965,7 @@ def ANEC_CA_DOE_demo_headspace(
     toolGC: str = "HS 2",
     volume_ul_GC: int = 300,
     liquidDrain_time: float = 60.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """DOE-style CA producing only a GC headspace aliquot.
 
@@ -1131,50 +985,21 @@ def ANEC_CA_DOE_demo_headspace(
         toolGC: PAL tool used for gas-chromatograph sampling.
         volume_ul_GC: Volume sampled for gas chromatography (µL).
         liquidDrain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
     """
-
-    epm = ExperimentPlanMaker()
-
-    # housekeeping
-    epm.add("ANEC_sub_unload_cell", {})
-
-    # epm.add("ANEC_sub_normal_state", {})
-
-    epm.add(
-        "ANEC_sub_load_solid",
-        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
+    return _anec_seq_cell(
+        **locals(),
+        tech="CA",
+        loop="once",
+        sampling="GC_headspacealiquot_nomixing",
+        flush=False,
     )
 
-    epm.add(
-        "ANEC_sub_CA",
-        {
-            "WE_potential__V": WE_potential__V,
-            "WE_versus": WE_versus,
-            "ref_type": ref_type,
-            "pH": pH,
-            "ref_offset__V": ref_offset__V,
-            "CA_duration_sec": CA_duration_sec,
-            "SampleRate": SampleRate,
-            "IErange": IErange,
-        },
-    )
 
-    epm.add(
-        "ANEC_sub_GC_headspacealiquot_nomixing",
-        {
-            "toolGC": toolGC,
-            "volume_ul_GC": volume_ul_GC,
-        },
-    )
-    epm.add("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
-
-    return epm.planned_experiments
-
-
-@sequence(version=1)
+@sequence(version=4)
 def ANEC_repeat_CA(
     num_repeats: int = 1,
     plate_id: int = 4534,
@@ -1199,6 +1024,7 @@ def ANEC_repeat_CA(
     wash4: bool = False,
     liquid_flush_time: float = 70.0,
     liquidDrain_time: float = 60.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Repeat a single-potential CA followed by aliquot+drain.
 
@@ -1228,70 +1054,15 @@ def ANEC_repeat_CA(
         wash4: Whether to run wash step 4.
         liquid_flush_time: Duration of the liquid flush (s).
         liquidDrain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
     """
-
-    epm = ExperimentPlanMaker()
-
-    # housekeeping
-    epm.add("ANEC_sub_unload_cell", {})
-
-    # epm.add("ANEC_sub_normal_state", {})
-
-    epm.add(
-        "ANEC_sub_load_solid",
-        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
-    )
-
-    for _ in range(num_repeats):
-
-        epm.add(
-            "ANEC_sub_flush_fill_cell",
-            {
-                "liquid_flush_time": liquid_flush_time,
-                "co2_purge_time": 15,
-                "equilibration_time": 1.0,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "volume_ul_cell_liquid": volume_ul_cell_liquid,
-            },
-        )
-
-        epm.add(
-            "ANEC_sub_CA",
-            {
-                "WE_potential__V": WE_potential__V,
-                "WE_versus": WE_versus,
-                "ref_type": ref_type,
-                "pH": pH,
-                "ref_offset__V": ref_offset__V,
-                "CA_duration_sec": CA_duration_sec,
-                "SampleRate": SampleRate,
-                "IErange": IErange,
-            },
-        )
-
-        epm.add(
-            "ANEC_sub_aliquot",
-            {
-                "toolGC": toolGC,
-                "toolarchive": toolarchive,
-                "volume_ul_GC": volume_ul_GC,
-                "volume_ul_archive": volume_ul_archive,
-                "wash1": wash1,
-                "wash2": wash2,
-                "wash3": wash3,
-                "wash4": wash4,
-            },
-        )
-        epm.add("ANEC_sub_heatoff", {})
-        epm.add("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
-
-    return epm.planned_experiments
+    return _anec_seq_cell(**locals(), tech="CA", loop="repeat", sampling="aliquot")
 
 
-@sequence(version=1)
+@sequence(version=3)
 def ANEC_repeat_TentHeatCAgasonly(
     num_repeats: int = 1,
     plate_id: int = 6284,
@@ -1311,6 +1082,7 @@ def ANEC_repeat_TentHeatCAgasonly(
     liquid_flush_time: float = 70.0,
     liquidDrain_time: float = 60.0,
     target_temperature_degc: float = 25.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Repeated tent-heated CA with GC headspace aliquots.
 
@@ -1335,69 +1107,22 @@ def ANEC_repeat_TentHeatCAgasonly(
         liquid_flush_time: Duration of the liquid flush (s).
         liquidDrain_time: Duration of the liquid drain (s).
         target_temperature_degc: Target temperature (°C).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
     """
-
-    epm = ExperimentPlanMaker()
-
-    # housekeeping
-    epm.add("ANEC_sub_unload_cell", {})
-
-    # epm.add("ANEC_sub_normal_state", {})
-
-    epm.add(
-        "ANEC_sub_load_solid",
-        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
+    return _anec_seq_cell(
+        **locals(),
+        tech="CA",
+        loop="repeat",
+        sampling="GC_preparation",
+        setheat=True,
+        heatoff="end",
     )
 
-    for _ in range(num_repeats):
-        epm.add(
-            "ANEC_sub_setheat",
-            {
-                "target_temperature_degc": target_temperature_degc,
-            },
-        )
-        epm.add(
-            "ANEC_sub_flush_fill_cell",
-            {
-                "liquid_flush_time": liquid_flush_time,
-                "co2_purge_time": 15,
-                "equilibration_time": 1.0,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "volume_ul_cell_liquid": volume_ul_cell_liquid,
-            },
-        )
 
-        epm.add(
-            "ANEC_sub_CA",
-            {
-                "WE_potential__V": WE_potential__V,
-                "WE_versus": WE_versus,
-                "ref_type": ref_type,
-                "pH": pH,
-                "ref_offset__V": ref_offset__V,
-                "CA_duration_sec": CA_duration_sec,
-                "SampleRate": SampleRate,
-                "IErange": IErange,
-            },
-        )
-
-        epm.add(
-            "ANEC_sub_GC_preparation",
-            {
-                "toolGC": toolGC,
-                "volume_ul_GC": volume_ul_GC,
-            },
-        )
-
-        epm.add("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
-    epm.add("ANEC_sub_heatoff", {})
-    return epm.planned_experiments
-
-
-@sequence(version=1)
+@sequence(version=2)
 def ANEC_heatOCV(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
@@ -1427,50 +1152,12 @@ def ANEC_heatOCV(
     Returns:
         List of planned experiments to dispatch.
     """
-
-    epm = ExperimentPlanMaker()
-
-    # housekeeping
-    epm.add("ANEC_sub_unload_cell", {})
-
-    # epm.add("ANEC_sub_normal_state", {})
-
-    epm.add(
-        "ANEC_sub_load_solid",
-        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
+    return _anec_seq_cell(
+        **locals(), tech="OCV", loop="once", setheat=True, heatoff="end"
     )
 
-    epm.add(
-        "ANEC_sub_setheat",
-        {
-            "target_temperature_degc": target_temperature_degc,
-        },
-    )
-    epm.add(
-        "ANEC_sub_flush_fill_cell",
-        {
-            "liquid_flush_time": liquid_flush_time,
-            "co2_purge_time": 15,
-            "equilibration_time": 1.0,
-            "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-            "volume_ul_cell_liquid": volume_ul_cell_liquid,
-        },
-    )
 
-    epm.add(
-        "ANEC_sub_OCV",
-        {
-            "Tval__s": Tval__s,
-            "IErange": IErange,
-        },
-    )
-
-    epm.add("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
-    epm.add("ANEC_sub_heatoff", {})
-    return epm.planned_experiments
-
-
-@sequence(version=1)
+@sequence(version=3)
 def ANEC_repeat_TentHeatCA(
     num_repeats: int = 1,
     plate_id: int = 6284,
@@ -1496,6 +1183,7 @@ def ANEC_repeat_TentHeatCA(
     liquid_flush_time: float = 70.0,
     liquidDrain_time: float = 80.0,
     target_temperature_degc: float = 25.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Repeated tent-heated CA with combined GC+archive aliquots.
 
@@ -1526,75 +1214,22 @@ def ANEC_repeat_TentHeatCA(
         liquid_flush_time: Duration of the liquid flush (s).
         liquidDrain_time: Duration of the liquid drain (s).
         target_temperature_degc: Target temperature (°C).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
     """
-
-    epm = ExperimentPlanMaker()
-
-    # housekeeping
-    epm.add("ANEC_sub_unload_cell", {})
-
-    # epm.add("ANEC_sub_normal_state", {})
-
-    epm.add(
-        "ANEC_sub_load_solid",
-        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
+    return _anec_seq_cell(
+        **locals(),
+        tech="CA",
+        loop="repeat",
+        sampling="aliquot",
+        setheat=True,
+        heatoff="end",
     )
 
-    for _ in range(num_repeats):
-        epm.add(
-            "ANEC_sub_setheat",
-            {
-                "target_temperature_degc": target_temperature_degc,
-            },
-        )
-        epm.add(
-            "ANEC_sub_flush_fill_cell",
-            {
-                "liquid_flush_time": liquid_flush_time,
-                "co2_purge_time": 15,
-                "equilibration_time": 1.0,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "volume_ul_cell_liquid": volume_ul_cell_liquid,
-            },
-        )
 
-        epm.add(
-            "ANEC_sub_CA",
-            {
-                "WE_potential__V": WE_potential__V,
-                "WE_versus": WE_versus,
-                "ref_type": ref_type,
-                "pH": pH,
-                "ref_offset__V": ref_offset__V,
-                "CA_duration_sec": CA_duration_sec,
-                "SampleRate": SampleRate,
-                "IErange": IErange,
-            },
-        )
-
-        epm.add(
-            "ANEC_sub_aliquot",
-            {
-                "toolGC": toolGC,
-                "toolarchive": toolarchive,
-                "volume_ul_GC": volume_ul_GC,
-                "volume_ul_archive": volume_ul_archive,
-                "wash1": wash1,
-                "wash2": wash2,
-                "wash3": wash3,
-                "wash4": wash4,
-            },
-        )
-
-        epm.add("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
-    epm.add("ANEC_sub_heatoff", {})
-    return epm.planned_experiments
-
-
-@sequence(version=1)
+@sequence(version=3)
 def ANEC_repeat_HeatCA(
     num_repeats: int = 1,
     plate_id: int = 4534,
@@ -1620,6 +1255,7 @@ def ANEC_repeat_HeatCA(
     liquid_flush_time: float = 70.0,
     liquidDrain_time: float = 80.0,
     target_temperature_degc: float = 25.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Repeated heated CA without the tent step.
 
@@ -1650,71 +1286,15 @@ def ANEC_repeat_HeatCA(
         liquid_flush_time: Duration of the liquid flush (s).
         liquidDrain_time: Duration of the liquid drain (s).
         target_temperature_degc: Target temperature (°C).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
     """
-
-    epm = ExperimentPlanMaker()
-
-    # housekeeping
-    epm.add("ANEC_sub_unload_cell", {})
-
-    # epm.add("ANEC_sub_normal_state", {})
-
-    epm.add(
-        "ANEC_sub_load_solid",
-        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
-    )
-
-    for _ in range(num_repeats):
-
-        epm.add(
-            "ANEC_sub_flush_fill_cell",
-            {
-                "liquid_flush_time": liquid_flush_time,
-                "co2_purge_time": 15,
-                "equilibration_time": 1.0,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "volume_ul_cell_liquid": volume_ul_cell_liquid,
-            },
-        )
-
-        epm.add(
-            "ANEC_sub_HeatCA",
-            {
-                "WE_potential__V": WE_potential__V,
-                "WE_versus": WE_versus,
-                "ref_type": ref_type,
-                "pH": pH,
-                "ref_offset__V": ref_offset__V,
-                "CA_duration_sec": CA_duration_sec,
-                "SampleRate": SampleRate,
-                "IErange": IErange,
-                "target_temperature_degc": target_temperature_degc,
-            },
-        )
-
-        epm.add(
-            "ANEC_sub_aliquot",
-            {
-                "toolGC": toolGC,
-                "toolarchive": toolarchive,
-                "volume_ul_GC": volume_ul_GC,
-                "volume_ul_archive": volume_ul_archive,
-                "wash1": wash1,
-                "wash2": wash2,
-                "wash3": wash3,
-                "wash4": wash4,
-            },
-        )
-
-        epm.add("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
-
-    return epm.planned_experiments
+    return _anec_seq_cell(**locals(), tech="HeatCA", loop="repeat", sampling="aliquot")
 
 
-@sequence(version=1)
+@sequence(version=3)
 def ANEC_gasonly_CA(
     num_repeats: int = 1,
     plate_id: int = 4534,
@@ -1733,6 +1313,7 @@ def ANEC_gasonly_CA(
     volume_ul_GC: int = 300,
     liquid_flush_time: float = 70.0,
     liquidDrain_time: float = 60.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Single CA producing only a gas-phase (GC) aliquot.
 
@@ -1756,64 +1337,17 @@ def ANEC_gasonly_CA(
         volume_ul_GC: Volume sampled for gas chromatography (µL).
         liquid_flush_time: Duration of the liquid flush (s).
         liquidDrain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
     """
-
-    epm = ExperimentPlanMaker()
-
-    # housekeeping
-    epm.add("ANEC_sub_unload_cell", {})
-
-    # epm.add("ANEC_sub_normal_state", {})
-
-    epm.add(
-        "ANEC_sub_load_solid",
-        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
+    return _anec_seq_cell(
+        **locals(), tech="CA", loop="repeat", sampling="GC_preparation"
     )
 
-    for _ in range(num_repeats):
 
-        epm.add(
-            "ANEC_sub_flush_fill_cell",
-            {
-                "liquid_flush_time": liquid_flush_time,
-                "co2_purge_time": 15,
-                "equilibration_time": 1.0,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "volume_ul_cell_liquid": volume_ul_cell_liquid,
-            },
-        )
-
-        epm.add(
-            "ANEC_sub_CA",
-            {
-                "WE_potential__V": WE_potential__V,
-                "WE_versus": WE_versus,
-                "ref_type": ref_type,
-                "pH": pH,
-                "ref_offset__V": ref_offset__V,
-                "CA_duration_sec": CA_duration_sec,
-                "SampleRate": SampleRate,
-                "IErange": IErange,
-            },
-        )
-
-        epm.add(
-            "ANEC_sub_GC_preparation",
-            {
-                "toolGC": toolGC,
-                "volume_ul_GC": volume_ul_GC,
-            },
-        )
-
-        epm.add("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
-
-    return epm.planned_experiments
-
-
-@sequence(version=2)
+@sequence(version=4)
 def ANEC_repeat_CV(
     WE_versus: str = "ref",
     ref_type: str = "leakless",
@@ -1833,6 +1367,7 @@ def ANEC_repeat_CV(
     IErange: str = "auto",
     ref_offset: float = 0.0,
     liquidDrain_time: float = 80.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Repeated CV scans with optional aliquots between repeats.
 
@@ -1857,60 +1392,15 @@ def ANEC_repeat_CV(
         IErange: Potentiostat current (I/E) range setting.
         ref_offset: Reference-electrode potential offset (V).
         liquidDrain_time: Duration of the liquid drain (s).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
     """
-
-    epm = ExperimentPlanMaker()
-
-    # housekeeping
-    epm.add("ANEC_sub_unload_cell", {})
-
-    # epm.add("ANEC_sub_normal_state", {})
-
-    epm.add(
-        "ANEC_sub_load_solid",
-        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
-    )
-
-    for _ in range(num_repeats):
-
-        epm.add(
-            "ANEC_sub_flush_fill_cell",
-            {
-                "liquid_flush_time": 80,
-                "co2_purge_time": 15,
-                "equilibration_time": 1.0,
-                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-                "volume_ul_cell_liquid": volume_ul_cell_liquid,
-            },
-        )
-
-        epm.add(
-            "ANEC_sub_CV",
-            {
-                "WE_versus": WE_versus,
-                "ref_type": ref_type,
-                "ref_offset__V": ref_offset,
-                "pH": pH,
-                "WE_potential_init__V": WE_potential_init__V,
-                "WE_potential_apex1__V": WE_potential_apex1__V,
-                "WE_potential_apex2__V": WE_potential_apex2__V,
-                "WE_potential_final__V": WE_potential_final__V,
-                "ScanRate_V_s": ScanRate_V_s,
-                "Cycles": Cycles,
-                "SampleRate": SampleRate,
-                "IErange": IErange,
-            },
-        )
-
-        epm.add("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
-
-    return epm.planned_experiments
+    return _anec_seq_cell(**locals(), tech="CV", loop="repeat")
 
 
-@sequence(version=2)
+@sequence(version=4)
 def ANEC_ferricyanide_simpleprotocol(
     num_repeats: int = 1,
     plate_id: int = 5740,
@@ -1933,6 +1423,7 @@ def ANEC_ferricyanide_simpleprotocol(
     Cycles: int = 1,
     SampleRate_CV: float = 0.1,
     target_temperature_degc: float = 25.0,
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Simple ferricyanide diagnostic protocol.
 
@@ -1960,61 +1451,15 @@ def ANEC_ferricyanide_simpleprotocol(
         Cycles: Number of cycles to repeat.
         SampleRate_CV: Cyclic-voltammetry data acquisition sample rate.
         target_temperature_degc: Target temperature (°C).
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
     """
-
-    epm = ExperimentPlanMaker()
-
-    # housekeeping
-    epm.add("ANEC_sub_unload_cell", {})
-
-    # epm.add("ANEC_sub_normal_state", {})
-
-    epm.add(
-        "ANEC_sub_load_solid",
-        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
-    )
-
-    for _ in range(num_repeats):
-
-        epm.add(
-            "ANEC_sub_HeatCV",
-            {
-                "WE_versus": WE_versus,
-                "ref_type": ref_type,
-                "pH": pH,
-                "WE_potential_init__V": WE_potential_init__V,
-                "WE_potential_apex1__V": WE_potential_apex1__V,
-                "WE_potential_apex2__V": WE_potential_apex2__V,
-                "WE_potential_final__V": WE_potential_final__V,
-                "ScanRate_V_s": ScanRate_V_s,
-                "Cycles": Cycles,
-                "SampleRate": SampleRate_CV,
-                "IErange": IErange,
-                "target_temperature_degc": target_temperature_degc,
-            },
-        )
-        epm.add(
-            "ANEC_sub_HeatCA",
-            {
-                "WE_potential__V": WE_potential__V,
-                "WE_versus": WE_versus,
-                "ref_type": ref_type,
-                "pH": pH,
-                "ref_offset__V": ref_offset__V,
-                "CA_duration_sec": CA_duration_sec,
-                "SampleRate": SampleRate_CA,
-                "IErange": IErange,
-                "target_temperature_degc": target_temperature_degc,
-            },
-        )
-
-    return epm.planned_experiments
+    return _anec_seq_ferricyanide(**locals(), simple=True)
 
 
-@sequence(version=2)
+@sequence(version=4)
 def ANEC_ferricyanide_protocol(
     plate_id: int = 5740,
     solid_sample_no: int = 1,
@@ -2038,6 +1483,7 @@ def ANEC_ferricyanide_protocol(
     liquidDrain_time: float = 80.0,
     target_temperature_degc: list[float] = [25.0],
     CV_only: str = "yes",
+    OCV_duration__s: float = 2.0,
 ) -> list:
     """Full ferricyanide validation protocol with multi-step CA/CV.
 
@@ -2066,71 +1512,15 @@ def ANEC_ferricyanide_protocol(
         liquidDrain_time: Duration of the liquid drain (s).
         target_temperature_degc: Target temperature (°C).
         CV_only: Whether to run only the cyclic-voltammetry step.
+        OCV_duration__s: OCV measurement time (s); used only when ``WE_versus="ocv"``.
 
     Returns:
         List of planned experiments to dispatch.
     """
-
-    epm = ExperimentPlanMaker()
-
-    # housekeeping
-    epm.add("ANEC_sub_unload_cell", {})
-
-    # epm.add("ANEC_sub_normal_state", {})
-
-    epm.add(
-        "ANEC_sub_load_solid",
-        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
-    )
-    epm.add(
-        "ANEC_sub_flush_fill_cell",
-        {
-            "liquid_flush_time": 80,
-            "co2_purge_time": 15,
-            "equilibration_time": 1.0,
-            "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
-            "volume_ul_cell_liquid": volume_ul_cell_liquid,
-        },
-    )
-    for cycle, temp in enumerate(target_temperature_degc):
-        epm.add(
-            "ANEC_sub_HeatCV",
-            {
-                "WE_versus": WE_versus,
-                "ref_type": ref_type,
-                "pH": pH,
-                "WE_potential_init__V": WE_potential_init__V,
-                "WE_potential_apex1__V": WE_potential_apex1__V,
-                "WE_potential_apex2__V": WE_potential_apex2__V,
-                "WE_potential_final__V": WE_potential_final__V,
-                "ScanRate_V_s": ScanRate_V_s,
-                "Cycles": Cycles,
-                "SampleRate": SampleRate_CV,
-                "IErange": IErange,
-                "target_temperature_degc": temp,
-            },
-        )
-        if CV_only == "no":
-            epm.add(
-                "ANEC_sub_HeatCA",
-                {
-                    "WE_potential__V": WE_potential__V,
-                    "WE_versus": WE_versus,
-                    "ref_type": ref_type,
-                    "pH": pH,
-                    "ref_offset__V": ref_offset__V,
-                    "CA_duration_sec": CA_duration_sec,
-                    "SampleRate": SampleRate_CA,
-                    "IErange": IErange,
-                    "target_temperature_degc": temp,
-                },
-            )
-    epm.add("ANEC_sub_heatoff", {})
-    epm.add("ANEC_sub_drain_cell", {"drain_time": liquidDrain_time})
-
-    return epm.planned_experiments
+    return _anec_seq_ferricyanide(**locals(), simple=False)
 
 
+@sequence(version=1)
 def ANEC_create_and_load_liquid_sample(
     volume_ml: float = 0.84,
     source: list[str] = ["autoGDE"],
@@ -2188,51 +1578,6 @@ def ANEC_create_and_load_liquid_sample(
         )
 
     return epm.planned_experiments
-
-
-# =============================================================================
-# def ANEC_create_liquid_sample(
-#     sequence_version: int = 1,
-#     no_of_samples: int = 5,
-#     volume_ml: float = 0.84,
-#     source: list[str] = ["autoGDE"],
-#     partial_molarity: list[str] = ["unknown"],
-#     chemical: list[str] = ["unknown"],
-#     ph: float = 7.8,
-#     supplier: list[str] = ["N/A"],
-#     lot_number: list[str] = ["N/A"],
-#     electrolyte_name: str = "1M KHCO3",
-#     prep_date: str = "2024-03-19",
-#
-#
-# ):
-#     epm = ExperimentPlanMaker()
-#     for _ in range(no_of_samples):
-#         epm.add(
-#             "create_liquid_sample",
-#             {"volume_ml": volume_ml, "source": source, "partial_molarity":partial_molarity, "chemical":chemical, "ph":ph, "supplier":supplier, "lot_number":lot_number,"electrolyte_name":electrolyte_name, "prep_date":prep_date},
-#         )
-#
-#     return epm.planned_experiments
-#
-# def ANEC_create_liquid_tray(
-#     sequence_version: int = 1,
-#     liquid_sample_no: list[int] = [1, 1, 1, 1, 1],
-#     machine_name: str = "hte-ecms-01",
-#     slot: int = 1,
-#     vial: list[int] = [1, 2, 3, 4, 5],
-#
-#
-# ):
-#     epm = ExperimentPlanMaker()
-#     for num, (sample_no, vial_no) in enumerate(zip(liquid_sample_no, vial)):
-#         epm.add(
-#             "load_liquid_sample",
-#             {"liquid_sample_no": sample_no, "machine_name": machine_name, "tray":2, "slot":slot, "vial":vial_no},
-#         )
-#
-#     return epm.planned_experiments
-# =============================================================================
 
 
 @sequence(version=1)

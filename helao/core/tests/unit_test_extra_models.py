@@ -4,8 +4,8 @@ The action/experiment/sequence test module already covers the queue
 models; this module covers everything else under ``helao.core.models``
 and the loader enums:
 
-* :class:`RunUse`, :class:`ProcessContrib`, :class:`Electrolyte`,
-  :class:`YmlType` — full enum membership/value coverage.
+* :class:`RunUse`, :class:`ProcessContrib`, :class:`Electrolyte` --
+  full enum membership/value coverage.
 * :class:`HelaoDirs` — defaults and ``Path`` round-trip via ``as_dict``.
 * :class:`S3Locator` — ``url`` property and ``s3://`` formatting.
 * :class:`ProcessModel` / :class:`ShortProcessModel` — defaults,
@@ -24,7 +24,6 @@ from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
-from helao.core.drivers.data.enum import YmlType
 from helao.core.error import ErrorCodes
 from helao.core.models.analysis import (
     AnalysisDataModel,
@@ -95,12 +94,6 @@ def extra_models_unit_test() -> bool:
             "all Electrolyte values are non-empty unique strings",
             lambda: len({e.value for e in Electrolyte}) == len(list(Electrolyte))
             and all(isinstance(e.value, str) and e.value for e in Electrolyte),
-        )
-
-        reporter.section("YmlType enum")
-        reporter.check(
-            "YmlType has the three top-level kinds",
-            lambda: {m.value for m in YmlType} == {"action", "experiment", "sequence"},
         )
 
         reporter.section("HelaoDirs defaults and Path round-trip")

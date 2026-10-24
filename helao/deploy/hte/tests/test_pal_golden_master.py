@@ -45,19 +45,14 @@ like ``test_pal_ioloop_c1_guard.py``)::
 
     conda run -n helao python helao/deploy/hte/tests/test_pal_golden_master.py
 
-This writes baseline traces to ``.omc/artifacts/p4pal/baseline/<scenario>.json``
-(gitignored) and prints a PASS/FAIL summary plus a determinism check (the
-whole suite is captured twice in-process; the two JSON renderings must be
-byte-identical).
+Prints a PASS/FAIL summary of the 9 scenario checks; exits 1 on any failure.
 """
 
 import asyncio
 import itertools
-import json
 import time as time_module
 import uuid
 from copy import deepcopy
-from pathlib import Path
 from types import SimpleNamespace
 
 from helao.core.error import ErrorCodes
@@ -78,9 +73,6 @@ from helao.hexagon.adapters.shared.pal_transport import LegacyPalTransport
 from helao.hexagon.adapters.shared.pal_trigger import NullPalTrigger
 from helao.hexagon.adapters.shared.sample_state import SampleShimAdapter
 from helao.hexagon.domain.pal_reconciliation import PalReconciliation
-
-REPO_ROOT = Path(__file__).resolve().parents[4]
-BASELINE_DIR = REPO_ROOT / ".omc" / "artifacts" / "p4pal" / "baseline"
 
 _FIXED_CLOCK = 1_700_000_000.0
 _DET_NS = uuid.UUID("00000000-0000-0000-0000-0000000000ab")
@@ -1099,41 +1091,8 @@ async def _scenario_i():
     }
 
 
-SCENARIOS = {
-    "a_single_microcam_one_run": _scenario_a,
-    "b_three_microcams_archive_dest_two_splits": _scenario_b,
-    "c_microcam_repeat_two": _scenario_c,
-    "d_totalruns_spacing": _scenario_d,
-    "e_assembly_creation_update": _scenario_e,
-    "f_destroyed_dest_injection": _scenario_f,
-    "g_shim_raises_midpipeline": _scenario_g,
-    "h_stop_signal_between_palactions": _scenario_h,
-    "i_busy_rejection": _scenario_i,
-}
-
-
-async def run_all_scenarios(base_dir: Path) -> dict:
-    base_dir.mkdir(parents=True, exist_ok=True)
-    results = {}
-    for name, coro_fn in SCENARIOS.items():
-        data = await coro_fn()
-        payload = (
-            {"scenario": name, **data}
-            if "trace" in data
-            else {
-                "scenario": name,
-                **data,
-            }
-        )
-        text = json.dumps(payload, indent=2, sort_keys=True, default=str)
-        (base_dir / f"{name}.json").write_text(text, encoding="utf-8")
-        results[name] = text
-    return results
-
-
 # ---------------------------------------------------------------------------
-# assertions (lightweight; the real "gate" is Stage-2 diffing against these
-# baselines, not exhaustive behavioral proof here)
+# assertions (lightweight, not exhaustive behavioral proof)
 # ---------------------------------------------------------------------------
 
 
@@ -1247,36 +1206,8 @@ def main():
         print("SCENARIO CHECKS FAILED:")
         for f in failures:
             print(f"  - {f}")
-    else:
-        print("ALL 9 SCENARIO CHECKS PASSED (a-i)")
-
-    # capture baseline (single canonical copy under .omc, gitignored)
-    baseline_texts = asyncio.run(run_all_scenarios(BASELINE_DIR))
-    print(f"Baseline traces written to: {BASELINE_DIR}")
-
-    # determinism: capture twice more (in separate dirs) and diff byte-for-byte
-    import tempfile
-
-    with tempfile.TemporaryDirectory() as d1, tempfile.TemporaryDirectory() as d2:
-        run1 = asyncio.run(run_all_scenarios(Path(d1)))
-        run2 = asyncio.run(run_all_scenarios(Path(d2)))
-        det_failures = []
-        for name in SCENARIOS:
-            if run1[name] != run2[name]:
-                det_failures.append(name)
-        if det_failures:
-            print(f"DETERMINISM CHECK FAILED for: {det_failures}")
-        else:
-            print(
-                "DETERMINISM CHECK PASSED: two capture runs byte-identical for all 9 scenarios"
-            )
-
-    # also cross-check the first baseline capture against a fresh run
-    # (belt-and-suspenders against ordering bugs introduced by the checked
-    # assertion pass mutating shared global state, e.g. the CAMS singleton)
-    if failures or det_failures:
         raise SystemExit(1)
-    print("ALL GOLDEN-MASTER HARNESS CHECKS PASSED")
+    print("ALL 9 SCENARIO CHECKS PASSED (a-i)")
 
 
 if __name__ == "__main__":

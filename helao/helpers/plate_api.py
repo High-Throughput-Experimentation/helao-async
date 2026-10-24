@@ -237,11 +237,6 @@ class HTEPlateAPI:
         else:
             return infolist
 
-    def get_rcp_plateid(self, plateid: int):
-        """Forward an RCP lookup to ``HTELegacyAPI`` (currently a no-op)."""
-        LOGGER.info(f" ... get rcp for plateid: {plateid}")
-        return self.legacy_api.get_rcp_plateid(plateid)
-
     def check_plateid(self, plateid: int) -> bool:
         """Return ``True`` when an info record exists for ``plateid``."""
         infod = self.get_info(plateid)

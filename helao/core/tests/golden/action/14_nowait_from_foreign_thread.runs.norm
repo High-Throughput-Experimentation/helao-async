@@ -1,0 +1,89 @@
+===== RUNS_ACTIVE/None/0__0__ACTSRV__fthread/<DIRTS:0>-act.json =====
+{
+  "file_type": "action",
+  "hlo_version": <HLOVER>
+  "action_uuid": "<UUID:0>",
+  "action_output_dir": "None/0__0__ACTSRV__fthread",
+  "action_actual_order": 0,
+  "orch_submit_order": 0,
+  "action_server": {
+    "server_name": "ACTSRV",
+    "machine_name": "test-machine",
+    "hostname": "127.0.0.1",
+    "port": 8000
+  },
+  "orch_key": "ACTSRV",
+  "orch_host": "127.0.0.1",
+  "orch_port": 8000,
+  "access": "hte",
+  "dummy": false,
+  "simulation": false,
+  "run_use": "data",
+  "experiment_uuid": "<UUID:1>",
+  "experiment_timestamp": "<ISOTS:0>",
+  "action_timestamp": "<ISOTS:1>",
+  "action_status": [
+    "finished"
+  ],
+  "action_order": 0,
+  "action_retry": 0,
+  "action_split": 0,
+  "action_name": "fthread",
+  "action_abbr": "fthr",
+  "action_finished_timestamp": "<ISOTS:2>",
+  "files": [
+    {
+      "action_uuid": "<UUID:0>",
+      "run_use": "data",
+      "file_name": "fthr-0.0.0.0__0.jsonl",
+      "file_type": "gm__test_file",
+      "data_keys": [
+        "t",
+        "v"
+      ],
+      "nosync": false
+    }
+  ],
+  "manual_action": false,
+  "nonblocking": false,
+  "process_finish": false,
+  "error_code": "none",
+  "sync_data": true,
+  "start_condition": 3,
+  "save_act": true,
+  "save_data": true
+}
+
+===== RUNS_ACTIVE/None/0__0__ACTSRV__fthread/fthr-0.0.0.0__0.jsonl =====
+{"t":1,"v":10}
+{"t":2,"v":20}
+{"t":3,"v":30}
+{"t":4,"v":40}
+{"t":5,"v":50}
+{"t":6,"v":60}
+{"t":7,"v":70}
+{"t":8,"v":80}
+{"t":9,"v":90}
+{"t":10,"v":100}
+{"t":11,"v":110}
+{"t":12,"v":120}
+{"t":13,"v":130}
+{"t":14,"v":140}
+{"t":15,"v":150}
+{"t":16,"v":160}
+{"t":17,"v":170}
+{"t":18,"v":180}
+{"t":19,"v":190}
+{"t":20,"v":200}
+
+===== RUNS_ACTIVE/None/0__0__ACTSRV__fthread/fthr-0.0.0.0__0.meta.json =====
+{
+  "hlo_version": <HLOVER>
+  "action_name": "fthr",
+  "column_headings": [
+    "t",
+    "v"
+  ],
+  "epoch_ns": <EPOCHNS:0>
+}
+

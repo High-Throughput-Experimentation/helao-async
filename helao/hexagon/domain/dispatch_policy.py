@@ -1,7 +1,8 @@
 """Pure dispatch decision policy — the hexagon domain copy (spec §4.2.2).
 
-Ported verbatim from helao/core/servers/orch_dispatch.py:128-482 (CARDS P5
-inversion) per Q6 rewrite-with-reference. Line references in docstrings point
+Ported verbatim from the former policy copy in helao/hexagon/app/orch_dispatch.py
+(CARDS P5 inversion; that copy is now deleted, this module is the only one)
+per Q6 rewrite-with-reference. Line references in docstrings point
 at the legacy orch.py the CARDS code annotated; they are retained as the
 behavioral provenance. The async DispatchRunner effect shell is NOT ported —
 the P1b app layer drives this policy through the reducer in
@@ -15,7 +16,6 @@ Changes vs the source module (allowed by the porting rule, nothing else):
 
 __all__ = [
     "DispatchSnapshot",
-    "FinalizationSnapshot",
     "DispatchPolicy",
     "ExitLoop",
     "DriverHealthWait",
@@ -79,17 +79,6 @@ class DispatchSnapshot:
     step_thru_actions: bool  # orch.step_thru_actions (:1179)
     step_thru_experiments: bool  # orch.step_thru_experiments (:1188)
     step_thru_sequences: bool  # orch.step_thru_sequences (:1199)
-
-
-@dataclass(frozen=True)
-class FinalizationSnapshot:
-    """Post-loop snapshot for the finalization plan (guards re-checked live)."""
-
-    n_acts: int  # len(orch.action_dq) (:1235/:1241)
-    n_exps: int  # len(orch.experiment_dq) (:1240)
-    active_experiment_present: bool  # orch.active_experiment is not None (:1235)
-    active_sequence_present: bool  # orch.active_sequence is not None (:1242)
-    loop_state: LoopStatus  # orch.globalstatusmodel.loop_state (:1247, Q2)
 
 
 # ===========================================================================
@@ -216,7 +205,7 @@ class WaitAllActions:
     """wait_for_all (:897-898) AND unsupported fallback (:900-901) -> orch_wait_for_all_actions()."""
 
 
-# --- 2.4 finalization steps (DispatchPolicy.finalization_plan) ---
+# --- 2.4 finalization steps ---
 
 
 @dataclass(frozen=True)
@@ -409,15 +398,3 @@ class DispatchPolicy:
         if sc == ActionStartCondition.wait_for_all:  # :897
             return WaitAllActions()
         return WaitAllActions()  # :900-901 fallback
-
-    # --- finalization (:1234-1261) ---
-
-    def finalization_plan(self, fsnap: FinalizationSnapshot) -> list:
-        """The fixed ordered post-loop plan; per-step guards are re-checked live by the runner."""
-        return [
-            CloseOutExperiment(),
-            CloseOutSequence(),
-            SetLoopStopped(),
-            ClearIntent(),
-            ExportQueues(),
-        ]
