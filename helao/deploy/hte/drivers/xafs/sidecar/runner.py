@@ -4,6 +4,7 @@ Runs one vendor scan at a time on a worker thread, enforces safety interlocks,
 buffers per-point rows, supports stop, and has a watchdog. easyxafs singletons
 are only reached through module attributes so the sim patches apply.
 """
+
 import json
 import math
 import threading
@@ -28,7 +29,9 @@ _prev_excepthook = threading.excepthook
 def _record_excepthook(args: Any) -> None:
     if args.thread is not None:
         _thread_errors[args.thread] = "".join(
-            traceback.format_exception(args.exc_type, args.exc_value, args.exc_traceback)
+            traceback.format_exception(
+                args.exc_type, args.exc_value, args.exc_traceback
+            )
         )
     _prev_excepthook(args)
 
@@ -89,31 +92,57 @@ class ScanRunner:
     # -- control ----------------------------------------------------------
     def busy(self) -> bool:
         """A scan is active, or a watchdog-errored record still has live threads."""
-        return any(s.state in ACTIVE
-                   or (s.worker is not None and s.worker.is_alive())
-                   or (s.thread is not None and s.thread.is_alive())
-                   for s in self._scans.values())
+        return any(
+            s.state in ACTIVE
+            or (s.worker is not None and s.worker.is_alive())
+            or (s.thread is not None and s.thread.is_alive())
+            for s in self._scans.values()
+        )
 
-    def start(self, scan_def: dict, x_mm: float, y_mm: float,
-              xchanger_station: Optional[int], savename: str, save_dir: str,
-              duration_scale: float = 1.0, roi_element: str = "") -> str:
+    def start(
+        self,
+        scan_def: dict,
+        x_mm: float,
+        y_mm: float,
+        xchanger_station: Optional[int],
+        savename: str,
+        save_dir: str,
+        duration_scale: float = 1.0,
+        roi_element: str = "",
+    ) -> str:
         with self._lock:
             if self.busy():
                 raise BusyError("a scan is already active")
             self.check_interlocks(x_mm, y_mm)
             roi = None
-            if roi_element:  # resolve before any motion, as WaferGridScans does for Izero
+            if (
+                roi_element
+            ):  # resolve before any motion, as WaferGridScans does for Izero
                 import easyxafs.scan
+
                 try:
                     roi = easyxafs.scan.get_automatic_fluorescence_ROI(roi_element)
                 except Exception as e:
-                    raise InterlockError("cannot compute ROI for element %r: %s" % (roi_element, e))
+                    raise InterlockError(
+                        "cannot compute ROI for element %r: %s" % (roi_element, e)
+                    )
             scan_id = uuid.uuid4().hex
             rec = _Scan()
             self._scans[scan_id] = rec
             rec.worker = threading.Thread(
-                target=self._run, name="ScanRunner",
-                args=(rec, scan_def, x_mm, y_mm, xchanger_station, savename, save_dir, duration_scale, roi),
+                target=self._run,
+                name="ScanRunner",
+                args=(
+                    rec,
+                    scan_def,
+                    x_mm,
+                    y_mm,
+                    xchanger_station,
+                    savename,
+                    save_dir,
+                    duration_scale,
+                    roi,
+                ),
                 daemon=True,
             )
             rec.worker.start()
@@ -130,20 +159,40 @@ class ScanRunner:
         return self._scans[scan_id]  # KeyError if unknown
 
     # -- worker -----------------------------------------------------------
-    def _run(self, rec: _Scan, scan_def: dict, x_mm: float, y_mm: float,
-             station: Optional[int], savename: str, save_dir: str, scale: float,
-             roi: Optional[tuple] = None) -> None:
+    def _run(
+        self,
+        rec: _Scan,
+        scan_def: dict,
+        x_mm: float,
+        y_mm: float,
+        station: Optional[int],
+        savename: str,
+        save_dir: str,
+        scale: float,
+        roi: Optional[tuple] = None,
+    ) -> None:
         try:
-            self._run_inner(rec, scan_def, x_mm, y_mm, station, savename, save_dir, scale, roi)
+            self._run_inner(
+                rec, scan_def, x_mm, y_mm, station, savename, save_dir, scale, roi
+            )
         except Exception:
             rec.error = traceback.format_exc()
             rec.state = "error"
         rec.scan = None  # drop MCA data; mcas_bytes/artifacts read exd_path
         rec.t_end = time.monotonic()
 
-    def _run_inner(self, rec: _Scan, scan_def: dict, x_mm: float, y_mm: float,
-                   station: Optional[int], savename: str, save_dir: str, scale: float,
-                   roi: Optional[tuple] = None) -> None:
+    def _run_inner(
+        self,
+        rec: _Scan,
+        scan_def: dict,
+        x_mm: float,
+        y_mm: float,
+        station: Optional[int],
+        savename: str,
+        save_dir: str,
+        scale: float,
+        roi: Optional[tuple] = None,
+    ) -> None:
         import easyxafs
         import easyxafs.rowland
         import easyxafs.saveable_scan
@@ -153,7 +202,9 @@ class ScanRunner:
 
         rec.state = "moving"
         xch = easyxafs.xchanger_control.xchanger
-        if station is not None:  # unconditional: vendor go_to_deg skips moves within 0.01 deg
+        if (
+            station is not None
+        ):  # unconditional: vendor go_to_deg skips moves within 0.01 deg
             xch.go_to_station(station)
             xch.wait_until_idle()
         stage = easyxafs.wafer_stage_motor_control.wafer_stage
@@ -168,22 +219,28 @@ class ScanRunner:
         scan = easyxafs.scan.load_scan_def(scan_def)
         if scale != 1:
             scan.scale_scan_times(scale)
-        if roi is not None:  # same as WaferGridScans Izero: vendor only touches scan_def
-            scan.scan_def['ROI']['roi_min'] = roi[0]
-            scan.scan_def['ROI']['roi_max'] = roi[1]
+        if (
+            roi is not None
+        ):  # same as WaferGridScans Izero: vendor only touches scan_def
+            scan.scan_def["ROI"]["roi_min"] = roi[0]
+            scan.scan_def["ROI"]["roi_max"] = roi[1]
         scan.savename = str(Path(save_dir) / savename)
         scan._saveaftercomplete = True
         try:
             rec.est_total = float(scan.estimate_scan_time())
         except Exception:
-            rec.est_total = float(sum(z.get("duration", 0) for z in scan.scan_def["zone_defs"]))
+            rec.est_total = float(
+                sum(z.get("duration", 0) for z in scan.scan_def["zone_defs"])
+            )
         rec.scan = scan
 
         rec.state = "running"
 
         def cb(s: Any) -> None:
-            row = [v.item() if hasattr(v, "item") else v
-                   for v in list(s.data[-1][:-1]) + list(s.encoder_readings[-1])]
+            row = [
+                v.item() if hasattr(v, "item") else v
+                for v in list(s.data[-1][:-1]) + list(s.encoder_readings[-1])
+            ]
             with self._lock:
                 if not rec.columns:
                     rec.columns = list(s.data_headers[:-1]) + list(s.encoder_header)
@@ -205,7 +262,9 @@ class ScanRunner:
             if getattr(scan, "_stop_event", None) is not None:
                 scan.stop()
 
-        timer = threading.Timer(timeout, on_timeout)  # also covers a hang inside scan.start()
+        timer = threading.Timer(
+            timeout, on_timeout
+        )  # also covers a hang inside scan.start()
         timer.daemon = True
         timer.start()
         try:
@@ -226,14 +285,19 @@ class ScanRunner:
         exc = _thread_errors.pop(thread, None)
         n = len(rec.rows)
         if rec.stop_requested and n == 0:
-            rec.state = "stopped"  # nothing to save; vendor empty-data save error is expected
+            rec.state = (
+                "stopped"  # nothing to save; vendor empty-data save error is expected
+            )
         elif exc:
             rec.error, rec.state = exc, "error"
         elif rec.stop_requested:
             rec.exd_path = scan.saved_path
             rec.state = "stopped"
         elif n < rec.n_expected:
-            rec.error, rec.state = "scan ended early (%d/%d points)" % (n, rec.n_expected), "error"
+            rec.error, rec.state = (
+                "scan ended early (%d/%d points)" % (n, rec.n_expected),
+                "error",
+            )
         elif scan.saved_path is None:
             rec.error, rec.state = "save failed", "error"
         else:
@@ -249,15 +313,22 @@ class ScanRunner:
             st = "saving"
         end = rec.t_end if rec.t_end is not None else time.monotonic()
         return {
-            "state": st, "n_points": len(rec.rows), "n_expected": rec.n_expected,
-            "elapsed": end - rec.t0, "est_total": rec.est_total,
-            "exd_path": rec.exd_path, "error": rec.error,
+            "state": st,
+            "n_points": len(rec.rows),
+            "n_expected": rec.n_expected,
+            "elapsed": end - rec.t0,
+            "est_total": rec.est_total,
+            "exd_path": rec.exd_path,
+            "error": rec.error,
         }
 
     def rows(self, scan_id: str, since: int) -> dict:
         rec = self._get(scan_id)
         with self._lock:
-            return {"columns": list(rec.columns), "rows": [list(r) for r in rec.rows[since:]]}
+            return {
+                "columns": list(rec.columns),
+                "rows": [list(r) for r in rec.rows[since:]],
+            }
 
     def _zip(self, scan_id: str) -> zipfile.ZipFile:
         rec = self._get(scan_id)

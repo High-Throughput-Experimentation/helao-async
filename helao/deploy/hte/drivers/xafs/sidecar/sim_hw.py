@@ -4,6 +4,7 @@ Python 3.9 only (the easyxafs sim env). ``install_sim(state_dir)`` stubs the
 vendor hardware modules in ``sys.modules``, imports easyxafs, and swaps the
 real hardware singletons for the fakes below.
 """
+
 import os
 import sys
 import time
@@ -26,7 +27,10 @@ class FakeMono:
         self._calibrated = True
         self._speed_setting = "high_speed"
         self.stored_encoders: Dict[str, int] = {
-            "Beta": 0, "Detector": 0, "Rho": 0, "Theta": 0,
+            "Beta": 0,
+            "Detector": 0,
+            "Rho": 0,
+            "Theta": 0,
         }
         self.crystal2d = "Si(5,5,3)"  # extra: lets FakeKetek convert angle -> energy
         self.move_delay = 0.0
@@ -81,7 +85,9 @@ class FakeKetek:
     def initialize(self) -> None:
         self.is_initialized = True
 
-    def start_acquisition(self, duration: Optional[float] = None, channel: int = 0) -> None:
+    def start_acquisition(
+        self, duration: Optional[float] = None, channel: int = 0
+    ) -> None:
         self._duration = 0.1 if duration is None else float(duration)
 
     def wait_until_acquisition_complete(self) -> None:
@@ -93,7 +99,9 @@ class FakeKetek:
 
         if not self.mono.calls:
             return self.e0
-        return float(easyxafs_xray_utils.bragg_energy(self.mono.calls[-1], self.mono.crystal2d))
+        return float(
+            easyxafs_xray_utils.bragg_energy(self.mono.calls[-1], self.mono.crystal2d)
+        )
 
     def get_spectrum(self, channel: int = 0) -> np.ndarray:
         e = self._energy()
@@ -277,7 +285,9 @@ def install_sim(state_dir: str) -> SimHandles:
     easyxafs.monochromator.mono = mono
     easyxafs.scan.mono = mono
     easyxafs.scan.sdd_detector = ketek
-    easyxafs.ketek.initialize = ketek.initialize  # extra: sidecar initialize hits the fake
+    easyxafs.ketek.initialize = (
+        ketek.initialize
+    )  # extra: sidecar initialize hits the fake
     easyxafs.wafer_stage_motor_control.wafer_stage = wafer
     easyxafs.xchanger_control.xchanger = xch
     sys.modules["pyprotohv"].proto_controller = proto
