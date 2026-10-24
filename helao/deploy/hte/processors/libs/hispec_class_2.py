@@ -8,20 +8,20 @@ data (DeltaOD, differential spectra, co-plots of DeltaA and CV traces).
 import json
 import os
 import tkinter as tk
-from collections import defaultdict
 from pathlib import Path
 from tkinter import filedialog
-from typing import Optional, Union
+from typing import Optional
 
 import cmcrameri.cm as cmc
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import ruamel.yaml
 from scipy import signal
 from scipy.interpolate import UnivariateSpline
 from scipy.signal import sawtooth
+
+from helao.helpers.hlo_data import read_hlo
 
 
 class SpEC:
@@ -782,86 +782,6 @@ def change_directory_to_new_expt():
     ).parent  # Show the file dialog and get the selected file path
     root.destroy()  # Close the root window
     return os.chdir(file_path)
-
-
-def yml_load(input: Union[str, Path]):
-    """Parse a YAML document from a file path, a :class:`Path`, or a string.
-
-    Args:
-        input: Either a path-like pointing at an existing YAML file or
-            the raw YAML text itself.
-
-    Returns:
-        The parsed YAML document as ruamel.yaml round-trip objects.
-
-    Raises:
-        ruamel.yaml.YAMLError: If the YAML content cannot be parsed.
-    """
-    yaml = ruamel.yaml.YAML(typ="rt")
-    yaml.version = (1, 2)
-    if isinstance(input, Path):
-        with input.open("r", encoding="utf-8") as f:
-            obj = yaml.load(f)
-    elif os.path.exists(input):
-        with open(input, "r", encoding="utf-8") as f:
-            obj = yaml.load(f)
-    else:
-        obj = yaml.load(input)
-    return obj
-
-
-def read_hlo(
-    path: str, keep_keys: list = [], omit_keys: list = []
-) -> tuple[dict, dict]:
-    """Parse a ``.hlo`` file into its YAML header and per-line JSON records.
-
-    ``keep_keys`` takes precedence over ``omit_keys`` if both are
-    supplied.
-
-    Args:
-        path: Path to the ``.hlo`` file.
-        keep_keys: If non-empty, only these data keys are accumulated.
-        omit_keys: Data keys to skip when ``keep_keys`` is empty.
-
-    Returns:
-        Tuple of ``(metadata_dict, data_dict)`` where ``data_dict``
-        maps each kept key to a list of values.
-    """
-    if keep_keys and omit_keys:
-        print(
-            "Both keep_keys and omit_keys are provided. keep_keys will take precedence."
-        )
-
-    path_to_hlo = Path(path)
-    header_lines = []
-    header_end = False
-    data = defaultdict(list)
-
-    with path_to_hlo.open(encoding="utf-8") as f:
-        for line in f:
-            if line == "%%\n":
-                header_end = True
-            elif not header_end:
-                header_lines.append(line)
-            else:
-                line_dict = json.loads(line)
-                if keep_keys:
-                    for k, v in line_dict.items():
-                        if k in keep_keys:
-                            if isinstance(v, list):
-                                data[k] += v
-                            else:
-                                data[k].append(v)
-                else:
-                    for k, v in line_dict.items():
-                        if k not in omit_keys:
-                            if isinstance(v, list):
-                                data[k] += v
-                            else:
-                                data[k].append(v)
-    meta = dict(yml_load("".join(header_lines)))
-
-    return meta, data
 
 
 def read_CV_hlo(

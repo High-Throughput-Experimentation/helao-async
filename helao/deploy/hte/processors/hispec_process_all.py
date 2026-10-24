@@ -21,6 +21,7 @@ from helao.core.models.file import FileInfo
 from helao.deploy.hte.processors.libs.hispec_calibrate_downsample_parquet import (
     fully_read_and_calibrate_parquet,
 )
+from helao.hexagon.domain.naming import data_sibling
 from helao.helpers import helao_logging as logging
 from helao.helpers.helao_data import HelaoData
 from helao.helpers.hlo_data import hlo_to_parquet
@@ -64,7 +65,7 @@ class PostProcess(HloPostProcessor):
                                 with contextlib.suppress(OSError):
                                     os.unlink(temp_name)
                         action_comment = self.action.action_params.get("comment", "")
-                        new_file_path = file_path.replace(".hlo", ".parquet")
+                        new_file_path = data_sibling(file_path, ".parquet")
                         if action_comment:
                             new_file_path = new_file_path.replace(
                                 ".parquet", f"_{action_comment}.parquet"
