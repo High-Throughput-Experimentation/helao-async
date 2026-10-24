@@ -22,16 +22,10 @@ from collections.abc import Awaitable, Callable
 from typing import Any, Optional
 
 import msgspec
+import numpy as np
 import zmq
 import zmq.asyncio
 from pydantic import BaseModel
-
-try:
-    import numpy as _np_mod
-
-    _np: Any = _np_mod
-except ImportError:  # numpy is optional in some deployments
-    _np = None
 
 from helao.helpers import helao_logging as logging
 
@@ -96,12 +90,11 @@ def _msgpack_enc_hook(obj: Any) -> Any:
     """
     if isinstance(obj, pathlib.PurePath):
         return str(obj)
-    if _np is not None:
-        # ndarray.tolist() also recursively unwraps nested numpy scalars.
-        if isinstance(obj, _np.ndarray):
-            return obj.tolist()
-        if isinstance(obj, _np.generic):
-            return obj.item()
+    # ndarray.tolist() also recursively unwraps nested numpy scalars.
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, np.generic):
+        return obj.item()
     # ruamel.yaml scalar wrappers (and any other builtin subclass).
     # Order matters: bool before int (bool is an int subclass); numpy
     # checks above already ran, so these only catch pure-Python subclasses.

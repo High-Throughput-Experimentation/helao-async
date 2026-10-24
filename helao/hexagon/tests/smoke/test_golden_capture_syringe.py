@@ -6,30 +6,22 @@ Exercises only:
     masked_meta_keys are empty because get_present_volume writes a
     config-deterministic value -- 0.0 on a fresh idle pump -- not a live device
     reading; masking it would only weaken the parity check)
-  - the shared (gamry-authored, imported here) ``settle`` helper, applied to a
-    syringe-shaped RUNS_DIAG tree
 
 The (hardware-independent) POST to ``/WORKSYRINGE/get_present_volume`` (and
 ``check_device_open``'s ``/get_status`` probe) is NOT exercised here -- that
 only runs against a launched server (see golden_capture_syringe.py docstrings).
 
-Written as plain assert-based ``test_*`` functions with no ``import pytest``
-(mirrors ``test_golden_capture_galil.py`` -- this repo's conda ``helao`` env
-does not currently have the pytest package installed), so this module is
-runnable two ways:
+Run:
 
     conda run -n helao python -m pytest helao/hexagon/tests/smoke/test_golden_capture_syringe.py -q
-    conda run -n helao python -m helao.hexagon.tests.smoke.test_golden_capture_syringe
 """
 
 from __future__ import annotations
 
-import sys
 import tempfile
 from pathlib import Path
 
 from harness.manifest import ProvenanceManifest
-from helao.hexagon.tests.smoke.golden_capture import settle
 from helao.hexagon.tests.smoke.golden_capture_syringe import (
     SCENARIO,
     SYRVOL_MASKED_HLO_COLUMNS,
@@ -122,42 +114,6 @@ def test_snapshot_refuses_empty_capture():
         assert not out.exists()  # nothing written on refusal
 
 
-def test_settle_returns_once_action_artifacts_are_complete_and_stable():
-    with tempfile.TemporaryDirectory() as td:
-        root = Path(td) / "captroot"
-        _write_action(root, status="finished", with_hlo=True)
-        settle(root, settle_polls=2, poll_s=0.01, timeout_s=5.0)
-
-
-def test_settle_times_out_when_no_artifacts_are_written():
-    """The action never wrote output (errored / no data): settle must raise,
-    not silently return -- this is what prevents the empty-capture false PASS."""
-    with tempfile.TemporaryDirectory() as td:
-        root = Path(td) / "captroot"
-        root.mkdir()  # empty root, nothing ever written
-        try:
-            settle(root, settle_polls=2, poll_s=0.01, timeout_s=0.05)
-        except TimeoutError:
-            pass
-        else:
-            raise AssertionError("settle() should time out when no artifacts appear")
-
-
-def test_settle_does_not_return_while_action_active():
-    """-act.yml exists at init with status 'active' (base.py:1029). settle
-    must NOT return on file existence -- else it snapshots + kills the
-    server mid-query."""
-    with tempfile.TemporaryDirectory() as td:
-        root = Path(td) / "captroot"
-        _write_action(root, status="active", with_hlo=False)  # still running
-        try:
-            settle(root, settle_polls=2, poll_s=0.01, timeout_s=0.05)
-        except TimeoutError:
-            pass
-        else:
-            raise AssertionError("settle() must not return while status is 'active'")
-
-
 def test_snapshot_succeeds_with_terminal_act_yml_only():
     """snapshot captures a finished -act.yml-only tree (warns about the missing
     .hlo but does not refuse -- the -act.yml is still a real parity comparison).
@@ -169,32 +125,3 @@ def test_snapshot_succeeds_with_terminal_act_yml_only():
         out = Path(td) / "golden" / "run1"
         snapshot(root=root, out_dir=out, config_prefix="syringegold")
         assert (out / "provenance.yml").exists()
-
-
-ALL_TESTS = [
-    test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance,
-    test_snapshot_refuses_to_overwrite_existing_out_dir,
-    test_snapshot_refuses_empty_capture,
-    test_settle_returns_once_action_artifacts_are_complete_and_stable,
-    test_settle_times_out_when_no_artifacts_are_written,
-    test_settle_does_not_return_while_action_active,
-    test_snapshot_succeeds_with_terminal_act_yml_only,
-]
-
-
-def main() -> int:
-    failures = 0
-    for fn in ALL_TESTS:
-        try:
-            fn()
-        except Exception as exc:  # noqa: BLE001 -- report every failure, keep going
-            failures += 1
-            print(f"FAIL {fn.__name__}: {exc}")
-        else:
-            print(f"PASS {fn.__name__}")
-    print(f"{len(ALL_TESTS) - failures}/{len(ALL_TESTS)} passed")
-    return 1 if failures else 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

@@ -167,9 +167,9 @@ class GalilAlignerHost:
         """Bokeh document factory: attach an ``Aligner`` bound to the context.
 
         Wires the legacy driver's position-notify sink to the aligner's
-        ``motorpos_q`` so ``Galil.update_aligner`` (called from
-        ``query_axis_position``/``query_axis_moving``) keeps feeding live
-        positions to the Bokeh widgets.
+        ``motorpos_q`` so the driver's ``update_aligner`` (called from
+        its position queries) keeps feeding live positions to the Bokeh
+        widgets.
         """
         from helao.ui.bokeh.vis import HelaoVis
         from helao.deploy.hte.layouts.aligner import Aligner

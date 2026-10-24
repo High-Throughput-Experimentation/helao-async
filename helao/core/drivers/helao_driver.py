@@ -80,11 +80,6 @@ class DriverResponse:
         """Stamp the response with the current wall-clock time."""
         self.timestamp = datetime.now()
 
-    @property
-    def timestamp_str(self) -> str:
-        """Timestamp formatted as ``YYYY-MM-DD HH:MM:SS,mmm``."""
-        return self.timestamp.strftime("%F %T,%f")[:-3]
-
 
 class HelaoDriver(ABC):
     """Abstract base class every HELAO device driver implements.
@@ -116,16 +111,6 @@ class HelaoDriver(ABC):
         """
         self.timestamp = datetime.now()
         self.config = config
-
-    @property
-    def _created_at(self) -> str:
-        """Instantiation timestamp formatted as ``YYYY-MM-DD HH:MM:SS,mmm``."""
-        return self.timestamp.strftime("%F %T,%f")[:-3]
-
-    @property
-    def _uptime(self) -> str:
-        """Time since instantiation as a duration string (``H:MM:SS.ffffff``)."""
-        return str(datetime.now() - self.timestamp)
 
     @abstractmethod
     def connect(self) -> DriverResponse:

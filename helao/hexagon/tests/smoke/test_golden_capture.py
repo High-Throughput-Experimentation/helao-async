@@ -7,21 +7,13 @@ Exercises only:
 The real-hardware POST to ``/PSTAT/run_OCV`` is NOT exercised here -- that
 only runs at-station (see golden_capture.py docstrings).
 
-Written as plain assert-based ``test_*`` functions with no ``import pytest``
-(this repo's conda ``helao`` env does not currently have the pytest package
-installed -- see CLAUDE.md: "There is no pytest harness and no project-wide
-build step"), so this module is runnable two ways:
+Run:
 
     conda run -n helao python -m pytest helao/hexagon/tests/smoke/test_golden_capture.py -q
-    conda run -n helao python -m helao.hexagon.tests.smoke.test_golden_capture
-
-Both simply call the ``test_*`` functions below; the ``__main__`` block
-reports PASS/FAIL per function without requiring pytest to be installed.
 """
 
 from __future__ import annotations
 
-import sys
 import tempfile
 from pathlib import Path
 
@@ -228,34 +220,3 @@ def test_snapshot_succeeds_with_terminal_act_yml_only():
             root=root, out_dir=out, config_prefix="gamrygold", tval_s=3.0, acq_s=0.1
         )
         assert (out / "provenance.yml").exists()
-
-
-ALL_TESTS = [
-    test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance,
-    test_snapshot_refuses_to_overwrite_existing_out_dir,
-    test_snapshot_refuses_empty_capture,
-    test_settle_returns_once_action_artifacts_are_complete_and_stable,
-    test_settle_times_out_when_no_artifacts_are_written,
-    test_settle_returns_with_terminal_status_no_hlo,
-    test_settle_does_not_return_while_action_active,
-    test_settle_returns_on_errored_status,
-    test_snapshot_succeeds_with_terminal_act_yml_only,
-]
-
-
-def main() -> int:
-    failures = 0
-    for fn in ALL_TESTS:
-        try:
-            fn()
-        except Exception as exc:  # noqa: BLE001 -- report every failure, keep going
-            failures += 1
-            print(f"FAIL {fn.__name__}: {exc}")
-        else:
-            print(f"PASS {fn.__name__}")
-    print(f"{len(ALL_TESTS) - failures}/{len(ALL_TESTS)} passed")
-    return 1 if failures else 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

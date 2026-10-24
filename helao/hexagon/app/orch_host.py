@@ -85,9 +85,6 @@ def orch_ws_publishers(
 class OrchHost(ActionHost):
     """The native orchestrator server."""
 
-    # Q5 / P2b-2 D3: the orchestrator serves its own /ws_* relays, so no bridge.
-    _binds_ws_bridge = False
-
     #: Head action popped from ``action_dq`` while its start condition is awaited;
     #: ``export_queues`` serializes it so a shutdown mid-wait keeps it. A class
     #: default, so hosts built without ``__init__`` (test probes) read ``None``.
@@ -1421,11 +1418,6 @@ class OrchHost(ActionHost):
         self._hex_runtime = HexRuntime(self, self._hex_effects)
         self._hex_loop = HexDispatchLoop(self._hex_runtime)
         self._hex_ingestion = HexStatusIngestion(self, self._hex_runtime)
-        # health is required for an orch composition (ORCH_REQUIRED), and
-        # wiring.require() has already run, so this is not optional.
-        bind = getattr(self.hexagon_wiring.health, "bind_orch", None)
-        if bind is not None:
-            bind(self)
         self._hex_health = HexHealthMonitor(
             self, self._hex_runtime, self.hexagon_wiring.health
         )

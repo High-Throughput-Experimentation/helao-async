@@ -6,14 +6,12 @@ from datetime import datetime
 from helao.hexagon.adapters import fakes
 from helao.hexagon.domain.models import Action, ErrorCodes
 from helao.hexagon.ports.clock import ClockPort
-from helao.hexagon.ports.status import StatusPort
 from helao.hexagon.ports.transport import TransportPort
 
 
 def test_fakes_satisfy_protocols():
     assert isinstance(fakes.FakeClock(), ClockPort)
     assert isinstance(fakes.FakeTransport(), TransportPort)
-    assert isinstance(fakes.FakeStatusPush(), StatusPort)
 
 
 def test_fake_clock_is_deterministic():

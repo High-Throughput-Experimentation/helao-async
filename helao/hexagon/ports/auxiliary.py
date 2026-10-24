@@ -37,14 +37,7 @@ class StatePersistencePort(Protocol):
 
 @runtime_checkable
 class HealthPort(Protocol):
-    """HEAD-probe endpoints_available, ping_action_servers, heartbeat
-    monitors (HexHealthMonitor: default 10 s + ignore_heartbeats;
-    driver-health status_summary gate)."""
+    """HEAD-probe endpoints_available, heartbeat monitors (HexHealthMonitor:
+    default 10 s + ignore_heartbeats)."""
 
     async def endpoints_available(self, urls: list[str]) -> list[tuple[str, bool]]: ...
-
-    async def ping_action_servers(self) -> dict[str, str]: ...
-
-    def status_summary(self) -> dict[str, str]:
-        """server_key -> driver status string; 'unknown' gates dispatch."""
-        ...

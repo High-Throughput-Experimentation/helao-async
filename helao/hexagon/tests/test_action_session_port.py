@@ -214,7 +214,6 @@ def test_a_session_can_actually_be_constructed(tmp_path) -> None:
             clock=_Clock(),
             transport=_Stub(),
             state_persistence=_Stub(),
-            status=_Stub(),
             health=_Stub(),
             artifact_store=store,
         ),
@@ -281,7 +280,6 @@ async def test_ctx_begin_opens_a_session_through_the_host(tmp_path) -> None:
             clock=_Clock(),
             transport=_Stub(),
             state_persistence=_Stub(),
-            status=_Stub(),
             health=_Stub(),
             artifact_store=store,
         ),
@@ -344,7 +342,6 @@ def test_open_carries_sample_global_labels_onto_the_file_connection(tmp_path) ->
                 clock=_Clock(),
                 transport=_Stub(),
                 state_persistence=_Stub(),
-                status=_Stub(),
                 health=_Stub(),
                 artifact_store=NativeArtifactStoreAdapter(
                     config=_Stub(), clock=_Clock()

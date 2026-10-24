@@ -1,8 +1,8 @@
 """Row-15 negative, run live against a launched group (P7g gate).
 
 Drives all five private control routes against a running ``controlneg`` group
-through the **same** shared wrappers both UI stacks use -- via the hexagon's
-``ControlSurface`` -- and asserts the run tree is unchanged afterwards.
+through the **same** shared wrappers both UI stacks use (``io_control`` and
+``motion_control``) and asserts the run tree is unchanged afterwards.
 
 The two things that make this more than a tautology:
 

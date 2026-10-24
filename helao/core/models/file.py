@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 
 from helao.core.helaodict import HelaoDict
 from helao.core.version import get_hlo_version
@@ -107,11 +107,6 @@ class FileConn(BaseModel, HelaoDict):
             file=None,
         )
         return newfileconn
-
-    @validator("file")
-    def validate_file(cls, v):
-        """Pass-through validator for the `file` field."""
-        return v
 
 
 class FileInfo(BaseModel, HelaoDict):

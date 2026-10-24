@@ -18,8 +18,6 @@ from helao.hexagon.domain.orchestration import (
     StatusChanged,
 )
 from helao.hexagon.tests.live_group import (
-    SIM_HOST,
-    SIM_PORT,
     build_ws_sequence,
     live_group,
     orch_call,
@@ -330,40 +328,6 @@ async def test_item3c_estop_during_finalization_close_out(tmp_path):
 # Item 5: nonblocking lifecycle (send_nbstatuspackage -> update_nonblocking
 #         -> clear); the flag must survive the endpoint (ac42e9bf/e7534fd3)
 # =============================================================================
-@pytest.mark.asyncio
-async def test_item5_adapter_nonblocking_roundtrip_real_endpoints(tmp_path):
-    """Hexagon status adapter -> REAL /update_nonblocking on the live orch:
-    the bookkeeping tuple must carry the adapter's composed own host/port
-    (the Task 1 carry — never ''/0), and clear_nonblocking must reach the
-    real SIM /stop_executor over the dispatcher."""
-    from helao.helpers.time_utils import gen_uuid
-    from helao.hexagon.tests.live_group import ORCH_HOST, ORCH_PORT
-
-    async with live_group(str(tmp_path)) as g:
-        status = g.sim_app.hexagon_wiring.status
-        exec_id = "SIM p1b2b-item5"
-        act_uuid = gen_uuid()
-        await status.send_nonblocking_status(
-            "ORCH", ORCH_HOST, ORCH_PORT, "SIM", exec_id, act_uuid, "active"
-        )
-        expected = ("SIM", exec_id, SIM_HOST, SIM_PORT)
-        assert expected in g.orch.nonblocking, g.orch.nonblocking
-        # the carry: identity is the REAL composed one, never the defaults
-        assert ("SIM", exec_id, "", 0) not in g.orch.nonblocking
-
-        # clear leg: real /stop_executor POST to the SIM's live host/port
-        resp_tups = await g.orch.clear_nonblocking()
-        assert resp_tups, "clear_nonblocking sent nothing"
-        for resp, _err in resp_tups:
-            assert resp is not None, "stop_executor never reached the SIM"
-
-        # finished status removes the tuple
-        await status.send_nonblocking_status(
-            "ORCH", ORCH_HOST, ORCH_PORT, "SIM", exec_id, act_uuid, "finished"
-        )
-        assert expected not in g.orch.nonblocking
-
-
 @pytest.mark.asyncio
 async def test_item5_nonblocking_wait_full_lifecycle(tmp_path):
     """Full run: TEST_consecutive_noblocking's nonblocking /wait — the

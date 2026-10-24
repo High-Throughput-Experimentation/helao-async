@@ -46,7 +46,6 @@ dependencies:
   - psycopg2
   - pyaml
   - pyarrow
-  - pybase64
   - pydantic
   - pydantic-core
   - pydantic-settings
@@ -73,10 +72,8 @@ dependencies:
   - setuptools<82
   - shortuuid
   - sqlalchemy
-  - sqlmodel>=0.0.42
   - starlette
   - statsmodels
-  - termcolor
   - tqdm
   - uv
   - uvicorn

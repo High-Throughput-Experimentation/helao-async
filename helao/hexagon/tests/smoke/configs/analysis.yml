@@ -9,7 +9,7 @@
 # deliverable for now.
 #
 # Step-0 finding: AnalysisSyncer.__init__ (analysis_driver.py:173) builds a
-# pgs3.EcheUvisLoader (helao/core/drivers/data/loaders/pgs3.py) whose
+# HelaoLoader (helao/core/drivers/data/loaders/helao_loader.py) whose
 # HelaoCredentials (helao/core/models/credentials.py) fields ALL default to
 # empty SecretStr/str values when no env_file is set/found -- boto3.Session
 # and sqlalchemy's create_engine() are both lazy (no connection attempt until

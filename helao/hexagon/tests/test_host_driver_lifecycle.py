@@ -98,7 +98,6 @@ def _host(record: list, **kw):
         clock=stub,
         transport=stub,
         state_persistence=stub,
-        status=stub,
         health=stub,
         artifact_store=stub,
     )

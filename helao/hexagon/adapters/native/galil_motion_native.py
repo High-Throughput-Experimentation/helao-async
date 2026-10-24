@@ -17,7 +17,7 @@ clamp, ``SP``/``PR|PA|HM``/``BG`` sequence, settle-poll) and ``setaxisref``
 (homing). native-3 completes the full galil-server surface so this can be the
 sole ``app.driver``: it is now a ``HelaoDriver`` (with ``stop``/``reset``) and
 adds the public ``motor_move(active)``, ``motor_disconnect``, calibration-matrix
-management (``save``/``load``/``update``/``reset_plate_transfermatrix``) and the
+management (``save``/``update``/``reset_plate_transfermatrix``) and the
 ``solid_get_platemap``/``solid_get_samples_xy`` platemap lookups. All faithfully
 ported from the legacy driver. gclib I/O + at-station validation are the gate.
 """
@@ -26,7 +26,6 @@ import asyncio
 import json
 import os
 import time
-import traceback
 from copy import deepcopy
 from socket import gethostname
 from typing import TYPE_CHECKING, Any, Optional
@@ -905,20 +904,6 @@ class NativeGalilMotion(HelaoDriver):
                 os.makedirs(filedir, exist_ok=True)
             with open(file, "w", encoding="utf-8") as f:
                 f.write(json.dumps(self.plate_transfermatrix.tolist()))
-
-    def load_transfermatrix(self, file):
-        """Read a JSON matrix from ``file`` (None if missing/malformed/wrong-shape)."""
-        if os.path.exists(file):
-            with open(file, "r", encoding="utf-8") as f:
-                try:
-                    new_matrix = np.matrix(json.loads(f.readline()))
-                    if new_matrix.shape != self.dflt_matrix.shape:
-                        return None
-                    return new_matrix
-                except Exception:
-                    traceback.print_exc()
-                    return None
-        return None
 
     def update_plate_transfermatrix(self, newtransfermatrix):
         """Replace the plate matrix, propagate to the transform, persist to disk."""

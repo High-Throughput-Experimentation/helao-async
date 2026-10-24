@@ -132,7 +132,8 @@ def test_no_forbidden_host_read() -> None:
 
 def test_the_scan_sees_every_measured_read() -> None:
     _, reads, files = scan(_source_files())
-    assert reads >= 31 and len(files) >= 16, (reads, len(files))
+    # floor dropped by one read/file when the legacy galil_motion_driver was deleted
+    assert reads >= 30 and len(files) >= 15, (reads, len(files))
 
 
 def test_allowed_set_is_the_ten_members() -> None:

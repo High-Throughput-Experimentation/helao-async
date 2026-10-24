@@ -439,11 +439,6 @@ def _index_page(routes: dict):
     )
 
 
-def _stub_page(title: str, spec_note: str, route: str = "/"):
-    """Render a placeholder route that states what will fill it."""
-    return _page(title, rx.text(spec_note, padding_x="1em"), route)
-
-
 def _ensure_panel_states(routes: dict) -> None:
     """Mint every panel's state class at build time.
 

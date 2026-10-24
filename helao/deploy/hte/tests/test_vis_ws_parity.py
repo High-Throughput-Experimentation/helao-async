@@ -3,7 +3,7 @@ fed the decoded payload the real `VisSubscriber.IOloop_data` would hand them,
 built from `harness/ws_frames` (real encoder -> real WsSubscriber decoder,
 never a hand-built dict standing in for the wire).
 
-12 hte visualizer modules define `add_points`; **10** are conformance-tested
+11 hte visualizer modules define `add_points`; **9** are conformance-tested
 here. Two are excluded, both measured rather than assumed:
 
 - `sample_vis.add_points(self)` takes no payload argument at all -- it is
@@ -23,7 +23,7 @@ Two families, two different unrecognized-key tolerances, measured and pinned
 rather than assumed uniform (a correction to the plan's implicit "does not
 raise" premise for the ws_live family):
 
-- ws_live (`LiveVisualizer`): `co2_vis`, `syringe_vis`, `pressure_vis`,
+- ws_live (`LiveVisualizer`): `co2_vis`, `pressure_vis`,
   `tec_vis`, `temp_vis`, `mfc_vis` all initialize `data_dict = {k: [] for k in
   self.data_dict_keys}` then do an unconditional `data_dict[datalab].append`
   for any wire key that isn't `"sim_dict"`/`"tec_vals"` -- an unrecognized
@@ -118,7 +118,7 @@ def _import(modname):
 
 
 def test_targeted_module_set_matches_disk_and_is_documented():
-    """12 hte modules define add_points; 10 are conformance-tested; the 2
+    """11 hte modules define add_points; 9 are conformance-tested; the 2
     exclusions are named and justified in the module docstring above, not
     silently dropped."""
     import subprocess
@@ -130,10 +130,10 @@ def test_targeted_module_set_matches_disk_and_is_documented():
         check=True,
     ).stdout
     found = {line.split("/")[-1][: -len(".py")] for line in out.strip().splitlines()}
-    assert len(found) == 12, found
+    assert len(found) == 11, found
     excluded = {"sample_vis", "spec_vis"}
     tested = found - excluded
-    assert len(tested) == 10, tested
+    assert len(tested) == 9, tested
     assert excluded <= found
 
 
@@ -151,24 +151,6 @@ def test_co2_vis_ingests_recognized_and_raises_on_unrecognized():
         vis.add_points([decoded])
         assert len(vis.datasource.data["co2_ppm"]) == before + 1
         assert vis.datasource.data["co2_ppm"][-1] == 410.0
-
-        bad = await _decoded_live({}, strings={wf.LIVE_STRING_LABEL: "x"})
-        with pytest.raises(KeyError):
-            vis.add_points([bad])
-
-    asyncio.run(_run())
-
-
-def test_syringe_vis_ingests_recognized_and_raises_on_unrecognized():
-    module = _import("syringe_vis")
-
-    async def _run():
-        vis = _build(module, "SYRINGE0")
-        assert vis.connected
-        before = len(vis.datasource.data["co2_ppm"])
-        decoded = await _decoded_live({"co2_ppm": 1.5})
-        vis.add_points([decoded])
-        assert len(vis.datasource.data["co2_ppm"]) == before + 1
 
         bad = await _decoded_live({}, strings={wf.LIVE_STRING_LABEL: "x"})
         with pytest.raises(KeyError):
@@ -389,7 +371,6 @@ def test_nidaqmx_vis_ingests_recognized_columns_and_drops_string():
 if __name__ == "__main__":
     test_targeted_module_set_matches_disk_and_is_documented()
     test_co2_vis_ingests_recognized_and_raises_on_unrecognized()
-    test_syringe_vis_ingests_recognized_and_raises_on_unrecognized()
     test_temp_vis_ingests_recognized_and_raises_on_unrecognized()
     test_pressure_vis_ingests_recognized_and_raises_on_unrecognized()
     test_tec_vis_ingests_recognized_via_tec_vals_and_raises_on_unrecognized()

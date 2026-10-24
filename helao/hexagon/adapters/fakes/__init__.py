@@ -98,45 +98,6 @@ class FakeTransport:
         return self._fail_with is None
 
 
-class FakeStatusPush:
-    def __init__(self):
-        _banner("FakeStatusPush")
-        self.clients: list[tuple[str, str, int]] = []
-        self.nonblocking: list[tuple] = []
-        self.published: list[tuple[str, dict]] = []
-
-    async def attach_client(
-        self, client_servkey, client_host, client_port, retry_limit: int = 5
-    ) -> bool:
-        self.clients.append((client_servkey, client_host, client_port))
-        return True
-
-    async def detach_client(self, client_servkey, client_host, client_port) -> None:
-        self.clients.remove((client_servkey, client_host, client_port))
-
-    async def send_nonblocking_status(
-        self,
-        client_servkey,
-        client_host,
-        client_port,
-        server_key,
-        exec_id,
-        act_uuid,
-        status,
-        retries: int = 3,
-    ) -> None:
-        self.nonblocking.append((server_key, exec_id, act_uuid, status))
-
-    async def publish_status(self, payload: dict) -> None:
-        self.published.append(("status", payload))
-
-    async def publish_data(self, payload: dict) -> None:
-        self.published.append(("data", payload))
-
-    async def publish_live(self, payload: dict) -> None:
-        self.published.append(("live", payload))
-
-
 class FakeTableCatalog:
     """In-memory `TableCatalogPort`: rows supplied as dicts, no file at all.
 

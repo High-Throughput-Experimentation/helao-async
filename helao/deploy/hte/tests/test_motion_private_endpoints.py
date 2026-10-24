@@ -391,7 +391,7 @@ def test_galil_mm_move_of_the_same_distance_loses_a_count():
 
 def test_galil_absolute_counts_move_emits_pa_not_pr():
     app, ch = _galil_app()
-    from helao.deploy.hte.drivers.motion.galil_motion_driver import MoveModes
+    from helao.deploy.hte.drivers.motion.enum import MoveModes
 
     _galil_move(app, axis="y", value=4321, mode=MoveModes.absolute, units=Units.counts)
     assert "PAB=4321" in ch.commands, ch.commands

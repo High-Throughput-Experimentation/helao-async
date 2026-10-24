@@ -389,41 +389,8 @@ class NtpOffsetFormatter(logging.Formatter):
             return self.default_msec_format % (t, record.msecs)
 
 
-class ColoredNtpOffsetFormatter(ColoredFormatter):
+class ColoredNtpOffsetFormatter(NtpOffsetFormatter, ColoredFormatter):
     """Colour-aware variant of ``NtpOffsetFormatter`` for stream handlers."""
-
-    def __init__(self, *args, offset_seconds=0, use_utc: bool = False, **kwargs):
-        """Build the formatter.
-
-        Args:
-            *args: Positional arguments forwarded to ``ColoredFormatter``.
-            offset_seconds: Seconds to add to each log record timestamp.
-            use_utc: If ``True``, format times in UTC instead of local time.
-            **kwargs: Keyword arguments forwarded to ``ColoredFormatter``.
-        """
-        super().__init__(*args, **kwargs)
-        self.offset = timedelta(seconds=offset_seconds)
-        if use_utc:
-            self.tz = timezone.utc
-        else:
-            now = datetime.now()
-            local_now = now.astimezone()
-            local_tz = local_now.tzinfo
-            self.tz = local_tz
-
-    def formatTime(self, record, datefmt=None) -> str:
-        """Return the record's creation time shifted by the configured offset."""
-        # Convert the record's timestamp (seconds since epoch) to a UTC datetime
-        ct = datetime.fromtimestamp(record.created, tz=self.tz)
-        # Apply the desired offset
-        dt = ct + self.offset
-
-        if datefmt:
-            return dt.strftime(datefmt)
-        else:
-            # If no datefmt is specified, use a default ISO8601-like format with offset
-            t = dt.strftime(self.default_time_format)
-            return self.default_msec_format % (t, record.msecs)
 
 
 def make_logger(

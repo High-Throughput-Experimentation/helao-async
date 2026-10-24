@@ -51,7 +51,7 @@ from helao.core.models.machine import MachineModel
 from helao.core.models.process_contrib import ProcessContrib
 from helao.core.models.sample import LiquidSample, SolidSample
 from helao.deploy.hte.drivers.io.enum import TriggerType
-from helao.deploy.hte.drivers.motion.galil_motion_driver import (
+from helao.deploy.hte.drivers.motion.enum import (
     MoveModes,
     TransformationModes,
 )

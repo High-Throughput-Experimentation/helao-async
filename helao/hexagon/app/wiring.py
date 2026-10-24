@@ -11,19 +11,17 @@ P1b2/P2 and join the set then).
 from dataclasses import dataclass, fields
 from typing import Optional
 
-from helao.hexagon.adapters.errors import HexagonDeferred, UnwiredPortError
+from helao.hexagon.adapters.errors import UnwiredPortError
 from helao.hexagon.ports.artifact_store import ArtifactStorePort
 from helao.hexagon.ports.auxiliary import HealthPort, StatePersistencePort
 from helao.hexagon.ports.clock import ClockPort
 from helao.hexagon.ports.config import ConfigPort
 from helao.hexagon.ports.logging import LoggingPort
-from helao.hexagon.ports.status import StatusPort
 from helao.hexagon.ports.sync import SyncPort
 from helao.hexagon.ports.transport import TransportPort
 
 __all__ = [
     "ACTION_REQUIRED",
-    "HexagonDeferred",
     "ORCH_REQUIRED",
     "PortWiring",
     "UnwiredPortError",
@@ -38,7 +36,6 @@ ORCH_REQUIRED = (
     "clock",
     "transport",
     "state_persistence",
-    "status",
     "health",  # P2a: HexHealthMonitor + driver-health gate consume it
 )
 ACTION_REQUIRED = (
@@ -46,7 +43,6 @@ ACTION_REQUIRED = (
     "logging",
     "clock",
     "transport",
-    "status",
     # P2b-1: the native write runtime carries all Active write traffic —
     # a missing adapter must abort startup, never fall through to legacy
     "artifact_store",
@@ -64,7 +60,6 @@ class PortWiring:
     state_persistence: Optional[StatePersistencePort] = None
     artifact_store: Optional[ArtifactStorePort] = None
     sync: Optional[SyncPort] = None
-    status: Optional[StatusPort] = None
     health: Optional[HealthPort] = None
 
     def require(self, *names: str) -> None:

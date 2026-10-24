@@ -68,7 +68,6 @@ def _wiring() -> PortWiring:
         clock=_stub(),
         transport=_stub(),
         state_persistence=_stub(),
-        status=_stub(),
         health=_stub(),
         artifact_store=_stub(),
     )

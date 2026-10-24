@@ -1,11 +1,9 @@
 """Low-severity latent-crash fixes in the hte deployment (fakes only)."""
 
 import asyncio
-import json
 import logging as pylogging
 import sys
 import tempfile
-import types
 from types import SimpleNamespace
 
 import numpy as np
@@ -106,25 +104,6 @@ def test_get_voltage_async_success_is_reported_as_success():
     resp = asyncio.run(drv.get_voltage_async(sleep_time=0))
     assert resp.response == DriverResponseType.success
     assert resp.data == {"voltage_v": 3.3}
-
-
-# --- galil_motion_driver ----------------------------------------------------
-
-
-def test_galil_motor_disconnect_failure_is_json_serialisable(monkeypatch):
-    class GclibError(Exception):
-        pass
-
-    monkeypatch.setitem(sys.modules, "gclib", SimpleNamespace(GclibError=GclibError))
-    from helao.deploy.hte.drivers.motion.galil_motion_driver import Galil
-
-    def _close():
-        raise GclibError("link down")
-
-    drv = object.__new__(Galil)
-    drv.g = SimpleNamespace(GClose=_close)
-    out = asyncio.run(drv.motor_disconnect())
-    assert "link down" in json.loads(json.dumps(out))["connection"]
 
 
 # --- kinesis ----------------------------------------------------------------
@@ -390,22 +369,6 @@ def test_db_new_samples_with_no_reference_samples_does_not_raise(monkeypatch):
     out = asyncio.run(app.routes["db_new_samples"](SimpleNamespace(begin=begin)))
     assert out == {"done": True}
     assert "_fast_sample_out" not in active.action.action_params
-
-
-# --- gcld_operator ----------------------------------------------------------
-
-
-def test_insitu_potential_list_rejects_an_unknown_z_start(monkeypatch):
-    fake = types.ModuleType("data_request_client.client")
-    fake.CreateDataRequestModel = fake.DataRequestsClient = object  # type: ignore
-    monkeypatch.setitem(sys.modules, "data_request_client", types.ModuleType("x"))
-    monkeypatch.setitem(sys.modules, "data_request_client.client", fake)
-    from helao.deploy.hte.servers.operator import gcld_operator as g
-
-    assert g.insitu_potential_list(0.5, scan_down=False) is None
-    pots = g.insitu_potential_list(0.4, scan_down=False)
-    assert pots is not None and pots[:3] == [0.4, 0.6, 0.8]
-    assert sorted(pots) == sorted(g.ECHEUVIS_multiCA_led_defaults["CA_potential_vsRHE"])
 
 
 # --- sample_vis -------------------------------------------------------------

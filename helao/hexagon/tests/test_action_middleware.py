@@ -42,7 +42,6 @@ def _host(**server_params):
             clock=_Clock(),
             transport=_Stub(),
             state_persistence=_Stub(),
-            status=_Stub(),
             health=_Stub(),
             artifact_store=NativeArtifactStoreAdapter(config=_Stub(), clock=_Clock()),
         ),

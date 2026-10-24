@@ -5,9 +5,8 @@ output is byte-identical to the historical inline list ops. Enforcement is a
 later increment (3e) gated on soak telemetry from these warnings.
 
 3c adds the sample-status lifecycle half: a generic ``guarded_remove`` plus
-``sample_guarded_append``/``sample_guarded_remove``/``sample_guarded_reset``
-wrappers for ``SampleModel.status`` (``list[SampleStatus]``). Same log-only
-policy; ``SampleStatus`` is imported lazily inside the contradiction-warning
+``sample_guarded_append``/``sample_guarded_reset`` wrappers for
+``SampleModel.status`` (``list[SampleStatus]``). Same log-only policy; ``SampleStatus`` is imported lazily inside the contradiction-warning
 helper to avoid a ``sample.py`` <-> ``status_transitions.py`` import cycle.
 """
 
@@ -17,7 +16,6 @@ __all__ = [
     "guarded_reset",
     "guarded_remove",
     "sample_guarded_append",
-    "sample_guarded_remove",
     "sample_guarded_reset",
 ]
 
@@ -107,10 +105,6 @@ def sample_guarded_append(status_list, new_status, *, owner: str = "?") -> None:
         )
     status_list.append(new_status)  # unconditional — byte-identical to legacy
     _warn_sample_contradiction(status_list, owner)
-
-
-def sample_guarded_remove(status_list, old_status, *, owner: str = "?") -> None:
-    guarded_remove(status_list, old_status, owner=owner)
 
 
 def sample_guarded_reset(status_list, new_statuses, *, owner: str = "?") -> None:

@@ -7,17 +7,12 @@ from helao.hexagon.domain.dispatch_policy import (
     AwaitPreviousActionDone,
     AwaitServerFree,
     AwaitWaitEndpointFree,
-    ClearIntent,
-    CloseOutExperiment,
-    CloseOutSequence,
     DispatchPolicy,
     DispatchSnapshot,
     DrainForStop,
     DriverHealthWait,
     EstopClearActions,
     ExitLoop,
-    ExportQueues,
-    FinalizationSnapshot,
     FinishThenDispatchExperiment,
     FinishThenDispatchSequence,
     LaunchAction,
@@ -25,7 +20,6 @@ from helao.hexagon.domain.dispatch_policy import (
     NoWaitProceed,
     PauseLoop,
     ProceedDispatch,
-    SetLoopStopped,
     SkipClearActions,
     StopLoop,
     WaitAllActions,
@@ -193,25 +187,6 @@ def test_step_thru_none():
 
 
 # --- finalization guards (the third live estop re-check lives here) ---
-
-
-def test_finalization_plan_order():
-    plan = P.finalization_plan(
-        FinalizationSnapshot(
-            n_acts=0,
-            n_exps=0,
-            active_experiment_present=True,
-            active_sequence_present=True,
-            loop_state=LoopStatus.stopped,
-        )
-    )
-    assert [type(x) for x in plan] == [
-        CloseOutExperiment,
-        CloseOutSequence,
-        SetLoopStopped,
-        ClearIntent,
-        ExportQueues,
-    ]
 
 
 def test_close_out_guards_skip_under_estop():

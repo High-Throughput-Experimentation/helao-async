@@ -80,7 +80,7 @@ There is no separate linter config; `ty` (Astral type checker) may be used as a 
 - **action servers** (`group: action`, code under `servers/action/`) — wrap a specific driver and expose `/<server_key>/<action>` POST endpoints. Each module's `makeApp` returns an `ActionHost` (`helao/hexagon/app/action_host.py`), which is the FastAPI app itself (status WS, action lifecycle, hlo file output, NTP-synced clock, etc.).
 - **orchestrator servers** (`group: orchestrator`, usually `async_orch2.py`) — build an `OrchHost` (`helao/hexagon/app/orch_host.py`), a subclass of `ActionHost`. They own the sequence/experiment/action deques, dispatch actions to action servers over HTTP, and react to status updates. The operator UI runs as a separate `group: operator` server (`enable_op` is deprecated and ignored).
 - **visualizer servers** (`group: visualizer`, `bokeh: ...`) — Bokeh apps that subscribe to action server status/data WebSockets and render plots.
-- **operator servers** (`group: operator`) — separately launched UIs (e.g. `gcld_operator.py`) or post-run processors.
+- **operator servers** (`group: operator`) — separately launched UIs (e.g. `standalone_operator.py`) or post-run processors.
 
 Four traps live in the dispatch loop — `start_condition` being honoured only because the history poll releases on *acknowledgement*, `orch.last_action_uuid` being a `str` against a `UUID`-keyed dict, `loop_state == stopped` not meaning parked, and the head action being popped *before* its start condition is waited on. All four are in `helao/hexagon/app/CLAUDE.md`; read it before editing `orch_host.py`, `orch_effects.py` or `orch_dispatch.py`.
 
@@ -96,7 +96,7 @@ Server output is rooted at the YAML's `root:` key (e.g. `C:\INST_hlo`):
 **What the syncer uploads to `raw_data/` is the record's own `files` list (`HelaoYml.upload_files`, minus nosync entries), not a directory glob.** The consequences that have bitten in production — transient staging files getting shipped, the `staging_path` length rule, and the once-unbounded push loop — are in `helao/hexagon/adapters/native/CLAUDE.md`.
 
 ### Two execution models: Orchestrator vs Runners
-The orchestrator is the long-lived queue-and-dispatch service used in production. `helao/core/runners/` provides an alternative "micro-orchestrator" pattern (`action_runner`, `experiment_runner`, `sequence_runner`, `micro_client`) for callers that want a short-lived runner with no backend service. See `helao/core/runners/runner.md`. Several of those files are currently stubs.
+The orchestrator is the long-lived queue-and-dispatch service used in production. `helao/core/runners/` provides an alternative "micro-orchestrator" pattern (`micro_orch.py`) for callers that want a short-lived runner with no backend service. See `helao/core/runners/runner.md`.
 
 ## Conventions worth knowing
 - Drivers must implement the `HelaoDriver` ABC (`connect`/`get_status`/`stop`/`reset`/`disconnect`) and return `DriverResponse` objects; pollers extend `DriverPoller` with `get_data`. No device I/O in `__init__`; set `connect_on_startup = True` to have the host connect at startup (after `_base_hook`, before the poller).

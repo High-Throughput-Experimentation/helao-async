@@ -1,17 +1,14 @@
-"""StatePersistence / Status / SampleState adapters."""
+"""StatePersistence / SampleState adapters."""
 
 import os
 import pickle
 
 import pytest
 
-from helao.hexagon.adapters.errors import UnwiredPortError
 from helao.hexagon.adapters.shared.sample_state import SampleShimAdapter
 from helao.hexagon.adapters.shared.state_persistence import QueuePckStore
-from helao.hexagon.adapters.shared.status import DispatcherStatusAdapter
 from helao.hexagon.ports.auxiliary import StatePersistencePort
 from helao.hexagon.ports.sample_state import SampleStatePort
-from helao.hexagon.ports.status import StatusPort
 
 
 # --- StatePersistence: the queues.pck file contract --------------------------
@@ -39,71 +36,6 @@ def test_queue_pck_timestamped_export(tmp_path):
     name = os.path.basename(p)
     assert name.startswith("queues_") and name.endswith(".pck")
     assert name != "queues.pck"
-
-
-# --- Status: wire-level push (publish_* fail loud until the bridge binds) -----
-@pytest.mark.asyncio
-async def test_status_conformance_and_unbound_publish():
-    a = DispatcherStatusAdapter(server_key="ORCH")
-    assert isinstance(a, StatusPort)
-    with pytest.raises(UnwiredPortError):
-        await a.publish_status({})
-    with pytest.raises(UnwiredPortError):
-        await a.publish_data({})
-    with pytest.raises(UnwiredPortError):
-        await a.publish_live({})
-
-
-@pytest.mark.asyncio
-async def test_status_bound_publish_puts_wire_types():
-    """D1 through the adapter: a bound publish_status restores the
-    channel's wire type (ActionModel) onto the fan-out queue."""
-    from helao.core.models.action import ActionModel
-    from helao.helpers.multisubscriber_queue import MultisubscriberQueue
-    from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
-
-    status_q = MultisubscriberQueue()
-    data_q = MultisubscriberQueue()
-    live_q = MultisubscriberQueue()
-    sub = status_q.queue()  # direct subscriber queue
-    a = DispatcherStatusAdapter(server_key="SIM")
-    a.bind_publish_bridge(WsPublishBridge(status_q, data_q, live_q))
-    await a.publish_status(ActionModel(action_name="acquire_data").model_dump())
-    item = sub.get_nowait()
-    assert isinstance(item, ActionModel)
-    assert item.action_name == "acquire_data"
-
-
-@pytest.mark.asyncio
-async def test_status_attach_and_send_record_clients(monkeypatch):
-    from helao.core.error import ErrorCodes
-
-    sent = []
-
-    async def _fake_dispatch(
-        server_key,
-        host,
-        port,
-        private_action,
-        params_dict,
-        json_dict,
-        timeout=60,
-        retries=5,
-    ):
-        sent.append((server_key, host, port, private_action, params_dict, json_dict))
-        return {}, ErrorCodes.none
-
-    import helao.hexagon.adapters.shared.status as status_mod
-
-    monkeypatch.setattr(status_mod, "async_private_dispatcher", _fake_dispatch)
-    a = DispatcherStatusAdapter(server_key="SIM")
-    assert await a.attach_client("ORCH", "127.0.0.1", 8001) is True
-    await a.send_nonblocking_status(
-        "ORCH", "127.0.0.1", 8001, "SIM", "exec1", None, "finished"
-    )
-    assert sent[0][3] == "update_nonblocking"
-    await a.detach_client("ORCH", "127.0.0.1", 8001)
-    assert a.clients == []
 
 
 # --- SampleState: flattening facade over the shim ------------------------------

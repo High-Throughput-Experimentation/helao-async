@@ -27,7 +27,7 @@ Example:
     default; pass --no-hot-reload (or set `hot_reload.enabled: false` in the
     config) to disable it. Flags may appear anywhere on the command line.
 Note:
-    This script requires the 'click', 'termcolor', 'pyfiglet', 'colorama', 'psutil', and 'requests' libraries.
+    This script requires the 'click', 'pyfiglet', 'colorama', 'psutil', and 'requests' libraries.
 """
 
 __all__ = []
@@ -56,8 +56,8 @@ import click
 import colorama
 import psutil
 import requests
+from colorama import Fore, Style
 from pyfiglet import figlet_format
-from termcolor import cprint
 
 from helao.ui.shared.discovery import reserved_addresses
 from helao.core.version import get_hlo_version
@@ -73,6 +73,14 @@ from helao.helpers.parent_death import (
     write_detach_marker,
 )
 from helao.helpers.time_utils import get_ntp_time
+
+
+def cprint(text, color, attrs=()):
+    """Print ``text`` in a colorama foreground colour; ``attrs=["bold"]`` for bold."""
+    bold = Style.BRIGHT if "bold" in attrs else ""
+    fore = Fore.LIGHTWHITE_EX if color == "white" else getattr(Fore, color.upper())
+    print(f"{bold}{fore}{text}{Style.RESET_ALL}")
+
 
 # Upper bound (seconds) for a blocking POST /shutdown. The server's shutdown
 # hook runs its driver shutdown (e.g. gamry disconnect + kill GamryCOM) before

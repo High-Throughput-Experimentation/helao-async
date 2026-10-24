@@ -16,12 +16,11 @@ from zipfile import ZipFile
 import pandas as pd
 
 from helao.core.drivers.data.loaders.model_base import (
-    HelaoArtifact,
     HelaoDataModelMixin,
     HloPayload,
 )
 from helao.core.drivers.data.process_locator import process_uuid_of
-from helao.core.models.run_dir import RunDir, is_legacy_path, is_run_root
+from helao.core.models.run_dir import RunDir, is_legacy_path
 from helao.helpers.file_mapper import FileMapper
 from helao.helpers.hlo_data import read_hlo_via
 from helao.helpers.meta_io import meta_glob, read_meta
@@ -723,15 +722,6 @@ class LocalLoader:
             fbytes = FM.read_bytes(fpath)
         return BytesIO(fbytes)
 
-    def read_artifact_bytes(self, artifact: "HelaoArtifact") -> BytesIO:
-        """Read a :class:`HelaoArtifact`'s body via ``get_bytes`` as a ``BytesIO``.
-
-        The artifact's ``locator`` is a ``(yml_path, file_name)`` pair matching
-        :meth:`get_bytes`' signature (``yml_path=""`` routes through the
-        zip/sequence resolver for process-aggregated files).
-        """
-        return self.get_bytes(*artifact.locator)
-
     def get_parquet(self, yml_path: str, par_fn: str) -> pd.DataFrame:
         """Read a parquet file (zip-aware) into a dataframe.
 
@@ -794,7 +784,6 @@ class HelaoModel:
         self.timestamp = meta_dict.get(f"{helao_type}_timestamp")
         self.params = meta_dict.get(f"{helao_type}_params", {})
         self.meta_dict = meta_dict
-        self._meta_dict = self.meta_dict  # alias for HelaoLoader parity
         self.loader = loader
 
     @property
@@ -806,9 +795,7 @@ class HelaoModel:
 class HelaoDataModel(HelaoDataModelMixin, HelaoModel):
     """``HelaoModel`` mixed with HLO-data accessors for action and process records.
 
-    Adds two parallel views over the record's ``files``: :attr:`files` (legacy
-    ``(file_name, file_type, run_use)`` tuples) and :attr:`artifacts`
-    (:class:`HelaoArtifact` objects that can read their own bytes).
+    Adds :attr:`files` (legacy ``(file_name, file_type, run_use)`` tuples).
     """
 
     @property
@@ -827,16 +814,6 @@ class HelaoDataModel(HelaoDataModelMixin, HelaoModel):
         """``(file_name, file_type, run_use)`` tuples for every file in the record."""
         return [
             (fd["file_name"], fd.get("file_type"), fd.get("run_use"))
-            for fd in self.json.get("files", [])
-        ]
-
-    @property
-    def artifacts(self) -> list:
-        """Record ``files`` as :class:`HelaoArtifact` objects bound to the loader."""
-        return [
-            HelaoArtifact.from_meta(
-                fd, loader=self.loader, locator=(self.yml_path, fd["file_name"])
-            )
             for fd in self.json.get("files", [])
         ]
 
@@ -992,24 +969,6 @@ class HelaoProcess(HelaoDataModelMixin, HelaoModel):
         ]
 
     @property
-    def artifacts(self) -> list:
-        """Contributing action files as :class:`HelaoArtifact` objects.
-
-        Each artifact's ``locator`` is ``("", rel_path)`` so ``read_artifact_bytes``
-        resolves it through the loader's zip/sequence-aware path, mirroring how
-        :attr:`files` paths are consumed today.
-        """
-        act_map = self._artifact_paths
-        return [
-            HelaoArtifact.from_meta(
-                fd,
-                loader=self.loader,
-                locator=("", f"{act_map[fd['action_uuid']]}/{fd['file_name']}"),
-            )
-            for fd in self.json.get("files", [])
-        ]
-
-    @property
     def hlo(self) -> HloPayload:
         """:class:`HloPayload` of the primary data file, read from its action.
 
@@ -1020,9 +979,9 @@ class HelaoProcess(HelaoDataModelMixin, HelaoModel):
         fd = self.hlo_file
         rel = f"{self._artifact_paths[fd['action_uuid']]}/{fd['file_name']}"
 
-        # Through get_bytes("", ...) like ``artifacts``, so a synced sequence
-        # zip works too. Process files name the S3 ``.hlo.json``; on disk and
-        # in the zip it is the ``.jsonl`` pair or the legacy ``.hlo``.
+        # Through get_bytes("", ...) so a synced sequence zip works too.
+        # Process files name the S3 ``.hlo.json``; on disk and in the zip it
+        # is the ``.jsonl`` pair or the legacy ``.hlo``.
         def _get(name: str) -> bytes:
             return self.loader.get_bytes("", name).read()
 
@@ -1030,50 +989,3 @@ class HelaoProcess(HelaoDataModelMixin, HelaoModel):
             return HloPayload(*read_hlo_via(None, _get, rel))
         except FileNotFoundError:
             raise FileNotFoundError(f"{rel} not found under {self.loader.target}")
-
-    def read_action_file(self, relative_path: str) -> bytes:
-        """Read the raw bytes of an action file by its run-tree-relative path.
-
-        The process yml now sits beside its ``-exp.yml`` (colocated in the
-        same ``RUNS_<state>`` tree, or the legacy ``PROCESSES`` mirror for a
-        pre-cutover record), not in a separate location, but the file is
-        still resolved against the run tree rather than relative to
-        ``self.yml_path`` -- :class:`FileMapper` needs only the run root, and
-        deriving it that way lets it also find files that moved to a
-        different state directory than the prc did. ``relative_path`` (as
-        produced by :attr:`files`) is rooted at the ``RUNS_<state>`` directory
-        — ``YY.WW/MMDD/<seq_dir>/<exp>/<act>/<file>`` — which is enough for
-        :class:`FileMapper` to deduce and read from the owning synced sequence
-        zip (``RUNS_SYNCED/YY.WW/MMDD/<seq_dir>.zip``) once the loose file is
-        gone. Only the run root is taken from ``self.yml_path``.
-
-        This requires ``self.yml_path`` to be a real filesystem path inside
-        a ``RUNS_*``/``PROCESSES`` tree. A process loaded from a
-        fully-synced sequence zip has a bare zip-member name as its
-        ``yml_path`` (e.g. ``"<exp_dir>/<name>-prc.yml"``, with no
-        ``RUNS_*``/``PROCESSES`` segment for :class:`FileMapper` to anchor
-        on); that case is rejected explicitly below rather than left to
-        raise an opaque ``IndexError`` out of :class:`FileMapper`'s
-        constructor.
-
-        Args:
-            relative_path: Action file path relative to the ``RUNS_<state>``
-                root.
-
-        Returns:
-            Raw file bytes.
-
-        Raises:
-            ValueError: ``self.yml_path`` has no ``RUNS_*``/``PROCESSES``
-                segment for :class:`FileMapper` to anchor on -- e.g. a
-                zip-member path from a fully-synced record.
-        """
-        parts = os.path.normpath(self.yml_path).split(os.sep)
-        if not any(is_run_root(p) for p in parts):
-            raise ValueError(
-                f"read_action_file: yml_path {self.yml_path!r} has no "
-                "RUNS_*/PROCESSES segment (likely a zip-member path from a "
-                "fully-synced record); FileMapper cannot anchor on it"
-            )
-        fm = FileMapper(self.yml_path)
-        return fm.read_bytes(relative_path)

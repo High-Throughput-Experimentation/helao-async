@@ -88,12 +88,6 @@ ABR_MAP = {
     "seq": "sequence",
     "prc": "process",
 }
-PLURALS = {
-    "action": "actions",
-    "experiment": "experiments",
-    "sequence": "sequences",
-    "process": "processes",
-}
 
 
 def dict2json(input_dict: dict) -> io.BytesIO:
@@ -493,11 +487,6 @@ class HelaoYml:
     def finished_children(self) -> list:
         """Children that are finished but not yet shipped."""
         return self._children_in(self.finished_path, "finished")
-
-    @property
-    def synced_children(self) -> list:
-        """Children that have shipped."""
-        return self._children_in(self.synced_path, "synced")
 
     @property
     def children(self) -> list:
@@ -1755,22 +1744,6 @@ class SyncDriver:
                     weekdir = os.path.dirname(datedir)
                     if len(glob(os.path.join(weekdir, "*"))) == 0:
                         self.try_remove_empty(weekdir)
-
-    def sync_exit_callback(self, task: asyncio.Task):
-        """Drop the finished task from ``running_tasks`` and ``task_set``.
-
-        Args:
-            task: The asyncio task that just completed.
-        """
-        task_name = task.get_name()
-        if task_name in self.running_tasks:
-            LOGGER.debug(f"Removing {task_name} from running_tasks.")
-            self.running_tasks.pop(task_name)
-        try:
-            LOGGER.debug(f"Removing {task_name} from task_set.")
-            self.task_set.discard(task_name)
-        except KeyError:
-            pass
 
     @staticmethod
     def _rel_under_runs(path: Path) -> Optional[str]:

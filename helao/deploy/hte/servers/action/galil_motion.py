@@ -65,7 +65,7 @@ from helao.hexagon.adapters.vis.galil_aligner_host import GalilAlignerHost
 # (test_boundaries.py's bokeh.server-outside-app/ rule).
 from helao.hexagon.app.ui_host import BokehServerUiHost
 
-from ...drivers.motion.galil_motion_driver import (
+from ...drivers.motion.enum import (
     MoveModes,
     TransformationModes,
 )
