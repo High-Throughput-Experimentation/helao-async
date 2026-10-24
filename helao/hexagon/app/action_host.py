@@ -62,6 +62,7 @@ from helao.helpers.run_state import ACTIVE, RunStateJournal
 from helao.helpers.time_utils import read_saved_offset, set_time
 from helao.helpers.file_utils import _relative_file_name
 from helao.helpers.meta_io import meta_glob, read_meta
+from helao.hexagon.domain.naming import DATA_SUFFIX, HEADER_SUFFIX, meta_kind
 from helao.helpers.yml_tools import move_dir
 from helao.helpers.premodels import Action
 from helao.helpers.server_api import HelaoFastAPI
@@ -1488,8 +1489,9 @@ class ActionHost(HelaoFastAPI):
         The yml written at action start has ``files: []``; the finalizer fills
         it in memory, which an interrupted run never reached. The syncer ships
         only registered files, so without this the partial data is dropped.
-        Skips what the finalizer never registers: ymls, locks, staging and
-        other dotfiles. ``data_keys`` and sample labels are unknown here.
+        Skips what the finalizer never registers: records (``.json``/``.yml``),
+        data headers (``.meta.json``), locks, staging and other dotfiles.
+        ``data_keys`` and sample labels are unknown here.
         """
         known = {str(f.file_name) for f in action.files}
         for path in sorted(Path(act_dir).rglob("*")):
@@ -1497,12 +1499,14 @@ class ActionHost(HelaoFastAPI):
                 not path.is_file()
                 or path.name.startswith(".")
                 or path.suffix in (".yml", ".lock", ".tmp", ".prg")
+                or path.name.endswith(HEADER_SUFFIX)
+                or meta_kind(path) is not None
             ):
                 continue
             name = _relative_file_name(str(path), act_dir)
             if name in known:
                 continue
-            is_hlo = path.suffix == ".hlo"
+            is_hlo = path.suffix in (".hlo", DATA_SUFFIX)
             if is_hlo:
                 file_type = f"{self.server_key.lower()}_helao__file"
             elif path.suffix == ".csv":

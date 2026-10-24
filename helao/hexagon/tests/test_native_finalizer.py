@@ -74,7 +74,7 @@ async def test_finish_join_drain_close_chain(tmp_path, monkeypatch):
     out_dir = os.path.join(
         str(base.helaodirs.save_root), str(active.action.action_output_dir)
     )
-    hlo = [f for f in os.listdir(out_dir) if f.endswith(".hlo")]
+    hlo = [f for f in os.listdir(out_dir) if f.endswith(".jsonl")]
     text = open(os.path.join(out_dir, hlo[0]), encoding="utf-8").read()
     # hlo_json_dumps compact separators (no spaces)
     assert '{"t_s":2,"value":3.0}' in text  # late row landed before close
@@ -194,11 +194,10 @@ async def test_split_keep_active_then_finish_all_finishes_the_chain(
     rows = []
     for dirpath, _dirs, files in os.walk(str(base.helaodirs.save_root)):
         for fn in files:
-            if fn.endswith(".hlo"):
+            if fn.endswith(".jsonl"):
                 rows += (
                     open(os.path.join(dirpath, fn), encoding="utf-8")
                     .read()
-                    .split("%%\n", 1)[1]
                     .splitlines()
                 )
     assert '{"t_s":999}' in rows

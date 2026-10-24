@@ -28,7 +28,7 @@ class HloFileGroup(str, Enum):
 
 
 class HloHeaderModel(BaseModel, HelaoDict):
-    """YAML header block written at the top of every HLO file.
+    """Header of every HELAO data file (``X.meta.json``).
 
     Attributes:
         hlo_version (Optional[str]): HELAO version stamped at construction.
@@ -58,7 +58,7 @@ class FileConnParams(BaseModel, HelaoDict):
         file_type (str): File type tag (default ``"helao__file"``).
         file_group (Optional[HloFileGroup]): Which storage bucket to route the file to.
         file_name (Optional[str]): Output file name; `None` autogenerates one.
-        hloheader (Optional[HloHeaderModel]): Header to prepend to the file.
+        hloheader (Optional[HloHeaderModel]): Data header, written as ``X.meta.json``.
     """
 
     # we require a file conn key
@@ -75,7 +75,7 @@ class FileConnParams(BaseModel, HelaoDict):
     file_group: Optional[HloFileGroup] = HloFileGroup.helao_files
     # None will trigger autogeneration of a file name
     file_name: Optional[str] = None
-    # the header of the hlo file as dict (will be written as yml)
+    # the data header as a dict (written as X.meta.json)
     hloheader: Optional[HloHeaderModel] = Field(default_factory=HloHeaderModel)
 
 
@@ -84,12 +84,10 @@ class FileConn(BaseModel, HelaoDict):
 
     Attributes:
         params (FileConnParams): Static parameters describing the connection.
-        added_hlo_separator (bool): True once the HLO header/data separator has been written.
         file (Optional[object]): Underlying file handle (or `None` when closed).
     """
 
     params: FileConnParams
-    added_hlo_separator: bool = False
     # holds the file reference
     file: Optional[object] = None
 
@@ -99,15 +97,13 @@ class FileConn(BaseModel, HelaoDict):
         arbitrary_types_allowed = True
 
     def reset_file_conn(self):
-        """Clear the file handle and separator flag, leaving params intact."""
-        self.added_hlo_separator = False
+        """Clear the file handle, leaving params intact."""
         self.file = None
 
     def deepcopy(self) -> "FileConn":
         """Return a copy with params/flags duplicated but `file` reset to None."""
         newfileconn = FileConn(
             params=deepcopy(self.params),
-            added_hlo_separator=deepcopy(self.added_hlo_separator),
             file=None,
         )
         return newfileconn

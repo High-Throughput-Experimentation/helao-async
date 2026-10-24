@@ -6,8 +6,8 @@ live-data appender, the ``enqueue_data*`` -> ``data_q`` publish path (queued
 counter bumped only for data-bearing packets), and the ``log_data_task``
 drain loop -- subscribe, listen-uuid filter, LAZY file open on the first
 matching packet (json_data_keys inferred from the first row when unset),
-``%%`` separator exactly once via ``added_hlo_separator``, ``hlo_json_dumps``
-rows, non-serializable payload -> ``{"error": "data was not serializable"}``,
+``hlo_json_dumps`` rows (the header is ``X.meta.json``, written at open),
+non-serializable payload -> ``{"error": "data was not serializable"}``,
 string payloads written raw, ``num_data_written`` bump per data-bearing
 packet, subscription removal on cancel. Method bodies were byte-identical to
 the legacy engine (source-parity-pinned by ``test_native_data_stream.py``)
@@ -356,19 +356,6 @@ class NativeDataStreamer:
 
                     # write only data if the file connection is open
                     if self.active.file_conn_dict[file_conn_key].file:
-                        # check if separator was already written
-                        # else add it
-                        if not self.active.file_conn_dict[
-                            file_conn_key
-                        ].added_hlo_separator:
-                            self.active.file_conn_dict[
-                                file_conn_key
-                            ].added_hlo_separator = True
-                            await self.active.write_live_data(
-                                output_str="%%\n",
-                                file_conn_key=file_conn_key,
-                            )
-
                         if isinstance(sample_data, dict):
                             try:
                                 output_str = hlo_json_dumps(sample_data)

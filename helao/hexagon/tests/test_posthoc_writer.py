@@ -37,6 +37,7 @@ from helao.core.models.run_dir import RunDir, run_root
 from helao.core.models.run_use import RunUse
 from helao.core.models.sample import SolidSample
 from helao.helpers.helao_dirs import helao_dirs
+from helao.helpers.meta_io import read_meta
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.yml_tools import yml_dumps
 
@@ -147,8 +148,8 @@ def _read(path: str) -> str:
 # --------------------------------------------------------------------------
 
 
-def test_write_file_produces_header_separator_body_exactly(run):
-    """The HLO grammar is header + ``%%\\n`` + payload, with nothing else."""
+def test_write_file_produces_header_and_rows_exactly(run):
+    """A data file is ``X.jsonl`` rows plus an ``X.meta.json`` header, nothing else."""
     act, writer = run["act"], run["writer"]
     payload = '{"t_s": [0.0, 0.5], "signal": [1.0, 2.0]}'
     out = writer.write_file(
@@ -161,10 +162,14 @@ def test_write_file_produces_header_separator_body_exactly(run):
         json_data_keys=["t_s", "signal"],
         file_sample_label=LABEL,
     )
-    assert _read(out) == "scan_index: 1\nlabel: demo\n%%\n" + payload
+    assert _read(out) == payload + "\n"
+    assert read_meta(out[: -len(".jsonl")] + ".meta.json") == {
+        "scan_index": 1,
+        "label": "demo",
+    }
 
 
-def test_write_file_without_header_starts_at_the_separator(run):
+def test_write_file_without_header_writes_rows_only(run):
     act, writer = run["act"], run["writer"]
     out = writer.write_file(
         act,
@@ -173,7 +178,8 @@ def test_write_file_without_header_starts_at_the_separator(run):
         filenum=0,
         file_group=HloFileGroup.helao_files,
     )
-    assert _read(out) == '%%\n{"a": 1}'
+    assert _read(out) == '{"a": 1}\n'
+    assert not os.path.exists(out[: -len(".jsonl")] + ".meta.json")
 
 
 def test_write_file_lands_under_the_actions_output_dir(run):
@@ -186,13 +192,13 @@ def test_write_file_lands_under_the_actions_output_dir(run):
         file_group=HloFileGroup.helao_files,
     )
     assert os.path.dirname(out) == os.path.join(save_root, str(act.action_output_dir))
-    assert os.path.basename(out) == "demo-0.0.0.0__0.hlo"
+    assert os.path.basename(out) == "demo-0.0.0.0__0.jsonl"
 
 
 @pytest.mark.parametrize("filenum", [0, 1, 2])
 def test_filenum_is_honoured_verbatim_in_the_generated_filename(run, filenum):
     """Load-bearing: a downstream analysis locates the quantification HLO by
-    its filename index (``__2.hlo``). Re-deriving the index from file-connection
+    its filename index (``__2.jsonl``). Re-deriving the index from file-connection
     ordering -- which is what the core writer does -- would rename the file and
     break that lookup, so the face takes ``filenum`` from the caller."""
     act, writer = run["act"], run["writer"]
@@ -203,8 +209,8 @@ def test_filenum_is_honoured_verbatim_in_the_generated_filename(run, filenum):
         filenum=filenum,
         file_group=HloFileGroup.helao_files,
     )
-    assert os.path.basename(out) == f"demo-0.0.0.0__{filenum}.hlo"
-    assert act.files[-1].file_name == f"demo-0.0.0.0__{filenum}.hlo"
+    assert os.path.basename(out) == f"demo-0.0.0.0__{filenum}.jsonl"
+    assert act.files[-1].file_name == f"demo-0.0.0.0__{filenum}.jsonl"
 
 
 def test_three_filenums_produce_three_distinct_files(run):
@@ -220,7 +226,7 @@ def test_three_filenums_produce_three_distinct_files(run):
         for n in (0, 1, 2)
     ]
     assert len({os.path.basename(o) for o in outs}) == 3
-    assert _read(outs[2]) == '%%\n{"n": 2}'
+    assert _read(outs[2]) == '{"n": 2}\n'
     assert [f.file_name for f in act.files] == [os.path.basename(o) for o in outs]
 
 
@@ -240,7 +246,7 @@ def test_file_group_selects_the_extension(run):
         filenum=1,
         file_group=HloFileGroup.aux_files,
     )
-    assert hlo.endswith("__0.hlo")
+    assert hlo.endswith("__0.jsonl")
     assert csv.endswith("__1.csv")
 
 
@@ -308,7 +314,7 @@ def test_write_file_records_a_fileinfo_on_the_action(run):
         file_sample_label=LABEL,
     )
     (info,) = act.files
-    assert info.file_name == "demo-0.0.0.0__1.hlo"
+    assert info.file_name == "demo-0.0.0.0__1.jsonl"
     assert info.file_type == "demo_helao__file"
     assert info.data_keys == ["t_s", "signal"]
     assert info.sample == [LABEL]
@@ -358,8 +364,8 @@ def test_probe4_repeat_write_overwrites_instead_of_appending(run, caplog):
 
     assert second == first
     # replaced, not appended: one payload, and it is the second one
-    assert _read(first) == '%%\n{"n": 2}'
-    assert _read(first).count("%%") == 1
+    assert _read(first) == '{"n": 2}\n'
+    assert _read(first).count("\n") == 1
     # a same-run repeat is a converter bug, so it is still surfaced
     assert "written twice in one run" in caplog.text
 
@@ -375,7 +381,7 @@ def test_probe4_a_leftover_file_from_a_failed_run_is_replaced(run):
     act, writer, save_root = run["act"], run["writer"], run["save_root"]
     target_dir = os.path.join(save_root, str(act.action_output_dir))
     os.makedirs(target_dir, exist_ok=True)
-    stale = os.path.join(target_dir, "demo-0.0.0.0__0.hlo")
+    stale = os.path.join(target_dir, "demo-0.0.0.0__0.jsonl")
     with open(stale, "w", encoding="utf-8") as f:
         f.write("%%\n{}truncated-by-a-crash")
 
@@ -388,9 +394,9 @@ def test_probe4_a_leftover_file_from_a_failed_run_is_replaced(run):
     )
 
     assert written == stale
-    assert _read(stale) == '%%\n{"n": 1}'
+    assert _read(stale) == '{"n": 1}\n'
     assert "truncated-by-a-crash" not in _read(stale)
-    assert [f.file_name for f in act.files] == ["demo-0.0.0.0__0.hlo"]
+    assert [f.file_name for f in act.files] == ["demo-0.0.0.0__0.jsonl"]
 
 
 def test_probe4_a_partial_run_can_be_reconverted_end_to_end(run):
@@ -411,9 +417,9 @@ def test_probe4_a_partial_run_can_be_reconverted_end_to_end(run):
             )
     target_dir = os.path.join(save_root, str(act.action_output_dir))
     for filenum in (0, 1):
-        body = _read(os.path.join(target_dir, f"demo-0.0.0.0__{filenum}.hlo"))
-        assert body == f'%%\n{{"attempt": 2, "n": {filenum}}}'
-        assert body.count("%%") == 1
+        body = _read(os.path.join(target_dir, f"demo-0.0.0.0__{filenum}.jsonl"))
+        assert body == f'{{"attempt": 2, "n": {filenum}}}\n'
+        assert body.count("\n") == 1
 
 
 def test_data_files_are_written_atomically(run):
@@ -434,7 +440,7 @@ def test_data_files_are_written_atomically(run):
     target_dir = os.path.join(save_root, str(act.action_output_dir))
     leftovers = [n for n in os.listdir(target_dir) if n.endswith(".tmp")]
     assert leftovers == []
-    assert sorted(os.listdir(target_dir)) == ["demo-0.0.0.0__0.hlo"]
+    assert sorted(os.listdir(target_dir)) == ["demo-0.0.0.0__0.jsonl"]
 
 
 def test_atomic_write_leaves_no_temp_file_when_the_write_fails(tmp_path):
@@ -722,7 +728,7 @@ def test_write_act_writes_a_parsable_act_yml_and_returns_its_path(run):
     assert doc["file_type"] == "action"
     assert doc["action_name"] == "run_demo"
     assert doc["action_uuid"] == str(ACT_UUID)
-    assert [f["file_name"] for f in doc["files"]] == ["demo-0.0.0.0__0.hlo"]
+    assert [f["file_name"] for f in doc["files"]] == ["demo-0.0.0.0__0.jsonl"]
     assert doc["files"][0]["sample"] == [LABEL]
     assert doc["files"][0]["nosync"] is False
 
@@ -944,3 +950,14 @@ def test_module_does_not_mutate_sys_path():
     assert mod.__file__ is not None
     source = _read(mod.__file__)
     assert "sys.path" not in source
+
+
+def test_a_rewrite_without_header_removes_the_stale_header(run):
+    act, writer = run["act"], run["writer"]
+    kw = dict(
+        file_type="demo_helao__file", filenum=0, file_group=HloFileGroup.helao_files
+    )
+    out = writer.write_file(act, output_str='{"n": 1}', header={"h": 1}, **kw)
+    writer.write_file(act, output_str='{"n": 2}', **kw)
+    assert not os.path.exists(out[: -len(".jsonl")] + ".meta.json")
+    assert _read(out) == '{"n": 2}\n'

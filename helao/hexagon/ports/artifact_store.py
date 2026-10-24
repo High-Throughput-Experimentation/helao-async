@@ -7,12 +7,13 @@ the meta, finish, promotion and zip members:
 
 - Atomic yml writes (temp file + os.replace), trailing newline,
   ``file_type:`` first key.
-- LAZY hlo open on first data item per file_conn_key (mode ``w+``); header
-  (HloHeaderModel.clean_dict()) at open; ``%%\\n`` before first data row; one
-  JSON object per line; NaN/Infinity tokens legal; NO DATA => NO FILE; close
-  at finish (or substitute).
-- One-shot files: mode ``a+``, ``header + "%%\\n" + payload``, FileInfo
-  appended at write; gated by ``save_data``.
+- LAZY data open on first data item per file_conn_key (mode ``w+``); header
+  (HloHeaderModel.clean_dict()) to ``X.meta.json`` at open; rows to
+  ``X.jsonl``, one JSON object per line; NaN/Infinity tokens legal; NO DATA =>
+  NO FILE; close at finish (or substitute).
+- One-shot helao files: header overwritten, rows appended; aux files: mode
+  ``a+``, ``header + "%%\\n" + payload``. FileInfo appended at write; gated
+  by ``save_data``.
 - ``finish()`` JOINS the write queue before closing handles (drain protocol
   §5.4); late data beyond the bounded retries is dropped exactly as legacy
   drops it.

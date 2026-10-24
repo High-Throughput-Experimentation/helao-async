@@ -59,9 +59,9 @@ def _row(dflt: Any, i: int) -> DataModel:
 
 def _hlo_rows(root: Path) -> list[int]:
     """The ``t`` values of every data row, in file order."""
-    (hlo,) = sorted(root.rglob("*.hlo"))
+    (hlo,) = sorted(root.rglob("*.jsonl"))
     text = hlo.read_text(encoding="utf-8")
-    body = text.split("%%", 1)[1]
+    body = text
     return [json.loads(line)["t"] for line in body.splitlines() if line.strip()]
 
 

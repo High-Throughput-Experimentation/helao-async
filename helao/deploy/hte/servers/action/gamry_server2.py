@@ -37,7 +37,6 @@ from helao.hexagon.app.action_host import ActionHost
 from helao.helpers import helao_logging as logging  # get LOGGER from the host instance
 from helao.helpers.bubble_detection import bubble_detection
 from helao.helpers.executor import Executor
-from helao.helpers.yml_tools import yml_dumps
 
 # P3a gamry COM cut-over (2026-07-23): the gamry server is backed by the
 # hexagon GamryComAdapter (single COM-owning worker thread + single PumpEvents),
@@ -82,9 +81,9 @@ async def measure_init_ocv(active, driver, action_params: dict) -> float:
     await active.write_file(
         output_str=json.dumps(ocv_data),
         file_type="pstat_helao__file",
-        filename="init_ocv.hlo",
+        filename="init_ocv.jsonl",
         file_group=HloFileGroup.helao_files,
-        header=yml_dumps({"mean_ocv": mean_ocv}),
+        header={"mean_ocv": mean_ocv},
         json_data_keys=list(ocv_data.keys()),
     )
     LOGGER.info(f"OCV result: {mean_ocv:.3f} V")

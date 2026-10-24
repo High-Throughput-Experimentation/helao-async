@@ -62,9 +62,11 @@ from helao.core.models.sample import (
 )
 from helao.helpers import helao_logging as logging
 from helao.helpers.file_utils import staging_path
+from helao.helpers.meta_io import write_meta
 from helao.helpers.premodels import Action, Experiment, Sequence
+from helao.hexagon.domain.naming import HEADER_SUFFIX, data_sibling
 
-from .data_file import NativeDataFileWriter
+from .data_file import NativeDataFileWriter, _rows
 from .meta_writer import NativeMetaFileWriter
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -284,7 +286,7 @@ class PostHocRunWriter:
         index from ``action.file_conn_keys`` -- an ordering a post-hoc caller
         does not have. Format is otherwise identical.
         """
-        ext = "hlo" if file_group == HloFileGroup.helao_files else "csv"
+        ext = "jsonl" if file_group == HloFileGroup.helao_files else "csv"
         return (
             f"{action.action_abbr}-{action.orch_submit_order}"
             f".{action.action_order}.{action.action_retry}"
@@ -309,8 +311,10 @@ class PostHocRunWriter:
     ) -> Optional[str]:
         """Write one complete data file and record it on ``action``.
 
-        The file is ``header`` (if any) + ``%%\\n`` + ``output_str``, and a
-        matching ``FileInfo`` is appended to ``action.files``.
+        The ``helao_files`` file is ``X.jsonl`` (rows) plus ``X.meta.json``
+        (header, when there is one); an ``aux_files`` file is header +
+        ``%%\\n`` + payload. A matching ``FileInfo`` is appended to
+        ``action.files``.
 
         Args:
             action: Action the file belongs to; must already be ``init_act``-ed.
@@ -320,7 +324,7 @@ class PostHocRunWriter:
                 omitted.
             filenum: File index for the generated name. Required -- see the
                 module docstring.
-            file_group: Selects ``.hlo`` (helao) or ``.csv`` (aux). Required.
+            file_group: Selects ``.jsonl`` (helao) or ``.csv`` (aux). Required.
             header: Header content as a dict, list of lines, string or ``None``.
             json_data_keys: Column keys recorded on the ``FileInfo``.
             file_sample_label: Sample global label(s) for the file.
@@ -375,11 +379,20 @@ class PostHocRunWriter:
                 "conversion attempt)"
             )
 
-        body = (
-            f"{resolved_header}%%\n{output_str}"
-            if resolved_header
-            else f"%%\n{output_str}"
-        )
+        if isinstance(resolved_header, dict):
+            header_file = data_sibling(output_file, HEADER_SUFFIX)
+            if resolved_header:
+                write_meta(header_file, resolved_header)
+            elif os.path.exists(header_file):
+                # A rerun without a header must not keep the failed run's one.
+                os.remove(header_file)
+            body = _rows(output_str)
+        else:
+            body = (
+                f"{resolved_header}%%\n{output_str}"
+                if resolved_header
+                else f"%%\n{output_str}"
+            )
         _atomic_write_text(output_file, body)
         self._written.add(output_file)
 

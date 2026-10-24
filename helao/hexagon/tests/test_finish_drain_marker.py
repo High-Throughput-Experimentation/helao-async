@@ -54,10 +54,10 @@ def _hang_the_logger(active):
 
 
 def _rows(tmp_path) -> list:
-    (path,) = glob.glob(str(tmp_path / "**" / "*.hlo"), recursive=True)
+    (path,) = glob.glob(str(tmp_path / "**" / "*.jsonl"), recursive=True)
     with open(path, encoding="utf-8") as f:
         text = f.read()
-    return [ln for ln in text.split("%%\n", 1)[1].splitlines() if ln.strip()]
+    return [ln for ln in text.splitlines() if ln.strip()]
 
 
 @pytest.mark.asyncio
@@ -188,7 +188,6 @@ class _Rig:
         self.q.put = _put  # type: ignore[method-assign]
         file_conn = SimpleNamespace(
             file=object(),
-            added_hlo_separator=True,
             params=SimpleNamespace(json_data_keys=["t"]),
         )
 

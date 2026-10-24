@@ -647,3 +647,101 @@ def test_finish_pending_still_resets_a_legacy_progress_sidecar(tmp_path):
     resets = []
     asyncio.run(_finish_pending_driver([str(seq)], resets).finish_pending())
     assert resets == [str(prog.parent)]
+
+
+def test_register_present_files_takes_the_jsonl_not_its_header(tmp_path):
+    from helao.hexagon.app.action_host import ActionHost
+    from helao.helpers.premodels import Action
+
+    host = ActionHost.__new__(ActionHost)
+    host.server_key = "PSTAT"
+    act_dir = tmp_path / "a"
+    write_pair(act_dir, "CA-0.0.0.0__0", HEADER, ROWS)
+    write_meta(act_dir / "260102.030405678901-act.json", {"action_name": "x"})
+    action = Action(action_name="x")
+    host._register_present_files(action, str(act_dir))
+    assert [(f.file_name, f.file_type) for f in action.files] == [
+        ("CA-0.0.0.0__0.jsonl", "pstat_helao__file")
+    ]
+
+
+def _assert_compact_rows(path: str, n: int) -> None:
+    text = open(path, encoding="utf-8").read()
+    assert text.endswith("\n")
+    lines = text[:-1].split("\n")
+    assert len(lines) == n
+    for line in lines:
+        assert line and line == line.strip()
+        assert isinstance(json.loads(line), dict)
+        assert line == hlo_json_dumps(json.loads(line))  # compact, no indent
+
+
+def _assert_pretty_header(path: str) -> None:
+    text = open(path, encoding="utf-8").read()
+    assert text.endswith("}\n")
+    assert '\n  "' in text  # 2-space indent
+    assert text == dumps_meta(json.loads(text))
+
+
+@pytest.mark.asyncio
+async def test_real_writers_emit_compact_rows_and_a_pretty_header(tmp_path):
+    import asyncio
+
+    from helao.core.models.data import DataModel
+    from helao.core.models.file import HloFileGroup
+    from helao.hexagon.tests.native_fixtures import make_base, mk_active
+
+    base = make_base(str(tmp_path / "RUNS_ACTIVE"))
+    active, dflt = mk_active(base)
+    task = asyncio.get_running_loop().create_task(active.log_data_task())
+    await asyncio.sleep(0.05)
+    for row in ROWS:
+        await active.enqueue_data(DataModel(data={dflt: row}, errors=[]))
+    await asyncio.sleep(0.2)
+    task.cancel()
+    await asyncio.sleep(0.05)
+    await active.file_conn_dict[dflt].file.close()
+    out_dir = Path(base.helaodirs.save_root) / str(active.action.action_output_dir)
+    (streamed,) = sorted(out_dir.glob("*.jsonl"))
+    _assert_compact_rows(str(streamed), len(ROWS))
+    _assert_pretty_header(str(streamed)[: -len(".jsonl")] + ".meta.json")
+
+    one_shot = await active.write_file(
+        output_str="\n".join(hlo_json_dumps(r) for r in ROWS),
+        file_type="x_helao__file",
+        filename="one.jsonl",
+        file_group=HloFileGroup.helao_files,
+        header=HEADER,
+    )
+    assert one_shot is not None
+    _assert_compact_rows(one_shot, len(ROWS))
+    _assert_pretty_header(one_shot[: -len(".jsonl")] + ".meta.json")
+
+
+@pytest.mark.asyncio
+async def test_a_header_never_stands_alone(tmp_path):
+    """A stream opened with a header and closed with no rows leaves both files."""
+    from helao.core.models.file import HloFileGroup
+    from helao.hexagon.tests.native_fixtures import make_base, mk_active
+
+    base = make_base(str(tmp_path / "RUNS_ACTIVE"))
+    active, dflt = mk_active(base)
+    active.file_conn_dict[dflt].params.hloheader.epoch_ns = 1234567890
+    await active.log_data_set_output_file(file_conn_key=dflt)
+    await active.file_conn_dict[dflt].file.close()
+    out_dir = Path(base.helaodirs.save_root) / str(active.action.action_output_dir)
+    (data,) = sorted(out_dir.glob("*.jsonl"))
+    assert data.with_name(data.name[: -len(".jsonl")] + ".meta.json").is_file()
+    meta, rows = read_hlo(str(data))
+    assert meta["epoch_ns"] == 1234567890 and not rows
+
+    # one-shot with a header and an empty body: the .jsonl exists too
+    path = await active.write_file(
+        output_str="",
+        file_type="x_helao__file",
+        filename="empty.jsonl",
+        file_group=HloFileGroup.helao_files,
+        header={"k": 1},
+    )
+    assert path is not None and os.path.isfile(path)
+    assert read_hlo(path) == ({"k": 1}, {})
