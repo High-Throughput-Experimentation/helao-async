@@ -23,9 +23,7 @@ from helao.deploy.hte.sequences import (
     ECMS_seq,
     HISPEC_seq,
     ECHEUVIS_seq,
-    UVIS_DR_seq,
     UVIS_T_seq,
-    UVIS_TR_seq,
 )
 from helao.helpers.premodels import Experiment
 
@@ -100,8 +98,6 @@ def test_sequences_use_load_solid_only(mod, pre, first, second):
 def test_redundant_unloads_removed():
     plans = [
         _names(ECHE_seq.ECHE_CA),
-        _names(UVIS_DR_seq.UVIS_DR),
-        _names(UVIS_TR_seq.UVIS_TR),
         _names(UVIS_T_seq.UVIS_T),
     ]
     follow = {
