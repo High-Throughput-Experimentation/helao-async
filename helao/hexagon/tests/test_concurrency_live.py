@@ -63,7 +63,7 @@ def _count_exp_ymls(root: Path) -> int:
     # for a legacy tree -- this counter is also pointed at pre-cut-over
     # archives -- and the zip arm becomes legacy-only once the syncer stops
     # zipping a synced sequence.
-    total = len(list((root / "RUNS").rglob("*-exp.yml")))
+    total = len(list((root / "RUNS").rglob("*-exp.json")))
     total += len(list((root / "RUNS_FINISHED").rglob("*-exp.yml")))
     for zip_path in (root / "RUNS_SYNCED").rglob("*.zip"):
         try:
@@ -159,7 +159,7 @@ def _assert_estopped_exp_yml(root: Path):
     """[finished, estopped] terminal status, exactly once each."""
     import yaml
 
-    exp_ymls = list(Path(root).rglob("*-exp.yml"))
+    exp_ymls = list(Path(root).rglob("*-exp.json"))
     assert exp_ymls, "estop finalizer produced no experiment yml"
     statuses = [
         yaml.safe_load(p.read_text(encoding="utf-8")).get("experiment_status")

@@ -57,7 +57,7 @@ async def test_meta_members_require_bound_base(tmp_path):
     out_dir = os.path.join(
         str(base.helaodirs.save_root), str(active.action.action_output_dir)
     )
-    assert [f for f in os.listdir(out_dir) if f.endswith("-act.yml")]
+    assert [f for f in os.listdir(out_dir) if f.endswith("-act.json")]
 
 
 @pytest.mark.asyncio

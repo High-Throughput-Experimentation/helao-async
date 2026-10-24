@@ -39,7 +39,6 @@ from helao.core.models.sample import SolidSample
 from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.meta_io import read_meta
 from helao.helpers.premodels import Action, Experiment, Sequence
-from helao.helpers.yml_tools import yml_dumps
 
 from helao.hexagon.adapters.native.posthoc_writer import (
     PostHocRunWriter,
@@ -705,7 +704,7 @@ def test_probe1_face_computes_nosync_from_sync_data_and_extension(run):
 # --------------------------------------------------------------------------
 
 
-def test_write_act_writes_a_parsable_act_yml_and_returns_its_path(run):
+def test_write_act_writes_a_parsable_act_json_and_returns_its_path(run):
     act, writer, save_root = run["act"], run["writer"], run["save_root"]
     writer.write_file(
         act,
@@ -718,11 +717,11 @@ def test_write_act_writes_a_parsable_act_yml_and_returns_its_path(run):
     out = writer.write_act(act)
 
     assert out == os.path.join(
-        save_root, str(act.action_output_dir), f"{TS_STAMP}-act.yml"
+        save_root, str(act.action_output_dir), f"{TS_STAMP}-act.json"
     )
     assert os.path.isfile(out)
     text = _read(out)
-    assert text.startswith("file_type: action\n")
+    assert text.startswith('{\n  "file_type": "action",')
     assert text.endswith("\n")
     doc = yaml.safe_load(text)
     assert doc["file_type"] == "action"
@@ -766,7 +765,7 @@ def test_meta_writes_swap_a_complete_temp_file_into_place(run, monkeypatch):
     assert os.path.dirname(src) == os.path.dirname(out)
     assert os.path.basename(src).startswith(".") and src.endswith(".tmp")
     # the temp file was already complete at the moment of the swap
-    assert staged.startswith("file_type: action\n")
+    assert staged.startswith('{\n  "file_type": "action",')
     assert staged == _read(out)
 
 
@@ -795,7 +794,7 @@ def test_the_face_works_when_called_from_inside_a_running_loop(run):
     written = asyncio.run(drive())
     assert written is not None
     assert os.path.isfile(written)
-    assert os.path.basename(written).endswith("-act.yml")
+    assert os.path.basename(written).endswith("-act.json")
     assert yaml.safe_load(_read(written))["action_uuid"] == str(act.action_uuid)
 
 
@@ -815,10 +814,10 @@ def test_write_act_with_save_act_false_returns_none_without_raising(run):
     assert writer.write_act(act) is None
     act_dir = os.path.join(save_root, str(act.action_output_dir))
     written = os.listdir(act_dir) if os.path.isdir(act_dir) else []
-    assert [n for n in written if n.endswith("-act.yml")] == []
+    assert [n for n in written if n.endswith(("-act.json", "-act.yml"))] == []
 
 
-def test_write_exp_and_write_seq_write_their_own_yml(run):
+def test_write_exp_and_write_seq_write_their_own_record(run):
     writer, save_root = run["writer"], run["save_root"]
     exp, seq = run["exp"], run["seq"]
 
@@ -826,26 +825,23 @@ def test_write_exp_and_write_seq_write_their_own_yml(run):
     seq_out = writer.write_seq(seq)
 
     assert exp_out == os.path.join(
-        save_root, exp.get_experiment_dir(), f"{TS_STAMP}-exp.yml"
+        save_root, exp.get_experiment_dir(), f"{TS_STAMP}-exp.json"
     )
     assert seq_out == os.path.join(
-        save_root, seq.get_sequence_dir(), f"{TS_STAMP}-seq.yml"
+        save_root, seq.get_sequence_dir(), f"{TS_STAMP}-seq.json"
     )
     exp_doc = yaml.safe_load(_read(exp_out))
     seq_doc = yaml.safe_load(_read(seq_out))
-    assert _read(exp_out).startswith("file_type: experiment\n")
-    assert _read(seq_out).startswith("file_type: sequence\n")
+    assert _read(exp_out).startswith('{\n  "file_type": "experiment",')
+    assert _read(seq_out).startswith('{\n  "file_type": "sequence",')
     assert exp_doc["experiment_name"] == "demo_sub_exp"
     assert exp_doc["experiment_uuid"] == str(EXP_UUID)
     assert seq_doc["sequence_name"] == "batch__demo"
     assert seq_doc["sequence_uuid"] == str(SEQ_UUID)
 
 
-def test_meta_yml_uses_the_indented_block_sequence_style(run):
-    """Divergence 6: the fork dumped with ``fast=True``, which emits
-    non-indented block sequences. The face adopts core's default dumper. The
-    two differ textually but parse identically, which is why the difference
-    vanishes downstream."""
+def test_meta_json_is_two_space_indented(run):
+    """The record is pretty JSON (spec §1): 2-space indent, trailing newline."""
     act, writer = run["act"], run["writer"]
     writer.write_file(
         act,
@@ -856,14 +852,19 @@ def test_meta_yml_uses_the_indented_block_sequence_style(run):
         file_sample_label=LABEL,
     )
     text = _read(writer.write_act(act))
-    assert "files:\n  - action_uuid:" in text  # indented (core default)
-    assert "\n- " not in text  # no non-indented block sequence anywhere
+    assert text.startswith('{\n  "file_type": "action",\n')
+    assert '  "files": [\n    {\n' in text
+    assert text.endswith("}\n")
 
-    payload = yaml.safe_load(text)
-    fast_text = yml_dumps(payload, fast=True)
-    assert "\n- " in fast_text  # the style the fork emitted
-    assert fast_text != text
-    assert yaml.safe_load(fast_text) == payload
+
+def test_write_act_returns_the_in_flight_yml_it_rewrote(run):
+    act, writer, save_root = run["act"], run["writer"], run["save_root"]
+    legacy = os.path.join(save_root, str(act.action_output_dir), f"{TS_STAMP}-act.yml")
+    os.makedirs(os.path.dirname(legacy), exist_ok=True)
+    with open(legacy, "w", encoding="utf-8") as f:
+        f.write("action_status: [active]\n")
+    assert writer.write_act(act) == legacy
+    assert yaml.safe_load(_read(legacy))["action_name"] == "run_demo"
 
 
 # --------------------------------------------------------------------------

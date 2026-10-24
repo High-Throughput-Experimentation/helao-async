@@ -40,7 +40,7 @@ from helao.core.drivers.data.analysis_layout import (
     parse_analysis_timestamp,
     publish_outputs,
     sequence_part_of,
-    write_model_yml,
+    write_model_json,
 )
 from helao.helpers import helao_logging as logging
 from helao.hexagon.ports.analysis import AnalysisRecord
@@ -115,7 +115,7 @@ class NativeAnalysisArtifact:
         )
 
     async def publish(self, record: AnalysisRecord) -> bool:
-        """Write ``record``'s model yml and output JSONs, and upload them.
+        """Write ``record``'s model JSON and output JSONs, and upload them.
 
         Republishing an identical record overwrites the same paths rather than
         adding a second one: the analysis uuid is a content hash, so the record
@@ -130,7 +130,7 @@ class NativeAnalysisArtifact:
         """
         local_ana_dir = self.local_dir(record)
         await asyncio.to_thread(
-            write_model_yml,
+            write_model_json,
             local_ana_dir,
             record.model["analysis_uuid"],
             record.model,

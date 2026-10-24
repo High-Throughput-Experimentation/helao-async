@@ -81,7 +81,7 @@ from helao.core.drivers.data.analysis_layout import (
     parse_analysis_timestamp,
     publish_outputs,
     sequence_part_of,
-    write_model_yml,
+    write_model_json,
 )
 from helao.core.drivers.data.loaders import pgs3
 from helao.core.drivers.data.loaders.localfs import LocalLoader
@@ -1203,7 +1203,7 @@ class AnalysisSyncer(NativeSyncer):
         self,
         calc_tup: tuple[UUID, LocalLoader, dict, BaseAnalysis, Optional[UUID]],
     ) -> tuple:
-        """Run one analysis and write its model yml. Synchronous -- run in a thread.
+        """Run one analysis and write its model JSON. Synchronous -- run in a thread.
 
         This is the blocking half of :meth:`sync_ana`, split out so it can be
         handed to :func:`asyncio.to_thread` instead of being executed on the
@@ -1253,7 +1253,7 @@ class AnalysisSyncer(NativeSyncer):
                 model_dict.get("global_sample_label", ""),
             ),
         )
-        write_model_yml(local_ana_dir, eua.analysis_uuid, model_dict)
+        write_model_json(local_ana_dir, eua.analysis_uuid, model_dict)
 
         return eua, model_dict, output_dict, local_ana_dir
 
@@ -1285,7 +1285,7 @@ class AnalysisSyncer(NativeSyncer):
         """
         process_uuid = calc_tup[0]
         # The analysis proper -- instantiation, calc_output, export_analysis, the
-        # process metadata fetch and the model yml write -- is synchronous and
+        # process metadata fetch and the model JSON write -- is synchronous and
         # takes seconds, with no await point anywhere in it. Running it inline
         # pinned the server's event loop for its entire duration (measured: a
         # 24-analysis batch stalled the loop for the full 8.3s), so the

@@ -267,10 +267,14 @@ def _parse_norm(text: str) -> "dict[str, str]":
 
 
 def _split_hlo(body: str):
-    """Split an .hlo body into (header_text, [data_line, ...])."""
+    """Split a data body into (header_text, [data_line, ...]).
+
+    A legacy ``.hlo`` carries its header before ``%%``; a ``.jsonl`` is rows
+    only (its header is the separate ``.meta.json`` member).
+    """
     lines = body.splitlines()
     if "%%" not in lines:
-        return body, []
+        return "", [line for line in lines if line.strip()]
     idx = lines.index("%%")
     header = "\n".join(lines[:idx])
     data_lines = [line for line in lines[idx + 1 :] if line.strip()]
@@ -379,7 +383,7 @@ def _compare_norm(name: str, ref_text: str, cur_text: str) -> "list[str]":
         )
     for rel in sorted(ref_keys & cur_keys):
         body_ref, body_cur = ref[rel], cur[rel]
-        if rel.endswith(".hlo"):
+        if rel.endswith((".hlo", ".jsonl")):
             h_ref, d_ref = _split_hlo(body_ref)
             h_cur, d_cur = _split_hlo(body_cur)
             if h_ref != h_cur:

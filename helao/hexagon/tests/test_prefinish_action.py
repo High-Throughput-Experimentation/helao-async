@@ -25,7 +25,7 @@ class Hook(FinishHook):
 
 
 def _act_yml(root: str) -> dict:
-    ymls = [p for p in Path(root).rglob("*-act.yml")]
+    ymls = [p for p in Path(root).rglob("*-act.json")]
     assert len(ymls) == 1, ymls
     return yml_load(ymls[0].read_text(encoding="utf-8"))
 

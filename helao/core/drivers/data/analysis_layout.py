@@ -10,7 +10,7 @@ bucket* lives here and nowhere else:
   grammar and its two suffix rules (:func:`analysis_suffix`,
   :func:`analysis_dir`),
 * the local write and the S3 upload of the model plus one JSON per output group
-  (:func:`write_model_yml`, :func:`publish_outputs`).
+  (:func:`write_model_json`, :func:`publish_outputs`).
 
 Two callers share it. :mod:`helao.core.drivers.data.analysis_driver` is the
 live analysis server (``AnalysisSyncer.sync_ana``); the second is
@@ -47,7 +47,7 @@ __all__ = [
     "publish_outputs",
     "upload_json",
     "write_json",
-    "write_model_yml",
+    "write_model_json",
 ]
 
 import asyncio
@@ -66,7 +66,7 @@ from helao.core.models.analysis import AnalysisOutputModel
 from helao.core.models.s3locator import S3Locator
 from helao.helpers import helao_logging as logging
 from helao.helpers.time_utils import set_time
-from helao.helpers.yml_tools import yml_dumps
+from helao.helpers.meta_io import write_meta
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -288,22 +288,17 @@ def write_json(obj: dict, path: str) -> None:
         json.dump(obj, f)
 
 
-def write_model_yml(local_ana_dir: str, analysis_uuid, model_dict: dict) -> str:
-    """Write ``<local_ana_dir>/<analysis_uuid>.yml``, creating the directory.
+def write_model_json(local_ana_dir: str, analysis_uuid, model_dict: dict) -> str:
+    """Write ``<local_ana_dir>/<analysis_uuid>-ana.json`` atomically; return its path.
 
     Args:
         local_ana_dir: Directory from :func:`analysis_dir`.
         analysis_uuid: UUID naming the file.
         model_dict: The cleaned ``AnalysisModel`` dict to dump.
-
-    Returns:
-        The path written.
     """
-    os.makedirs(local_ana_dir, exist_ok=True)
-    path = os.path.join(local_ana_dir, f"{analysis_uuid}.yml")
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(yml_dumps(model_dict))
-    return path
+    return str(
+        write_meta(os.path.join(local_ana_dir, f"{analysis_uuid}-ana.json"), model_dict)
+    )
 
 
 async def upload_json(

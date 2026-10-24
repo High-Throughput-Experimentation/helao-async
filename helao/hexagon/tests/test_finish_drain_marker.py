@@ -335,7 +335,7 @@ async def test_a_failing_drain_still_closes_out_the_action(tmp_path):
 
         assert active.file_conn_dict == {}  # handles closed
         assert active.data_logger is not None and active.data_logger.done()
-        (act_yml,) = glob.glob(str(tmp_path / "**" / "*-act.yml"), recursive=True)
+        (act_yml,) = glob.glob(str(tmp_path / "**" / "*-act.json"), recursive=True)
         with open(act_yml, encoding="utf-8") as f:
             assert "finished" in f.read()
     assert len(_rows(tmp_path)) == 1

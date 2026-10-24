@@ -148,7 +148,7 @@ async def _run_one_action(
 @pytest.mark.asyncio
 async def test_an_action_writes_its_meta_and_data_files() -> None:
     names = await _run_one_action(tempfile.mkdtemp(prefix="helao_artifacts_"))
-    assert any(n.endswith("-act.yml") for n in names), f"no act meta file: {names}"
+    assert any(n.endswith("-act.json") for n in names), f"no act meta file: {names}"
     assert any(n.endswith(".jsonl") for n in names), f"no jsonl data file: {names}"
 
 
