@@ -10,6 +10,7 @@ __all__ = ["dumps_meta", "meta_glob", "read_meta", "resolve_meta_path", "write_m
 
 import glob
 import os
+import time
 from pathlib import Path
 from typing import Any, Optional, Union
 
@@ -62,8 +63,26 @@ def dumps_meta(d: Any, path: Union[str, os.PathLike, None] = None) -> str:
 def resolve_meta_path(path: Union[str, os.PathLike]) -> Path:
     """The file a write to ``path`` lands in: an existing ``<stem>.yml``, else ``<stem>.json``."""
     p = Path(path)
+    if p.suffix not in (".json", ".yml"):
+        raise ValueError(f"not a record path (want .json or .yml): {path}")
     legacy = p.with_suffix(".yml")
     return legacy if legacy.exists() else p.with_suffix(".json")
+
+
+def _replace_when_free(src, dst, timeout: float = 5.0) -> None:
+    """``os.replace`` retried while Windows holds ``dst`` open (sync twin of
+    ``file_utils.replace_when_free``; same backoff, shorter cap)."""
+    delay, waited = 0.05, 0.0
+    while True:
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError:
+            if waited >= timeout:
+                raise
+            time.sleep(delay)
+            waited += delay
+            delay = min(delay * 2, 1.0)
 
 
 def write_meta(path: Union[str, os.PathLike], d: Any) -> Path:
@@ -74,7 +93,7 @@ def write_meta(path: Union[str, os.PathLike], d: Any) -> Path:
     try:
         with open(tmp, "w", encoding="utf-8") as f:
             f.write(dumps_meta(d, target))
-        os.replace(tmp, target)
+        _replace_when_free(tmp, target)
     except BaseException:
         if os.path.exists(tmp):
             os.remove(tmp)

@@ -32,9 +32,30 @@ from helao.hexagon.tests.smoke.golden_capture import (
     OCV_HLO_ROW_COUNT_TOLERANCE,
     OCV_MASKED_HLO_COLUMNS,
     SCENARIO,
+    _actions_complete,
+    _run_artifacts,
     settle,
     snapshot,
 )
+
+
+def test_json_era_tree_is_seen_by_artifact_helpers_and_settle():
+    """-act.json + X.jsonl (JSON storage format) must be found and settled on."""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td) / "captroot"
+        d = root / "RUNS_DIAG" / "25.28" / "0716" / "0__0__PSTAT__run_OCV"
+        d.mkdir(parents=True)
+        (d / "250716.131421123456-act.json").write_text(
+            '{"file_type": "action", "action_status": ["finished"]}\n',
+            encoding="utf-8",
+        )
+        (d / "PSTAT-OCV-0.jsonl").write_text("[0, 1]\n", encoding="utf-8")
+        (d / "PSTAT-OCV-0.meta.json").write_text("{}\n", encoding="utf-8")
+        acts, hlos = _run_artifacts(root)
+        assert [Path(a).name for a in acts] == ["250716.131421123456-act.json"]
+        assert [Path(h).name for h in hlos] == ["PSTAT-OCV-0.jsonl"]
+        assert _actions_complete(root)
+        settle(root, settle_polls=2, poll_s=0.01, timeout_s=5.0)
 
 
 def test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance():

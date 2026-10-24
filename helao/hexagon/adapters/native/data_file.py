@@ -384,7 +384,6 @@ class NativeDataFileWriter:
         if result is None:
             return None
         header, file_info, output_path, output_file = result
-        action.files.append(file_info)
         LOGGER.info(f"writing non stream data to: {output_file}")
         if isinstance(header, dict):
             # helao_files: header overwritten atomically, rows appended (spec §2).
@@ -392,12 +391,13 @@ class NativeDataFileWriter:
                 write_meta(data_sibling(output_file, HEADER_SUFFIX), header)
             async with aiofiles.open(output_file, mode="a+", encoding="utf-8") as f:
                 await f.write(_rows(output_str))
-            return output_file
-        async with aiofiles.open(output_file, mode="a+", encoding="utf-8") as f:
-            if header:
-                await f.write(header)
-            await f.write("%%\n")
-            await f.write(output_str)
+        else:
+            async with aiofiles.open(output_file, mode="a+", encoding="utf-8") as f:
+                if header:
+                    await f.write(header)
+                await f.write("%%\n")
+                await f.write(output_str)
+        action.files.append(file_info)
         return output_file
 
     def write_file_nowait(

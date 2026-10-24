@@ -64,7 +64,9 @@ from helao.core.error import ErrorCodes
 from helao.core.models.machine import MachineModel
 from helao.helpers.config_loader import read_config
 from helao.helpers.dispatcher import async_action_dispatcher
+from helao.helpers.meta_io import meta_glob
 from helao.helpers.premodels import Action
+from helao.hexagon.domain.naming import DATA_SUFFIX
 
 # async_action_dispatcher's RPC-first path opens a zmq.asyncio socket, which
 # requires the add_reader event-loop family the Windows Proactor loop (the
@@ -183,11 +185,11 @@ def run_ocv_action(host: str, port: int, tval_s: float, acq_s: float) -> dict:
 
 
 def _run_artifacts(root: Path) -> tuple:
-    """(-act.yml paths, .hlo paths) anywhere under root's captured run trees."""
+    """(-act.json/.yml paths, .hlo/.jsonl paths) anywhere under root's captured run trees."""
     root = Path(root)
     return (
-        sorted(str(p) for p in root.rglob("*-act.yml")),
-        sorted(str(p) for p in root.rglob("*.hlo")),
+        sorted(str(p) for p in meta_glob(root, "act", "**/*")),
+        sorted(str(p) for sfx in (".hlo", DATA_SUFFIX) for p in root.rglob(f"*{sfx}")),
     )
 
 
@@ -195,7 +197,7 @@ def _act_status_map(root: Path) -> dict:
     """{-act.yml path: action_status list}. A file that is missing/partial/
     unreadable (mid-write) yields [] -> treated as not-yet-terminal."""
     out: dict = {}
-    for a in Path(root).rglob("*-act.yml"):
+    for a in meta_glob(root, "act", "**/*"):
         try:
             data = load_yml_plain(a)
             st = data.get("action_status") or []

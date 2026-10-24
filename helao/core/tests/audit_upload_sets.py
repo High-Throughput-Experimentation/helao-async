@@ -102,6 +102,13 @@ def main(argv=None) -> int:
     print(f"actions scanned : {scanned}")
     print(f"actions with gap: {with_gap}")
     print()
+    if not scanned:
+        print(
+            "no -act.yml found: this tool scans legacy YAML records only, so a "
+            "JSON-era tree (-act.json) is not audited; not reporting 'no gap'",
+            file=sys.stderr,
+        )
+        return 1
     if not by_suffix:
         print("no gap: every globbed file is named in its action's files list")
         return 0

@@ -745,3 +745,67 @@ async def test_a_header_never_stands_alone(tmp_path):
     )
     assert path is not None and os.path.isfile(path)
     assert read_hlo(path) == ({"k": 1}, {})
+
+
+def test_resolve_meta_path_rejects_a_suffixless_or_foreign_path(tmp_path):
+    # with_suffix would otherwise turn "<ts>-act" into "<ts>.json"
+    for bad in (tmp_path / "261023.120000123456-act", tmp_path / "x.hlo"):
+        with pytest.raises(ValueError):
+            resolve_meta_path(bad)
+    ok = tmp_path / "261023.120000123456-act.json"
+    assert resolve_meta_path(ok) == ok
+
+
+def _fail_replace(monkeypatch, n):
+    real, calls = os.replace, []
+
+    def flaky(src, dst):
+        calls.append(1)
+        if len(calls) <= n:
+            raise PermissionError("[WinError 5] Access is denied")
+        return real(src, dst)
+
+    monkeypatch.setattr(os, "replace", flaky)
+    monkeypatch.setattr("helao.helpers.meta_io.time.sleep", lambda s: None)
+    return calls
+
+
+def test_write_meta_retries_a_reader_held_replace(tmp_path, monkeypatch):
+    calls = _fail_replace(monkeypatch, 3)
+    out = write_meta(tmp_path / "260101.000000000000-prc.json", {"a": 1})
+    assert len(calls) == 4
+    assert read_meta(out) == {"a": 1}
+    assert [p.name for p in tmp_path.iterdir()] == [out.name]
+
+
+def test_write_meta_gives_up_after_the_limit_and_cleans_staging(tmp_path, monkeypatch):
+    calls = _fail_replace(monkeypatch, 10**6)
+    with pytest.raises(PermissionError):
+        write_meta(tmp_path / "260101.000000000000-prc.json", {"a": 1})
+    assert 1 < len(calls) < 100
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("legacy", [True, False])
+async def test_move_dir_hands_off_the_record_the_writer_produced(
+    tmp_path, monkeypatch, legacy
+):
+    """An in-flight stem with a .yml posts the .yml; a new record the .json."""
+    from helao.core.tests.run_layout_fixtures import finished_action
+    from helao.helpers import yml_tools
+
+    hobj, base = finished_action(tmp_path)  # writes <ts>-act.yml
+    act_dir = Path(str(base.helaodirs.save_root)) / hobj.get_action_dir()
+    yml = next(act_dir.glob("*-act.yml"))
+    if not legacy:
+        yml.unlink()
+        yml.with_suffix(".json").write_text("{}\n", encoding="utf-8")
+    posted = []
+
+    async def fake_finisher(path, sync_config=None, **kw):
+        posted.append(path)
+
+    monkeypatch.setattr(yml_tools, "yml_finisher", fake_finisher)
+    await yml_tools.move_dir(hobj, base=base)
+    assert [Path(p).suffix for p in posted] == [".yml" if legacy else ".json"]

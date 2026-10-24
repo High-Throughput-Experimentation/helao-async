@@ -255,3 +255,18 @@ async def test_track_file_outside_the_output_dir_records_its_basename(tmp_path):
     outside.write_text("payload", encoding="utf-8")
     await active.track_file("df__aux", str(outside), [])
     assert any(fi.file_name == "aux_data.dat" for fi in active.action.files)
+
+
+@pytest.mark.asyncio
+async def test_write_file_records_the_file_only_after_the_header_wrote(tmp_path):
+    _, active, _ = _native_active(tmp_path)
+    before = len(active.action.files)
+    with pytest.raises(TypeError):
+        await active.write_file(
+            output_str='{"a": 1}',
+            file_type="x_helao__file",
+            filename="bad.jsonl",
+            file_group=HloFileGroup.helao_files,
+            header={"k": object()},
+        )
+    assert len(active.action.files) == before
