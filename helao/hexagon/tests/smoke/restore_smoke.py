@@ -99,7 +99,7 @@ def phase_restore(root: str, out: str) -> int:
         if status == ["skipped", "finished"]:
             skipped_finished += 1
     summary = {
-        "n_exp_yml": len(exps),
+        "n_exp": len(exps),
         "experiment_status": sorted(
             json.dumps(
                 [

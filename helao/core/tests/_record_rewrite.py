@@ -135,7 +135,7 @@ def unsynced_records(seq_dir: "str | os.PathLike[str]") -> "list[Path]":
 def _prg_has_write_off(prg: Path) -> bool:
     """Whether ``prg`` carries a top-level ``write_off`` block (flat-text read)."""
     try:
-        lines = prg.read_text(encoding="utf-8").splitlines()
+        lines = prg.read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError:
         return False
     for line in lines:

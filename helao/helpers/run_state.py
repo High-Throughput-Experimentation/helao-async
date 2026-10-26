@@ -289,7 +289,7 @@ def _prg_is_complete(prg_path: Path) -> bool:
     mid-rebuild.
     """
     try:
-        lines = prg_path.read_text(encoding="utf-8").splitlines()
+        lines = prg_path.read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError:
         return False
     # A record that entered the post-finish chain carries `synced` (the chain
@@ -315,7 +315,7 @@ def _prg_is_quarantined(prg_path: Path) -> bool:
     unquarantined record is merely retried.
     """
     try:
-        lines = prg_path.read_text(encoding="utf-8").splitlines()
+        lines = prg_path.read_text(encoding="utf-8", errors="replace").splitlines()
     except (OSError, ValueError):
         return False
     for line in lines:

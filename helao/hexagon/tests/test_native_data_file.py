@@ -106,6 +106,25 @@ async def test_log_data_set_output_file_truncates_stale_bytes(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_stream_open_registers_file_only_after_header_write(
+    tmp_path, monkeypatch
+):
+    """A failing header write fails the open; files[] must not gain an entry
+    for a file that was never created (same order as write_file)."""
+    from helao.hexagon.adapters.native import data_file
+
+    def boom(*a, **k):
+        raise OSError("disk full")
+
+    _, active, dflt = _native_active(tmp_path)
+    active.file_conn_dict[dflt].params.hloheader.epoch_ns = 1
+    monkeypatch.setattr(data_file, "write_meta", boom)
+    with pytest.raises(OSError):
+        await active.log_data_set_output_file(file_conn_key=dflt)
+    assert active.action.files == []
+
+
+@pytest.mark.asyncio
 async def test_one_shot_helao_write_overwrites_the_header_and_appends_rows(tmp_path):
     _, active, _ = _native_active(tmp_path)
     path = await active.write_file(

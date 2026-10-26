@@ -280,7 +280,6 @@ class NativeDataFileWriter:
             file_conn_key=file_conn_key,
             action=output_action,
         )
-        output_action.files.append(file_info)
         filename = file_info.file_name
         save_root = str(self.active.base.helaodirs.save_root)
         if self.active.action.manual_action:
@@ -305,6 +304,8 @@ class NativeDataFileWriter:
         self.active.file_conn_dict[file_conn_key].file = await aiofiles.open(
             output_file, mode="w+", encoding="utf-8"
         )
+        # Register only once the header and the rows file exist (as write_file).
+        output_action.files.append(file_info)
 
         if header:
             LOGGER.debug("adding header to new file")
