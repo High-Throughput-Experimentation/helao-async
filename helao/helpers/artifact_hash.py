@@ -10,6 +10,8 @@ the launcher's collector also write those records to the never-deleted
 import asyncio
 import hashlib
 import os
+import stat
+import threading
 from typing import Optional
 
 from helao.helpers import helao_logging
@@ -24,6 +26,7 @@ _UUID_KEYS = (
     "analysis_uuid",
 )
 _FALLBACK = None
+_FALLBACK_LOCK = threading.Lock()
 
 
 def record_uuid(doc: dict) -> Optional[str]:
@@ -41,10 +44,13 @@ def _logger(logger):
     if helao_logging.LOGGER is not None:
         return helao_logging.LOGGER
     if _FALLBACK is None:
-        _FALLBACK = helao_logging.make_logger("artifact_hash")
-        _FALLBACK.warning(
-            "no config root: artefact ledger entries go to a temporary directory"
-        )
+        with _FALLBACK_LOCK:
+            if _FALLBACK is None:
+                fallback = helao_logging.make_logger("artifact_hash")
+                fallback.warning(
+                    "no config root: artefact ledger entries go to a temporary directory"
+                )
+                _FALLBACK = fallback
     return _FALLBACK
 
 
@@ -81,26 +87,56 @@ def log_artifact_hashes_sync(
 ) -> None:
     """Hash each file and log one record per file; for non-async callers."""
     log = _logger(logger)
-    root = _root(root)
-    for path in paths:
-        path = os.fspath(path)
-        rel = _rel(path, root)
-        common = {"kind": kind, "uuid": str(owner_uuid), "path": rel}
+    if paths is None:
+        log.warning(
+            "artifact_hash_failed: paths is None",
+            extra={
+                "event": "artifact_hash_failed",
+                "kind": kind,
+                "reason": "paths is None",
+            },
+        )
+        return
+    if isinstance(paths, (str, bytes, os.PathLike)):
+        paths = [paths]
+    try:
+        root = _root(root)
+        entries = list(paths)
+    except Exception as exc:  # spec §5: never raises into the caller
+        log.warning(
+            f"artifact_hash_failed: bad arguments: {exc}",
+            extra={"event": "artifact_hash_failed", "kind": kind, "reason": str(exc)},
+        )
+        return
+    for path in entries:
+        rel = str(path)
         try:
+            path = os.fsdecode(path)
+            rel = _rel(path, root)
+            if not stat.S_ISREG(os.stat(path).st_mode):
+                raise OSError("not a regular file")
             with open(path, "rb") as f:
                 digest = hashlib.file_digest(f, "sha256").hexdigest()
-            size = os.path.getsize(path)
-        except OSError as exc:
+                size = os.fstat(f.fileno()).st_size
+        except Exception as exc:
             log.warning(
                 f"artifact_hash_failed {kind} {rel}: {exc}",
-                extra={**common, "event": "artifact_hash_failed", "reason": str(exc)},
+                extra={
+                    "event": "artifact_hash_failed",
+                    "kind": kind,
+                    "uuid": str(owner_uuid),
+                    "path": rel,
+                    "reason": str(exc),
+                },
             )
             continue
         log.info(
             f"{event} {kind} {rel} sha256={digest}",
             extra={
-                **common,
                 "event": event,
+                "kind": kind,
+                "uuid": str(owner_uuid),
+                "path": rel,
                 "bytes": size,
                 "sha256": digest,
                 "reason": reason,
@@ -108,6 +144,29 @@ def log_artifact_hashes_sync(
         )
 
 
-async def log_artifact_hashes(paths, **kwargs) -> None:
+async def log_artifact_hashes(
+    paths,
+    *,
+    kind: str,
+    owner_uuid,
+    event: str = "artifact_final",
+    reason: Optional[str] = None,
+    root: Optional[str] = None,
+    logger=None,
+) -> None:
     """``log_artifact_hashes_sync`` on a worker thread; awaited by the caller."""
-    await asyncio.to_thread(log_artifact_hashes_sync, list(paths), **kwargs)
+    if paths is not None and not isinstance(paths, (str, bytes, os.PathLike)):
+        try:
+            paths = list(paths)  # snapshot before leaving the loop thread
+        except Exception:
+            pass  # the sync function reports it
+    await asyncio.to_thread(
+        log_artifact_hashes_sync,
+        paths,
+        kind=kind,
+        owner_uuid=owner_uuid,
+        event=event,
+        reason=reason,
+        root=root,
+        logger=logger,
+    )
