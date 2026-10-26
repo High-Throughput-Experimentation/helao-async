@@ -350,3 +350,64 @@ def test_connect_failure_closes_sockets(tmp_path, monkeypatch):
         JsonlSinkHandler("X", tmp_path, endpoint="tcp://")
     monkeypatch.undo()
     assert made and all(s.closed for s in made)
+
+
+def test_min_level_drops_ordinary_records_but_not_artefacts(tmp_path):
+    h = JsonlSinkHandler("L", tmp_path, min_level=30)
+    lg = _logger("t_minlevel", h)
+    lg.info("quiet")
+    lg.warning("loud")
+    lg.info("hash", extra={"event": "artifact_final", "kind": "data"})
+    h.close()
+    assert [r["msg"] for r in _read(tmp_path / "L.jsonl") if "event" not in r] == [
+        "loud"
+    ]
+    (led,) = _read(tmp_path / "artifacts_L.jsonl")
+    assert led["event"] == "artifact_final"
+
+
+def test_replay_spills_with_one_write_per_writer(tmp_path, monkeypatch):
+    from helao.helpers import log_jsonl
+
+    h = JsonlSinkHandler("R", tmp_path)
+    lg = _logger("t_replay_many", h)
+    for i in range(5):
+        lg.info(f"m{i}")
+    for e in h.recent:
+        e[2] = True  # pretend all were sent
+    calls = []
+    real = log_jsonl.RotatingJsonlWriter.write_many
+    monkeypatch.setattr(
+        log_jsonl.RotatingJsonlWriter,
+        "write_many",
+        lambda self, lines: calls.append(len(lines)) or real(self, lines),
+    )
+    h._replay()
+    h.close()
+    assert calls == [5]
+    assert len(_read(tmp_path / "R.jsonl")) == 10  # 5 original + 5 replayed
+
+
+def test_make_logger_twice_leaves_one_sink_and_one_console(tmp_path, monkeypatch):
+    from logging.handlers import QueueHandler
+
+    from helao.helpers import helao_logging
+
+    monkeypatch.delenv("HELAO_LOG_ENDPOINT", raising=False)
+    cfg = {"webhook": "http://127.0.0.1:9/x", "payload": {}}
+    for _ in range(2):
+        lg = helao_logging.make_logger(
+            "t_twice", log_dir=str(tmp_path), email_config=cfg
+        )
+    try:
+        kinds = [type(h) for h in lg.handlers]
+        assert kinds.count(JsonlSinkHandler) == 1
+        assert kinds.count(logging.StreamHandler) == 1
+        assert kinds.count(QueueHandler) == 1
+    finally:
+        for h in list(lg.handlers):
+            lg.removeHandler(h)
+            listener = getattr(h, "listener", None)
+            if listener:
+                listener.stop()
+            h.close()

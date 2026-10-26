@@ -384,3 +384,47 @@ def test_orphaned_compressor_tmp_swept_at_start(tmp_path):
         os.utime(p, (old, old))
     RotatingJsonlWriter(tmp_path, "s").write(b"x\n")
     assert not stale.exists() and fresh.exists() and other.exists()
+
+
+def test_write_many_rotates_at_the_threshold_line(tmp_path):
+    w = RotatingJsonlWriter(tmp_path, "m", rotate_records=3, grace_s=0.2)
+    w.write_many(_lines(7))
+    # 7 lines at N=3: two rotated files of exactly 3, 1 line live
+    assert w.path.read_bytes() == b'{"seq": 6}\n'
+    assert _wait(lambda: len(list(tmp_path.glob("m_*.jsonl*"))) == 2)
+    got = sorted(
+        gzip.open(p).read() if p.suffix == ".gz" else p.read_bytes()
+        for p in tmp_path.glob("m_*.jsonl*")
+    )
+    assert got == sorted([b"".join(_lines(3)), b"".join(_lines(3, 3))])
+    w.close()
+
+
+def test_write_many_is_one_write_per_batch(tmp_path, monkeypatch):
+    w = RotatingJsonlWriter(tmp_path, "o", rotate_records=100, shared=True)
+    w.write(b"x\n")  # starts the writer
+    opens = []
+    real = open
+
+    def counting(p, mode="r", *a, **k):
+        if str(p).endswith("o.jsonl"):
+            opens.append(mode)
+        return real(p, mode, *a, **k)
+
+    monkeypatch.setattr("builtins.open", counting)
+    w.write_many([b"a\n"] * 10)
+    assert opens == ["ab"]
+    w.close()
+
+
+def test_read_logs_reports_a_damaged_gz(tmp_path, capsys):
+    from helao.helpers.log_jsonl import read_logs
+
+    good = gzip.compress(
+        b'{"ts":"2026-01-01T00:00:00Z","server":"s","pid":1,"seq":1}\n'
+    )
+    (tmp_path / "s_20260101T000000.jsonl.gz").write_bytes(good)
+    (tmp_path / "s_20260102T000000.jsonl.gz").write_bytes(good[:-12])  # truncated
+    df = read_logs(tmp_path)
+    assert len(df) == 1
+    assert "s_20260102T000000.jsonl.gz" in capsys.readouterr().err

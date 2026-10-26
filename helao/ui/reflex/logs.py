@@ -4,6 +4,7 @@ The logic lives in ``helao/ui/shared/log_tail.py`` (Reflex-free). Design:
 docs/superpowers/specs/2026-10-26-jsonl-unified-logging-design.md (section 4).
 """
 
+import asyncio
 import os
 
 import reflex as rx
@@ -48,31 +49,53 @@ def _set_servers(state) -> None:
         state.servers = found
 
 
-def _start(state) -> None:
-    d = _log_dir()
-    if d is None:
-        state.rows = []
-        return
-    recs, state._cursors = log_tail.tail_init(d, MAX_ROWS)
+def _apply_init(state, recs, cursors) -> None:
+    state._cursors = tuple(cursors)
     # tuple: Reflex wraps a list var in a proxy that costs ~30 ms per busy tick
     state._all = tuple(recs)
     _set_servers(state)
     _refresh(state)
 
 
-def _tick(state) -> None:
-    # Never log here: the page reads the logs, so a log line would feed itself.
-    d = _log_dir()
-    if d is None:
-        return
-    if not state._cursors:
-        # a tick before start would read from offset 0 and show the oldest rows
-        return _start(state)
-    new, state._cursors = log_tail.tail_poll(d, state._cursors)
+def _apply_poll(state, new, cursors) -> None:
+    state._cursors = tuple(cursors)
     if new:
         state._all = tuple(log_tail.merge(list(state._all), new, MAX_ROWS))
         _set_servers(state)
         _refresh(state)
+
+
+async def _load_bg(state, tick: bool) -> None:
+    """One init (``start``) or poll (``tick``) of the log files.
+
+    ``state`` is the Reflex ``StateProxy`` of a background event: it may be read
+    or written only inside ``async with state``, and the file I/O runs on a
+    worker thread between the two blocks so the event loop never waits on disk.
+    Never log here: the page reads the logs, so a log line would feed itself.
+    """
+    async with state:
+        if state._busy:  # a slow poll must not be overtaken by the next tick
+            return
+        d = _log_dir()
+        if d is None:
+            if not tick:
+                state.rows = []
+            return
+        # a tick before start would otherwise read from offset 0 and show the oldest rows
+        cursors = list(state._cursors) if tick else []
+        state._busy = True
+    try:
+        if cursors:
+            result = await asyncio.to_thread(log_tail.tail_poll, d, cursors)
+        else:
+            result = await asyncio.to_thread(log_tail.tail_init, d, MAX_ROWS)
+    except BaseException:
+        async with state:
+            state._busy = False
+        raise
+    async with state:
+        state._busy = False
+        (_apply_poll if cursors else _apply_init)(state, *result)
 
 
 def _set_min_level(state, value: str) -> None:
@@ -103,7 +126,8 @@ class LogsState(rx.State):
 
     _all: tuple = ()
     _frozen: tuple = ()
-    _cursors: list = []
+    _cursors: tuple = ()
+    _busy: bool = False
     rows: list[list[str]] = []
     servers: list[str] = []
     selected: list[str] = []
@@ -111,15 +135,15 @@ class LogsState(rx.State):
     text: str = ""
     paused: bool = False
 
-    @rx.event
-    def start(self):
-        _start(self)
+    @rx.event(background=True)
+    async def start(self):
+        await _load_bg(self, tick=False)
 
-    @rx.event
-    def tick(self, _value=None):
+    @rx.event(background=True)
+    async def tick(self, _value=None):
         # polls even while paused (only the display is frozen), so a rotated
         # file's plain copy is read inside its grace window
-        _tick(self)
+        await _load_bg(self, tick=True)
 
     @rx.event
     def set_min_level(self, value: str):

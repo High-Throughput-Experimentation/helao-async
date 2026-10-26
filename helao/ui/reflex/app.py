@@ -683,8 +683,8 @@ def _install_backend_logger(cfg: dict) -> None:
 
     ``make_logger`` defaults to a fresh temp directory, so without this every
     panel warning raised in the Reflex backend lands somewhere no operator
-    looks. Its own file rather than the launcher's file: two processes
-    rotating one file collide on Windows. Installed as the global logger before
+    looks. Its own file rather than reflex_launcher's `<key>.jsonl`: two
+    processes rotating one file collide on Windows. Installed as the global logger before
     ``build_app`` imports the panel modules, which pick it up at import.
     """
     global LOGGER

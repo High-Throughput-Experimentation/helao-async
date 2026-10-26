@@ -271,3 +271,39 @@ def test_non_str_fields_do_not_raise():
     assert len(merged) == 2
     assert len(log_tail.filter_records(merged, None, "INFO", "42")) == 1
     assert log_tail.to_rows(merged)[0][0] == "5"
+
+
+def test_rotated_tail_is_capped_with_a_note(tmp_path, monkeypatch):
+    monkeypatch.setattr(log_tail, "CHUNK", 256)
+    monkeypatch.setattr(log_tail, "MAX_ROTATED_TAIL", 400)
+    f = tmp_path / "helao_g.jsonl"
+    f.write_bytes(_line(0))
+    _, cur = log_tail.tail_init(tmp_path)
+    with open(f, "ab") as fh:
+        fh.write(b"".join(_line(i) for i in range(1, 31)))  # far over the cap
+    rotated = tmp_path / "helao_g_20261026T000000.jsonl"
+    os.rename(f, rotated)
+    f.write_bytes(_line(99))
+    recs, _ = log_tail.tail_poll(tmp_path, cur)
+    notes = [r["msg"] for r in recs if r.get("_note")]
+    assert any(
+        m.endswith("of helao_g_20261026T000000.jsonl skipped (viewer fell behind)")
+        and int(m.split()[0]) > 0
+        for m in notes
+    )
+    seqs = [r["seq"] for r in recs if not r.get("_note")]
+    assert seqs[-2:] == [30, 99] and 1 not in seqs  # the newest were kept
+    assert len(seqs) <= 400 // len(_line(1)) + 3  # bounded by the cap
+
+
+def test_rotated_name_match_is_anchored(tmp_path):
+    live = tmp_path / "UI.jsonl"
+    live.write_bytes(_line(1))
+    _, cur = log_tail.tail_init(tmp_path)
+    # the cursor's file is now an unrelated live file that merely shares the stem
+    os.rename(live, tmp_path / "UI_backend.jsonl")
+    live.write_bytes(_line(2))
+    rows = log_tail._finish_rotated(live, cur[0])
+    assert [r["msg"] for r in rows] == [
+        "UI.jsonl rotated; records written just before may be missing"
+    ]

@@ -34,3 +34,27 @@ def test_stale_txt_zip_blocks_removed():
     assert "Compressing:" not in Path("helao/helpers/helao_dirs.py").read_text(
         encoding="utf-8"
     )
+
+
+def test_wants_collector_skips_visualizer_only_launchers():
+    import launch
+
+    for opt in ("liveonly", "gpvis"):
+        assert launch.wants_collector(opt) is False
+    for opt in ("", "nolive", "actionvis", "other"):
+        assert launch.wants_collector(opt) is True
+
+
+def test_main_gates_the_collector_on_wants_collector_and_registers_atexit():
+    src = _main_src()
+    assert "wants_collector(extraopt)" in src
+    i_start = src.index("collector.start()")
+    assert "atexit.register(collector.stop)" in src[i_start : i_start + 900]
+
+
+def test_teardown_stops_collector_in_a_finally():
+    src = _main_src()
+    teardown = src[src.index("def teardown_group") : src.index("def restart_server")]
+    fin = teardown[teardown.index("finally:") :]
+    assert "collector.stop()" in fin
+    assert teardown.index("graceful_shutdown_all()") < teardown.index("finally:")

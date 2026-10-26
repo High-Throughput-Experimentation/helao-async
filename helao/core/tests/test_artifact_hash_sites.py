@@ -278,6 +278,16 @@ def test_data_files_hashed_even_when_save_act_false(tmp_path, ledger):
     assert rows[0]["path"].endswith("CA-0__0.jsonl")
 
 
+def test_terminal_action_without_output_dir_skips_data_hash(tmp_path, ledger, caplog):
+    a = _action([HloStatus.finished], [])
+    a.save_act = False
+    a.action_output_dir = None
+    with caplog.at_level("WARNING"):
+        asyncio.run(_writer(tmp_path).write_act(a))
+    assert ledger() == []
+    assert "no action_output_dir" in caplog.text
+
+
 def test_micro_orch_hashes_terminal_exp_and_seq(tmp_path, ledger):
     from helao.core.runners.micro_orch import MicroOrch
 

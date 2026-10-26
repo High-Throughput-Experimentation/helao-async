@@ -32,6 +32,7 @@ Note:
 
 __all__ = []
 
+import atexit
 import json
 
 # ``logging`` below is helao's logging helper, NOT the stdlib module, so the
@@ -1966,6 +1967,16 @@ def server_is_idle(group, server_entry):
     return False
 
 
+def wants_collector(extraopt: str) -> bool:
+    """False for a visualizer-only launcher (``liveonly``/``gpvis``).
+
+    Such a launcher shares its config, and so its ``log_port``, with the full
+    launcher of the same group; its children write their own fallback files
+    instead of binding or feeding a second collector.
+    """
+    return extraopt not in ("liveonly", "gpvis")
+
+
 def main():
     """
     Main function to initialize and launch the HELAO application.
@@ -1977,7 +1988,7 @@ def main():
     5. Runs the full unit-test suite when ``run_unit_tests: true`` is set in the loaded config.
     6. Clears the terminal screen and prints the HELAO banner.
     7. Displays the current branch and status of each local HELAO repository.
-    8. Compresses old log files.
+    8. Starts the group's log collector (not for a visualizer-only launcher).
     9. Launches the HELAO application using the provided configuration.
     10. Sets up hotkey listeners for terminating or restarting servers.
     The function also defines helper functions for printing messages, stopping servers,
@@ -2117,7 +2128,7 @@ def main():
     # re-attach on their own. Without a `root` there is no LOGS dir; the check
     # further down exits for that case.
     collector = None
-    if helaodirs.log_root is not None:
+    if helaodirs.log_root is not None and wants_collector(extraopt):
         try:
             log_port = resolve_log_port(config)
         except ValueError as exc:
@@ -2129,13 +2140,17 @@ def main():
             collector.start()
         except zmq.ZMQError as exc:
             cprint(
-                f"\nlog_port {log_port} is in use ({exc}). Is another launcher for "
-                f"this group running? Set log_port in the config if it is taken by "
-                f"something else.\n",
+                f"\nlog_port {log_port} is in use ({exc}). Most likely an earlier "
+                f"launcher of this group is still running (see the pids_*.pck file "
+                f"under STATES): stop it, or launch with --force-relaunch. Change "
+                f"log_port in the config only if a non-helao process holds the port.\n",
                 "red",
                 attrs=["bold"],
             )
             sys.exit(1)
+        # the launcher's final records are lost if it exits without teardown;
+        # stop() is idempotent
+        atexit.register(collector.stop)
         os.environ[LOG_ENDPOINT_ENV] = log_endpoint(log_port)
 
     global LAUNCH_LOGGER
@@ -2350,11 +2365,13 @@ def main():
             # Orchestrators first (they detach subscribers and export non-empty
             # queues), then action servers. Visualizer/operator bokeh apps have
             # no /shutdown route, so pidd.close() signals those.
-            graceful_shutdown_all()
-            pidd.close()
-            # last: the shutdown sweep's records are in by now
-            if collector is not None:
-                collector.stop()
+            try:
+                graceful_shutdown_all()
+                pidd.close()
+            finally:
+                # last: the shutdown sweep's records are in by now
+                if collector is not None:
+                    collector.stop()
         return True
 
     def restart_server(groupname, servername, restore=False):

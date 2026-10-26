@@ -2,9 +2,8 @@
 
 Given a loaded config, ``helao_dirs`` ensures the standard ``RUNS``,
 ``DIAG``, ``LOGS``, ``STATES``, ``DATABASE``, ``USER_CONFIG``, ``ANALYSES``
-and ``PROCESSES`` subdirectories exist under the configured ``root``, archives
-any leftover ``*.txt`` log files from a previous run, and returns a
-populated ``HelaoDirs`` model.
+and ``PROCESSES`` subdirectories exist under the configured ``root`` and
+returns a populated ``HelaoDirs`` model.
 """
 
 __all__ = ["helao_dirs"]

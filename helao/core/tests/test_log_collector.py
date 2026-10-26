@@ -238,3 +238,22 @@ def test_rpc_port_offset_mirrors_zmq_rpc():
     from helao.helpers import log_collector
 
     assert log_collector.RPC_PORT_OFFSET == zmq_rpc.RPC_PORT_OFFSET
+
+
+def test_resolve_log_port_avoids_plate_aligner_ports():
+    servers = {
+        "A": {
+            "host": "h",
+            "port": 8001,
+            "params": {"enable_aligner": True, "bokeh_port": 8002},
+        },
+        # implicit aligner default: port + 1000 = 8001 is also taken by A's own port
+        "B": {"host": "h", "port": 7501, "params": {"enable_aligner": True}},
+    }
+    assert resolve_log_port({"servers": servers}) == 8003  # 8002 is A's aligner
+    with pytest.raises(ValueError):
+        resolve_log_port({"log_port": 8002, "servers": servers})
+    only_b = {"B": servers["B"]}  # implicit aligner at 8501
+    assert resolve_log_port({"log_port": 8100, "servers": only_b}) == 8100
+    with pytest.raises(ValueError):
+        resolve_log_port({"log_port": 8501, "servers": only_b})

@@ -189,22 +189,36 @@ class RotatingJsonlWriter:
 
     def write(self, data: bytes) -> None:
         """Append one serialized record; rotate when the count is reached."""
+        self.write_many([data])
+
+    def write_many(self, lines: list) -> None:
+        """Append serialized records, one ``write()`` per file they land in.
+
+        Each line counts; the batch is cut at the line where the rotation
+        threshold is reached, so a rotated file never holds more than the
+        threshold from this writer.
+        """
         if not self._started:
             self._start()
-        if self.shared:
-            with open(self.path, "ab") as f:
-                f.write(data)
-        else:
-            if self._fh is None:
-                self._fh = open(self.path, "ab", buffering=0)
-            self._fh.write(data)
-        self._count += 1
-        due = self._retry_at if self._retry_at is not None else self.rotate_records
-        if self._count >= due:
-            try:
-                self._rotate()
-            except Exception as exc:  # the record is written; never raise now
-                sys.stderr.write(f"log rotation of {self.path} failed: {exc}\n")
+        i = 0
+        while i < len(lines):
+            due = self._retry_at if self._retry_at is not None else self.rotate_records
+            batch = lines[i : i + max(1, due - self._count)]
+            data = b"".join(batch)
+            if self.shared:
+                with open(self.path, "ab") as f:
+                    f.write(data)
+            else:
+                if self._fh is None:
+                    self._fh = open(self.path, "ab", buffering=0)
+                self._fh.write(data)
+            self._count += len(batch)
+            i += len(batch)
+            if self._count >= due:
+                try:
+                    self._rotate()
+                except Exception as exc:  # the records are written; never raise now
+                    sys.stderr.write(f"log rotation of {self.path} failed: {exc}\n")
 
     def _rotate(self):
         stamp = time.strftime("%Y%m%dT%H%M%S")
@@ -401,8 +415,12 @@ class JsonlSinkHandler(logging.Handler):
         dedup_interval: float = 10.0,
         rotate_records: int = ROTATE_RECORDS,
         connect_timeout_ms: int = 1000,
+        min_level: int = 0,
     ):
         super().__init__()
+        # The handler's own level stays 0 so artefact records always arrive;
+        # ordinary records below ``min_level`` are dropped in emit().
+        self.min_level = min_level
         self.stem = stem
         self.log_dir = Path(log_dir)
         self.endpoint = endpoint
@@ -492,6 +510,8 @@ class JsonlSinkHandler(logging.Handler):
             if is_artifact(record):
                 self._out(record)
                 return
+            if record.levelno < self.min_level:
+                return
             for kind, *rest in self.deduper.feed(fingerprint(record), record):
                 self._out(rest[0] if kind == "record" else _summary_record(*rest))
         except Exception:
@@ -539,10 +559,17 @@ class JsonlSinkHandler(logging.Handler):
 
     def _replay(self):
         # at-least-once: records still in socket buffers when the launcher died
+        log, ledger = [], []
         for entry in list(self.recent):
             if entry[2]:
-                self._spill(entry[0], entry[1], count=False)
+                log.append(entry[0])
+                if entry[1]:
+                    ledger.append(entry[0])
                 entry[2] = False  # once only, or every flip re-spills it
+        if log:
+            self._writer(False).write_many(log)
+        if ledger:
+            self._writer(True).write_many(ledger)
 
     def _spill(self, data: bytes, ledger: bool, count: bool = True):
         self._writer(False).write(data)
@@ -587,7 +614,8 @@ def _read_one(p: Path):
     opener = gzip.open if gz else open
     try:
         if gz:
-            # a rotated file is complete; a damaged tail falls to the line parser
+            # a rotated file is complete; a damaged one raises EOFError/zlib.error,
+            # which read_logs reports and skips (only bad JSON falls to the line parser)
             with gzip.open(p, "rb") as f:
                 return _chunked(pd, f)
         with open(p, "rb") as f:
@@ -643,7 +671,10 @@ def read_logs(log_dir, server=None, *, ledger: bool = False):
             if not p.stat().st_size:
                 continue
             df = _read_one(p)
-        except (EOFError, OSError, ValueError, zlib.error):
+        except (EOFError, zlib.error) as exc:
+            sys.stderr.write(f"read_logs: skipped damaged file {p}: {exc!r}\n")
+            continue
+        except (OSError, ValueError):
             continue  # deleted or gzipped away between listing and reading
         if df is not None:
             frames.append(df)

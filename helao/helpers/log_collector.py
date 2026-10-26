@@ -28,8 +28,9 @@ def resolve_log_port(config: dict) -> int:
     """``log_port`` from the config, else one above every port a server occupies.
 
     The port must be in 1..65535 and clear of every server's address and of the
-    RPC port paired with each server port.
+    RPC port paired with each server port and of any plate-aligner port.
     """
+    from helao.hexagon.preflight import _aligner_port
     from helao.ui.shared.discovery import reserved_addresses
 
     taken, http = set(), set()
@@ -42,6 +43,11 @@ def resolve_log_port(config: dict) -> int:
         # unsure which group kinds bind an RPC port: reserve it for every int port
         if isinstance(entry.get("port"), int):
             taken.add(entry["port"] + RPC_PORT_OFFSET)
+        # the aligner's Bokeh port is in no config key unless bokeh_port is set;
+        # preflight owns the rule (params.bokeh_port, else port + 1000)
+        aligner = _aligner_port(entry)
+        if aligner is not None:
+            taken.add(aligner)
     port = config.get("log_port")
     if port is None:
         port = max(http, default=8000) + 1

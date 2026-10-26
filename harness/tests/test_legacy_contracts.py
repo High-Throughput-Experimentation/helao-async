@@ -82,7 +82,9 @@ def test_logger_handlers_gate_but_logger_is_debug():
     logger = make_logger("LEVELKEY_P0", log_dir=tempfile.mkdtemp(), log_level=30)
     assert logger.level <= 10
     assert logger.propagate is False
-    assert any(h.level == 30 for h in logger.handlers)
+    # the JSONL sink keeps handler level 0 (artefact records bypass the gate) and
+    # carries the gate itself as min_level
+    assert any(getattr(h, "min_level", h.level) == 30 for h in logger.handlers)
 
 
 # --- §9.2 config raw-dict identity -------------------------------------------

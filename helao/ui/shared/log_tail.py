@@ -13,6 +13,9 @@ from pathlib import Path
 from helao.ui.shared.palette import LOG_LEVEL_TEXT
 
 CHUNK = 2 << 20
+# most a poll reads from one rotated file: a viewer that fell far behind must
+# not stall the page's worker thread on a 300k-record file
+MAX_ROTATED_TAIL = 32 * CHUNK
 LEVELS = {
     "DEBUG": 10,
     "INFO": 20,
@@ -122,8 +125,14 @@ def _finish_rotated(live: Path, cur: dict) -> list:
         "inode"
     ]:  # st_ino 0 (FAT, some network mounts): inodes cannot identify a file
         return missing
+    # anchored: `UI_*.jsonl` must not match the unrelated live file `UI_backend.jsonl`
+    name_re = re.compile(rf"^{re.escape(live.stem)}_\d{{8}}T\d{{6}}(?:_\d+)?\.jsonl$")
     rotated = []
-    for p in live.parent.glob(f"{live.stem}_*.jsonl"):
+    try:
+        candidates = [p for p in live.parent.iterdir() if name_re.match(p.name)]
+    except OSError:
+        return missing
+    for p in candidates:
         try:
             rotated.append((p, p.stat()))
         except OSError:
@@ -134,6 +143,21 @@ def _finish_rotated(live: Path, cur: dict) -> list:
     p, st = mine
     rows = []
     try:
+        size = p.stat().st_size
+        if size - cur["offset"] > MAX_ROTATED_TAIL:
+            start = size - MAX_ROTATED_TAIL
+            with open(p, "rb") as f:
+                f.seek(start)
+                head = f.read(CHUNK)
+            nl = head.find(b"\n")
+            # to the next line start; if none within CHUNK, skip the whole file
+            start = start + nl + 1 if nl >= 0 else size
+            rows.append(
+                _note(
+                    f"{start - cur['offset']} bytes of {p.name} skipped (viewer fell behind)"
+                )
+            )
+            cur = {**cur, "offset": start}
         while cur["offset"] < p.stat().st_size:
             got, nxt = _read_from(p, cur)
             rows += got

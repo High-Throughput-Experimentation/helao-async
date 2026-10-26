@@ -139,7 +139,12 @@ class NativeMetaFileWriter:
                 f"writing meta file for action '{action.action_name}' is disabled."
             )
         # data files are artefacts whether or not the act record is saved
-        if is_terminal(action.action_status):
+        if is_terminal(action.action_status) and action.action_output_dir is None:
+            LOGGER.warning(
+                f"action '{action.action_name}' has no action_output_dir: "
+                f"its data files are not hashed"
+            )
+        elif is_terminal(action.action_status):
             save_root = str(self.base.helaodirs.save_root)
             if action.manual_action:
                 save_root = redirect_manual_dir(save_root)

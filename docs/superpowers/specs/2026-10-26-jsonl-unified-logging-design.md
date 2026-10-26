@@ -52,9 +52,10 @@ file larger. There is no byte backstop; add one if a real station's files exceed
   buffer). The summary says the preceding `repeat_period`-record sequence was suppressed
   `repeat_count` more times.
 - `event`, `kind`, `uuid`, `path`, `bytes`, `sha256`, `reason`: present only on artefact hash
-  records (§5).
-- `(server, pid, seq)` is unique per record. Replay (below) can write a record twice; readers
-  drop duplicates on that key.
+  records (§5). `uuid` is omitted when the owner is unknown. The artefact `msg` is short,
+  `"<event> <kind>"` (for example `artifact_final act`); the path and hash are fields only.
+- `(server, pid, seq, ts)` identifies a record. Replay (below) can write a record twice; readers
+  drop duplicates on that key. `(pid, seq)` alone repeats when a PID is reused by a later process.
 - Serialized with `ensure_ascii=False`, UTF-8, `\n`-terminated.
 
 ### Handlers built by `make_logger`
@@ -64,30 +65,46 @@ file larger. There is no byte backstop; add one if a real station's files exceed
 1. **Console**: the coloured text `StreamHandler`, unchanged. Under the launcher it still flows
    through `ConsoleMux` to the terminal.
 2. **`JsonlSinkHandler`** (new; replaces `DedupTimedRotatingFileHandler`). Per record:
-   1. **Dedup** against the recent-records buffer (below). Replaces today's
-      consecutive-only dedup; `dedup_interval` keeps its meaning.
+   1. **Level filter and dedup.** The sink has handler level 0 and its own `min_level` (the
+      configured `log_level`): an ordinary record below it is dropped inside `emit`, but an
+      artefact record (`event` starting `artifact_`) always passes, so a `log_level` of 30 or
+      more cannot silently empty the ledger. The logger's level is `min(10, log_level)` so the
+      records reach the handler. Then **dedup** against the recent-records buffer (below).
+      Replaces today's consecutive-only dedup; `dedup_interval` keeps its meaning.
    2. **Format** the record to the §1 JSON bytes.
    3. **Send**: if `HELAO_LOG_ENDPOINT` is set, `send(NOBLOCK)` on a ZMQ PUSH socket connected
-      to it with `IMMEDIATE=1` and `SNDHWM=1000`. `IMMEDIATE` makes the send raise
-      `zmq.Again` when no launcher is connected, as well as when the queue is full.
+      to it with `IMMEDIATE=1`, `SNDHWM=1000`, `SNDBUF=65536` and `LINGER=500`. `IMMEDIATE` makes
+      the send raise `zmq.Again` when no launcher is connected, as well as when the queue is
+      full. Because a send before the ZMTP handshake completes also raises `Again`, the connect
+      waits once (up to 1 s) for the handshake so startup records reach the launcher; if that
+      wait times out the endpoint goes into `_NO_WAIT` and later connects in the process do not
+      wait. The socket is opened and closed only under the handler lock.
    4. **Fallback**: on `zmq.Again`, or when there is no endpoint, write the record to this
       process's own file through a `RotatingJsonlWriter` (§2), at `<log_dir>/<name>.jsonl`.
       On the first `Again` after a run of successful sends, first **replay** the buffer
       (below) into that file.
    5. **Re-attach marker**: the first successful send after one or more fallback writes is
-      preceded by a WARNING record: `"<N> records went to <fallback path>"`.
+      preceded by a WARNING record: `"<N> records went to <fallback path>"`. The marker takes
+      `seq + 1` and the counter advances only once the marker is sent, so a refused marker
+      burns no `seq`.
+   6. **Lazy reconnect and fork reset.** uvicorn's `dictConfig` runs `logging.shutdown` on every
+      handler, which closes the socket; the next `emit` reconnects (1 s handshake wait, spilling
+      to the file if that fails). In a forked child (`os.getpid()` differs) the handler drops
+      the parent's socket and writers, resets the deduper and buffer, and reconnects with a
+      200 ms wait.
 
 ### Recent-records buffer
 
-Each `JsonlSinkHandler` keeps a `deque(maxlen=2000)` of the records it emitted: fingerprint,
-`seq`, the JSON bytes, and whether the bytes were sent to the launcher. About 500 KB per process.
+Each `JsonlSinkHandler` keeps a `deque(maxlen=3000)` (`BUFFER_SIZE`) of the records it emitted.
+Each entry is `[json_bytes, is_ledger, sent]`; the fingerprint lives in the deduper. About 650 KB
+per process.
 It serves two purposes.
 
 **Repeated-sequence dedup.** Today's dedup compares each message with the previous one only,
 so a loop logging `A B C A B C ...` (for example, a cascading exception) is never collapsed.
 
-- Fingerprint: level, `file`, `line`, the rendered message, and the exception type and text
-  when present. (Today's comparison ignores the level and the traceback, so two different
+- Fingerprint: level, `pathname` (the full path, not the basename), line number, the rendered
+  message, and the formatted traceback when present. (Today's comparison ignores the level and the traceback, so two different
   exceptions logged with the same message text collapse into one; this fixes that.)
 - For each new record, check every period `p` from 1 to 16 for which the buffer's record `p`
   places back has the same fingerprint. A cycle of period `p` is confirmed when the last `p`
@@ -97,7 +114,9 @@ so a loop logging `A B C A B C ...` (for example, a cascading exception) is neve
 - When a record breaks the cycle, or `dedup_interval` (10 s) has passed since the cycle was
   confirmed, write one summary record (`msg`: `"previous <p>-message sequence repeated <M>
   times"`, with `repeat_count` and `repeat_period`). Then write the held-back records of the
-  incomplete cycle; they are real records, not repeats. An elapsed interval opens a new
+  incomplete cycle; they are real records, not repeats. Summary `msg` formats: for `p = 1`,
+  `"<message> [previous message repeated M times]"`; otherwise `"[previous <p>-message sequence
+  repeated M times, ending: <last message>]"`; `time` is singular when `M = 1`. An elapsed interval opens a new
   window, so a sustained loop yields one summary every 10 s.
 - `p = 1` is today's behaviour. Messages that differ on every pass (a counter or a timestamp
   inside the f-string) do not match and are not collapsed. Comparing message templates would
@@ -111,9 +130,11 @@ so a loop logging `A B C A B C ...` (for example, a cascading exception) is neve
 kernel socket buffers, or the collector's receive queue when the launcher dies would be lost.
 On the first `Again` after a run of successful sends, the handler writes every buffered record
 that was sent to the launcher (oldest first) into its fallback file, then the new record. Some
-of them already reached the unified file; readers drop the duplicates on `(server, pid, seq)`.
+of them already reached the unified file; readers drop the duplicates on `(server, pid, seq, ts)`. Replay writes all the entries for a
+file with one `write_many` call per writer, not one open/append/close per record.
 Records are lost only if more than 2,000 were in flight. The two high-water marks bound that at
-`SNDHWM + RCVHWM = 2000`.
+`SNDHWM + RCVHWM = 2000`; `SNDBUF` and `RCVBUF` are 65536 (`SOCK_BUF`) on both ends, so the kernel
+buffers add only a few tens of KB. The buffer holds 3,000 records, so everything in flight is in it.
 
    The socket is used only inside `emit`, which `logging.Handler.handle` already runs under
    the handler lock. That serializes access from executor threads and the event-loop thread.
@@ -129,22 +150,31 @@ socket is opened and every record goes to the process's own file: today's behavi
 
 - `tcp://127.0.0.1:<log_port>`. `log_port` is a new optional top-level config key. It defaults
   to one above the highest port any server occupies (a Reflex server occupies `port` and
-  `port + 1`).
-- `launch.py`'s existing `host:port` uniqueness check covers `log_port`. A bound port aborts
-  the launch before any server is spawned, like a server port clash.
-- The launcher puts `HELAO_LOG_ENDPOINT` into every child's environment. `ConsoleMux.child_env`
-  returns an environment always, not only when the mux is active.
+  `port + 1`), skipping any port taken by a server, a server's RPC port (`port + 10000`) or a
+  plate-aligner port (`params.bokeh_port`, else `port + 1000`; the rule is preflight's
+  `_aligner_port`). An explicit `log_port` must be an int in 1..65535 clear of all of those.
+- `resolve_log_port` checks `log_port` against the server, RPC and aligner ports before the
+  collector binds. A bound port aborts the launch before any server is spawned, with a message
+  that names the pid file and says to stop the earlier launcher or use `--force-relaunch`; the
+  collector binds before the stale-group check, so a second launcher fails on the port.
+- The launcher sets `HELAO_LOG_ENDPOINT` in its own environment, and every child inherits it
+  (as with `PARENT_PID_ENV`); nothing passes it explicitly.
+- A visualizer-only launcher (`extraopt` `liveonly` or `gpvis`) shares the config, and so the
+  port, with the full launcher of its group. It starts no collector and sets no endpoint; its
+  children write their own fallback files. `wants_collector(extraopt)` in `launch.py` decides.
 - The endpoint is fixed by the config, so a `--reconnect` launcher binds the same port, and a
   detached group's children re-attach without a restart (ZMQ reconnects on its own).
 
 ### `LogCollector`
 
-- One daemon thread owns the PULL socket (`RCVHWM=1000`) and the unified file
+- One daemon thread owns the PULL socket (`RCVHWM=1000`, `RCVBUF=65536`, `LINGER=0`; each
+  drain writes at most `HWM` records before re-checking the stop flag) and the unified file
   `<root>/LOGS/helao_<config_prefix>.jsonl`.
 - Loop: poll with a 0.5 s timeout, check the stop flag, and append each received message's
   bytes unchanged. The child already serialized it; the launcher does no JSON work.
-- The file is opened unbuffered (one `write` per record), so a killed launcher loses nothing
-  it already wrote (it is in the OS page cache).
+- Writers are `shared=True` everywhere (collector, fallback, ledger): each write opens the file
+  in append mode and closes it, so a rename is never blocked (Windows) and never appended past.
+  A killed launcher loses nothing it already wrote (it is in the OS page cache).
 - If the collector falls behind, the PULL queue fills, children get `zmq.Again`, and their
   records go to their own files. Nothing blocks.
 - The launcher's own `LAUNCH_LOGGER` uses the same `JsonlSinkHandler`, connected to its own
@@ -156,21 +186,28 @@ socket is opened and every record goes to the process's own file: today's behavi
 
 Backs both the unified file and each child's fallback file.
 
-- Counts records written. At 300,000 it closes the live file, renames it to
-  `<stem>_<YYYYmmddTHHMMSS>.jsonl`, opens a fresh live file, and puts the renamed path on a
-  queue. The next record is written at once; it never waits for compression.
-- A compressor thread gzips each queued file to `.jsonl.gz`. It deletes the plain copy 10 s
-  after the gzip finishes, so a live viewer can finish reading it (§4).
+- Counts records written (`write_many` counts each line and cuts the batch at the threshold
+  line). At 300,000 it renames the live file to `<stem>_<YYYYmmddTHHMMSS>.jsonl` (local time;
+  `_<n>` is appended if that name or its `.gz` exists), the next write opens a fresh live file,
+  and the renamed path goes on a queue. If the rename is refused (a reader holds the file on
+  Windows) it keeps appending and retries every `ROTATE_RETRY = 1000` records. The next record is written at once; it never waits for compression.
+- A compressor thread gzips each queued file through a temporary name
+  (`<name>.jsonl.gz.<id>.tmp`, swept at startup when over an hour old) to `.jsonl.gz`. It deletes
+  the plain copy 10 s after the gzip finishes, so a live viewer can finish reading it (§4);
+  `close()` skips that grace.
 - At startup, any rotated plain `<stem>_*.jsonl` left behind (a crash mid-compress) is queued.
 - Retention: rotated `.jsonl.gz` log files older than 90 days are deleted at startup and after
   each rotation. The artefact ledger (§5) is never deleted. This matches today's `backupCount=90` daily files.
 - A write `OSError` in the collector is reported to stderr and the record is dropped. It never
-  raises into another thread.
+  raises into another thread. In a child, an unwritable `log_dir` goes to `handleError`.
 
 ### Teardown
 
 - The collector stops last, after the server shutdown sweep, so shutdown records land. It
   drains for up to 2 s, closes the file, and waits for the compressor queue to empty.
+- The launcher also registers `collector.stop` with `atexit` (it is idempotent), and the
+  teardown stops it in a `finally` around the shutdown sweep, so the final records are not lost
+  when the launcher exits another way.
 - CTRL-d (detach): the collector closes with no final rotation. Children fall back to their own
   files until a `--reconnect` launcher binds the endpoint again.
 
@@ -192,12 +229,14 @@ The stale `.txt` log-zipping blocks in `launch.py` (`main`, after `LAUNCH_LOGGER
 - **Readers of `<key>.log`** switch to `.jsonl` or to the unified file:
   `helao/hexagon/tests/test_behavior_hexagon.py`, the golden-capture smoke stubs, `harness`
   capture tests, and smoke checks in private deployments that read `LOGS/ORCH.log`.
-  `helao/core/tests/unit_test_logging.py` and `test_gzip_rotator_fallback.py` are rewritten for
-  the new writer. Private-deployment code that references the old handler is checked during
+  `helao/core/tests/unit_test_logging.py` is rewritten for the new writer, and the old gzip
+  rotator test (`test_gzip_rotator_fallback.py`) is deleted. Private-deployment code that references the old handler is checked during
   planning.
-- **`read_logs(log_dir, server=None, *, ledger=False) -> DataFrame`** in
+- **`read_logs(log_dir, server=None, *, ledger=False) -> DataFrame`** (reads each file in
+  chunks, trims a partial last line, skips unparseable lines with one stderr line per file, and
+  skips a damaged `.gz` with a stderr line naming it) in
   `helao/helpers/log_jsonl.py`, re-exported by `helao_logging`: reads the live
-  files and rotated `.gz` files, concatenates, drops duplicates on `(server, pid, seq)`, filters
+  files and rotated `.gz` files, concatenates, drops duplicates on `(server, pid, seq, ts)`, filters
   by server, and sorts by `ts`. One helper,
   so tests and pandas consumers do not each re-implement the glob and merge.
 - **Docs**: the root `CLAUDE.md` mentions of `LOGS/<server_key>.log`, and the `orch_effects.py`
@@ -207,7 +246,7 @@ The stale `.txt` log-zipping blocks in `launch.py` (`main`, after `LAUNCH_LOGGER
 
 | Event | Behaviour |
 |---|---|
-| Launcher dies or detaches | The next send raises `Again`; records go to the child's own file, after the recent-records buffer is replayed there; a marker is sent on re-attach. Records are lost only if more than 2,000 were in flight. Replayed records may duplicate unified-file records; readers drop them on `(server, pid, seq)`. |
+| Launcher dies or detaches | The next send raises `Again`; records go to the child's own file, after the recent-records buffer is replayed there; a marker is sent on re-attach. Records are lost only if more than 2,000 were in flight. Replayed records may duplicate unified-file records; readers drop them on `(server, pid, seq, ts)`. |
 | Collector behind | Children spill to their own files; no caller blocks. |
 | Collector disk error | stderr report, record dropped, no raise. |
 | `log_port` already bound | Launch aborts before spawning. |
@@ -246,28 +285,41 @@ The logic lives in the shared layer so that a Bokeh front end can be added later
 fork.
 
 - `tail_init(log_dir, n=2000)`: the newest `n` records across every live `*.jsonl` in the
-  directory (the unified file and any fallback files), read backwards from the end of each.
-  Returns the records and one cursor per file (path, inode, offset).
-- `tail_poll(cursors)`: reads only the bytes appended since each cursor, at most 2 MiB per file
-  per tick, and splits on complete lines (a partial final line waits for the next tick).
+  directory (the unified file and any fallback files; not `artifacts_*` ledgers or rotated
+  files). It reads only the last 2 MiB (`CHUNK`) of each file. Returns the records and one
+  cursor per file (path, inode, offset).
+- `tail_poll(log_dir, cursors)`: reads only the bytes appended since each cursor, at most 2 MiB
+  per file per tick, and splits on complete lines (a partial final line waits for the next tick).
   A changed inode, or a size below the cursor, means the file rotated. The poll then finds the
   rotated plain `<stem>_*.jsonl` with the cursor's old inode, reads it to the end from the
   cursor, and moves on to the new live file from offset 0. The writer keeps that plain copy
   for 10 s after its gzip finishes (§2), which covers a 1 s poll. If the copy is already gone,
-  the poll emits one WARNING row saying records may be missing.
+  the poll emits one WARNING row saying records may be missing. The rotated name is matched
+  with the exact rotated-name pattern (`<stem>_<YYYYmmddTHHMMSS>[_<n>].jsonl`), so `UI_*.jsonl`
+  does not match `UI_backend.jsonl`. One call reads at most `MAX_ROTATED_TAIL = 32 * CHUNK`
+  from a rotated file; a viewer further behind skips to the last such span and emits a note
+  `"<N> bytes of <file> skipped (viewer fell behind)"`. A line over 2 MiB is skipped with a
+  note.
 - Filtering by server set, minimum level, and substring; records merge by `ts`.
 
 ### Page: `helao/ui/reflex/logs.py`, route `/logs`
 
 - `LogsState` holds the cursors and the newest 2,000 rows as `list[list[str]]`. `rx.foreach`
   needs the element annotation, or the frontend build fails.
-- Controls: a server multi-select (filled from the server keys seen), a level floor, a text
+- Controls: a server checkbox per server key seen, a level floor (`DEBUG` to `ALERT`), a text
   search, and a pause toggle. Rows are newest-first, so the latest records stay at the top
   without scroll scripting. Pause freezes the display
-  only; polling continues, so the viewer never misses the window during which a rotated file's
-  plain copy is still readable.
-- Rows are deduplicated on `(server, pid, seq)`, since a replay can write a record twice.
-- The message column is monospace. Level colours come from `helao/ui/shared/palette.py`.
+  only (it shows a frozen snapshot; filter changes still apply to it); polling continues, so
+  the viewer never misses the window during which a rotated file's plain copy is still
+  readable.
+- Rows are deduplicated on `(server, pid, seq, ts)`, since a replay can write a record twice.
+- The message column is monospace. Each row's text colour (a column of the row, `row[4]`) comes
+  from `helao/ui/shared/palette.py` (`LOG_LEVEL_TEXT`). The table body is white
+  (`palette.REFLEX_TABLE_HUES`) and the page uses the tint indigo-50.
+- `start` and `tick` are background events: the file I/O runs in `asyncio.to_thread` between two
+  `async with self` blocks, and a `_busy` flag drops a tick that arrives during a slow read.
+  `_all` and `_cursors` are tuples (a list var costs ~30 ms per busy tick as a `MutableProxy`).
+  The tick never logs.
 - It ticks from an `rx.moment(interval=1000)` in the page, never from a background loop, so a
   closed tab stops polling.
 - The `LOGS` directory is resolved from the config root as an absolute path: the Reflex process
@@ -293,18 +345,29 @@ the records themselves.
 - Every entry in an action's `files[]`: data `.jsonl` plus its `.meta.json`, `.parquet`, and
   any other attached file.
 - Every file in an analysis's `outputs`.
+- An action's data files are hashed at a terminal status even when `save_act` is false (the
+  act record is not saved). If the action has no `action_output_dir`, the data hash is skipped
+  with a warning.
+- Kinds are `act|exp|seq|prc|ana|data|output`, plus `zip` (a rewritten zip's digest) and
+  `record` (a rewritten record whose kind `meta_kind` cannot name).
 
-### `log_artifact_hashes(paths, *, kind, owner_uuid, event="artifact_final", reason=None)`
+### `log_artifact_hashes(paths, *, kind, owner_uuid, event="artifact_final", reason=None, root=None, logger=None)`
 
 - Lives in `helao/helpers/artifact_hash.py` (it imports `helao_logging`, so it cannot live
   inside it). It is async: each file is hashed with
   `hashlib.file_digest(f, "sha256")` inside `asyncio.to_thread`, so a large raw file never
   blocks the event loop. A sync twin, `log_artifact_hashes_sync`, serves standalone tools and
-  other non-async callers.
+  other non-async callers. `root=` and `logger=` override the config root and the logger. Helpers:
+  `record_uuid(doc)` picks the owning uuid, `root_for(path)` finds the helao root above a
+  run-tree path (`RUNS`, `RUNS_*`, `DIAG`, `ANALYSES`), and `use_root_logger(path, name)` gives a
+  CLI tool a logger writing to `<root>/LOGS`.
 - For each file it logs one INFO record with these extra fields: `event`, `kind`
-  (`act|exp|seq|prc|ana|data|output`), `uuid` (the owning record's uuid), `path` (relative to
-  the config root when under it, else absolute), `bytes`, `sha256`, and `reason` (rewrites
-  only).
+  (`act|exp|seq|prc|ana|data|output`), `uuid` (the owning record's uuid; omitted when unknown),
+  `path` (relative to the root when under it, else absolute; always with forward slashes),
+  `bytes`, `sha256`, and `reason` (rewrites only). The root is the `root=` argument, else the
+  config root, else the root `use_root_logger` found, else `root_for(path)` per file, so a tool
+  with no config logs the same `RUNS/...` string as a server and "latest record per `path`"
+  matches. The `msg` is `"<event> <kind>"`.
 - A missing or unreadable file logs a WARNING with `event: "artifact_hash_failed"` and the
   error. It never raises into the caller and never fails an action.
 - **Awaited**, not fire-and-forget: the hash runs after the final write and before
@@ -320,7 +383,8 @@ the records themselves.
 | `-act.json` and `files[]` | `MetaWriter.write_act`, after any write whose `action_status` holds a terminal status (`finished`, `errored`, `aborted`, `skipped`, `estopped`, `retired`). The finalizer's final write is such a write; data files are already closed. |
 | `-exp.json`, `-seq.json` | `MetaWriter.write_exp` / `write_seq`, on the same terminal-status rule. Every exp/seq record write goes through them. |
 | `-prc.json` | Where the sync driver writes it (`sync_driver.py`, the process-record `write_meta`). |
-| `-ana.json` and `outputs` | Analysis driver, after `write_model_json` and `publish_outputs` complete. |
+| `-ana.json` and `outputs` | Analysis driver, after `write_model_json` and `publish_outputs` complete; `publish_outputs` hashes in a `finally`, so a failed upload still hashes what was written. |
+| `-exp.json`, `-seq.json` of a micro-orchestrator | `MicroOrch` hashes its terminal exp and seq records. |
 
 ### Rewrites after finalization (`event: "artifact_rewritten"`)
 
@@ -331,8 +395,10 @@ terminal status logs `artifact_final` again; a caller that passes `reason=` logs
 `artifact_rewritten`. Consumers take the latest record per `path`. Sites found in planning:
 
 - `_record_rewrite.rewrite_dir`, `rewrite_zip` and `rewrite_processes` (used by `set_run_use`);
-- the `-prc.json` re-push after a write-off (`sync_driver.py`, `reason="process_repush"`);
-- the interrupted-action reconcile (`ActionHost._reconcile_one`);
+- the `-prc.json` re-push after a write-off (`sync_driver.py`, `reason="process_repush"`); the
+  prc is hashed only when its bytes change;
+- the interrupted-action reconcile (`ActionHost._reconcile_one`), which hashes the data files as
+  rewritten;
 
 `reset_sync` and `write_off` are not rewrite sites. `reset_sync` deletes `.prg`/`.lock`
 sidecars and extracts a zip, and `write_off` writes the `.prg` and a ledger line. Neither
@@ -345,7 +411,7 @@ changes a record's bytes.
 A move that does not change the bytes (such as `/retire` moving a run to `RUNS_SUPERSEDED`) is
 not a rewrite and logs no hash.
 
-**Gate test:** an AST sweep lists every call to the record writers (`write_meta`, the YAML
+**Gate test** (`helao/core/tests/test_artifact_hash_gate.py`): an AST sweep lists every call to the record writers (`write_meta`, the YAML
 record dump, and the zip rewrite helpers) outside the finalization points. Each call must
 either be followed by a `log_artifact_hashes` call in the same function or be on a short
 allowlist with a reason (for example, the data `.meta.json` header rewritten on every
@@ -364,9 +430,19 @@ fails the sweep.
   is **excluded from the 90-day retention**. The retention sweep matches only the log stems,
   never `artifacts_*`. At about 300 bytes per file, the ledger grows slowly.
 - Artefact records are included in the §1 replay, so a launcher death does not lose ledger
-  entries. Duplicates are dropped on `(server, pid, seq)` as for the log.
+  entries. Duplicates are dropped on `(server, pid, seq, ts)` as for the log.
 - A tool run with no config root logs a WARNING that the ledger entry went to a temporary
-  directory.
+  directory, unless it called `use_root_logger`, which puts its log and ledger in `<root>/LOGS`.
+- A failed hash is a WARNING with `event: "artifact_hash_failed"`; it also goes to the ledger,
+  so the ledger has failure rows.
+- Rows are about 300 bytes: the `msg` is `"<event> <kind>"`, with the path and hash as fields
+  only (an earlier repeat of both in `msg` made them about 726 bytes).
+- An artefact record bypasses the sink's level filter (§1), so the ledger is complete at any
+  `log_level`.
+- Every `make_logger` call, including per-module loggers, gets its own sink; those loggers'
+  names appear as `server` in the unified file.
+- Calling `make_logger` again for a name replaces that logger's sink, console and queue handlers
+  instead of stacking duplicates.
 
 ### Tests
 
@@ -382,6 +458,14 @@ fails the sweep.
 - The AST gate fails on a planted rewrite without a rehash.
 - Mutation checks: delete one finalization call site, and delete the ledger tee; each must
   fail a test.
+
+## Known limits / follow-ups
+
+- Private-deployment rewrite tools are not hashed yet.
+- Module logger names appear as servers in the unified file.
+- Windows `TIME_WAIT` can delay the collector re-bind on a quick `--reconnect`.
+- Co-hosted groups on one machine each derive a default `log_port` from their own ports; set
+  `log_port` explicitly if two groups could pick the same one.
 
 ## Out of scope
 

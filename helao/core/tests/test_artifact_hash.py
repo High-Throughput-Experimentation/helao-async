@@ -242,3 +242,72 @@ def test_root_for_survives_an_unlistable_ancestor(tmp_path, monkeypatch):
 
     monkeypatch.setattr(os, "listdir", boom)
     assert root_for(tmp_path / "RUNS" / "x.json") is None
+
+
+def test_tool_and_server_log_the_same_path_string(tmp_path, monkeypatch):
+    from helao.helpers import config_loader
+
+    h, lg = _setup(tmp_path)
+    f = tmp_path / "RUNS" / "s" / "x-act.json"
+    f.parent.mkdir(parents=True)
+    f.write_text("{}")
+    # server: CONFIG root known
+    log_artifact_hashes_sync(
+        [f], kind="record", owner_uuid="u", root=str(tmp_path), logger=lg
+    )
+    # tool: no CONFIG, no root argument -> falls back to root_for(path)
+    monkeypatch.setattr(config_loader, "CONFIG", None)
+    monkeypatch.setattr(artifact_hash, "_TOOL_ROOT", None)
+    log_artifact_hashes_sync(
+        [f], kind="record", owner_uuid="u", event="artifact_rewritten", logger=lg
+    )
+    h.close()
+    server, tool = _rows(tmp_path / "LOGS" / "SRV.jsonl")
+    assert server["path"] == tool["path"] == "RUNS/s/x-act.json"
+
+
+def test_use_root_logger_remembers_its_root(tmp_path, monkeypatch):
+    from helao.helpers import helao_logging
+
+    (tmp_path / "RUNS").mkdir()
+    monkeypatch.setattr(helao_logging, "LOGGER", None)
+    monkeypatch.setattr(artifact_hash, "_TOOL_ROOT", None)
+    made = []
+    monkeypatch.setattr(
+        helao_logging, "make_logger", lambda name, **kw: made.append(kw) or object()
+    )
+    artifact_hash.use_root_logger(tmp_path / "RUNS" / "a.json", "tool")
+    assert artifact_hash._TOOL_ROOT == str(tmp_path)
+
+
+def test_root_for_is_case_insensitive_where_normcase_is(tmp_path, monkeypatch):
+    from helao.helpers.artifact_hash import root_for
+
+    (tmp_path / "RUNS").mkdir()
+    # same filesystem, query spelt with a different case of the run dir
+    monkeypatch.setattr(artifact_hash.os.path, "normcase", lambda s: s.lower())
+    q = os.path.join(str(tmp_path), "RUNS", "a").replace("RUNS", "runs")
+    assert root_for(q) == str(tmp_path)
+
+
+def test_ledger_survives_a_high_log_level(tmp_path, monkeypatch):
+    from helao.helpers import helao_logging
+
+    monkeypatch.delenv("HELAO_LOG_ENDPOINT", raising=False)
+    lg = helao_logging.make_logger("t_hi_level", log_dir=str(tmp_path), log_level=30)
+    try:
+        f = tmp_path / "RUNS" / "a.json"
+        f.parent.mkdir()
+        f.write_text("{}")
+        lg.info("ordinary info")
+        log_artifact_hashes_sync(
+            [f], kind="record", owner_uuid="u", root=str(tmp_path), logger=lg
+        )
+    finally:
+        for h in list(lg.handlers):
+            lg.removeHandler(h)
+            h.close()
+    (led,) = _rows(tmp_path / "artifacts_t_hi_level.jsonl")
+    assert led["event"] == "artifact_final" and led["msg"] == "artifact_final record"
+    log = _rows(tmp_path / "t_hi_level.jsonl")
+    assert "ordinary info" not in [r["msg"] for r in log]

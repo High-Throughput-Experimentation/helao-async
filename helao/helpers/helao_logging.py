@@ -352,6 +352,18 @@ def make_logger(
     logger_instance = logging.getLogger(logger_name)
     logger_instance.setLevel(min(10, log_level))
 
+    # a second make_logger for this name must not stack a second copy of each
+    # handler type (every record would be written and printed twice)
+    for old in list(logger_instance.handlers):
+        if isinstance(old, (JsonlSinkHandler, QueueHandler)) or (
+            type(old) is logging.StreamHandler
+        ):
+            logger_instance.removeHandler(old)
+            listener = getattr(old, "listener", None)
+            if listener is not None:
+                listener.stop()
+            old.close()
+
     # create handlers
     console = logging.StreamHandler()
     console.setFormatter(colored_formatter)
@@ -361,8 +373,9 @@ def make_logger(
         endpoint=os.environ.get(LOG_ENDPOINT_ENV),
         offset_seconds=offset_seconds,
         dedup_interval=dedup_interval,
+        # the handler's own level stays 0: artefact records bypass the filter
+        min_level=log_level,
     )
-    sink.setLevel(log_level)
     logger_instance.addHandler(sink)
 
     debug_handlers = [console]
@@ -402,6 +415,7 @@ def make_logger(
         # logger_instance.addHandler(email_handler)
         queue_listener = QueueListener(email_queue, email_handler)
         queue_listener.start()
+        queue_handler.listener = queue_listener
         logger_instance.info(
             f"Email alerts enabled at log level: {ALERT_LEVEL} "
             f"(throttled to 1 email per {email_interval}s)"
@@ -439,6 +453,7 @@ def make_logger(
         # logger_instance.addHandler(webhook_handler)
         webhook_queue_listener = QueueListener(webhook_queue, webhook_handler)
         webhook_queue_listener.start()
+        webhook_queue_handler.listener = webhook_queue_listener
         logger_instance.info(f"Webhook alerts enabled at log level: {ALERT_LEVEL}")
     else:
         missing = [

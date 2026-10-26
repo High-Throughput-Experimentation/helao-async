@@ -12,6 +12,7 @@ import hashlib
 import os
 import stat
 import threading
+from pathlib import Path
 from typing import Optional
 
 from helao.helpers import helao_logging
@@ -33,6 +34,7 @@ _UUID_KEYS = (
     "sequence_uuid",
 )
 _FALLBACK = None
+_TOOL_ROOT = None  # root found by use_root_logger, for a tool with no CONFIG
 _FALLBACK_LOCK = threading.Lock()
 
 
@@ -69,7 +71,10 @@ def root_for(path) -> Optional[str]:
             for name in names:
                 if name in _RUN_DIRS or name.startswith("RUNS_"):
                     top = os.path.join(parent, name) + os.sep
-                    if os.path.isdir(top) and (p + os.sep).startswith(top):
+                    # normcase: Windows paths compare case-insensitively
+                    if os.path.isdir(top) and os.path.normcase(p + os.sep).startswith(
+                        os.path.normcase(top)
+                    ):
                         return parent
         parent = os.path.dirname(parent)
     return None
@@ -80,8 +85,10 @@ def use_root_logger(path, name: str) -> None:
 
     Does nothing when a logger is already installed or no root is found.
     """
+    global _TOOL_ROOT
     root = None if helao_logging.LOGGER is not None else root_for(path)
     if root is not None:
+        _TOOL_ROOT = root
         helao_logging.LOGGER = helao_logging.make_logger(
             name, log_dir=os.path.join(root, "LOGS")
         )
@@ -110,7 +117,7 @@ def _root(root):
     from helao.helpers import config_loader
 
     cfg = config_loader.CONFIG
-    return cfg.get("root") if isinstance(cfg, dict) else None
+    return (cfg.get("root") if isinstance(cfg, dict) else None) or _TOOL_ROOT
 
 
 def _rel(path: str, root) -> str:
@@ -119,10 +126,10 @@ def _rel(path: str, root) -> str:
         base = os.path.abspath(root)
         try:
             if os.path.commonpath([absolute, base]) == base:
-                return os.path.relpath(absolute, base)
+                return Path(os.path.relpath(absolute, base)).as_posix()
         except ValueError:
             pass  # different drives on Windows
-    return absolute
+    return Path(absolute).as_posix()
 
 
 def log_artifact_hashes_sync(
@@ -162,7 +169,9 @@ def log_artifact_hashes_sync(
         rel = str(path)
         try:
             path = os.fsdecode(path)
-            rel = _rel(path, root)
+            # a tool has no CONFIG: find each file's own root, so its path
+            # matches the server-style RUNS/... the ledger keys on
+            rel = _rel(path, root or root_for(path))
             if not stat.S_ISREG(os.stat(path).st_mode):
                 raise OSError("not a regular file")
             with open(path, "rb") as f:
@@ -181,7 +190,7 @@ def log_artifact_hashes_sync(
             )
             continue
         log.info(
-            f"{event} {kind} {rel} sha256={digest}",
+            f"{event} {kind}",
             extra={
                 "event": event,
                 "kind": kind,
