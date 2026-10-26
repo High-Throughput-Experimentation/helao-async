@@ -13,6 +13,8 @@ Date: 2026-10-26. Status: design approved in conversation; awaiting spec review.
 5. Files rotate by record count, sized so a consumer with 1 GB of memory can load one rotated
    file into pandas with a single `pd.read_json(..., lines=True, compression="gzip")`.
 6. A live log page in the Reflex UI.
+7. A SHA-256 record for every output artefact when it is finalized and whenever it is rewritten
+   afterwards, also kept in a ledger that is never deleted (§5).
 
 The unified log serves both live tailing and later analysis in pandas, equally.
 
@@ -49,6 +51,8 @@ file larger. There is no byte backstop; add one if a real station's files exceed
 - `repeat_count`, `repeat_period`: present only on a dedup summary record (§1, recent-records
   buffer). The summary says the preceding `repeat_period`-record sequence was suppressed
   `repeat_count` more times.
+- `event`, `kind`, `uuid`, `path`, `bytes`, `sha256`, `reason`: present only on artefact hash
+  records (§5).
 - `(server, pid, seq)` is unique per record. Replay (below) can write a record twice; readers
   drop duplicates on that key.
 - Serialized with `ensure_ascii=False`, UTF-8, `\n`-terminated.
@@ -158,8 +162,8 @@ Backs both the unified file and each child's fallback file.
 - A compressor thread gzips each queued file to `.jsonl.gz`. It deletes the plain copy 10 s
   after the gzip finishes, so a live viewer can finish reading it (§4).
 - At startup, any rotated plain `<stem>_*.jsonl` left behind (a crash mid-compress) is queued.
-- Retention: rotated `.jsonl.gz` files older than 90 days are deleted at startup and after each
-  rotation. This matches today's `backupCount=90` daily files.
+- Retention: rotated `.jsonl.gz` log files older than 90 days are deleted at startup and after
+  each rotation. The artefact ledger (§5) is never deleted. This matches today's `backupCount=90` daily files.
 - A write `OSError` in the collector is reported to stderr and the record is dropped. It never
   raises into another thread.
 
@@ -273,6 +277,101 @@ fork.
   filters, and a merge across the unified and fallback files.
 - A headless Playwright check of `/logs` on `goldenreflex`: rows appear and the filters narrow
   them.
+
+## §5 Artefact SHA-256 records
+
+Every output artefact is hashed when it is finalized and again whenever it is rewritten after
+that. The hash goes to the log and to a ledger that is never deleted. Hashes are **not** added to
+the records themselves.
+
+### Which files
+
+- Records: `-act.json`, `-exp.json`, `-seq.json`, `-prc.json`, `-ana.json` (and an existing
+  `.yml` record, which stays YAML).
+- Every entry in an action's `files[]`: data `.jsonl` plus its `.meta.json`, `.parquet`, and
+  any other attached file.
+- Every file in an analysis's `outputs`.
+
+### `log_artifact_hashes(paths, *, kind, owner_uuid, event="artifact_final", reason=None)`
+
+- Lives in `helao_logging.py`. It is async: each file is hashed with
+  `hashlib.file_digest(f, "sha256")` inside `asyncio.to_thread`, so a large raw file never
+  blocks the event loop. A sync twin, `log_artifact_hashes_sync`, serves standalone tools and
+  other non-async callers.
+- For each file it logs one INFO record with these extra fields: `event`, `kind`
+  (`act|exp|seq|prc|ana|data|output`), `uuid` (the owning record's uuid), `path` (relative to
+  the config root when under it, else absolute), `bytes`, `sha256`, and `reason` (rewrites
+  only).
+- A missing or unreadable file logs a WARNING with `event: "artifact_hash_failed"` and the
+  error. It never raises into the caller and never fails an action.
+- **Awaited**, not fire-and-forget: the hash runs after the final write and before
+  finalization returns, so a record is never mutated mid-hash, and the event's order in the
+  log is meaningful. At SHA-NI speed (about 1-2 GB/s) a 100 MB data file adds about 0.1 s to
+  an action's finish.
+- Artefact records bypass the §1 sequence dedup (each is distinct anyway, by `path`).
+
+### Finalization points (`event: "artifact_final"`)
+
+| Artefact | Point |
+|---|---|
+| `-act.json` and `files[]` | Action finalizer, after the final `write_act` (data files are already closed). |
+| `-exp.json`, `-seq.json` | After their final writes in the finalizer. |
+| `-prc.json` | Where the sync driver writes it (`sync_driver.py`, the process-record `write_meta`). |
+| `-ana.json` and `outputs` | Analysis driver, after `write_model_json` and `publish_outputs` complete. |
+
+### Rewrites after finalization (`event: "artifact_rewritten"`)
+
+Any code path that changes the bytes of a finalized artefact calls `log_artifact_hashes` with
+`event="artifact_rewritten"` and a `reason` naming the path (for example `"reset_sync"`,
+`"set_plate_id"`, `"write_off"`, `"reconcile_interrupted"`). Known sites, to be confirmed by an
+inventory during planning:
+
+- the sync driver's record rewrites (`_record_rewrite`, `reset_sync`, `write_off`);
+- the interrupted-action reconcile (`ActionHost._reconcile_one`);
+- the standalone repair tools under `helao/core/tests/` that rewrite records or zips
+  (`set_plate_id`, `set_run_use`), through the sync twin;
+- private-deployment tools that inject into or rewrite existing records, which are
+  inventoried and changed in their own repos.
+
+A move that does not change the bytes (such as `/retire` moving a run to `RUNS_SUPERSEDED`) is
+not a rewrite and logs no hash.
+
+**Gate test:** an AST sweep lists every call to the record writers (`write_meta`, the YAML
+record dump, and the zip rewrite helpers) outside the finalization points. Each call must
+either be followed by a `log_artifact_hashes` call in the same function or be on a short
+allowlist with a reason (for example, the data `.meta.json` header rewritten on every
+`write_file`, which is hashed at action finalization). A new rewrite site without a rehash
+fails the sweep.
+
+### Ledger
+
+- `artifact_*` records go to the normal log **and** to a ledger:
+  `<root>/LOGS/artifacts_<config_prefix>.jsonl` under the launcher, and
+  `<root>/LOGS/artifacts_<name>.jsonl` in a child's fallback or a standalone tool.
+- The child sends artefact records as a two-frame ZMQ message (`b"ledger"`, then the bytes).
+  The collector writes such messages to both files; ordinary records are one frame. In
+  fallback, the child's writer does the same with its own two files.
+- The ledger uses the same `RotatingJsonlWriter` (300,000 records, gzip in the background) but
+  is **excluded from the 90-day retention**. The retention sweep matches only the log stems,
+  never `artifacts_*`. At about 300 bytes per file, the ledger grows slowly.
+- Artefact records are included in the §1 replay, so a launcher death does not lose ledger
+  entries. Duplicates are dropped on `(server, pid, seq)` as for the log.
+- A tool run with no config root logs a WARNING that the ledger entry went to a temporary
+  directory.
+
+### Tests
+
+- An action with two data files logs `artifact_final` for `-act.json` and for each data
+  `.jsonl` and `.meta.json`. Each `sha256` equals `hashlib.sha256` of the file on disk, and
+  each record is in both the log and the ledger.
+- An analysis with two outputs logs hashes for `-ana.json` and both outputs.
+- A rewrite through `reset_sync` logs `artifact_rewritten` with the new hash and the reason.
+- A missing file logs `artifact_hash_failed` and the action still finishes.
+- A ledger file older than 90 days survives the retention sweep; a log file of that age does
+  not.
+- The AST gate fails on a planted rewrite without a rehash.
+- Mutation checks: delete one finalization call site, and delete the ledger tee; each must
+  fail a test.
 
 ## Out of scope
 
