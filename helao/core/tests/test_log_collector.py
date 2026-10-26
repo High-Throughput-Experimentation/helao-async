@@ -18,6 +18,20 @@ def _free_port():
     return port
 
 
+def _start_collector(log_dir, prefix):
+    """Start a collector on a free port. The probe port can be taken by another
+    process between _free_port() closing it and bind, so retry on a new one."""
+    for _ in range(10):
+        ep = log_endpoint(_free_port())
+        col = LogCollector(ep, log_dir, prefix)
+        try:
+            col.start()
+            return ep, col
+        except zmq.ZMQError:
+            continue
+    raise RuntimeError("no free port for the collector")
+
+
 def _logger(name, h):
     lg = logging.getLogger(name)
     lg.handlers[:] = [h]
@@ -46,9 +60,7 @@ def test_resolve_log_port_explicit_and_collision():
 
 
 def test_collector_writes_unified_file_and_ledger(tmp_path):
-    ep = log_endpoint(_free_port())
-    col = LogCollector(ep, tmp_path, "grp")
-    col.start()
+    ep, col = _start_collector(tmp_path, "grp")
     h1 = JsonlSinkHandler("A", tmp_path, endpoint=ep)
     h2 = JsonlSinkHandler("B", tmp_path, endpoint=ep)
     _logger("A", h1).info("from A")
@@ -76,9 +88,7 @@ def test_collector_writes_unified_file_and_ledger(tmp_path):
 
 
 def test_second_bind_fails(tmp_path):
-    ep = log_endpoint(_free_port())
-    a = LogCollector(ep, tmp_path, "g")
-    a.start()
+    ep, a = _start_collector(tmp_path, "g")
     b = LogCollector(ep, tmp_path / "b", "g")
     made = []
     real = zmq.Context.instance().socket
@@ -139,9 +149,7 @@ def _line(r):
 def test_stop_respects_deadline_under_continuous_input(tmp_path):
     import threading
 
-    ep = log_endpoint(_free_port())
-    col = LogCollector(ep, tmp_path, "g")
-    col.start()
+    ep, col = _start_collector(tmp_path, "g")
     thread = col._thread
     push = zmq.Context.instance().socket(zmq.PUSH)
     push.setsockopt(zmq.LINGER, 0)
