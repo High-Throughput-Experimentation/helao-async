@@ -21,6 +21,7 @@ goldenhex launch on 8001/8002/8010 and parallel pytest workers never collide."""
 
 import asyncio
 import os
+import random
 import socket
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -48,12 +49,20 @@ def _bindable(port: int) -> bool:
     return True
 
 
+def _worker_band() -> range:
+    """HTTP-port band private to this xdist worker (gwN), below the ephemeral
+    range (32768+) even with the +10000 RPC mirror. Import-time picks from the
+    ephemeral range collided across workers (birthday) and with outbound
+    sockets; disjoint bands cannot collide between workers."""
+    n = int(os.environ.get("PYTEST_XDIST_WORKER", "gw0").lstrip("gw") or 0) % 64
+    return range(10000 + n * 150, 10000 + (n + 1) * 150)
+
+
 def _free_port_pair(taken: set = frozenset()) -> int:
     """An HTTP port whose RPC mirror port is also bindable right now."""
+    band = _worker_band()
     while True:
-        with socket.socket() as s:
-            s.bind(("127.0.0.1", 0))
-            p = s.getsockname()[1]
+        p = random.choice(band)
         rpc = derive_rpc_port(p)
         if rpc <= 65535 and not {p, rpc} & taken and _bindable(p) and _bindable(rpc):
             return p

@@ -5,6 +5,8 @@ OUT of the REQUIRED wiring sets, because it is bound at startup."""
 from pathlib import Path
 from types import SimpleNamespace
 
+import os
+
 import pytest
 
 from helao.core.models.helaodirs import HelaoDirs
@@ -53,6 +55,10 @@ async def test_falls_back_to_db_params_without_aws_config_path(tmp_path):
 
 @pytest.mark.asyncio
 async def test_keeps_local_params_with_aws_config_path(tmp_path, monkeypatch):
+    # Record the true pre-test state (absent) so teardown restores "absent":
+    # __init__ sets AWS_CONFIG_PATH raw, and a delenv issued after that would
+    # make monkeypatch restore the temporary value at teardown.
+    monkeypatch.delenv("AWS_CONFIG_PATH", raising=False)
     aws_cfg = tmp_path / "aws.ini"
     aws_cfg.write_text("[default]\n", encoding="utf-8")
     host = _host(
@@ -73,7 +79,7 @@ async def test_keeps_local_params_with_aws_config_path(tmp_path, monkeypatch):
         assert syncer.s3 is not None  # boto3 client built, never contacted
     finally:
         await teardown_driver(syncer)
-        monkeypatch.delenv("AWS_CONFIG_PATH", raising=False)  # __init__ set it
+        os.environ.pop("AWS_CONFIG_PATH", None)  # __init__ set it
 
 
 @pytest.mark.asyncio
