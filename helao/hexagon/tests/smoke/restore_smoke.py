@@ -19,7 +19,7 @@ import pickle
 import re
 import sys
 
-from helao.helpers.yml_tools import yml_load
+from helao.helpers.meta_io import meta_glob, read_meta
 from helao.hexagon.tests.smoke.conc_items import (
     build_ws_sequence,
     get_orch_state,
@@ -32,16 +32,12 @@ ORCH = "ORCH"
 TS_RE = re.compile(r"\d{6}\.\d{6}")
 
 
-def _exp_ymls(root: str) -> list:
-    return sorted(
-        glob.glob(os.path.join(root, "RUNS", "**", "*-exp.yml"), recursive=True)
-    )
+def _exp_records(root: str) -> list:
+    return meta_glob(os.path.join(root, "RUNS"), "exp", "**/*")
 
 
-def _act_ymls(root: str) -> list:
-    return sorted(
-        glob.glob(os.path.join(root, "RUNS", "**", "*-act.yml"), recursive=True)
-    )
+def _act_records(root: str) -> list:
+    return meta_glob(os.path.join(root, "RUNS"), "act", "**/*")
 
 
 def phase_export(root: str) -> int:
@@ -51,7 +47,7 @@ def phase_export(root: str) -> int:
 
     def second_exp_running() -> bool:
         st = get_orch_state(ORCH)
-        return bool(st.get("active_experiment")) and len(_exp_ymls(root)) >= 2
+        return bool(st.get("active_experiment")) and len(_exp_records(root)) >= 2
 
     wait_until(second_exp_running, 120, poll_s=0.5, label="second experiment running")
     print("READY-TO-KILL")
@@ -91,11 +87,11 @@ def phase_restore(root: str, out: str) -> int:
     orch_post(ORCH, "start")
     wait_until(lambda: orch_parked(ORCH), 300, label="orch_parked")
 
-    exps = _exp_ymls(root)
+    exps = _exp_records(root)
     acts = collections.defaultdict(list)
     skipped_finished = 0
-    for p in _act_ymls(root):
-        a = yml_load(p)
+    for p in _act_records(root):
+        a = read_meta(p)
         status = [str(getattr(s, "value", s)) for s in a.get("action_status", [])]
         acts[a["action_name"]].append(
             json.dumps([status, a.get("action_retry")], sort_keys=True)
@@ -108,7 +104,7 @@ def phase_restore(root: str, out: str) -> int:
             json.dumps(
                 [
                     str(getattr(s, "value", s))
-                    for s in yml_load(p).get("experiment_status", [])
+                    for s in read_meta(p).get("experiment_status", [])
                 ]
             )
             for p in exps

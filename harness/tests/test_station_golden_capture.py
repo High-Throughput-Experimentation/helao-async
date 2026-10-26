@@ -1,5 +1,6 @@
 """station_golden_capture.py: a station run tree -> a golden set the parity gate accepts."""
 
+import json
 import shutil
 import subprocess
 import sys
@@ -7,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from helao.helpers.yml_tools import yml_load
 from harness.manifest import ProvenanceManifest
 from harness.parity import run_parity
 from harness.tests.test_parity_legacy_remap import SEQ_NAME, _u, _write_run
@@ -200,3 +202,43 @@ def test_nosync_dir_without_seq_yml_does_not_hide_the_zip(tmp_path):
     assert r.returncode == 0, r.stderr
     assert "prc=1" in r.stdout
     assert (tmp_path / "out/root/RUNS_NOSYNC/26.39/0929" / SEQ_NAME).is_dir()
+
+
+def _jsonify(root, version="1e10"):
+    """Rewrite every seq/prc .yml under root as the .json record."""
+    for y in list(root.rglob("*-seq.yml")) + list(root.rglob("*-prc.yml")):
+        doc = dict(yml_load(y))
+        if "hlo_version" in doc:  # YAML read "1e10" as a float; JSON keeps a string
+            doc["hlo_version"] = version
+        y.with_suffix(".json").write_text(
+            json.dumps(doc, default=str), encoding="utf-8"
+        )
+        y.unlink()
+
+
+def test_json_records_in_unified_dir_give_real_provenance(tmp_path):
+    root = unified_root(tmp_path, version="1e10")
+    _jsonify(root)
+    r = capture(root, tmp_path / "o")
+    assert r.returncode == 0, r.stderr
+    m = ProvenanceManifest.load(tmp_path / "o")
+    assert m.sequence_name == "GMTEST"
+    assert m.legacy_git_sha == "1e10"
+
+
+@pytest.mark.parametrize("zipped", [False, True])
+def test_json_seq_and_prc_in_legacy_layout(tmp_path, zipped):
+    root = legacy_root(tmp_path, version="1e10")
+    _jsonify(root)
+    seq = root / "RUNS_SYNCED/26.39/0929" / SEQ_NAME
+    if zipped:
+        shutil.make_archive(str(seq), "zip", root_dir=seq)
+        shutil.rmtree(seq)
+    r = capture(root, tmp_path / "o")
+    assert r.returncode == 0, r.stderr
+    assert "prc=1" in r.stdout  # matched by sequence_uuid, unrelated ones skipped
+    m = ProvenanceManifest.load(tmp_path / "o")
+    assert m.sequence_name == "GMTEST"
+    assert m.legacy_git_sha == "1e10"
+    prcs = sorted(p.name for p in (tmp_path / "o/root/PROCESSES").rglob("*-prc.json"))
+    assert prcs == ["0__0__t-prc.json"]
