@@ -2,13 +2,15 @@
 
 import json
 import logging
+import logging.config
 import os
+import threading
 import time
 from pathlib import Path
 
 import zmq
 
-from helao.helpers.log_jsonl import LEDGER_FRAME, JsonlSinkHandler
+from helao.helpers.log_jsonl import HWM, LEDGER_FRAME, SOCK_BUF, JsonlSinkHandler
 
 
 def _logger(name, handler):
@@ -165,9 +167,152 @@ def test_fork_resets_socket_and_writers(tmp_path):
     pull, port = _pull()
     h = JsonlSinkHandler("SRV", tmp_path, endpoint=f"tcp://127.0.0.1:{port}")
     old_sock = h._sock
-    h._pid = -1  # what a forked child observes
     lg = _logger("t_fork", h)
+    lg.info("before fork")
+    old_dedup = h.deduper
+    h._spilled = 5
+    h._pid = -1  # what a forked child observes
     lg.info("after fork")
     assert h._sock is not old_sock and h._pid == os.getpid()
+    assert h.deduper is not old_dedup and h._spilled == 0
+    assert [json.loads(e[0])["msg"] for e in h.recent] == ["after fork"]
     h.close()
+    pull.close()
+
+
+def test_survives_dictconfig_shutdown(tmp_path):
+    pull, port = _pull()
+    h = JsonlSinkHandler("SRV", tmp_path, endpoint=f"tcp://127.0.0.1:{port}")
+    lg = _logger("t_dictcfg", h)
+    lg.info("before")
+    assert len(_recv_all(pull)) == 1
+    # uvicorn.Config does this: logging.shutdown() closes every live handler
+    logging.config.dictConfig({"version": 1, "disable_existing_loggers": False})
+    if h not in lg.handlers:
+        lg.addHandler(h)
+    lg.info("after")
+    frames = _recv_all(pull)
+    assert [json.loads(f[-1])["msg"] for f in frames] == ["after"]
+    assert not (tmp_path / "SRV.jsonl").exists()
+    h.close()
+    pull.close()
+
+
+def test_emit_after_close_recreates_writers(tmp_path):
+    h = JsonlSinkHandler("SRV", tmp_path)
+    lg = _logger("t_reuse", h)
+    lg.info("one")
+    h.close()
+    lg.info("two")
+    h.close()
+    assert [r["msg"] for r in _read(tmp_path / "SRV.jsonl")] == ["one", "two"]
+
+
+def _rows(*socks_frames, path):
+    out = {}
+    for frames in socks_frames:
+        for f in frames:
+            d = json.loads(f[-1])
+            out[(d["pid"], d["seq"])] = d
+    for d in _read(path):
+        out[(d["pid"], d["seq"])] = d
+    return out
+
+
+def test_replay_covers_everything_in_flight(tmp_path):
+    pull, port = _pull_hwm()
+    h = JsonlSinkHandler(
+        "SRV", tmp_path, endpoint=f"tcp://127.0.0.1:{port}", dedup_interval=0
+    )
+    lg = _logger("t_inflight", h)
+    i, after = 0, None
+    while i < 100_000 and (after is None or i < after + 300):
+        i += 1
+        lg.info(f"short record {i}")
+        if after is None and (tmp_path / "SRV.jsonl").exists():
+            after = i
+        if i % 500 == 0:
+            time.sleep(0.01)  # let the io thread move bytes to the kernel
+    assert after is not None, "sender never hit Again"
+    got = _recv_all(pull, 1.0)
+    pull.close()  # the launcher dies with the rest unread
+    time.sleep(0.3)
+    end = time.monotonic() + 5
+    while (
+        time.monotonic() < end and "probe" not in (tmp_path / "SRV.jsonl").read_text()
+    ):
+        lg.info("probe")  # the first refused send triggers the replay
+        time.sleep(0.05)
+    n = h.seq
+    h.close()
+    rows = _rows(got, path=tmp_path / "SRV.jsonl")
+    missing = set(range(1, n + 1)) - {k[1] for k in rows}
+    assert not missing, f"{len(missing)} of {n} records lost"
+
+
+def _pull_hwm():
+    s = zmq.Context.instance().socket(zmq.PULL)
+    s.setsockopt(zmq.LINGER, 0)
+    s.setsockopt(zmq.RCVHWM, HWM)
+    s.setsockopt(zmq.RCVBUF, SOCK_BUF)
+    return s, s.bind_to_random_port("tcp://127.0.0.1")
+
+
+def test_slow_reader_does_not_duplicate_fallback_rows(tmp_path):
+    pull = zmq.Context.instance().socket(zmq.PULL)
+    pull.setsockopt(zmq.LINGER, 0)
+    pull.setsockopt(zmq.RCVHWM, 100)
+    pull.setsockopt(zmq.RCVBUF, SOCK_BUF)
+    port = pull.bind_to_random_port("tcp://127.0.0.1")
+    stop = threading.Event()
+
+    def reader():  # alive, but slower than the sender
+        while not stop.is_set():
+            for _ in range(20):
+                if pull.poll(0):
+                    pull.recv_multipart()
+            time.sleep(0.005)
+
+    t = threading.Thread(target=reader, daemon=True)
+    t.start()
+    h = JsonlSinkHandler(
+        "SRV", tmp_path, endpoint=f"tcp://127.0.0.1:{port}", dedup_interval=0
+    )
+    flips = []
+    orig = h._replay
+    h._replay = lambda: (flips.append(1), orig())
+    lg = _logger("t_slow", h)
+    pad = "x" * 500
+    for i in range(6000):
+        lg.info(f"r{i} {pad}")
+    stop.set()
+    t.join()
+    h.close()
+    pull.close()
+    assert len(flips) >= 2, "the reader was never slow enough to flip"
+    rows = _read(tmp_path / "SRV.jsonl")
+    keys = [(r["pid"], r["seq"]) for r in rows]
+    assert len(keys) == len(set(keys)) and keys
+
+
+def test_dedup_collapses_on_send_path(tmp_path):
+    pull, port = _pull()
+    h = JsonlSinkHandler("SRV", tmp_path, endpoint=f"tcp://127.0.0.1:{port}")
+    lg = _logger("t_dedup_send", h)
+    for _ in range(20):
+        lg.error("A")
+        lg.error("B")
+    lg.info("done")
+    h.close()
+    docs = [json.loads(f[-1]) for f in _recv_all(pull)]
+    assert [d["msg"] for d in docs if "repeat_count" not in d] == [
+        "A",
+        "B",
+        "A",
+        "B",
+        "done",
+    ]
+    (s,) = [d for d in docs if "repeat_count" in d]
+    assert (s["repeat_count"], s["repeat_period"]) == (18, 2)
+    assert not (tmp_path / "SRV.jsonl").exists()
     pull.close()

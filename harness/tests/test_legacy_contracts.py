@@ -49,10 +49,12 @@ def test_log_file_lands_at_contract_path(tmp_path, monkeypatch):
     log_dir.mkdir()
     logger = make_logger("GOLDENKEY", log_dir=str(log_dir))
     logger.info("logging path contract check")
-    assert (log_dir / "GOLDENKEY.log").exists()
-    assert len(mkdtemp_calls) == 1, "legacy eagerly allocates one wasted temp dir"
+    assert (log_dir / "GOLDENKEY.jsonl").exists()
+    # make_logger used to mkdtemp() on every call; since the JSONL sink it only
+    # does so when the caller gave no log_dir (spec 3), so no wasted temp dir
+    assert mkdtemp_calls == [], "a supplied log_dir must not allocate a temp dir"
     assert not any(
-        (Path(d) / "GOLDENKEY.log").exists() for d in mkdtemp_calls
+        (Path(d) / "GOLDENKEY.jsonl").exists() for d in mkdtemp_calls
     ), "the wasted temp dir must never receive the actual log file"
 
 

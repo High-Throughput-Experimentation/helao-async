@@ -25,9 +25,14 @@ ROTATE_RECORDS = 300_000
 RETAIN_DAYS = 90
 GRACE_S = 10.0
 TMP_MAX_AGE_S = 3600
-BUFFER_SIZE = 2000
+BUFFER_SIZE = 3000
 MAX_PERIOD = 16
 HWM = 1000
+#: kernel buffer bytes on the PUSH (and, in Task 5, the PULL) socket, so the
+#: in-flight bound is the zmq HWMs plus a few tens of KB, not megabytes
+SOCK_BUF = 65536
+#: endpoints whose handshake wait timed out; later connects skip the wait
+_NO_WAIT: set = set()
 LEDGER_FRAME = b"ledger"
 EXTRA_KEYS = (
     "repeat_count",
@@ -422,13 +427,18 @@ class JsonlSinkHandler(logging.Handler):
         sock = zmq.Context.instance().socket(zmq.PUSH)
         sock.setsockopt(zmq.IMMEDIATE, 1)
         sock.setsockopt(zmq.SNDHWM, HWM)
+        sock.setsockopt(zmq.SNDBUF, SOCK_BUF)
         sock.setsockopt(zmq.LINGER, 500)
         mon = sock.get_monitor_socket(zmq.EVENT_HANDSHAKE_SUCCEEDED)
         sock.connect(self.endpoint)
         # with IMMEDIATE, sends before the ZMTP handshake completes raise Again;
         # wait once (process start) so startup records reach the launcher
+        if self.endpoint in _NO_WAIT:
+            timeout_ms = 0
         if mon.poll(timeout_ms):
             mon.recv_multipart()
+        elif timeout_ms:
+            _NO_WAIT.add(self.endpoint)
         sock.disable_monitor()
         mon.close()
         self._sock = sock
@@ -439,6 +449,9 @@ class JsonlSinkHandler(logging.Handler):
         self._sock = None
         self._log = self._ledger = None
         self._connected = False
+        self.deduper = SequenceDeduper(interval=self.deduper.interval)
+        self.recent.clear()
+        self._spilled = 0
         if self.endpoint:
             self._connect(200)
 
@@ -463,6 +476,10 @@ class JsonlSinkHandler(logging.Handler):
         try:
             if os.getpid() != self._pid:
                 self._after_fork()
+            elif self._sock is None and self.endpoint:
+                # closed behind our back (uvicorn's dictConfig runs
+                # logging.shutdown on every handler): reattach
+                self._connect(1000)
             if is_artifact(record):
                 self._out(record)
                 return
@@ -485,7 +502,6 @@ class JsonlSinkHandler(logging.Handler):
     def _send(self, data: bytes, ledger: bool) -> bool:
         try:
             if self._spilled:
-                self.seq += 1
                 note = logging.LogRecord(
                     self.stem,
                     logging.WARNING,
@@ -495,9 +511,10 @@ class JsonlSinkHandler(logging.Handler):
                     None,
                     None,
                 )
-                self._sock.send(
-                    record_to_json(note, self.seq, self.offset_seconds), zmq.NOBLOCK
-                )
+                marker = record_to_json(note, self.seq + 1, self.offset_seconds)
+                self._sock.send(marker, zmq.NOBLOCK)
+                self.seq += 1  # only once sent: a refused marker burns no seq
+                self.recent.append([marker, False, True])
                 self._spilled = 0
             self._sock.send_multipart(
                 [LEDGER_FRAME, data] if ledger else [data], zmq.NOBLOCK
@@ -508,13 +525,15 @@ class JsonlSinkHandler(logging.Handler):
                 self._replay()
             return False
         self._connected = True
+        _NO_WAIT.discard(self.endpoint)
         return True
 
     def _replay(self):
         # at-least-once: records still in socket buffers when the launcher died
-        for data, ledger, sent in list(self.recent):
-            if sent:
-                self._spill(data, ledger, count=False)
+        for entry in list(self.recent):
+            if entry[2]:
+                self._spill(entry[0], entry[1], count=False)
+                entry[2] = False  # once only, or every flip re-spills it
 
     def _spill(self, data: bytes, ledger: bool, count: bool = True):
         self._writer(False).write(data)
