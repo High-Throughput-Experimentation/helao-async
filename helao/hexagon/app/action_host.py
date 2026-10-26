@@ -1451,7 +1451,7 @@ class ActionHost(HelaoFastAPI):
                 "The action server stopped while the action was running; the "
                 "record was reconciled at the next server startup."
             )
-            await self.write_act(action)
+            await self.write_act(action, reason="reconcile_interrupted")
             LOGGER.warning(f"Reconciled interrupted action {uuid} ({act_dir}).")
         try:
             await move_dir(action, base=self)

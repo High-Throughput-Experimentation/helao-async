@@ -81,6 +81,7 @@ from helao.core.tests._record_rewrite import (
     run_reset_only,
     runs_gate,
 )
+from helao.helpers.artifact_hash import log_artifact_hashes_sync, record_uuid
 from helao.helpers.meta_io import meta_glob, read_meta, write_meta
 from helao.helpers.plate_api import HTEPlateAPI, PlateAPIUnavailable
 from helao.helpers.yml_tools import yml_load
@@ -409,12 +410,16 @@ def _record(args) -> int:
         return 0
 
     if runs:
-        _record_rewrite.rewrite_dir(zip_path, apply)
-        _record_rewrite.rewrite_processes(zip_path, sequence_uuid, apply)
+        _record_rewrite.rewrite_dir(zip_path, apply, reason="set_plate_id")
+        _record_rewrite.rewrite_processes(
+            zip_path, sequence_uuid, apply, reason="set_plate_id"
+        )
     else:
-        _record_rewrite.rewrite_zip(zip_path, apply)
+        _record_rewrite.rewrite_zip(zip_path, apply, reason="set_plate_id")
     if process_dir is not None and process_dir.is_dir():
-        _record_rewrite.rewrite_processes(process_dir, sequence_uuid, apply)
+        _record_rewrite.rewrite_processes(
+            process_dir, sequence_uuid, apply, reason="set_plate_id"
+        )
     if args.no_reset:
         print("--no-reset: the record stays where it is and will not re-sync.")
         return 0
@@ -599,6 +604,13 @@ def _analyses(args) -> int:
                 continue
             n_uploads += 1
         write_meta(path, ynew)
+        log_artifact_hashes_sync(
+            [path],
+            kind=meta_kind(path) or "record",
+            owner_uuid=record_uuid(ynew),
+            event="artifact_rewritten",
+            reason="set_plate_id",
+        )
 
     verb = "would make" if args.dry_run else "made"
     print(

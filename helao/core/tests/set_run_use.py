@@ -170,7 +170,9 @@ def rewrite_zip(
         ``(edits, sequence_uuid)``; see
         :func:`~helao.core.tests._record_rewrite.rewrite_zip`.
     """
-    return _record_rewrite.rewrite_zip(zip_path, _retag(run_use), dry_run=dry_run)
+    return _record_rewrite.rewrite_zip(
+        zip_path, _retag(run_use), dry_run=dry_run, reason="set_run_use"
+    )
 
 
 def rewrite_processes(
@@ -186,7 +188,11 @@ def rewrite_processes(
     :func:`~helao.core.tests._record_rewrite.rewrite_processes`.
     """
     return _record_rewrite.rewrite_processes(
-        process_dir, sequence_uuid, _retag(run_use), dry_run=dry_run
+        process_dir,
+        sequence_uuid,
+        _retag(run_use),
+        dry_run=dry_run,
+        reason="set_run_use",
     )
 
 
@@ -277,7 +283,7 @@ def main(argv=None) -> int:
 
     if runs:
         zip_edits, sequence_uuid = _record_rewrite.rewrite_dir(
-            zip_path, _retag(run_use), dry_run=args.dry_run
+            zip_path, _retag(run_use), dry_run=args.dry_run, reason="set_run_use"
         )
         # Processes colocated beside their experiments, in the same tree.
         zip_edits += rewrite_processes(

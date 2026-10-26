@@ -310,3 +310,59 @@ def test_is_terminal():
     assert is_terminal([HloStatus.active, HloStatus.finished])
     assert not is_terminal([HloStatus.active])
     assert not is_terminal([]) and not is_terminal(None)
+
+
+def _flip(doc, kind):
+    doc["run_use"] = "ref"
+    return ["run_use"], ""
+
+
+def test_rewrite_dir_logs_rewritten(tmp_path, ledger):
+    from helao.core.tests import _record_rewrite
+    from helao.helpers.meta_io import write_meta
+
+    write_meta(
+        tmp_path / "250101.000000000000-act.json",
+        {"action_uuid": "a1", "run_use": "data"},
+    )
+    _record_rewrite.rewrite_dir(tmp_path, _flip, reason="set_run_use")
+    (r,) = [r for r in ledger() if r["event"] == "artifact_rewritten"]
+    assert (r["uuid"], r["reason"], r["kind"]) == ("a1", "set_run_use", "act")
+
+
+def test_rewrite_zip_logs_zip_digest(tmp_path, ledger):
+    import zipfile
+
+    from helao.core.tests import _record_rewrite
+    from helao.helpers.yml_tools import yml_dumps
+
+    zp = tmp_path / "seq.zip"
+    with zipfile.ZipFile(zp, "w") as z:
+        z.writestr(
+            "250101.000000000000-act.yml",
+            yml_dumps({"action_uuid": "a1", "sequence_uuid": "s1", "run_use": "data"}),
+        )
+        z.writestr(
+            "250101.000000000000-seq.yml",
+            yml_dumps({"sequence_uuid": "s1", "run_use": "data"}),
+        )
+    _record_rewrite.rewrite_zip(zp, _flip, reason="set_plate_id")
+    (r,) = [r for r in ledger() if r["kind"] == "zip"]
+    assert r["event"] == "artifact_rewritten" and r["reason"] == "set_plate_id"
+    assert r["uuid"] == "s1"
+    assert r["sha256"] == hashlib.sha256(zp.read_bytes()).hexdigest()
+
+
+def test_rewrite_processes_logs_rewritten(tmp_path, ledger):
+    from helao.core.tests import _record_rewrite
+    from helao.helpers.meta_io import write_meta
+
+    write_meta(
+        tmp_path / "250101.000000000000-prc.json",
+        {"process_uuid": "p1", "sequence_uuid": "s1", "run_use": "data"},
+    )
+    _record_rewrite.rewrite_processes(tmp_path, "s1", _flip)
+    (r,) = [r for r in ledger() if r["event"] == "artifact_rewritten"]
+    # record_uuid checks sequence_uuid before process_uuid, so a process is
+    # owned by its sequence here.
+    assert (r["uuid"], r["reason"], r["kind"]) == ("s1", "record_rewrite", "prc")
