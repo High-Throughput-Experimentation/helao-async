@@ -128,6 +128,7 @@ CANONICAL_TAILWIND: Final[dict[str, str]] = {
     "rose-50": "#fff1f2",
     "orange-50": "#fff7ed",
     "red-50": "#fef2f2",
+    "indigo-50": "#eef2ff",
 }
 
 TW_KEY_RE: Final[re.Pattern[str]] = re.compile(r"^[a-z]+-(50|[1-9]00|950)$")
@@ -593,6 +594,8 @@ PAGE_TINT_TEXT_ROWS: Final[dict[tuple[str, str], float]] = {
     ("slate-600", "orange-50"): 7.14,
     ("slate-900", "red-50"): 16.32,  # /quarantine
     ("slate-600", "red-50"): 6.93,
+    ("slate-900", "indigo-50"): 15.97,  # /logs
+    ("slate-600", "indigo-50"): 6.78,
 }
 
 # The shade slate-600 replaced, kept as a measurement rather than a comment.
@@ -639,6 +642,13 @@ REFLEX_BORDER_ROWS: Final[dict[tuple[str, str], float]] = {
     ("cyan-600", "rose-50"): 3.35,  # the tightest cell in the whole design
     ("slate-600", "rose-50"): 6.90,
     ("emerald-600", "rose-50"): 3.43,
+    # indigo-50 (/logs) is darker than rose-50 for every hue, so it is the
+    # worst tint now; the rose-50 rows above stay as the earlier measurement.
+    ("violet-600", "indigo-50"): 5.10,
+    ("blue-600", "indigo-50"): 4.62,
+    ("cyan-600", "indigo-50"): 3.29,
+    ("slate-600", "indigo-50"): 6.78,
+    ("emerald-600", "indigo-50"): 3.37,
 }
 
 

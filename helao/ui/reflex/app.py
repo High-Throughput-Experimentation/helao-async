@@ -77,6 +77,7 @@ from helao.ui.reflex.sync_quarantine import (
     configure_quarantine,
     sync_quarantine_page,
 )
+from helao.ui.reflex.logs import LogsState, configure_logs, logs_page
 from helao.ui.reflex.state import make_panel_state
 from helao.ui.reflex.xy_component import make_buffer_router
 from helao.helpers import config_loader
@@ -99,6 +100,7 @@ SHELL_ROUTES = (
     "/xrds",
     "/retire",
     "/quarantine",
+    "/logs",
 )
 
 #: Page name -> the config key whose panels belong on it.
@@ -359,6 +361,7 @@ def _nav():
             ),
         ),
         rx.link("Quarantine", href="/quarantine"),
+        rx.link("Logs", href="/logs"),
         width="100%",
         padding="0.75em 1em",
         align="center",
@@ -525,6 +528,7 @@ def build_app(world_cfg: dict, server_key: str):
     assert XrdsState is not None
     assert RetireState is not None
     assert QuarantineState is not None
+    assert LogsState is not None
     # The operator's backend is built per session from this config; without
     # this the page renders but can never reach an orchestrator.
     configure_operator(world_cfg, server_key)
@@ -537,6 +541,7 @@ def build_app(world_cfg: dict, server_key: str):
     configure_retire(world_cfg, server_key)
     # And the sync-quarantine page, off unless this server opts in.
     configure_quarantine(world_cfg, server_key)
+    configure_logs(world_cfg, server_key)
 
     # The buffer route carries bulk column data out-of-band, so megabyte float
     # arrays never traverse Reflex's JSON state channel. `api_transformer` is
@@ -643,6 +648,11 @@ def build_app(world_cfg: dict, server_key: str):
         lambda: _page("Sync quarantine", sync_quarantine_page(), "/quarantine"),
         route="/quarantine",
         title="HELAO quarantine",
+    )
+    application.add_page(
+        lambda: _page("Logs", logs_page(), "/logs"),
+        route="/logs",
+        title="HELAO logs",
     )
 
     @contextlib.asynccontextmanager
