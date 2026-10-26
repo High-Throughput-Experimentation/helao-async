@@ -91,6 +91,7 @@ from pathlib import Path
 
 from helao.core.models.run_use import RunUse
 from helao.core.tests import _record_rewrite
+from helao.helpers.artifact_hash import use_root_logger
 from helao.core.tests._record_rewrite import (
     PROCESS_DIR_NAME,
     Edit,
@@ -265,6 +266,8 @@ def main(argv=None) -> int:
         return 2  # unreachable: parser.error exits
 
     zip_path = Path(args.zip_path)
+    if not args.dry_run:
+        use_root_logger(zip_path, "set_run_use")
     if args.reset_only:
         return run_reset_only(zip_path, dry_run=args.dry_run)
     runs = is_runs_dir(zip_path)

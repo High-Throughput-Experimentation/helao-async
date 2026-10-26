@@ -328,6 +328,8 @@ def test_rewrite_dir_logs_rewritten(tmp_path, ledger):
     _record_rewrite.rewrite_dir(tmp_path, _flip, reason="set_run_use")
     (r,) = [r for r in ledger() if r["event"] == "artifact_rewritten"]
     assert (r["uuid"], r["reason"], r["kind"]) == ("a1", "set_run_use", "act")
+    final = tmp_path / "250101.000000000000-act.json"
+    assert r["sha256"] == hashlib.sha256(final.read_bytes()).hexdigest()
 
 
 def test_rewrite_zip_logs_zip_digest(tmp_path, ledger):
@@ -359,10 +361,58 @@ def test_rewrite_processes_logs_rewritten(tmp_path, ledger):
 
     write_meta(
         tmp_path / "250101.000000000000-prc.json",
-        {"process_uuid": "p1", "sequence_uuid": "s1", "run_use": "data"},
+        {
+            "process_uuid": "p1",
+            "experiment_uuid": "e1",
+            "sequence_uuid": "s1",
+            "run_use": "data",
+        },
     )
     _record_rewrite.rewrite_processes(tmp_path, "s1", _flip)
     (r,) = [r for r in ledger() if r["event"] == "artifact_rewritten"]
-    # record_uuid checks sequence_uuid before process_uuid, so a process is
-    # owned by its sequence here.
-    assert (r["uuid"], r["reason"], r["kind"]) == ("s1", "record_rewrite", "prc")
+    assert (r["uuid"], r["reason"], r["kind"]) == ("p1", "record_rewrite", "prc")
+    final = tmp_path / "250101.000000000000-prc.json"
+    assert r["sha256"] == hashlib.sha256(final.read_bytes()).hexdigest()
+
+
+def test_dry_run_rewrites_log_nothing(tmp_path, ledger):
+    import zipfile
+
+    from helao.core.tests import _record_rewrite
+    from helao.helpers.meta_io import write_meta
+    from helao.helpers.yml_tools import yml_dumps
+
+    write_meta(
+        tmp_path / "250101.000000000000-act.json",
+        {"action_uuid": "a1", "run_use": "data"},
+    )
+    write_meta(
+        tmp_path / "250101.000000000001-prc.json",
+        {"process_uuid": "p1", "sequence_uuid": "s1", "run_use": "data"},
+    )
+    zp = tmp_path / "seq.zip"
+    with zipfile.ZipFile(zp, "w") as z:
+        z.writestr(
+            "250101.000000000000-seq.yml",
+            yml_dumps({"sequence_uuid": "s1", "run_use": "data"}),
+        )
+    _record_rewrite.rewrite_dir(tmp_path, _flip, dry_run=True)
+    _record_rewrite.rewrite_processes(tmp_path, "s1", _flip, dry_run=True)
+    _record_rewrite.rewrite_zip(zp, _flip, dry_run=True)
+    assert ledger() == []
+
+
+def test_record_uuid_prefers_the_most_specific_owner_and_none_omits_the_key(
+    tmp_path, ledger
+):
+    from helao.helpers.artifact_hash import log_artifact_hashes_sync, record_uuid
+
+    assert (
+        record_uuid({"process_uuid": "p", "experiment_uuid": "e", "sequence_uuid": "s"})
+        == "p"
+    )
+    f = tmp_path / "x.txt"
+    f.write_text("1")
+    log_artifact_hashes_sync([f], kind="output", owner_uuid=None)
+    (r,) = ledger()
+    assert "uuid" not in r

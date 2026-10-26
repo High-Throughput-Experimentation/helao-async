@@ -572,13 +572,21 @@ def test_an_already_retagged_record_is_nothing_to_change_and_exits_zero(
     else:
         path = _build_runs_dir(tmp_path)
         assert main([str(path), "--no-reset"]) == 0
-    before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    before = {
+        p: p.read_bytes()
+        for p in tmp_path.rglob("*")
+        if p.is_file() and "LOGS" not in p.parts  # the tool's own log
+    }
     capsys.readouterr()
 
     assert main([str(path), *no_reset]) == 0
 
     assert "nothing to change" in capsys.readouterr().out
-    assert {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()} == before
+    assert {
+        p: p.read_bytes()
+        for p in tmp_path.rglob("*")
+        if p.is_file() and "LOGS" not in p.parts  # the tool's own log
+    } == before
 
 
 def test_a_zip_with_no_record_in_it_exits_non_zero(tmp_path, capsys):
@@ -693,3 +701,49 @@ def test_the_finish_yml_hint_is_absolute_for_a_relative_input(
     )
     target = hint.split("yml_path=", 1)[1].split(" ", 1)[0]
     assert Path(target).is_absolute() and Path(target).is_file()
+
+
+@pytest.fixture(autouse=True)
+def _reset_logger():
+    """CLI mains install a root logger; keep it from leaking between tests."""
+    from helao.helpers import helao_logging
+
+    saved = helao_logging.LOGGER
+    yield
+    lg = helao_logging.LOGGER
+    if lg is not saved and lg is not None:
+        for h in list(lg.handlers):
+            lg.removeHandler(h)
+            h.close()
+    helao_logging.LOGGER = saved
+
+
+def _ledger_rows(root, tool):
+    import hashlib
+
+    from helao.helpers import helao_logging
+
+    for h in helao_logging.LOGGER.handlers:
+        h.flush()
+    p = root / "LOGS" / f"artifacts_{tool}.jsonl"
+    rows = [json.loads(x) for x in p.read_bytes().splitlines()]
+    for r in rows:
+        f = Path(r["path"])
+        f = f if f.is_absolute() else root / f
+        assert r["sha256"] == hashlib.sha256(f.read_bytes()).hexdigest()
+    return rows
+
+
+def test_main_ledgers_rewrites_beside_the_runs_tree(tmp_path):
+    seq_dir = _build_runs_dir(tmp_path)
+    assert main([str(seq_dir), "--run-use", "data"]) == 0
+    rows = _ledger_rows(tmp_path, "set_run_use")
+    assert {r["event"] for r in rows} == {"artifact_rewritten"}
+    assert {r["reason"] for r in rows} == {"set_run_use"}
+    assert {r["kind"] for r in rows} >= {"act", "exp", "prc"}
+
+
+def test_dry_run_logs_nothing(tmp_path):
+    seq_dir = _build_runs_dir(tmp_path)
+    assert main([str(seq_dir), "--dry-run"]) == 0
+    assert not (tmp_path / "LOGS").exists()

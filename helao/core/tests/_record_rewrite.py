@@ -243,9 +243,9 @@ def rewrite_dir(
                 sequence_uuid = str(uuid)
         changed, note = apply(doc, kind)
         if changed and not dry_run:
-            write_meta(path, doc)
+            written = write_meta(path, doc)
             log_artifact_hashes_sync(
-                [path],
+                [written],
                 kind=meta_kind(path) or "record",
                 owner_uuid=record_uuid(doc),
                 event="artifact_rewritten",
@@ -550,9 +550,9 @@ def rewrite_processes(
             continue
         edits.append(Edit(str(path), "process", changed, note))
         if not dry_run:
-            write_meta(path, doc)
+            written = write_meta(path, doc)
             log_artifact_hashes_sync(
-                [path],
+                [written],
                 kind="prc",
                 owner_uuid=record_uuid(doc),
                 event="artifact_rewritten",

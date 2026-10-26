@@ -81,7 +81,11 @@ from helao.core.tests._record_rewrite import (
     run_reset_only,
     runs_gate,
 )
-from helao.helpers.artifact_hash import log_artifact_hashes_sync, record_uuid
+from helao.helpers.artifact_hash import (
+    log_artifact_hashes_sync,
+    record_uuid,
+    use_root_logger,
+)
 from helao.helpers.meta_io import meta_glob, read_meta, write_meta
 from helao.helpers.plate_api import HTEPlateAPI, PlateAPIUnavailable
 from helao.helpers.yml_tools import yml_load
@@ -603,9 +607,9 @@ def _analyses(args) -> int:
                 failed += 1
                 continue
             n_uploads += 1
-        write_meta(path, ynew)
+        written = write_meta(path, ynew)
         log_artifact_hashes_sync(
-            [path],
+            [written],
             kind=meta_kind(path) or "record",
             owner_uuid=record_uuid(ynew),
             event="artifact_rewritten",
@@ -677,6 +681,11 @@ def main(argv=None) -> int:
     if args.old == args.new or args.old <= 0 or args.new <= 0:
         parser.error("--old and --new must be different positive integers")
         return 2  # unreachable: parser.error exits
+    if not args.dry_run:
+        use_root_logger(
+            args.zip_path if args.command == "record" else args.analyses_root,
+            "set_plate_id",
+        )
     return _record(args) if args.command == "record" else _analyses(args)
 
 

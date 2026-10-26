@@ -16,14 +16,21 @@ from typing import Optional
 
 from helao.helpers import helao_logging
 
-__all__ = ["log_artifact_hashes", "log_artifact_hashes_sync", "record_uuid"]
+__all__ = [
+    "log_artifact_hashes",
+    "log_artifact_hashes_sync",
+    "record_uuid",
+    "root_for",
+    "use_root_logger",
+]
 
+# Most specific owner first: a record also carries its parents' uuids.
 _UUID_KEYS = (
+    "analysis_uuid",
     "action_uuid",
+    "process_uuid",
     "experiment_uuid",
     "sequence_uuid",
-    "process_uuid",
-    "analysis_uuid",
 )
 _FALLBACK = None
 _FALLBACK_LOCK = threading.Lock()
@@ -35,6 +42,45 @@ def record_uuid(doc: dict) -> Optional[str]:
         if doc.get(key):
             return str(doc[key])
     return None
+
+
+def _uuid_extra(owner_uuid) -> dict:
+    """``{"uuid": ...}``, or nothing when the owner is unknown."""
+    return {} if owner_uuid is None else {"uuid": str(owner_uuid)}
+
+
+_RUN_DIRS = ("RUNS", "DIAG")
+
+
+def root_for(path) -> Optional[str]:
+    """The helao root above a rewritten run-tree path, or ``None``.
+
+    The first ancestor with a child directory named ``RUNS``, ``RUNS_*`` or
+    ``DIAG`` that contains ``path``.
+    """
+    p = os.path.abspath(os.fspath(path))
+    parent = os.path.dirname(p)
+    while parent != os.path.dirname(parent):
+        if os.path.isdir(parent):
+            for name in os.listdir(parent):
+                if name in _RUN_DIRS or name.startswith("RUNS_"):
+                    top = os.path.join(parent, name) + os.sep
+                    if os.path.isdir(top) and p.startswith(top):
+                        return parent
+        parent = os.path.dirname(parent)
+    return None
+
+
+def use_root_logger(path, name: str) -> None:
+    """For a CLI tool: ledger beside ``path``'s run tree, not in a temp dir.
+
+    Does nothing when a logger is already installed or no root is found.
+    """
+    root = None if helao_logging.LOGGER is not None else root_for(path)
+    if root is not None:
+        helao_logging.LOGGER = helao_logging.make_logger(
+            name, log_dir=os.path.join(root, "LOGS")
+        )
 
 
 def _logger(logger):
@@ -124,7 +170,7 @@ def log_artifact_hashes_sync(
                 extra={
                     "event": "artifact_hash_failed",
                     "kind": kind,
-                    "uuid": str(owner_uuid),
+                    **_uuid_extra(owner_uuid),
                     "path": rel,
                     "reason": str(exc),
                 },
@@ -135,7 +181,7 @@ def log_artifact_hashes_sync(
             extra={
                 "event": event,
                 "kind": kind,
-                "uuid": str(owner_uuid),
+                **_uuid_extra(owner_uuid),
                 "path": rel,
                 "bytes": size,
                 "sha256": digest,
