@@ -606,6 +606,7 @@ SLATE_500_ON_TINT_ROWS: Final[dict[tuple[str, str], float]] = {
     ("slate-500", "rose-50"): 4.33,  # /control -- a third failing surface
     ("slate-500", "orange-50"): 4.48,  # /retire
     ("slate-500", "red-50"): 4.35,  # /quarantine
+    ("slate-500", "indigo-50"): 4.26,  # /logs
     ("slate-500", "slate-50"): 4.55,
     ("slate-500", "sky-50"): 4.46,
     ("slate-500", "violet-50"): 4.34,
@@ -633,9 +634,9 @@ REFLEX_HEADER_ROWS: Final[dict[tuple[str, str], float]] = {
 
 # Each table's 3px left border against its worst-case page tint. A border is a
 # non-text graphical object, so the 3:1 control floor applies, not 4.5. Every
-# one of the five is worst on violet-50, the darkest tint, so that is the only
-# background that needs declaring -- the four brighter tints are strictly
-# easier.
+# one of the five is worst on indigo-50, the darkest tint (/logs; violet-50 was
+# before it), so that is the background that needs declaring -- the brighter
+# tints are strictly easier. cyan-600 is the tightest cell, 3.29.
 REFLEX_BORDER_ROWS: Final[dict[tuple[str, str], float]] = {
     ("violet-600", "rose-50"): 5.19,
     ("blue-600", "rose-50"): 4.70,
@@ -899,7 +900,7 @@ def test_page_tint_rows_cover_every_route_twice() -> None:
 def test_slate_500_is_measured_on_every_tint(pair: tuple[str, str]) -> None:
     """The shade the Reflex stack moved *away* from, pinned as a measurement.
 
-    Five of the twelve tints put ``slate-500`` under the 4.5 body floor, which
+    Six of the thirteen tints put ``slate-500`` under the 4.5 body floor, which
     is why ``REFLEX_MUTED_TEXT`` is ``slate-600``.
     Asserting the numbers here means a future edit that reintroduces
     ``slate-500`` cannot claim it was fine, and a Tailwind revision that changed
@@ -910,8 +911,8 @@ def test_slate_500_is_measured_on_every_tint(pair: tuple[str, str]) -> None:
     assert measured == pytest.approx(SLATE_500_ON_TINT_ROWS[pair], abs=0.01)
 
 
-def test_slate_500_fails_the_body_floor_on_five_of_the_twelve_tints() -> None:
-    """Exactly five, and named -- not "at least one".
+def test_slate_500_fails_the_body_floor_on_six_of_the_thirteen_tints() -> None:
+    """Exactly six, and named -- not "at least one".
 
     A count would pass if the failing set moved to four different tints, and
     the point of the row block above is that *which* surfaces fail is not
@@ -920,14 +921,22 @@ def test_slate_500_fails_the_body_floor_on_five_of_the_twelve_tints() -> None:
     ``slate-500`` any better, and it did not. ``lime-50`` arrived with
     ``/composition`` at 4.60 and did not join them, which is the other half of
     the same point -- the set is measured, not predicted. ``orange-50`` joined
-    them with ``/retire``, at 4.48, and ``red-50`` with ``/quarantine``, at 4.35.
+    them with ``/retire``, at 4.48, ``red-50`` with ``/quarantine``, at 4.35, and
+    ``indigo-50`` with ``/logs``, at 4.26.
     """
     failing = {
         bg
         for (fg, bg) in SLATE_500_ON_TINT_ROWS
         if contrast_ratio(_shade(fg), _shade(bg)) < FLOOR_BODY_TEXT
     }
-    assert failing == {"sky-50", "violet-50", "rose-50", "orange-50", "red-50"}
+    assert failing == {
+        "sky-50",
+        "violet-50",
+        "rose-50",
+        "orange-50",
+        "red-50",
+        "indigo-50",
+    }
 
 
 def test_slate_600_clears_every_tint_by_a_real_margin() -> None:

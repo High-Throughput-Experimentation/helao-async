@@ -251,8 +251,8 @@ against it. Zebra striping, if any is ever added, stays ``slate-50``.
 
 Each header text clears the 4.5 body floor on its own header background
 (4.79–9.45). Each 600-level border clears the 3.0 non-text floor against every
-entry in :data:`REFLEX_PAGE_TINTS`, worst case ``cyan-600`` at 3.36 on
-``violet-50``.
+entry in :data:`REFLEX_PAGE_TINTS`, worst case ``cyan-600`` at 3.29 on
+``indigo-50``.
 """
 
 REFLEX_MUTED_TEXT: Final[str] = "slate-600"

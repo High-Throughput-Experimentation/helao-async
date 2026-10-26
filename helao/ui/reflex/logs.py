@@ -33,12 +33,19 @@ def _log_dir():
 
 
 def _refresh(state) -> None:
-    if state.paused:
-        return
+    # while paused the view is the frozen snapshot, so filter changes still apply
+    source = state._frozen if state.paused else state._all
     servers = set(state.selected) or None
     state.rows = log_tail.to_rows(
-        log_tail.filter_records(state._all, servers, state.min_level, state.text)
+        log_tail.filter_records(source, servers, state.min_level, state.text)
     )
+
+
+def _set_servers(state) -> None:
+    # a selected server stays listed even after it ages out of the buffer
+    found = sorted({r.get("server", "") for r in state._all} | set(state.selected))
+    if found != state.servers:
+        state.servers = found
 
 
 def _start(state) -> None:
@@ -46,8 +53,10 @@ def _start(state) -> None:
     if d is None:
         state.rows = []
         return
-    state._all, state._cursors = log_tail.tail_init(d, MAX_ROWS)
-    state.servers = sorted({r.get("server", "") for r in state._all})
+    recs, state._cursors = log_tail.tail_init(d, MAX_ROWS)
+    # tuple: Reflex wraps a list var in a proxy that costs ~30 ms per busy tick
+    state._all = tuple(recs)
+    _set_servers(state)
     _refresh(state)
 
 
@@ -56,10 +65,13 @@ def _tick(state) -> None:
     d = _log_dir()
     if d is None:
         return
+    if not state._cursors:
+        # a tick before start would read from offset 0 and show the oldest rows
+        return _start(state)
     new, state._cursors = log_tail.tail_poll(d, state._cursors)
     if new:
-        state._all = log_tail.merge(state._all, new, MAX_ROWS)
-        state.servers = sorted({r.get("server", "") for r in state._all})
+        state._all = tuple(log_tail.merge(list(state._all), new, MAX_ROWS))
+        _set_servers(state)
         _refresh(state)
 
 
@@ -81,14 +93,17 @@ def _toggle_server(state, server: str, on: bool) -> None:
 
 def _toggle_pause(state) -> None:
     state.paused = not state.paused
+    if state.paused:
+        state._frozen = tuple(state._all)
     _refresh(state)
 
 
 class LogsState(rx.State):
     """Per-tab tail state. ``_all``/``_cursors`` are backend-only."""
 
-    _all: list = []
-    _cursors: dict = {}
+    _all: tuple = ()
+    _frozen: tuple = ()
+    _cursors: list = []
     rows: list[list[str]] = []
     servers: list[str] = []
     selected: list[str] = []
@@ -171,6 +186,9 @@ def logs_page() -> rx.Component:
             ),
             rx.table.body(rx.foreach(LogsState.rows, _row)),
             width="100%",
+            # table bodies stay white (palette.REFLEX_TABLE_HUES); the page
+            # tint would otherwise show through the transparent Radix rows
+            class_name="bg-white",
         ),
         on_mount=LogsState.start,
         width="100%",

@@ -245,3 +245,29 @@ def test_poll_returns_at_most_one_chunk_per_file_then_continues(tmp_path, monkey
             break
         got += [r["seq"] for r in more]
     assert got == list(range(20))
+
+
+def test_non_str_fields_do_not_raise():
+    recs = [
+        {
+            "ts": 5,
+            "level": "INFO",
+            "server": "A",
+            "pid": 1,
+            "seq": 1,
+            "msg": 42,
+            "exc": ["e"],
+        },
+        {
+            "ts": "2026-10-26T00:00:01.000000Z",
+            "level": "INFO",
+            "server": "A",
+            "pid": 1,
+            "seq": 2,
+            "msg": None,
+        },
+    ]
+    merged = log_tail.merge([], recs, 10)
+    assert len(merged) == 2
+    assert len(log_tail.filter_records(merged, None, "INFO", "42")) == 1
+    assert log_tail.to_rows(merged)[0][0] == "5"

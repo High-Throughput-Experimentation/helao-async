@@ -24,6 +24,11 @@ LEVELS = {
 _ROTATED = re.compile(r"_\d{8}T\d{6}(?:_\d+)?\.jsonl$")
 
 
+def _s(x) -> str:
+    """Text of a field a hand-written line may have typed wrongly."""
+    return "" if x is None else str(x)
+
+
 def _note(msg: str) -> dict:
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
     return {
@@ -181,7 +186,7 @@ def merge(old: list, new: list, keep: int) -> list:
             continue
         seen.add(key)
         out.append(r)
-    out.sort(key=lambda r: r.get("ts") or "")
+    out.sort(key=lambda r: _s(r.get("ts")))
     return out[-keep:]
 
 
@@ -193,10 +198,7 @@ def filter_records(records, servers, min_level: str, text: str) -> list:
         for r in records
         if (servers is None or r.get("server") in servers)
         and LEVELS.get(r.get("level"), 0) >= floor
-        and (
-            not needle
-            or needle in ((r.get("msg") or "") + (r.get("exc") or "")).lower()
-        )
+        and (not needle or needle in (_s(r.get("msg")) + _s(r.get("exc"))).lower())
     ]
 
 
@@ -204,13 +206,13 @@ def to_rows(records) -> list:
     """Newest-first ``[ts, level, server, msg, color]`` rows for the table."""
     rows = []
     for r in reversed(records):
-        msg = r.get("msg") or ""
+        msg = _s(r.get("msg"))
         if r.get("exc"):
-            msg = f"{msg}\n{r['exc']}"
+            msg = f"{msg}\n{_s(r['exc'])}"
         level = r.get("level", "")
         rows.append(
             [
-                r.get("ts") or "",
+                _s(r.get("ts")),
                 level,
                 r.get("server", ""),
                 msg,
