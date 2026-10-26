@@ -779,6 +779,16 @@ BROWSER_HEADER_TEXT: Final[str] = TW["sky-700"]
 BROWSER_FAILURE_TEXT: Final[str] = TW["red-700"]
 """Data-browser scan-failure span. Replaces ``#c0392b``."""
 
+#: Row text colour per log level on the Reflex /logs page.
+LOG_LEVEL_TEXT: Final[dict[str, str]] = {
+    "DEBUG": TW["slate-500"],
+    "INFO": TW["slate-900"],
+    "WARNING": TW["amber-700"],
+    "ERROR": TW["red-700"],
+    "CRITICAL": TW["red-700"],
+    "ALERT": TW["red-700"],
+}
+
 # ---------------------------------------------------------------------------
 # Controls
 # ---------------------------------------------------------------------------
