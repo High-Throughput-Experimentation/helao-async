@@ -33,6 +33,7 @@ def _note(msg: str) -> dict:
         "pid": 0,
         "seq": 0,
         "msg": msg,
+        "_note": True,
     }
 
 
@@ -52,9 +53,11 @@ def _parse(chunk: bytes):
     rows = []
     for line in chunk[:end].split(b"\n"):
         try:
-            rows.append(json.loads(line))
+            row = json.loads(line)
         except ValueError:
             continue
+        if isinstance(row, dict):
+            rows.append(row)
     return rows, end + 1
 
 
@@ -85,11 +88,14 @@ def tail_init(log_dir, n: int = 2000):
     """The newest ``n`` records across the live files, and a cursor per file."""
     records, cursors = [], []
     for p in live_files(log_dir):
-        st = p.stat()
-        start = max(0, st.st_size - CHUNK)
-        with open(p, "rb") as f:
-            f.seek(start)
-            chunk = f.read(st.st_size - start)
+        try:
+            st = p.stat()
+            start = max(0, st.st_size - CHUNK)
+            with open(p, "rb") as f:
+                f.seek(start)
+                chunk = f.read(st.st_size - start)
+        except OSError:
+            continue
         dropped = 0
         if start:
             dropped = chunk.find(b"\n") + 1  # first line is partial
@@ -103,29 +109,66 @@ def tail_init(log_dir, n: int = 2000):
 
 
 def _finish_rotated(live: Path, cur: dict) -> list:
+    """Read the rotated file holding the cursor's inode to its end."""
+    missing = [
+        _note(f"{live.name} rotated; records written just before may be missing")
+    ]
+    if not cur[
+        "inode"
+    ]:  # st_ino 0 (FAT, some network mounts): inodes cannot identify a file
+        return missing
+    rotated = []
     for p in live.parent.glob(f"{live.stem}_*.jsonl"):
         try:
-            if p.stat().st_ino == cur["inode"]:
-                rows, _ = _read_from(p, cur)
-                return rows
+            rotated.append((p, p.stat()))
         except OSError:
             continue
-    return [_note(f"{live.name} rotated; records written just before may be missing")]
+    mine = next(((p, st) for p, st in rotated if st.st_ino == cur["inode"]), None)
+    if mine is None:
+        return missing
+    p, st = mine
+    rows = []
+    try:
+        while cur["offset"] < p.stat().st_size:
+            got, nxt = _read_from(p, cur)
+            rows += got
+            if nxt["offset"] <= cur["offset"]:
+                rows.append(
+                    _note(f"{p.name}: tail not fully read (incomplete last line)")
+                )
+                break
+            cur = nxt
+    except OSError:
+        return rows + missing
+    # a newer rotated file means a rotation happened since our last poll
+    if any(other.st_mtime > st.st_mtime for _, other in rotated):
+        rows.append(
+            _note(f"{live.name}: another rotation was skipped; records may be missing")
+        )
+    return rows
 
 
 def tail_poll(log_dir, cursors: list):
     """Records appended since ``cursors``; follows a rotation to its renamed file."""
     known = {c["path"]: c for c in cursors}
-    out, new = [], []
+    out, new, seen = [], [], set()
     for p in live_files(log_dir):
-        st = p.stat()
-        cur = known.get(str(p)) or {"path": str(p), "inode": st.st_ino, "offset": 0}
-        if st.st_ino != cur["inode"] or st.st_size < cur["offset"]:
-            out += _finish_rotated(p, cur)
-            cur = {"path": str(p), "inode": st.st_ino, "offset": 0}
-        rows, cur = _read_from(p, cur)
+        seen.add(str(p))
+        try:
+            st = p.stat()
+            cur = known.get(str(p)) or {"path": str(p), "inode": st.st_ino, "offset": 0}
+            if st.st_ino != cur["inode"] or st.st_size < cur["offset"]:
+                out += _finish_rotated(p, cur)
+                cur = {"path": str(p), "inode": st.st_ino, "offset": 0}
+            rows, cur = _read_from(p, cur)
+        except OSError:
+            if str(p) in known:
+                new.append(known[str(p)])
+            continue
         out += rows
         new.append(cur)
+    # a file absent for one poll keeps its cursor, so a reappearing file finds its old tail
+    new += [c for path, c in known.items() if path not in seen and c not in new]
     return out, new
 
 
@@ -134,11 +177,11 @@ def merge(old: list, new: list, keep: int) -> list:
     seen, out = set(), []
     for r in old + new:
         key = (r.get("server"), r.get("pid"), r.get("seq"), r.get("ts"))
-        if r.get("server") != "logs" and key in seen:
+        if not r.get("_note") and key in seen:
             continue
         seen.add(key)
         out.append(r)
-    out.sort(key=lambda r: r.get("ts", ""))
+    out.sort(key=lambda r: r.get("ts") or "")
     return out[-keep:]
 
 
@@ -150,7 +193,10 @@ def filter_records(records, servers, min_level: str, text: str) -> list:
         for r in records
         if (servers is None or r.get("server") in servers)
         and LEVELS.get(r.get("level"), 0) >= floor
-        and (not needle or needle in (r.get("msg", "") + r.get("exc", "")).lower())
+        and (
+            not needle
+            or needle in ((r.get("msg") or "") + (r.get("exc") or "")).lower()
+        )
     ]
 
 
@@ -158,13 +204,13 @@ def to_rows(records) -> list:
     """Newest-first ``[ts, level, server, msg, color]`` rows for the table."""
     rows = []
     for r in reversed(records):
-        msg = r.get("msg", "")
+        msg = r.get("msg") or ""
         if r.get("exc"):
             msg = f"{msg}\n{r['exc']}"
         level = r.get("level", "")
         rows.append(
             [
-                r.get("ts", ""),
+                r.get("ts") or "",
                 level,
                 r.get("server", ""),
                 msg,

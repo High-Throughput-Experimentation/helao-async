@@ -107,3 +107,141 @@ def test_filter_and_rows():
     assert log_tail.filter_records(recs, None, "DEBUG", "DISK") == recs[1:]
     rows = log_tail.to_rows(recs)
     assert rows[0][2] == "B" and rows[0][4].startswith("#")  # newest first, colour
+
+
+def test_rotated_file_is_read_to_its_end_not_one_chunk(tmp_path, monkeypatch):
+    monkeypatch.setattr(log_tail, "CHUNK", 256)
+    f = tmp_path / "helao_g.jsonl"
+    f.write_bytes(_line(0))
+    _, cur = log_tail.tail_init(tmp_path)
+    with open(f, "ab") as fh:
+        fh.write(b"".join(_line(i) for i in range(1, 11)))  # > 3 * CHUNK unread
+    os.rename(f, tmp_path / "helao_g_20261026T000000.jsonl")
+    f.write_bytes(_line(20))
+    recs, _ = log_tail.tail_poll(tmp_path, cur)
+    assert [r["seq"] for r in recs] == [*range(1, 11), 20]
+
+
+def test_file_absent_for_one_poll_keeps_its_tail(tmp_path):
+    f = tmp_path / "helao_g.jsonl"
+    f.write_bytes(_line(1))
+    _, cur = log_tail.tail_init(tmp_path)
+    with open(f, "ab") as fh:
+        fh.write(_line(2))
+    os.rename(f, tmp_path / "helao_g_20261026T000000.jsonl")
+    recs, cur = log_tail.tail_poll(tmp_path, cur)  # no live file
+    assert recs == []
+    f.write_bytes(_line(3))
+    recs, _ = log_tail.tail_poll(tmp_path, cur)
+    assert [r["seq"] for r in recs] == [2, 3]
+
+
+def test_vanishing_file_never_raises(tmp_path, monkeypatch):
+    f = tmp_path / "helao_g.jsonl"
+    f.write_bytes(_line(1))
+    _, cur = log_tail.tail_init(tmp_path)
+    real = log_tail.live_files
+    monkeypatch.setattr(
+        log_tail, "live_files", lambda d: real(d) + [tmp_path / "gone.jsonl"]
+    )
+    assert log_tail.tail_init(tmp_path)[0]
+    recs, new = log_tail.tail_poll(tmp_path, cur)
+    assert recs == [] and [c["path"] for c in new] == [str(f)]
+
+
+def test_truncate_in_place_is_a_rotation(tmp_path):
+    f = tmp_path / "helao_g.jsonl"
+    f.write_bytes(_line(1) + _line(2) + _line(3))
+    _, cur = log_tail.tail_init(tmp_path)
+    f.write_bytes(_line(9))  # same inode, smaller than the cursor
+    recs, _ = log_tail.tail_poll(tmp_path, cur)
+    assert "may be missing" in recs[0]["msg"] and recs[-1]["seq"] == 9
+
+
+def test_unrelated_rotated_file_is_not_read(tmp_path):
+    f = tmp_path / "helao_g.jsonl"
+    f.write_bytes(_line(1))
+    _, cur = log_tail.tail_init(tmp_path)
+    f.unlink()
+    (tmp_path / "helao_g_20261026T000000.jsonl").write_bytes(_line(77))
+    f.write_bytes(_line(5))
+    recs, _ = log_tail.tail_poll(tmp_path, cur)
+    assert 77 not in [r.get("seq") for r in recs] and "may be missing" in recs[0]["msg"]
+
+
+def test_zero_inode_cursor_does_not_match_by_inode(tmp_path):
+    f = tmp_path / "helao_g.jsonl"
+    f.write_bytes(_line(1))
+    (tmp_path / "helao_g_20261026T000000.jsonl").write_bytes(_line(77))
+    cur = [{"path": str(f), "inode": 0, "offset": 0}]
+    recs, _ = log_tail.tail_poll(tmp_path, cur)
+    assert 77 not in [r.get("seq") for r in recs] and "may be missing" in recs[0]["msg"]
+
+
+def test_skipped_rotation_is_noted(tmp_path):
+    f = tmp_path / "helao_g.jsonl"
+    f.write_bytes(_line(1))
+    _, cur = log_tail.tail_init(tmp_path)
+    old = tmp_path / "helao_g_20261026T000000.jsonl"
+    os.rename(f, old)
+    newer = tmp_path / "helao_g_20261026T010000.jsonl"
+    newer.write_bytes(_line(2))
+    os.utime(newer, (time.time() + 10, time.time() + 10))
+    f.write_bytes(_line(3))
+    recs, _ = log_tail.tail_poll(tmp_path, cur)
+    assert any("rotation was skipped" in r.get("msg", "") for r in recs)
+
+
+def test_non_dict_rows_and_null_ts_are_tolerated(tmp_path):
+    (tmp_path / "A.jsonl").write_bytes(b'123\n[1]\n{"ts": null}\n' + _line(4))
+    recs, _ = log_tail.tail_init(tmp_path)
+    assert all(isinstance(r, dict) for r in recs) and len(recs) == 2
+    assert recs[0] == {"ts": None}  # "" sorts first
+    assert log_tail.to_rows(recs)
+    assert log_tail.filter_records(recs, None, "DEBUG", "x") == []
+
+
+def test_exc_is_joined_and_searched():
+    r = json.loads(_line(1))
+    r["exc"] = "Traceback ZeroDivisionError"
+    assert log_tail.to_rows([r])[0][3] == "m1\nTraceback ZeroDivisionError"
+    assert log_tail.filter_records([r], None, "DEBUG", "zerodivision") == [r]
+
+
+def test_merge_sorts_out_of_order_and_across_files():
+    unified = [json.loads(_line(5, "A")), json.loads(_line(2, "A"))]
+    fallback = [json.loads(_line(3, "B"))]
+    assert [r["seq"] for r in log_tail.merge(unified, fallback, 10)] == [2, 3, 5]
+
+
+def test_notes_are_not_deduped_and_show_as_logs():
+    n = log_tail._note("x")
+    assert log_tail.merge([n], [dict(n)], 10) == [n, n]
+    assert log_tail.to_rows([n])[0][2] == "logs"
+
+
+def test_init_on_file_larger_than_chunk_keeps_whole_newest_records(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(log_tail, "CHUNK", 512)
+    (tmp_path / "helao_g.jsonl").write_bytes(b"".join(_line(i) for i in range(20)))
+    recs, cur = log_tail.tail_init(tmp_path, n=3)
+    assert [r["seq"] for r in recs] == [17, 18, 19]
+    assert log_tail.tail_poll(tmp_path, cur)[0] == []
+
+
+def test_poll_returns_at_most_one_chunk_per_file_then_continues(tmp_path, monkeypatch):
+    monkeypatch.setattr(log_tail, "CHUNK", 512)
+    f = tmp_path / "helao_g.jsonl"
+    f.write_bytes(b"")
+    _, cur = log_tail.tail_init(tmp_path)
+    f.write_bytes(b"".join(_line(i) for i in range(20)))
+    first, cur = log_tail.tail_poll(tmp_path, cur)
+    assert 0 < len(first) < 20
+    got = [r["seq"] for r in first]
+    while True:
+        more, cur = log_tail.tail_poll(tmp_path, cur)
+        if not more:
+            break
+        got += [r["seq"] for r in more]
+    assert got == list(range(20))

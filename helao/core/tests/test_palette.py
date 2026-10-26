@@ -509,6 +509,7 @@ HEADING_ROWS: Final[dict[tuple[str, str], float]] = {
 BODY_TEXT_ROWS: Final[dict[tuple[str, str], float]] = {
     ("slate-500", "white"): 4.76,  # muted text on white
     ("slate-600", "slate-300"): 5.10,  # muted text on the panel
+    ("slate-600", "white"): 7.58,  # /logs DEBUG rows (REFLEX_MUTED_TEXT)
     ("amber-700", "white"): 5.02,  # warning text
     ("amber-700", "slate-50"): 4.80,  # the cell that makes 2 dp matter
     ("slate-900", "white"): 17.85,  # body text
@@ -1449,6 +1450,12 @@ def test_exceptions_registry_is_empty() -> None:
     empty case rather than deleting the mechanism.
     """
     assert ACCEPTED_CONTRAST_EXCEPTIONS == {}
+
+
+def test_log_level_text_shades_have_body_rows_on_white() -> None:
+    hex_to_name = {v: k for k, v in TW.items()}
+    for colour in palette.LOG_LEVEL_TEXT.values():
+        assert (hex_to_name[colour], "white") in BODY_TEXT_ROWS
 
 
 def test_every_accepted_exception_is_a_declared_row() -> None:

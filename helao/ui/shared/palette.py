@@ -781,7 +781,7 @@ BROWSER_FAILURE_TEXT: Final[str] = TW["red-700"]
 
 #: Row text colour per log level on the Reflex /logs page.
 LOG_LEVEL_TEXT: Final[dict[str, str]] = {
-    "DEBUG": TW["slate-500"],
+    "DEBUG": TW[REFLEX_MUTED_TEXT],
     "INFO": TW["slate-900"],
     "WARNING": TW["amber-700"],
     "ERROR": TW["red-700"],
