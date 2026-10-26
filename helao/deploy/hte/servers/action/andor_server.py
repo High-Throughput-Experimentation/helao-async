@@ -236,6 +236,7 @@ class AndorAcquire(Executor):
             self.framerate = self.action_params["framerate"]
 
             self.first_tick = None
+            self.first_frame_epoch_s = None
 
             LOGGER.info("AndorAcquire initialized.")
         except Exception:
@@ -297,8 +298,25 @@ class AndorAcquire(Executor):
         # ticks. Zero them here so the body matches the header, rather than
         # writing a column name nothing in the JSON uses.
         elapsed = [float(t) - self.first_tick for t in ticks]
+        # Wall-clock (raw time.time()) of the first frame. A queued frame
+        # returns late, so each estimate is an upper bound; the minimum
+        # over the run is the frames that came back in real time. A
+        # BioLogic-side stamp cannot see the firmware start-up before the
+        # TTL; this one is measured after the camera has the edge.
+        hosts = resp.data.get("host_epoch_s") or []
+        if hosts:
+            est = min(float(h) - e for h, e in zip(hosts, elapsed))
+            if self.first_frame_epoch_s is None or est < self.first_frame_epoch_s:
+                self.first_frame_epoch_s = est
+                self.action_params["first_frame_epoch_s"] = est
         data = {"elapsed_time_s": elapsed}
-        data.update({k: v for k, v in resp.data.items() if k != "tick_time"})
+        data.update(
+            {
+                k: v
+                for k, v in resp.data.items()
+                if k not in ("tick_time", "host_epoch_s")
+            }
+        )
         return {"error": error, "status": status, "data": data}
 
     async def _post_exec(self) -> dict:

@@ -553,26 +553,74 @@ async def test_calibrated_defaults_to_false_on_a_driver_without_the_flag():
     assert ctx.active.action.action_params["calibrated"] is False
 
 
-def test_andor_poll_emits_elapsed_time_s_matching_the_header():
-    """The driver streams tick_time; the HLO header declares elapsed_time_s."""
+def _poll_executor(polls):
+    """An AndorAcquire whose driver returns ``polls`` in order."""
     ex = AndorAcquire.__new__(AndorAcquire)
     ex.first_tick = None
+    ex.first_frame_epoch_s = None
+    ex.action_params = {}
     ex.duration = 10.0
     ex.external_trigger = False
     ex.frames_per_poll = 3
-    ticks = [100.0, 100.01, 100.02]
+    queue = list(polls)
     ex.driver = SimpleNamespace(
         get_data=lambda **k: SimpleNamespace(
-            data={"tick_time": ticks, "ch_0000": [1.0, 2.0, 3.0]},
-            response="success",
-            status=DriverStatus.busy,
+            data=queue.pop(0), response="success", status=DriverStatus.busy
         )
+    )
+    return ex
+
+
+def test_andor_poll_emits_elapsed_time_s_matching_the_header():
+    """The driver streams tick_time; the HLO header declares elapsed_time_s."""
+    ex = _poll_executor(
+        [
+            {
+                "tick_time": [100.0, 100.01, 100.02],
+                "host_epoch_s": [5000.0, 5000.01, 5000.02],
+                "ch_0000": [1.0, 2.0, 3.0],
+            }
+        ]
     )
 
     out = asyncio.run(ex._poll())
 
     assert "tick_time" not in out["data"]
+    assert "host_epoch_s" not in out["data"]
     assert out["data"]["elapsed_time_s"] == pytest.approx([0.0, 0.01, 0.02])
     assert out["data"]["ch_0000"] == [1.0, 2.0, 3.0]
     assert ex.first_tick == 100.0
     assert out["status"] == HloStatus.active
+
+
+def test_first_frame_epoch_is_the_minimum_over_real_time_frames():
+    """Queued frames return late; the real-time ones pin frame 0.
+
+    Frame 0 is exposed at wall 1000.0. The first three sat queued and came
+    back together at 1000.5; the rest returned 10 ms after their exposure.
+    """
+    ex = _poll_executor(
+        [
+            {
+                "tick_time": [7.0, 7.01, 7.02],
+                "host_epoch_s": [1000.5, 1000.5, 1000.5],
+                "ch_0000": [0, 0, 0],
+            },
+            {
+                "tick_time": [7.6, 7.61, 7.62],
+                "host_epoch_s": [1000.61, 1000.62, 1000.63],
+                "ch_0000": [0, 0, 0],
+            },
+        ]
+    )
+
+    asyncio.run(ex._poll())
+    assert ex.action_params["first_frame_epoch_s"] == pytest.approx(1000.48)
+    asyncio.run(ex._poll())
+    assert ex.action_params["first_frame_epoch_s"] == pytest.approx(1000.01)
+
+
+def test_a_driver_without_host_stamps_records_no_first_frame_epoch():
+    ex = _poll_executor([{"tick_time": [1.0, 1.01], "ch_0000": [0, 0]}])
+    asyncio.run(ex._poll())
+    assert "first_frame_epoch_s" not in ex.action_params

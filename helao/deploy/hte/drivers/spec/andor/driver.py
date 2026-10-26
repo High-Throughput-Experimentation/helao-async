@@ -972,17 +972,21 @@ class AndorDriver(HelaoDriver):
 
         Returns:
             :class:`DriverResponse` whose ``data`` is
-            ``{"tick_time": [...], "ch_NNNN": [...]}``.
+            ``{"tick_time": [...], "host_epoch_s": [...], "ch_NNNN": [...]}``.
+            ``host_epoch_s`` is raw ``time.time()`` when ``wait_buffer``
+            returned each frame: late for a frame that sat queued, about one
+            readout after exposure for a frame returned in real time.
         """
         try:
             status = DriverStatus.busy
-            data_dict = {"tick_time": []}
+            data_dict = {"tick_time": [], "host_epoch_s": []}
             data_dict.update({f"ch_{i:04}": [] for i in range(self.wl_arr.size)})
             for _ in range(frames):
                 try:
                     if not external:
                         self.cam.SoftwareTrigger()
                     acq = self.cam.wait_buffer(self.timeout)
+                    data_dict["host_epoch_s"].append(time.time())
                     self.cam.queue(
                         np.zeros(acq._np_data.shape), self.cam.ImageSizeBytes
                     )  # requeue the buffer
