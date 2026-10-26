@@ -2,8 +2,9 @@
 
 Adds a custom ``ALERT`` level above ``CRITICAL`` and provides ``make_logger``,
 which configures a single per-server ``logging.Logger`` with a coloured
-console handler, a daily ``TimedRotatingFileHandler`` that gzips rotated
-files, and optional NTP-offset-aware timestamps. When credentials are
+console handler, a JSONL sink handler (launcher collector over ZMQ, else its
+own ``<log_dir>/<name>.jsonl``, rotating every 300,000 records), and optional
+NTP-offset-aware timestamps. When credentials are
 provided, ``ALERT``-level records are also fanned out to an SMTP handler
 and/or a JSON HTTP POST webhook via queue listeners.
 
@@ -15,13 +16,9 @@ Usage::
     logger = logging.LOGGER
 """
 
-import copy
-import gzip
 import logging
 import os
 import re
-import shutil
-import subprocess
 import tempfile
 import time
 from datetime import datetime, timedelta, timezone
@@ -29,9 +26,7 @@ from logging.handlers import (
     QueueHandler,
     QueueListener,
     SMTPHandler,
-    TimedRotatingFileHandler,
 )
-from pathlib import Path
 from queue import Queue
 from socket import gethostname
 from typing import Optional
@@ -39,6 +34,7 @@ from typing import Optional
 import requests
 from colorlog import ColoredFormatter
 
+from helao.helpers.log_jsonl import LOG_ENDPOINT_ENV, JsonlSinkHandler
 from helao.helpers.time_utils import read_saved_offset
 
 ALERT_LEVEL = 60
@@ -51,12 +47,8 @@ logging.addLevelName(ALERT_LEVEL, "ALERT")
 # key in the alert config referenced by ``alert_config_path``.
 DEFAULT_EMAIL_INTERVAL = 600
 
-# Default seconds over which identical consecutive file-log messages are
-# collapsed into a single summary line. When a message is immediately repeated,
-# further identical records are counted (not written) until a different message
-# arrives or this interval elapses, at which point one summary line reporting
-# the repeat count is written. ``0`` disables de-duplication and restores stock
-# ``TimedRotatingFileHandler`` behaviour. Overridden per-logger via the
+# Default seconds a repeated message sequence (period 1-16) is collapsed before
+# a summary record is written; ``0`` disables. Overridden per-logger via the
 # ``dedup_interval`` argument to :func:`make_logger`.
 DEFAULT_DEDUP_INTERVAL = 10.0
 
@@ -118,22 +110,6 @@ def subject_title(message: str) -> str:
     if len(title) > MAX_SUBJECT_TITLE:
         title = title[:MAX_SUBJECT_TITLE].rstrip() + "..."
     return title
-
-
-class GZipRotator:
-    """Rotation callable that renames the rotated log file and gzips it."""
-
-    def __call__(self, source, dest):
-        """Move ``source`` to ``dest`` then spawn ``gzip`` to compress it."""
-        os.rename(source, dest)
-        try:
-            subprocess.Popen(["gzip", dest])
-        except FileNotFoundError:
-            # No gzip on PATH (e.g. Windows): leaving the plain ``dest`` would
-            # make the stdlib handler skip every later rollover.
-            with open(dest, "rb") as fin, gzip.open(dest + ".gz", "wb") as fout:
-                shutil.copyfileobj(fin, fout)
-            os.remove(dest)
 
 
 class TitledSMTPHandler(SMTPHandler):
@@ -222,96 +198,6 @@ class TitledSMTPHandler(SMTPHandler):
         super().emit(record)
         self._suppressed_count = 0
         self._suppressed_subjects = []
-
-
-class DedupTimedRotatingFileHandler(TimedRotatingFileHandler):
-    """Rotating file handler that collapses repeated consecutive messages.
-
-    When the same log message — compared by raw content via
-    ``record.getMessage()``, ignoring formatting — is emitted twice in a row,
-    a de-duplication cooldown starts: subsequent identical messages are counted
-    rather than written. The buffered repeat count is flushed as a single
-    summary line when either a different message arrives or the cooldown
-    interval elapses, whichever comes first. Because handlers only act on
-    ``emit``, an elapsed cooldown is detected lazily on the next record; a run
-    of duplicates that simply stops is summarised when the next record (of any
-    kind) arrives. ``dedup_interval`` of ``0`` disables the behaviour and
-    restores stock ``TimedRotatingFileHandler`` semantics.
-    """
-
-    def __init__(self, *args, dedup_interval: float = 0, **kwargs):
-        """Build the handler.
-
-        Args:
-            *args: Positional arguments forwarded to
-                ``TimedRotatingFileHandler``.
-            dedup_interval: Seconds a run of identical consecutive messages is
-                collapsed before a summary line is written. ``0`` (the default)
-                disables de-duplication.
-            **kwargs: Keyword arguments forwarded to
-                ``TimedRotatingFileHandler``.
-        """
-        kwargs.setdefault("encoding", "utf-8")
-        super().__init__(*args, **kwargs)
-        self.dedup_interval = dedup_interval
-        self._dedup_last_message = None
-        self._dedup_record = None
-        self._dedup_count = 0
-        self._dedup_started = None
-
-    def _flush_dedup(self):
-        """Write a summary line for any buffered repeats and reset the window."""
-        if self._dedup_count > 0 and self._dedup_record is not None:
-            times = self._dedup_count
-            summary = copy.copy(self._dedup_record)
-            summary.msg = (
-                f"{self._dedup_record.getMessage()} "
-                f"[previous message repeated {times} "
-                f"time{'s' if times != 1 else ''}]"
-            )
-            summary.args = None
-            super().emit(summary)
-        self._dedup_count = 0
-        self._dedup_started = None
-
-    def emit(self, record):
-        """Write ``record`` unless it is a suppressed consecutive duplicate."""
-        if not (self.dedup_interval and self.dedup_interval > 0):
-            super().emit(record)
-            return
-
-        try:
-            message = record.getMessage()
-        except Exception:
-            # A malformed log call (e.g. printf-style args with no % placeholders)
-            # must not propagate out of emit() and kill the calling coroutine.
-            # Defer to the stdlib handler, which routes formatting errors through
-            # handleError() instead of raising.
-            super().emit(record)
-            return
-        now = time.monotonic()
-
-        if message != self._dedup_last_message:
-            # New, non-duplicate message: flush any pending repeats, then write.
-            self._flush_dedup()
-            super().emit(record)
-            self._dedup_last_message = message
-            self._dedup_record = record
-            return
-
-        if self._dedup_started is None:
-            # First immediate repeat: open the cooldown window and suppress.
-            self._dedup_started = now
-            self._dedup_count = 1
-            return
-
-        # Continued repeat within an open window.
-        self._dedup_count += 1
-        if now - self._dedup_started >= self.dedup_interval:
-            # Cooldown satisfied: summarise the run so far and reopen a window
-            # so sustained spam yields one summary line per interval.
-            self._flush_dedup()
-            self._dedup_started = now
 
 
 class HTTPPostHandler(logging.Handler):
@@ -403,7 +289,7 @@ def make_logger(
 ) -> logging.Logger:
     """Build and configure the canonical per-server HELAO logger.
 
-    Attaches a daily-rotating gzip file handler and a coloured console
+    Attaches a JSONL sink handler and a coloured console
     handler. When ``email_config`` provides full SMTP credentials or a
     webhook plus payload, an ``ALERT``-level queue-backed handler is added
     that forwards records to email and/or HTTP respectively. Timestamps are
@@ -423,19 +309,18 @@ def make_logger(
             interval, defaulting to :data:`DEFAULT_EMAIL_INTERVAL`.
         show_debug_console: If ``True``, the console handler is set to
             ``DEBUG`` level.
-        dedup_interval: Seconds over which identical consecutive messages
-            written to the rotating file are collapsed into a single summary
-            line, defaulting to :data:`DEFAULT_DEDUP_INTERVAL`. ``0`` disables
-            de-duplication.
+        dedup_interval: Seconds a repeated message sequence (period 1-16) is
+            collapsed before a summary record is written; ``0`` disables.
+            Defaults to :data:`DEFAULT_DEDUP_INTERVAL`.
 
     Returns:
         The configured ``logging.Logger`` instance.
     """
     if logger_name is not None and logger_name.endswith(".py"):
         logger_name = os.path.basename(logger_name).replace(".py", "")
-    temp_dir = tempfile.mkdtemp()
-    log_dir = temp_dir if log_dir is None else log_dir
-    log_path = Path(os.path.join(log_dir, f"{logger_name}.log"))
+    # a temp dir only when the caller gave none (spec §3: F3 keeps configured
+    # roots off it); the old code made one on every call and leaked it
+    log_dir = tempfile.mkdtemp() if log_dir is None else log_dir
     format_string = "%(asctime)s | %(levelname)-8s | %(name)s :: %(funcName)s @ %(filename)s:%(lineno)d - %(message)s"
     ntp_path = os.path.join(log_dir, "ntpLastSync.txt")
     if os.path.exists(ntp_path):
@@ -466,32 +351,15 @@ def make_logger(
     # create handlers
     console = logging.StreamHandler()
     console.setFormatter(colored_formatter)
-    try:
-        timed_rotation = DedupTimedRotatingFileHandler(
-            filename=log_path,
-            when="D",
-            interval=1,
-            backupCount=90,
-            dedup_interval=dedup_interval,
-        )
-        timed_rotation.rotator = GZipRotator()
-    except OSError:
-        temp_log_path = Path(os.path.join(temp_dir, f"{logger_name}.log"))
-        print(f"Can't write to {log_path}. Redirecting to: {temp_log_path}")
-        timed_rotation = DedupTimedRotatingFileHandler(
-            filename=temp_log_path,
-            when="D",
-            interval=1,
-            backupCount=90,
-            dedup_interval=dedup_interval,
-        )
-    timed_rotation.setFormatter(formatter)
-
-    # set log level and attach default handlers
-    handlers = [timed_rotation]
-    for handler in handlers:
-        handler.setLevel(log_level)
-        logger_instance.addHandler(handler)
+    sink = JsonlSinkHandler(
+        logger_name or "root",
+        log_dir,
+        endpoint=os.environ.get(LOG_ENDPOINT_ENV),
+        offset_seconds=offset_seconds,
+        dedup_interval=dedup_interval,
+    )
+    sink.setLevel(log_level)
+    logger_instance.addHandler(sink)
 
     debug_handlers = [console]
     for handler in debug_handlers:
@@ -574,7 +442,8 @@ def make_logger(
         ]
         logger_instance.info(f"Webhook alerts not enabled, missing keys: {missing}")
 
-    logger_instance.info(f"writing log events to {log_path}")
+    target = sink.endpoint or sink.fallback_path
+    logger_instance.info(f"writing log events to {target}")
     logger_instance.propagate = False
     return logger_instance
 

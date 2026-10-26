@@ -3,6 +3,7 @@
 Design: docs/superpowers/specs/2026-10-26-jsonl-unified-logging-design.md (§1, §2).
 """
 
+import copy
 import gzip
 import json
 import logging
@@ -17,10 +18,13 @@ from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 
+import zmq
+
 LOG_ENDPOINT_ENV = "HELAO_LOG_ENDPOINT"
 ROTATE_RECORDS = 300_000
 RETAIN_DAYS = 90
 GRACE_S = 10.0
+TMP_MAX_AGE_S = 3600
 BUFFER_SIZE = 2000
 MAX_PERIOD = 16
 HWM = 1000
@@ -86,11 +90,11 @@ def record_to_json(
     doc = {
         "ts": ts.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
         "level": record.levelname,
-        "server": record.name,
+        "server": _clean(record.name),
         "pid": record.process,
         "seq": seq,
-        "func": record.funcName,
-        "file": record.filename,
+        "func": _clean(record.funcName),
+        "file": _clean(record.filename),
         "line": record.lineno,
         "msg": _clean(_message(record)),
     }
@@ -145,6 +149,7 @@ class RotatingJsonlWriter:
         self.rotated_re = re.compile(
             rf"^{re.escape(stem)}_\d{{8}}T\d{{6}}(?:_\d+)?\.jsonl(?:\.gz)?$"
         )
+        self.tmp_re = re.compile(rf"^{re.escape(stem)}_.*\.jsonl\.gz\..*\.tmp$")
         self._started = False
         self._fh = None
         self._count = 0
@@ -161,8 +166,20 @@ class RotatingJsonlWriter:
         for p in sorted(self.dir.iterdir()):
             if p.suffix == ".jsonl" and self.rotated_re.match(p.name):
                 self._queue_compress(p)
+        self._sweep_tmp()
         self._prune()
         self._started = True
+
+    def _sweep_tmp(self):
+        # compressor temp files orphaned by a crash (a live one is minutes old at most)
+        cutoff = time.time() - TMP_MAX_AGE_S
+        for p in self.dir.iterdir():
+            if self.tmp_re.match(p.name):
+                try:
+                    if p.stat().st_mtime < cutoff:
+                        p.unlink()
+                except OSError:
+                    pass
 
     def write(self, data: bytes) -> None:
         """Append one serialized record; rotate when the count is reached."""
@@ -226,7 +243,7 @@ class RotatingJsonlWriter:
             path = self._queue.get()
             if path is None:
                 return
-            tmp = f"{path}.gz.{os.getpid()}.tmp"
+            tmp = f"{path}.gz.{os.getpid()}.{threading.get_ident()}.tmp"
             try:
                 try:
                     fin = open(path, "rb")
@@ -340,3 +357,184 @@ class SequenceDeduper:
     def flush(self) -> list:
         """Everything still pending: a summary and any held-back records."""
         return self._close() if self._cycle is not None else []
+
+
+def _summary_record(
+    period: int, count: int, last: logging.LogRecord
+) -> logging.LogRecord:
+    rec = copy.copy(last)
+    times = f"{count} time{'s' if count != 1 else ''}"
+    if period == 1:
+        rec.msg = f"{_message(last)} [previous message repeated {times}]"
+    else:
+        rec.msg = f"[previous {period}-message sequence repeated {times}, ending: {_message(last)}]"
+    rec.args = None
+    rec.exc_info = None
+    rec.exc_text = None
+    rec.created = time.time()
+    rec.repeat_count = count
+    rec.repeat_period = period
+    return rec
+
+
+class JsonlSinkHandler(logging.Handler):
+    """Dedup, serialize, and send each record to the launcher, else to own file.
+
+    The ZMQ socket is touched only inside ``emit``/``close``, which
+    ``logging.Handler`` runs under the handler lock, so access is serialized
+    across the event-loop thread and executor threads.
+    """
+
+    def __init__(
+        self,
+        stem: str,
+        log_dir,
+        *,
+        endpoint=None,
+        offset_seconds: float = 0.0,
+        dedup_interval: float = 10.0,
+        rotate_records: int = ROTATE_RECORDS,
+        connect_timeout_ms: int = 1000,
+    ):
+        super().__init__()
+        self.stem = stem
+        self.log_dir = Path(log_dir)
+        self.endpoint = endpoint
+        self.offset_seconds = offset_seconds
+        self.rotate_records = rotate_records
+        self.deduper = SequenceDeduper(interval=dedup_interval)
+        self.recent: deque = deque(maxlen=BUFFER_SIZE)
+        self.seq = 0
+        self._spilled = 0
+        self._connected = False
+        self._log = None
+        self._ledger = None
+        self._sock = None
+        self._pid = os.getpid()
+        if endpoint:
+            self._connect(connect_timeout_ms)
+
+    @property
+    def fallback_path(self) -> Path:
+        return self.log_dir / f"{self.stem}.jsonl"
+
+    def _connect(self, timeout_ms: int):
+        sock = zmq.Context.instance().socket(zmq.PUSH)
+        sock.setsockopt(zmq.IMMEDIATE, 1)
+        sock.setsockopt(zmq.SNDHWM, HWM)
+        sock.setsockopt(zmq.LINGER, 500)
+        mon = sock.get_monitor_socket(zmq.EVENT_HANDSHAKE_SUCCEEDED)
+        sock.connect(self.endpoint)
+        # with IMMEDIATE, sends before the ZMTP handshake completes raise Again;
+        # wait once (process start) so startup records reach the launcher
+        if mon.poll(timeout_ms):
+            mon.recv_multipart()
+        sock.disable_monitor()
+        mon.close()
+        self._sock = sock
+
+    def _after_fork(self):
+        # never use the parent's socket or file handles in a forked child
+        self._pid = os.getpid()
+        self._sock = None
+        self._log = self._ledger = None
+        self._connected = False
+        if self.endpoint:
+            self._connect(200)
+
+    def _writer(self, ledger: bool) -> RotatingJsonlWriter:
+        if ledger:
+            if self._ledger is None:
+                self._ledger = RotatingJsonlWriter(
+                    self.log_dir,
+                    f"artifacts_{self.stem}",
+                    rotate_records=self.rotate_records,
+                    retain_days=None,
+                    shared=True,
+                )
+            return self._ledger
+        if self._log is None:
+            self._log = RotatingJsonlWriter(
+                self.log_dir, self.stem, rotate_records=self.rotate_records, shared=True
+            )
+        return self._log
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            if os.getpid() != self._pid:
+                self._after_fork()
+            if is_artifact(record):
+                self._out(record)
+                return
+            for kind, *rest in self.deduper.feed(fingerprint(record), record):
+                self._out(rest[0] if kind == "record" else _summary_record(*rest))
+        except Exception:
+            self.handleError(record)
+
+    def _out(self, record: logging.LogRecord) -> None:
+        self.seq += 1
+        data = record_to_json(record, self.seq, self.offset_seconds)
+        ledger = is_artifact(record)
+        entry = [data, ledger, False]
+        self.recent.append(entry)
+        if self._sock is not None and self._send(data, ledger):
+            entry[2] = True
+            return
+        self._spill(data, ledger)
+
+    def _send(self, data: bytes, ledger: bool) -> bool:
+        try:
+            if self._spilled:
+                self.seq += 1
+                note = logging.LogRecord(
+                    self.stem,
+                    logging.WARNING,
+                    __file__,
+                    0,
+                    f"{self._spilled} records went to {self.fallback_path}",
+                    None,
+                    None,
+                )
+                self._sock.send(
+                    record_to_json(note, self.seq, self.offset_seconds), zmq.NOBLOCK
+                )
+                self._spilled = 0
+            self._sock.send_multipart(
+                [LEDGER_FRAME, data] if ledger else [data], zmq.NOBLOCK
+            )
+        except zmq.Again:
+            if self._connected:
+                self._connected = False
+                self._replay()
+            return False
+        self._connected = True
+        return True
+
+    def _replay(self):
+        # at-least-once: records still in socket buffers when the launcher died
+        for data, ledger, sent in list(self.recent):
+            if sent:
+                self._spill(data, ledger, count=False)
+
+    def _spill(self, data: bytes, ledger: bool, count: bool = True):
+        self._writer(False).write(data)
+        if ledger:
+            self._writer(True).write(data)
+        if count:
+            self._spilled += 1
+
+    def close(self) -> None:
+        self.acquire()
+        try:
+            for kind, *rest in self.deduper.flush():
+                self._out(rest[0] if kind == "record" else _summary_record(*rest))
+            if self._sock is not None:
+                self._sock.close()
+                self._sock = None
+            for w in (self._log, self._ledger):
+                if w is not None:
+                    w.close()
+            self._log = self._ledger = None
+        finally:
+            self.release()
+            super().close()

@@ -328,3 +328,59 @@ def test_next_write_never_waits_for_compressor(tmp_path, monkeypatch):
     gate.set()
     assert _wait(lambda: list(tmp_path.glob("s_*.jsonl.gz")))
     w.close()
+
+
+def test_concurrent_compressors_produce_one_valid_gz(tmp_path):
+    plain = tmp_path / "s_20260101T000000.jsonl"
+    body = b"".join(
+        f'{{"seq": {i}, "x": "{os.urandom(8).hex()}"}}\n'.encode()
+        for i in range(150_000)
+    )
+    plain.write_bytes(body)
+    barrier = threading.Barrier(2)
+    writers = [RotatingJsonlWriter(tmp_path, "s", grace_s=0) for _ in range(2)]
+
+    def go(w):
+        barrier.wait()
+        w.write(b"x\n")  # first write scans the dir and queues the rotated file
+
+    gz = tmp_path / "s_20260101T000000.jsonl.gz"
+    stop, partial = threading.Event(), []
+
+    def watch():  # a .gz that exists must already be complete (temp + replace)
+        while not stop.is_set():
+            if gz.exists():
+                try:
+                    gzip.open(gz).read()
+                except (EOFError, OSError):
+                    partial.append(1)
+            time.sleep(0.001)
+
+    watcher = threading.Thread(target=watch)
+    watcher.start()
+    threads = [threading.Thread(target=go, args=(w,)) for w in writers]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    for w in writers:
+        w.close()  # waits for the queued compressions
+    stop.set()
+    watcher.join()
+    assert not partial
+    assert gzip.open(gz).read() == body
+    assert not list(tmp_path.glob("*.tmp"))
+    assert not plain.exists()
+
+
+def test_orphaned_compressor_tmp_swept_at_start(tmp_path):
+    old = time.time() - 2 * 3600
+    stale = tmp_path / "s_20260101T000000.jsonl.gz.1.2.tmp"
+    fresh = tmp_path / "s_20260102T000000.jsonl.gz.1.2.tmp"
+    other = tmp_path / "t_20260101T000000.jsonl.gz.1.2.tmp"
+    for p in (stale, fresh, other):
+        p.write_bytes(b"")
+    for p in (stale, other):
+        os.utime(p, (old, old))
+    RotatingJsonlWriter(tmp_path, "s").write(b"x\n")
+    assert not stale.exists() and fresh.exists() and other.exists()
