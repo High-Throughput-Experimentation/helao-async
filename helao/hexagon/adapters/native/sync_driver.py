@@ -58,6 +58,7 @@ from helao.core.models.run_dir import (
 
 # from filelock import FileLock
 from helao.helpers import helao_logging as logging
+from helao.helpers.artifact_hash import log_artifact_hashes
 from helao.helpers.run_state import (
     DONE,
     QUARANTINED,
@@ -2589,12 +2590,19 @@ class SyncDriver:
                 # every repair tool had to consult a parallel tree that might
                 # no longer be beside the zip it was repairing.
                 save_dir = str(exp_prog.yml.target.parent)
-                write_meta(
-                    os.path.join(
-                        save_dir,
-                        f"{pidx}__{uuid_key}__{meta['technique_name']}-prc.json",
-                    ),
-                    model,
+                prc_path = os.path.join(
+                    save_dir,
+                    f"{pidx}__{uuid_key}__{meta['technique_name']}-prc.json",
+                )
+                existed = os.path.exists(prc_path)
+                write_meta(prc_path, model)
+                # a re-push after a write-off rewrites the record (spec §5)
+                await log_artifact_hashes(
+                    [prc_path],
+                    kind="prc",
+                    owner_uuid=uuid_key,
+                    event="artifact_rewritten" if existed else "artifact_final",
+                    reason="process_repush" if existed else None,
                 )
                 # sync to s3
                 meta_s3_key = f"process/{uuid_key}.json"

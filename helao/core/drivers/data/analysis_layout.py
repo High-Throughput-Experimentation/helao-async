@@ -37,6 +37,7 @@ that choice explicit is what stops it being decided by luck.
 __all__ = [
     "ANALYSES_DIRNAME",
     "analysis_dir",
+    "local_output_path",
     "analysis_model_key",
     "analysis_output_models",
     "analysis_root",
@@ -391,6 +392,13 @@ async def upload_json(
         return False
 
 
+def local_output_path(output: dict, local_ana_dir: str) -> str:
+    """Where :func:`publish_outputs` writes one output group locally."""
+    return os.path.join(
+        local_ana_dir, os.path.basename(output["analysis_output_path"]["key"])
+    )
+
+
 async def publish_outputs(
     model_dict: dict,
     values: dict,
@@ -441,7 +449,7 @@ async def publish_outputs(
         keys = output["output_keys"]
         body = {k: v for k, v in values.items() if k in keys}
         target = output["analysis_output_path"]["key"]
-        local_json_out = os.path.join(local_ana_dir, os.path.basename(target))
+        local_json_out = local_output_path(output, local_ana_dir)
         # Array outputs serialize to megabytes of JSON; keep that off the event
         # loop for the same reason as the analysis itself.
         await asyncio.to_thread(write_json, body, local_json_out)

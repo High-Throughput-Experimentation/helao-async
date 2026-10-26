@@ -24,6 +24,7 @@ Q2 (binding): sample/status mutations are NOT here — see
 """
 
 from pathlib import Path
+from typing import Optional
 
 from helao.helpers.file_utils import zip_dir
 from helao.helpers.yml_tools import move_dir
@@ -87,8 +88,8 @@ class NativeArtifactStoreAdapter:
 
     # --- meta ymls (native bodies, resolved through the bound base's
     # meta_writer, which is native) ---
-    async def write_act(self, action: Action) -> None:
-        await self._require_base().write_act(action)
+    async def write_act(self, action: Action, reason: Optional[str] = None) -> None:
+        await self._require_base().write_act(action, reason=reason)
 
     async def write_exp(self, experiment: Experiment) -> None:
         await self._require_base().write_exp(experiment)

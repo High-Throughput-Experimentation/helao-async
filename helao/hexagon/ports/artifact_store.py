@@ -35,7 +35,7 @@ the meta, finish, promotion and zip members:
 """
 
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import Optional, Protocol, runtime_checkable
 
 from helao.hexagon.domain.models import Action, Experiment, Sequence
 
@@ -45,7 +45,7 @@ __all__ = ["ArtifactStorePort"]
 @runtime_checkable
 class ArtifactStorePort(Protocol):
     # --- meta ymls (atomic; file_type first key; same-name rewrite wins) ---
-    async def write_act(self, action: Action) -> None: ...
+    async def write_act(self, action: Action, reason: Optional[str] = None) -> None: ...
 
     async def write_exp(self, experiment: Experiment) -> None: ...
 
