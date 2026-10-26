@@ -567,12 +567,44 @@ class JsonlSinkHandler(logging.Handler):
             super().close()
 
 
+def _read_one(p: Path):
+    """Records of one JSONL file as a DataFrame, or None. A partial last line
+    (a writer mid-append) is trimmed; unparseable lines are skipped with one
+    warning on stderr."""
+    import io
+
+    import pandas as pd
+
+    raw = (gzip.open(p, "rb") if p.name.endswith(".gz") else open(p, "rb")).read()
+    raw = raw[: raw.rfind(b"\n") + 1]
+    if not raw:
+        return None
+    try:
+        return pd.read_json(io.BytesIO(raw), lines=True, dtype=False)
+    except ValueError:
+        pass
+    good, bad = [], 0
+    for ln in raw.splitlines():
+        try:
+            rec = json.loads(ln)
+        except ValueError:
+            bad += 1
+            continue
+        if isinstance(rec, dict):
+            good.append(rec)
+        else:
+            bad += 1
+    sys.stderr.write(f"read_logs: skipped {bad} unparseable line(s) in {p}\n")
+    return pd.DataFrame(good) if good else None
+
+
 def read_logs(log_dir, server=None, *, ledger: bool = False):
     """All JSONL records under ``log_dir`` as one DataFrame sorted by ``ts``.
 
     Reads live and rotated (``.gz``) files; ``ledger=True`` reads only the
     ``artifacts_*`` ledger instead of the logs. Duplicates from replay are
-    dropped on ``(server, pid, seq)``.
+    dropped on ``(server, pid, seq, ts)``: pid and seq alone repeat when a PID
+    is reused by a later process.
     """
     import pandas as pd
 
@@ -580,16 +612,32 @@ def read_logs(log_dir, server=None, *, ledger: bool = False):
     for p in sorted(Path(log_dir).iterdir()):
         if not p.name.endswith((".jsonl", ".jsonl.gz")):
             continue
-        if p.name.startswith("artifacts_") != ledger or not p.stat().st_size:
+        if p.name.startswith("artifacts_") != ledger:
             continue
         try:
-            frames.append(pd.read_json(p, lines=True, compression="infer", dtype=False))
-        except (EOFError, OSError, ValueError):
-            continue  # a .gz still being written; its plain copy is read instead
+            if not p.stat().st_size:
+                continue
+            df = _read_one(p)
+        except (EOFError, OSError):
+            continue  # deleted or gzipped away between listing and reading
+        if df is not None:
+            frames.append(df)
     if not frames:
-        return pd.DataFrame(columns=["ts", "level", "server", "pid", "seq", "msg"])
-    df = pd.concat(frames, ignore_index=True).drop_duplicates(["server", "pid", "seq"])
+        df = pd.DataFrame(
+            {
+                "ts": pd.Series([], dtype="datetime64[us, UTC]"),
+                "level": pd.Series([], dtype=object),
+                "server": pd.Series([], dtype=object),
+                "pid": pd.Series([], dtype="int64"),
+                "seq": pd.Series([], dtype="int64"),
+                "msg": pd.Series([], dtype=object),
+            }
+        )
+        return df
+    df = pd.concat(frames, ignore_index=True).drop_duplicates(
+        ["server", "pid", "seq", "ts"]
+    )
     if server is not None:
         df = df[df["server"] == server]
-    df["ts"] = pd.to_datetime(df["ts"], utc=True)
+    df["ts"] = pd.to_datetime(df["ts"], utc=True).astype("datetime64[us, UTC]")
     return df.sort_values(["ts", "pid", "seq"], kind="stable").reset_index(drop=True)

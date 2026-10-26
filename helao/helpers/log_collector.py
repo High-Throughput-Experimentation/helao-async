@@ -22,22 +22,41 @@ def log_endpoint(port: int) -> str:
 
 
 def resolve_log_port(config: dict) -> int:
-    """``log_port`` from the config, else one above every port a server occupies."""
+    """``log_port`` from the config, else one above every port a server occupies.
+
+    The port must be in 1..65535 and clear of every server's address and of the
+    RPC port paired with each server port.
+    """
+    from helao.core.rpc.zmq_rpc import derive_rpc_port
     from helao.ui.shared.discovery import reserved_addresses
 
-    taken = {
-        int(addr.rsplit(":", 1)[1])
-        for entry in (config.get("servers") or {}).values()
-        if isinstance(entry, dict)
-        for addr in reserved_addresses(entry)
-    }
+    taken, http = set(), set()
+    for entry in (config.get("servers") or {}).values():
+        if not isinstance(entry, dict):
+            continue
+        ports = {int(addr.rsplit(":", 1)[1]) for addr in reserved_addresses(entry)}
+        http |= ports
+        taken |= ports
+        # unsure which group kinds bind an RPC port: reserve it for every int port
+        if isinstance(entry.get("port"), int):
+            taken.add(derive_rpc_port(entry["port"]))
     port = config.get("log_port")
     if port is None:
-        return max(taken, default=8000) + 1
-    if not isinstance(port, int) or isinstance(port, bool) or port in taken:
+        port = max(http, default=8000) + 1
+        while port in taken:
+            port += 1
+        if port > 65535:
+            raise ValueError(f"no free log_port below 65536 (taken: {sorted(taken)})")
+        return port
+    if (
+        not isinstance(port, int)
+        or isinstance(port, bool)
+        or not 1 <= port <= 65535
+        or port in taken
+    ):
         raise ValueError(
-            f"log_port {port!r} must be an int that no server occupies "
-            f"(taken: {sorted(taken)})"
+            f"log_port {port!r} must be an int in 1..65535 that no server "
+            f"or server RPC port occupies (taken: {sorted(taken)})"
         )
     return port
 
@@ -73,6 +92,7 @@ class LogCollector:
         self._thread = None
 
     def start(self) -> None:
+        self._stop.clear()
         sock = zmq.Context.instance().socket(zmq.PULL)
         sock.setsockopt(zmq.RCVHWM, HWM)
         sock.setsockopt(zmq.RCVBUF, SOCK_BUF)
@@ -89,30 +109,36 @@ class LogCollector:
         self._thread.start()
 
     def _run(self) -> None:
-        poller = zmq.Poller()
-        poller.register(self._sock, zmq.POLLIN)
-        while not self._stop.is_set():
-            if poller.poll(500):
+        try:
+            poller = zmq.Poller()
+            poller.register(self._sock, zmq.POLLIN)
+            while not self._stop.is_set():
+                if poller.poll(500):
+                    self._drain()
+            deadline = time.monotonic() + self._drain_s
+            while time.monotonic() < deadline and poller.poll(100):
                 self._drain()
-        deadline = time.monotonic() + self._drain_s
-        while time.monotonic() < deadline and poller.poll(100):
-            self._drain()
-        self._sock.close()
-        self._log.close()
-        self._ledger.close()
+        finally:
+            self._sock.close()
+            self._log.close()
+            self._ledger.close()
 
     def _drain(self) -> None:
-        while True:
+        """Write up to HWM queued records, so the caller can re-check stop/deadline."""
+        for _ in range(HWM):
             try:
                 frames = self._sock.recv_multipart(zmq.NOBLOCK)
             except zmq.Again:
                 return
             try:
                 self._log.write(frames[-1])
-                if len(frames) == 2 and frames[0] == LEDGER_FRAME:
-                    self._ledger.write(frames[1])
             except Exception as exc:  # a writer bug must not kill the thread
                 sys.stderr.write(f"log collector write failed: {exc}\n")
+            if len(frames) == 2 and frames[0] == LEDGER_FRAME:
+                try:
+                    self._ledger.write(frames[1])
+                except Exception as exc:
+                    sys.stderr.write(f"log collector ledger write failed: {exc}\n")
 
     def stop(self, drain_s: float = 2.0) -> None:
         """Drain for up to ``drain_s`` seconds, close files, finish gzips."""

@@ -79,8 +79,18 @@ def test_second_bind_fails(tmp_path):
     ep = log_endpoint(_free_port())
     a = LogCollector(ep, tmp_path, "g")
     a.start()
-    with pytest.raises(zmq.ZMQError):
-        LogCollector(ep, tmp_path / "b", "g").start()
+    b = LogCollector(ep, tmp_path / "b", "g")
+    made = []
+    real = zmq.Context.instance().socket
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(
+            zmq.Context.instance(),
+            "socket",
+            lambda *x, **k: made.append(real(*x, **k)) or made[-1],
+        )
+        with pytest.raises(zmq.ZMQError):
+            b.start()
+    assert made and all(m.closed for m in made)
     a.stop()
 
 
@@ -108,3 +118,108 @@ def test_read_logs_merges_dedups_sorts(tmp_path):
     assert list(df["seq"]) == [0, 1, 2, 3]
     assert list(read_logs(tmp_path, ledger=True)["seq"]) == [99]
     assert read_logs(tmp_path, server="nobody").empty
+
+
+def _rec(i, **kw):
+    r = {
+        "ts": f"2026-10-26T00:00:0{i}.000000Z",
+        "level": "INFO",
+        "server": "A",
+        "pid": 1,
+        "seq": i,
+        "msg": str(i),
+    }
+    return {**r, **kw}
+
+
+def _line(r):
+    return (json.dumps(r) + "\n").encode()
+
+
+def test_stop_respects_deadline_under_continuous_input(tmp_path):
+    import threading
+
+    ep = log_endpoint(_free_port())
+    col = LogCollector(ep, tmp_path, "g")
+    col.start()
+    thread = col._thread
+    push = zmq.Context.instance().socket(zmq.PUSH)
+    push.setsockopt(zmq.LINGER, 0)
+    push.setsockopt(zmq.SNDTIMEO, 50)
+    push.connect(ep)
+    quit_ = threading.Event()
+    data = _line(_rec(1))
+
+    def pump():
+        while not quit_.is_set():
+            try:
+                push.send(data)
+            except zmq.ZMQError:
+                pass
+
+    t = threading.Thread(target=pump)
+    t.start()
+    time.sleep(0.3)
+    t0 = time.monotonic()
+    col.stop(drain_s=0.5)
+    took = time.monotonic() - t0
+    quit_.set()
+    t.join()
+    push.close(linger=0)
+    assert took < 2.0
+    assert not thread.is_alive()
+    assert col._log._fh is None and col._sock.closed
+
+
+def test_stop_without_start_is_noop(tmp_path):
+    LogCollector(log_endpoint(1), tmp_path, "g").stop()
+
+
+def test_resolve_log_port_range_and_rpc_ports():
+    from helao.core.rpc.zmq_rpc import derive_rpc_port
+
+    srv = {"A": {"host": "h", "port": 8001}}
+    rpc = derive_rpc_port(8001)
+    for bad in (0, 65536, -1, rpc):
+        with pytest.raises(ValueError):
+            resolve_log_port({"log_port": bad, "servers": srv})
+    with pytest.raises(ValueError):
+        resolve_log_port({"servers": {"A": {"host": "h", "port": 65535}}})
+    # default steps over an RPC port
+    cfg = {
+        "servers": {
+            "A": {"host": "h", "port": 8001},
+            "B": {"host": "h", "port": rpc - 1},
+        }
+    }
+    assert resolve_log_port(cfg) not in {8001, rpc - 1, rpc, derive_rpc_port(rpc - 1)}
+
+
+def test_read_logs_partial_last_line_and_corrupt_middle(tmp_path, capsys):
+    good = b"".join(_line(_rec(i)) for i in range(5))
+    (tmp_path / "helao_g.jsonl").write_bytes(good + b'{"ts": "2026-10-26T00:0')
+    assert list(read_logs(tmp_path)["seq"]) == [0, 1, 2, 3, 4]
+    (tmp_path / "helao_g.jsonl").write_bytes(
+        _line(_rec(0)) + b"not json\n" + _line(_rec(2))
+    )
+    assert list(read_logs(tmp_path)["seq"]) == [0, 2]
+    err = capsys.readouterr().err
+    assert "skipped 1" in err and "helao_g.jsonl" in err
+
+
+def test_read_logs_dedup_key_includes_ts(tmp_path):
+    a, b = _rec(1), _rec(1, ts="2026-10-26T00:00:09.000000Z")
+    (tmp_path / "helao_g.jsonl").write_bytes(_line(a) + _line(b) + _line(a))
+    assert len(read_logs(tmp_path)) == 2
+
+
+def test_read_logs_skips_tmp_and_empty_dir(tmp_path):
+    empty = read_logs(tmp_path)
+    assert empty.empty and str(empty["ts"].dtype) == "datetime64[us, UTC]"
+    assert str(empty["pid"].dtype) == "int64" and str(empty["seq"].dtype) == "int64"
+    (tmp_path / "helao_g_20261026T000000.jsonl.gz.1.2.tmp").write_bytes(b"junk")
+    assert read_logs(tmp_path).empty
+    (tmp_path / "helao_g.jsonl").write_bytes(_line(_rec(0)))
+    full = read_logs(tmp_path)
+    assert str(full["ts"].dtype) == str(empty["ts"].dtype)
+    assert str(full["pid"].dtype) == "int64"
