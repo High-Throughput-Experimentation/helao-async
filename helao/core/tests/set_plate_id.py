@@ -1,7 +1,7 @@
 """Correct a plate serial that was recorded as the plate id, in synced records.
 
 ```
-python -m helao.core.tests.set_plate_id record <RUNS_SYNCED/.../<seq>.zip> --old OLD --new NEW \
+python -m helao.core.tests.set_plate_id record <RUNS_SYNCED/.../<seq>.zip | RUNS/<year>/<day>/<seq>> --old OLD --new NEW \
     [--dry-run] [--no-reset] [--process-dir DIR] [--allow-serial-mismatch]
 python -m helao.core.tests.set_plate_id analyses <PROCESSES/.../<seq dir>> --sequence-uuid UUID \
     --old OLD --new NEW --analyses-root DIR [--analysis-dir DIR ...] \
@@ -41,6 +41,11 @@ Things worth knowing before editing this:
   Both subcommands check first; ``analyses`` also refuses when no analysis yml
   belongs to the sequence, and counts an analysis whose S3 body cannot be read
   as failed (exit 1) without stopping the run.
+- **A ``RUNS`` sequence directory is accepted as well as a zip**, with the
+  same rules as ``set_run_use``: refused unless every seq/exp/act record's
+  ``.prg`` is ``synced: true``, records edited in place in their own format,
+  and the hand-back deletes the sequence's ``.prg`` files -- unless there is no
+  change to make, when nothing is deleted and the run exits 0.
 - **The re-sync is not automatic.** ``record`` prints the ``POST /finish_yml``
   call that makes the syncer pick the record up and never makes it; see
   :func:`~helao.core.tests._record_rewrite.reset_to_finished`.
@@ -68,12 +73,18 @@ from helao.core.tests._record_rewrite import (
     Edit,
     finish_yml_hint,
     finished_dir_for,
+    is_runs_dir,
     process_dir_for,
+    reset_runs_dir,
     reset_to_finished,
+    gate_message,
+    run_reset_only,
+    runs_gate,
 )
-from helao.helpers.file_utils import staging_path
+from helao.helpers.meta_io import meta_glob, read_meta, write_meta
 from helao.helpers.plate_api import HTEPlateAPI, PlateAPIUnavailable
-from helao.helpers.yml_tools import yml_dumps, yml_load
+from helao.helpers.yml_tools import yml_load
+from helao.hexagon.domain.naming import meta_kind
 
 #: Record kinds as ``_record_rewrite`` names them -> the kinds ``rewrite_doc`` takes.
 _SHORT = {"sequence": "seq", "experiment": "exp", "action": "act", "process": "prc"}
@@ -283,26 +294,40 @@ def _check_plate(old: int, new: int, allow_serial_mismatch: bool) -> "str | None
 
 
 def _record(args) -> int:
+    if args.reset_only:
+        # No edits, so no plate check: the edits are already on disk.
+        return run_reset_only(args.zip_path, dry_run=args.dry_run)
     old, new = args.old, args.new
     reason = _check_plate(old, new, args.allow_serial_mismatch)
     if reason:
         return _refuse(reason)
 
     zip_path = Path(args.zip_path)
-    if not zip_path.is_file():
+    runs = is_runs_dir(zip_path)
+    if not runs and not zip_path.is_file():
         return _refuse(f"not a file: {zip_path}")
+    unsynced = runs_gate(zip_path) if runs else []
+    if unsynced and not args.dry_run:
+        return _refuse(gate_message(unsynced))
     seen: dict = {}
     apply = _applier(old, new, seen)
     try:
-        zip_edits, sequence_uuid = _record_rewrite.rewrite_zip(
-            zip_path, apply, dry_run=True
-        )
+        if runs:
+            zip_edits, sequence_uuid = _record_rewrite.rewrite_dir(
+                zip_path, apply, dry_run=True
+            )
+        else:
+            zip_edits, sequence_uuid = _record_rewrite.rewrite_zip(
+                zip_path, apply, dry_run=True
+            )
     except Exception as exc:  # BadZipFile, a yml that will not parse
         return _refuse(f"cannot read {zip_path}: {type(exc).__name__}: {exc}")
 
     plate = seen.get("seq_plate_id")
     if sequence_uuid is None or plate is None:
-        return _refuse("the zip has no -seq.yml carrying sequence_params.plate_id")
+        return _refuse(
+            "the record has no -seq record carrying sequence_params.plate_id"
+        )
     if str(plate) not in (str(old), str(new)):
         return _refuse(
             f"sequence_params.plate_id is {plate}, expected {old} (or {new} for a re-run)"
@@ -312,6 +337,12 @@ def _record(args) -> int:
         Path(args.process_dir) if args.process_dir else process_dir_for(zip_path)
     )
     process_edits: "list[Edit]" = []
+    if runs:
+        # Processes colocated beside their experiments, in the same tree, so
+        # reported with the records.
+        zip_edits += _record_rewrite.rewrite_processes(
+            zip_path, sequence_uuid, apply, dry_run=True
+        )
     if process_dir is not None and process_dir.is_dir():
         process_edits = _record_rewrite.rewrite_processes(
             process_dir, sequence_uuid, apply, dry_run=True
@@ -324,7 +355,7 @@ def _record(args) -> int:
             f"{old}:\n" + "\n".join(f"  {path}: {item}" for path, item in bad)
         )
 
-    if not args.no_reset:
+    if not args.no_reset and not runs:
         if finished_dir_for(zip_path) is None:
             return _refuse(
                 f"{zip_path} is not under a RUNS_SYNCED tree to hand back (--no-reset "
@@ -342,7 +373,10 @@ def _record(args) -> int:
         print(f"  sequence_params.plate_id is already {new}: already corrected")
     _print_edits(zip_edits)
     if process_dir is None:
-        print("  no RUNS_* segment in the path; external process ymls not searched")
+        print(
+            "  no RUNS or RUNS_* segment in the path; external process ymls "
+            "not searched"
+        )
     elif process_dir.is_dir():
         print(f"{process_dir}:")
         _print_edits(process_edits)
@@ -355,15 +389,39 @@ def _record(args) -> int:
         f"{verb} {n_changes} change(s) in {len([e for e in edits if e.changed])} yml(s); "
         f"{n_left} path value(s) left alone"
     )
+    if unsynced:
+        return _refuse(gate_message(unsynced))
+    if not n_changes and (args.no_reset or runs):
+        # Idempotent re-run: no hand-back, so a RUNS sequence keeps its .prg
+        # files. A zip without --no-reset is still handed back, as before.
+        print("nothing to change")
+        if runs and not args.no_reset:
+            print(
+                "if an earlier --no-reset run made these edits, hand the "
+                "sequence back with --reset-only"
+            )
+        return 0
     if args.dry_run:
+        if runs and not args.no_reset:
+            prgs = reset_runs_dir(zip_path, dry_run=True)
+            print(f"would delete {len(prgs)} .prg file(s)")
         print("--dry-run: nothing written.")
         return 0
 
-    _record_rewrite.rewrite_zip(zip_path, apply)
+    if runs:
+        _record_rewrite.rewrite_dir(zip_path, apply)
+        _record_rewrite.rewrite_processes(zip_path, sequence_uuid, apply)
+    else:
+        _record_rewrite.rewrite_zip(zip_path, apply)
     if process_dir is not None and process_dir.is_dir():
         _record_rewrite.rewrite_processes(process_dir, sequence_uuid, apply)
     if args.no_reset:
-        print("--no-reset: the record stays in RUNS_SYNCED and will not re-sync.")
+        print("--no-reset: the record stays where it is and will not re-sync.")
+        return 0
+    if runs:
+        prgs = reset_runs_dir(zip_path)
+        print(f"deleted {len(prgs)} .prg file(s)")
+        print(finish_yml_hint(zip_path))
         return 0
     ok, dest, note = reset_to_finished(zip_path)
     print(f"handback {dest}: {note}")
@@ -399,8 +457,8 @@ def _as_body(doc) -> dict:
 
 def _process_uuids(process_dir: Path, sequence_uuid: str) -> "set[str]":
     found: set[str] = set()
-    for path in sorted(process_dir.rglob("*-prc.yml")):
-        doc = yml_load(path)
+    for path in meta_glob(process_dir, "prc", "**/*"):
+        doc = _load_meta(path)
         if not isinstance(doc, dict) or str(doc.get("sequence_uuid")) != sequence_uuid:
             print(f"  {path}: not this sequence's process; skipped")
             continue
@@ -408,24 +466,22 @@ def _process_uuids(process_dir: Path, sequence_uuid: str) -> "set[str]":
     return found
 
 
-def _write_yml(path: Path, doc) -> None:
-    staged = staging_path(path)
-    try:
-        with open(staged, "w", encoding="utf-8") as fh:
-            fh.write(yml_dumps(doc))
-    except BaseException:
-        if os.path.exists(staged):
-            os.remove(staged)
-        raise
-    os.replace(staged, path)
+def _load_meta(path: Path):
+    """``.yml`` round-trip (comments kept for the write-back), else JSON."""
+    return yml_load(path) if path.suffix == ".yml" else read_meta(path)
+
+
+def _is_analysis(path: Path) -> bool:
+    """A legacy ``<uuid>.yml`` or a ``<uuid>-ana.json`` analysis model."""
+    return path.suffix == ".yml" or meta_kind(path) == "ana"
 
 
 def _analysis_candidates(args) -> list:
-    """The analysis ymls to consider: the named directories, else the whole tree."""
+    """The analysis models to consider: the named directories, else the whole tree."""
     root = Path(args.analyses_root)
     dirs = getattr(args, "analysis_dir", None)
     if not dirs:
-        return sorted(root.glob("*/*/*/*.yml"))
+        return sorted(p for p in root.glob("*/*/*/*") if _is_analysis(p))
     found = []
     for d in dirs:
         path = Path(d)
@@ -433,7 +489,7 @@ def _analysis_candidates(args) -> list:
             path = root.parent / path
         if not path.is_dir():
             raise FileNotFoundError(f"--analysis-dir {d} is not a directory")
-        found.extend(sorted(path.glob("*.yml")))
+        found.extend(sorted(p for p in path.glob("*") if _is_analysis(p)))
     return found
 
 
@@ -465,7 +521,7 @@ def _analyses(args) -> int:
             head = fh.read(_HEADER_BYTES)
         if "process_uuid" in head and not any(u in head for u in uuids):
             continue
-        doc = yml_load(path)
+        doc = _load_meta(path)
         if isinstance(doc, dict) and str(doc.get("process_uuid")) in uuids:
             ymls.append((path, doc))
     if not ymls:
@@ -489,7 +545,7 @@ def _analyses(args) -> int:
     n_changes = 0
     n_uploads = 0
     for path, ydoc in ymls:
-        uuid = str(ydoc.get("analysis_uuid") or path.stem)
+        uuid = str(ydoc.get("analysis_uuid") or path.stem.removesuffix("-ana"))
         key = analysis_layout.analysis_model_key(uuid)
         ynew, ychanges, yunc = rewrite_doc(ydoc, "analysis", old, new)
         try:
@@ -542,7 +598,7 @@ def _analyses(args) -> int:
                 failed += 1
                 continue
             n_uploads += 1
-        _write_yml(path, ynew)
+        write_meta(path, ynew)
 
     verb = "would make" if args.dry_run else "made"
     print(
@@ -566,7 +622,8 @@ def main(argv=None) -> int:
         p.add_argument(
             "zip_path" if name == "record" else "process_dir",
             help=(
-                "the sequence zip under RUNS_SYNCED"
+                "the sequence zip under RUNS_SYNCED, or a fully synced "
+                "sequence directory under RUNS"
                 if name == "record"
                 else "the record's PROCESSES directory"
             ),
@@ -577,7 +634,17 @@ def main(argv=None) -> int:
         p.add_argument("--new", type=int, required=True, help="the plate id")
         p.add_argument("--dry-run", action="store_true", help="write nothing")
         if name == "record":
-            p.add_argument("--no-reset", action="store_true", help="no hand-back")
+            p.add_argument(
+                "--no-reset",
+                action="store_true",
+                help="no hand-back",
+            )
+            p.add_argument(
+                "--reset-only",
+                action="store_true",
+                help="RUNS sequence directory only: edit nothing, delete the "
+                "remaining .prg files and print the /finish_yml call",
+            )
             p.add_argument("--process-dir", default=None, help="PROCESSES directory")
         p.add_argument("--allow-serial-mismatch", action="store_true")
         if name == "analyses":
@@ -593,6 +660,8 @@ def main(argv=None) -> int:
             )
             p.add_argument("--bucket", default=None)
     args = parser.parse_args(argv)
+    if getattr(args, "reset_only", False) and args.no_reset:
+        parser.error("--reset-only and --no-reset contradict each other")
     if args.old == args.new or args.old <= 0 or args.new <= 0:
         parser.error("--old and --new must be different positive integers")
         return 2  # unreachable: parser.error exits
