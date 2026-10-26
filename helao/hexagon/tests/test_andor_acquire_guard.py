@@ -18,6 +18,7 @@ same pattern ``test_endpoint_overlay`` uses -- because the point is what the
 handler does before ``ctx.begin``, not how the real host wires it up.
 """
 
+import asyncio
 from types import SimpleNamespace
 
 import numpy as np
@@ -30,7 +31,10 @@ from helao.deploy.hte.drivers.spec.andor import wl_fit
 from helao.deploy.hte.drivers.spec.andor.spectrograph import (
     AndorSpectrographDriver,
 )
+from helao.core.drivers.helao_driver import DriverStatus
+from helao.core.models.hlostatus import HloStatus
 from helao.deploy.hte.servers.action.andor_server import (
+    AndorAcquire,
     AndorCalibrateWavelength,
     andor_dyn_endpoints,
 )
@@ -547,3 +551,28 @@ async def test_calibrated_defaults_to_false_on_a_driver_without_the_flag():
     await acquire(ctx)
 
     assert ctx.active.action.action_params["calibrated"] is False
+
+
+def test_andor_poll_emits_elapsed_time_s_matching_the_header():
+    """The driver streams tick_time; the HLO header declares elapsed_time_s."""
+    ex = AndorAcquire.__new__(AndorAcquire)
+    ex.first_tick = None
+    ex.duration = 10.0
+    ex.external_trigger = False
+    ex.frames_per_poll = 3
+    ticks = [100.0, 100.01, 100.02]
+    ex.driver = SimpleNamespace(
+        get_data=lambda **k: SimpleNamespace(
+            data={"tick_time": ticks, "ch_0000": [1.0, 2.0, 3.0]},
+            response="success",
+            status=DriverStatus.busy,
+        )
+    )
+
+    out = asyncio.run(ex._poll())
+
+    assert "tick_time" not in out["data"]
+    assert out["data"]["elapsed_time_s"] == pytest.approx([0.0, 0.01, 0.02])
+    assert out["data"]["ch_0000"] == [1.0, 2.0, 3.0]
+    assert ex.first_tick == 100.0
+    assert out["status"] == HloStatus.active

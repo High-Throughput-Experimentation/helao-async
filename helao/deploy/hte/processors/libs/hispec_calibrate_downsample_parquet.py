@@ -116,9 +116,11 @@ def read_CV_hlo(
 
 
 def read_spec_times_from_hlo(spec_file_path: str) -> pd.DataFrame:
-    """Read only the ``tick_time`` column from an Andor spectroscopy HLO.
+    """Read the time column from an Andor spectroscopy HLO.
 
-    The values are zero-shifted to the first sample and renamed to ``t_s``.
+    Accepts ``tick_time`` (camera clock) or ``elapsed_time_s`` (the same
+    values, zeroed at the first frame). Zero-shifts to the first sample and
+    renames to ``t_s``. ``elapsed_time_s`` wins when both are present.
 
     Args:
         spec_file_path: Path to the spectroscopy HLO file.
@@ -126,17 +128,24 @@ def read_spec_times_from_hlo(spec_file_path: str) -> pd.DataFrame:
     Returns:
         DataFrame with a single ``t_s`` column.
     """
-    data = pd.DataFrame(read_hlo(spec_file_path, keep_keys=["tick_time"])[1])
-    data.iloc[:, 0] = data.iloc[:, 0] - data.iloc[0, 0]
-    # name the collumn t_s
-    data.columns = ["t_s"]
-    return data
+    data = pd.DataFrame(
+        read_hlo(spec_file_path, keep_keys=["tick_time", "elapsed_time_s"])[1]
+    )
+    if "elapsed_time_s" in data.columns:
+        col = "elapsed_time_s"
+    elif "tick_time" in data.columns:
+        col = "tick_time"
+    else:
+        raise KeyError(f"{spec_file_path} has neither elapsed_time_s nor tick_time")
+    t = data[col].astype(float)
+    return pd.DataFrame({"t_s": t - t.iloc[0]})
 
 
 def read_spectra_from_hlo(spec_file_path: str) -> pd.DataFrame:
     """Read all spectral channels from an Andor spectroscopy HLO file.
 
-    Skips the ``tick_time`` column and names the remaining columns by
+    Skips the time column (``tick_time`` or ``elapsed_time_s``) and names
+    the remaining columns by
     the wavelength array stored under ``metadata['optional']['wl']``.
 
     Args:
@@ -146,7 +155,7 @@ def read_spectra_from_hlo(spec_file_path: str) -> pd.DataFrame:
         DataFrame whose columns are wavelengths and whose rows are
         spectra.
     """
-    meta, data = read_hlo(spec_file_path, omit_keys=["tick_time"])
+    meta, data = read_hlo(spec_file_path, omit_keys=["tick_time", "elapsed_time_s"])
     # get the tick time from the metadata
     WL = meta["optional"]["wl"]
 
@@ -610,6 +619,13 @@ def downsample_to_1mV_precision(
     nearest multiple of ``precision`` and averages all rows sharing a
     bin. Final columns are renamed to ``U (V)`` and ``t (s)``.
 
+    Skipped when the median frame-to-frame ``|ΔU|`` is already at or below
+    ``2 * precision``. At 98 fps and 100 mV/s the frames are 1.02 mV apart,
+    so a 1 mV threshold would still bin; the factor of two covers that
+    spacing. The bin buys nothing then, and near a turnaround both sides
+    of the apex share a direction label and a 1 mV bin: averaging ``t_s``
+    collapses those frames onto the turning point.
+
     Args:
         calibrated_spectra: Calibrated spectral DataFrame with
             ``cycle`` and ``direction`` columns.
@@ -618,6 +634,12 @@ def downsample_to_1mV_precision(
     Returns:
         Concatenated DataFrame indexed by ``U (V)``.
     """
+    dU = calibrated_spectra["Ewe_V"].diff().abs()
+    median_du = dU[dU > 0].median()
+    if pd.notna(median_du) and median_du <= 2 * precision:
+        out = calibrated_spectra.rename(columns={"Ewe_V": "U (V)", "t_s": "t (s)"})
+        return out.set_index("U (V)")
+
     totaldf = pd.DataFrame()
     for cycle, frame in calibrated_spectra.groupby("cycle"):
         for scan, sub_frame in frame.groupby("direction"):

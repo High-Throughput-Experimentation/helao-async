@@ -531,6 +531,11 @@ class ActionHost(HelaoFastAPI):
         instead of a cached ``ntp_offset``: an explicit *offset* wins, otherwise
         the port's, otherwise zero. Stamped onto every HLO header and every data
         message, so a drift here is a wire-visible artifact difference.
+
+        ``ClockPort.now_ns`` is already NTP-corrected. Adding the offset on
+        top of it applied the correction twice (legacy used raw
+        ``time.time_ns()`` as the base). Callers that pass a raw ``epoch_ns``
+        still get the offset added once, matching the live-buffer path.
         """
         import math
 
@@ -540,8 +545,11 @@ class ActionHost(HelaoFastAPI):
             offset_ns = int(math.floor(port_offset * 1e9)) if port_offset else 0
         else:
             offset_ns = int(math.floor(offset * 1e9))
-        base_ns = clock.now_ns() if epoch_ns is None else epoch_ns
-        return int(math.floor(base_ns + offset_ns))
+        if epoch_ns is None:
+            if offset is None:
+                return int(math.floor(clock.now_ns()))
+            return int(math.floor(time.time_ns() + offset_ns))
+        return int(math.floor(epoch_ns + offset_ns))
 
     async def get_realtime(
         self, epoch_ns: Optional[int] = None, offset: Optional[float] = None

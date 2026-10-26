@@ -183,6 +183,13 @@ class BiologicExec(Executor):
                 else ErrorCodes.critical_error
             )
             if error == ErrorCodes.none:
+                # Wall-clock instant of BL_StartChannel, the same clock Ocean
+                # epoch_s uses. Private-deployment interpolators prefer this
+                # over the CV file-open header epoch, which is several hundred
+                # ms earlier (technique load) and NTP-corrected.
+                self.active.action.action_params["channel_start_epoch_s"] = (
+                    self.start_time
+                )
                 LOGGER.info("BiologicExec measurement started.")
             else:
                 # Logged unconditionally until 2026-09-18, so a station log

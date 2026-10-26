@@ -277,9 +277,10 @@ class AndorAcquire(Executor):
         if not resp.data:
             LOGGER.info("No data received.")
             return {"error": ErrorCodes.none, "status": HloStatus.active}
+        ticks = resp.data["tick_time"]
         if self.first_tick is None:
-            self.first_tick = resp.data["tick_time"][0]
-        latest_tick = resp.data["tick_time"][-1]
+            self.first_tick = ticks[0]
+        latest_tick = ticks[-1]
         error = (
             ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
         )
@@ -292,7 +293,13 @@ class AndorAcquire(Executor):
                 and latest_tick - self.first_tick < self.duration
                 else HloStatus.finished
             )
-        return {"error": error, "status": status, "data": resp.data}
+        # The HLO header declares elapsed_time_s; the driver streams camera
+        # ticks. Zero them here so the body matches the header, rather than
+        # writing a column name nothing in the JSON uses.
+        elapsed = [float(t) - self.first_tick for t in ticks]
+        data = {"elapsed_time_s": elapsed}
+        data.update({k: v for k, v in resp.data.items() if k != "tick_time"})
+        return {"error": error, "status": status, "data": data}
 
     async def _post_exec(self) -> dict:
         """Run :meth:`AndorDriver.cleanup` to release camera resources."""

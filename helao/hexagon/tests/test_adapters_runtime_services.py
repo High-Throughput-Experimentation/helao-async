@@ -119,3 +119,34 @@ def test_clock_from_offset_file(tmp_path):
 def test_clock_from_missing_offset_file(tmp_path):
     a = LegacyClockAdapter.from_offset_file(str(tmp_path))  # no file -> offset 0.0
     assert a.offset() == 0.0
+
+
+def test_get_realtime_nowait_adds_the_ntp_offset_once(monkeypatch):
+    """Headers used to sit 2*offset ahead of raw ``time.time()``.
+
+    ``LegacyClockAdapter.now_ns`` already adds the offset. Adding it again in
+    ``ActionHost.get_realtime_nowait`` made every HLO ``epoch_ns`` twice-
+    corrected, which shifted Ocean ``epoch_s`` (raw ``time.time()``) against
+    the CV/Andor headers.
+    """
+    import math
+    import time as time_mod
+    from types import SimpleNamespace
+
+    from helao.hexagon.app.action_host import ActionHost
+
+    offset_s = 0.138
+    frozen_ns = 1_700_000_000_000_000_000
+
+    monkeypatch.setattr(time_mod, "time_ns", lambda: frozen_ns)
+
+    host = SimpleNamespace(
+        hexagon_wiring=SimpleNamespace(clock=LegacyClockAdapter(offset_s=offset_s))
+    )
+    got = ActionHost.get_realtime_nowait(host)
+    once = frozen_ns + int(math.floor(offset_s * 1e9))
+    twice = frozen_ns + 2 * int(math.floor(offset_s * 1e9))
+    assert got == once
+    assert got != twice
+    # A caller that passes a raw epoch still gets the offset added once.
+    assert ActionHost.get_realtime_nowait(host, epoch_ns=frozen_ns) == once

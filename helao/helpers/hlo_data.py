@@ -128,12 +128,16 @@ def read_hlo_stream(
                 print(f"skipping unparseable hlo data line: {line[:80]!r}")
                 continue
         for k in line_dict:
-            if k in keep_keys or k not in omit_keys:
-                v = line_dict[k]
-                if isinstance(v, list):
-                    data[k] += v
-                else:
-                    data[k].append(v)
+            if keep_keys:
+                if k not in keep_keys:
+                    continue
+            elif k in omit_keys:
+                continue
+            v = line_dict[k]
+            if isinstance(v, list):
+                data[k] += v
+            else:
+                data[k].append(v)
     if header_lines:
         meta = dict(yml_load("".join([x.decode("utf8") for x in header_lines])))
     else:
