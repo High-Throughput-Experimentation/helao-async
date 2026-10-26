@@ -1015,3 +1015,14 @@ def test_record_dry_run_logs_nothing(tmp_path):
     seq_dir = build_runs_record(tmp_path)
     assert _run(seq_dir, "--dry-run") == 0
     assert not (tmp_path / "LOGS").exists()
+
+
+def test_analyses_main_ledgers_beside_the_analyses_tree(tmp_path, monkeypatch):
+    pdir, yml, _, _ = build_analysis(tmp_path, monkeypatch)
+    (tmp_path / "RUNS").mkdir(exist_ok=True)
+    assert _ana(pdir, tmp_path) == 0
+    rows = _ledger_rows(tmp_path, "set_plate_id")
+    (r,) = [r for r in rows if r["event"] == "artifact_rewritten"]
+    assert r["reason"] == "set_plate_id"
+    assert r["uuid"] == ANA_UUID
+    assert Path(r["path"]).name == yml.name

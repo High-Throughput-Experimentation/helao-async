@@ -221,3 +221,24 @@ def test_record_uuid():
     assert record_uuid({"action_uuid": "a"}) == "a"
     assert record_uuid({"process_uuid": "p"}) == "p"
     assert record_uuid({}) is None
+
+
+def test_root_for_finds_the_root_above_run_trees(tmp_path):
+    from helao.helpers.artifact_hash import root_for
+
+    (tmp_path / "RUNS" / "a").mkdir(parents=True)
+    (tmp_path / "ANALYSES").mkdir()
+    assert root_for(tmp_path / "RUNS" / "a" / "x-act.json") == str(tmp_path)
+    assert root_for(tmp_path / "ANALYSES") == str(tmp_path)
+    assert root_for(tmp_path / "ANALYSES" / "x" / "y.json") == str(tmp_path)
+    assert root_for(tmp_path / "other" / "y.json") is None
+
+
+def test_root_for_survives_an_unlistable_ancestor(tmp_path, monkeypatch):
+    from helao.helpers.artifact_hash import root_for
+
+    def boom(_):
+        raise PermissionError
+
+    monkeypatch.setattr(os, "listdir", boom)
+    assert root_for(tmp_path / "RUNS" / "x.json") is None

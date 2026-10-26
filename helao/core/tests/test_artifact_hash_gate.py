@@ -35,7 +35,7 @@ ALLOW = {
     (
         "helao/hexagon/adapters/native/data_file.py",
         "init_datafile",
-    ): "data .meta.json header text; hashed at action finalization",
+    ): "builds the YAML preamble of the data file body; hashed at action finalization",
     (
         "helao/hexagon/adapters/native/data_file.py",
         "log_data_set_output_file",

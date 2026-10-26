@@ -266,8 +266,6 @@ def main(argv=None) -> int:
         return 2  # unreachable: parser.error exits
 
     zip_path = Path(args.zip_path)
-    if not args.dry_run:
-        use_root_logger(zip_path, "set_run_use")
     if args.reset_only:
         return run_reset_only(zip_path, dry_run=args.dry_run)
     runs = is_runs_dir(zip_path)
@@ -284,6 +282,8 @@ def main(argv=None) -> int:
     if unsynced and not args.dry_run:
         return _refuse_unsynced(unsynced)
 
+    if not args.dry_run:
+        use_root_logger(zip_path, "set_run_use")
     if runs:
         zip_edits, sequence_uuid = _record_rewrite.rewrite_dir(
             zip_path, _retag(run_use), dry_run=args.dry_run, reason="set_run_use"

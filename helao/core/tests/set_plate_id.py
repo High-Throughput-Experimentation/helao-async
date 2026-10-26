@@ -413,6 +413,7 @@ def _record(args) -> int:
         print("--dry-run: nothing written.")
         return 0
 
+    use_root_logger(zip_path, "set_plate_id")
     if runs:
         _record_rewrite.rewrite_dir(zip_path, apply, reason="set_plate_id")
         _record_rewrite.rewrite_processes(
@@ -550,6 +551,8 @@ def _analyses(args) -> int:
     bucket = args.bucket or loader.s3_bucket
     print(f"bucket {bucket}; {len(ymls)} analysis yml(s) for {len(uuids)} process(es)")
 
+    if not args.dry_run:
+        use_root_logger(args.analyses_root, "set_plate_id")
     failed = 0
     n_changes = 0
     n_uploads = 0
@@ -681,11 +684,6 @@ def main(argv=None) -> int:
     if args.old == args.new or args.old <= 0 or args.new <= 0:
         parser.error("--old and --new must be different positive integers")
         return 2  # unreachable: parser.error exits
-    if not args.dry_run:
-        use_root_logger(
-            args.zip_path if args.command == "record" else args.analyses_root,
-            "set_plate_id",
-        )
     return _record(args) if args.command == "record" else _analyses(args)
 
 

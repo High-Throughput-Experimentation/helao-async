@@ -16,6 +16,8 @@ from pathlib import Path
 
 import pytest
 
+from helao.helpers import helao_logging
+
 from helao.core.models.helaodirs import HelaoDirs
 from helao.core.tests.set_plate_id import main
 from helao.core.tests.test_set_plate_id import (
@@ -49,6 +51,19 @@ def _offline(monkeypatch):
     monkeypatch.delenv("HELAO_CREDENTIALS", raising=False)
     monkeypatch.delenv("AWS_CONFIG_PATH", raising=False)
     set_api(monkeypatch, {"plate_id": NEW, "serial_no": OLD})
+
+
+@pytest.fixture(autouse=True)
+def _reset_logger():
+    """CLI mains install a root logger; keep it from leaking between tests."""
+    saved = helao_logging.LOGGER
+    yield
+    lg = helao_logging.LOGGER
+    if lg is not saved and lg is not None:
+        for h in list(lg.handlers):
+            lg.removeHandler(h)
+            h.close()
+    helao_logging.LOGGER = saved
 
 
 def _body(s3: Path, key: str) -> dict:

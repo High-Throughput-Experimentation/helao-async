@@ -49,23 +49,27 @@ def _uuid_extra(owner_uuid) -> dict:
     return {} if owner_uuid is None else {"uuid": str(owner_uuid)}
 
 
-_RUN_DIRS = ("RUNS", "DIAG")
+_RUN_DIRS = ("RUNS", "DIAG", "ANALYSES")
 
 
 def root_for(path) -> Optional[str]:
     """The helao root above a rewritten run-tree path, or ``None``.
 
-    The first ancestor with a child directory named ``RUNS``, ``RUNS_*`` or
-    ``DIAG`` that contains ``path``.
+    The first ancestor with a child directory named ``RUNS``, ``RUNS_*``,
+    ``DIAG`` or ``ANALYSES`` that contains ``path``.
     """
     p = os.path.abspath(os.fspath(path))
     parent = os.path.dirname(p)
     while parent != os.path.dirname(parent):
         if os.path.isdir(parent):
-            for name in os.listdir(parent):
+            try:
+                names = os.listdir(parent)
+            except OSError:
+                names = []
+            for name in names:
                 if name in _RUN_DIRS or name.startswith("RUNS_"):
                     top = os.path.join(parent, name) + os.sep
-                    if os.path.isdir(top) and p.startswith(top):
+                    if os.path.isdir(top) and (p + os.sep).startswith(top):
                         return parent
         parent = os.path.dirname(parent)
     return None
