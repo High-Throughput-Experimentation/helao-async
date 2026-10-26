@@ -20,7 +20,12 @@ import pytest
 
 import launch
 
-launch.LAUNCH_LOGGER = _logging.getLogger("test_launch_hotreload_teardown")
+
+@pytest.fixture(autouse=True)
+def _launch_logger(monkeypatch):
+    monkeypatch.setattr(
+        launch, "LAUNCH_LOGGER", _logging.getLogger("test_launch_hotreload_teardown")
+    )
 
 
 def test_watcher_never_polls_once_teardown_has_started():

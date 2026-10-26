@@ -16,11 +16,12 @@ process == shared CONFIG dict + logging singleton (a documented deviation
 from launched groups; items 2/4/6/7 run against a real launched group
 instead).
 
-Ports 8101/8102/8110 (RPC mirrors 18101/18102/18110) so a live goldenhex
-launch on 8001/8002/8010 never collides with pytest."""
+Ports are picked free at import time (RPC mirrors at port + 10000), so a live
+goldenhex launch on 8001/8002/8010 and parallel pytest workers never collide."""
 
 import asyncio
 import os
+import socket
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,6 +30,7 @@ from typing import Any
 import uvicorn
 
 from helao.core.error import ErrorCodes
+from helao.core.rpc.zmq_rpc import derive_rpc_port
 from helao.helpers import config_loader, helao_logging
 from helao.helpers.dispatcher import aclose_all_rpc_clients, async_private_dispatcher
 from helao.helpers.helao_logging import make_logger
@@ -36,9 +38,36 @@ from helao.helpers.premodels import ExperimentPlanMaker, Sequence
 from helao.helpers.time_utils import gen_uuid
 from helao.hexagon.domain.models import LoopStatus
 
-ORCH_HOST, ORCH_PORT = "127.0.0.1", 8101  # RPC mirror -> 18101
-SIM_HOST, SIM_PORT = "127.0.0.1", 8102  # RPC mirror -> 18102
-DB_HOST, DB_PORT = "127.0.0.1", 8110  # RPC mirror -> 18110
+
+def _bindable(port: int) -> bool:
+    with socket.socket() as s:  # SO_REUSEADDR left off
+        try:
+            s.bind(("127.0.0.1", port))
+        except OSError:
+            return False
+    return True
+
+
+def _free_port_pair(taken: set = frozenset()) -> int:
+    """An HTTP port whose RPC mirror port is also bindable right now."""
+    while True:
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", 0))
+            p = s.getsockname()[1]
+        rpc = derive_rpc_port(p)
+        if rpc <= 65535 and not {p, rpc} & taken and _bindable(p) and _bindable(rpc):
+            return p
+
+
+_ports: list = []
+for _ in range(3):
+    _taken = {q for p in _ports for q in (p, derive_rpc_port(p))}
+    _ports.append(_free_port_pair(_taken))
+_orch_p, _sim_p, _db_p = _ports
+
+ORCH_HOST, ORCH_PORT = "127.0.0.1", _orch_p  # RPC mirror -> port + 10000
+SIM_HOST, SIM_PORT = "127.0.0.1", _sim_p
+DB_HOST, DB_PORT = "127.0.0.1", _db_p
 
 _REPO_ROOT = str(Path(__file__).resolve().parents[3])
 

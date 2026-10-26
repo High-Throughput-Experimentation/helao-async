@@ -5,14 +5,25 @@ fix the harness FIRST (systematic-debugging), never weaken it to a stub."""
 
 import pytest
 
+from helao.core.rpc.zmq_rpc import derive_rpc_port
 from helao.hexagon.domain.models import LoopStatus
 from helao.hexagon.tests.live_group import (
+    DB_PORT,
+    ORCH_PORT,
+    SIM_PORT,
     build_ws_sequence,
     live_group,
     orch_call,
     wait_for_glob,
     wait_parked,
 )
+
+
+def test_live_group_ports_distinct_and_in_range():
+    ports = [ORCH_PORT, SIM_PORT, DB_PORT]
+    rpc = [derive_rpc_port(p) for p in ports]
+    assert len(set(ports + rpc)) == 6
+    assert all(1024 <= p and r <= 65535 for p, r in zip(ports, rpc))
 
 
 @pytest.mark.asyncio
