@@ -88,7 +88,7 @@ Action servers, experiments, and sequences are written as importable Python; the
 
 ### Data and state on disk
 Server output is rooted at the YAML's `root:` key (e.g. `C:\INST_hlo`):
-- `LOGS/<server_name>/` — rotating text logs; `launch.py` zips old `*.txt` logs at startup using a timestamp parsed from the first log line.
+- `LOGS/` — JSONL logs. Under `launch.py` every process sends records to the launcher's collector, which writes `helao_<prefix>.jsonl`; without a launcher each process writes `<server_key>.jsonl`. Files rotate every 300,000 records (gzipped in the background); rotated logs are deleted after 90 days; `artifacts_*.jsonl` (artefact SHA-256 ledger) is never deleted. Read with `helao_logging.read_logs`; duplicates from replay are dropped on `(server, pid, seq, ts)`. Spec: `docs/superpowers/specs/2026-10-26-jsonl-unified-logging-design.md`.
 - `STATES/` — pickled PID files and other runtime state.
 - `RUNS` — the single per-run output tree consumed by `NativeSyncer`. Manual/diagnostic runs go to `DIAG` instead, which is **never synced**: `move_dir` skips the syncer handoff for a manual record, so a DIAG run has no `.prg` and no upload. Records are written there once and never move; lifecycle state lives in the per-server journals. `RUNS_*` (e.g. `RUNS_SYNCED`) is legacy read-only vocabulary for existing archives; see `helao/core/models/run_dir.py`.
 - Record format (spec `docs/superpowers/specs/2026-10-23-json-storage-format-design.md`): records are `-act/-exp/-seq/-prc.json` (pretty) and data is `X.meta.json` + `X.jsonl`; an existing `.yml` record stays YAML; `.prg` stays YAML; S3 still gets `X.hlo.json`. Never glob `-act.yml`/`.hlo` directly — use `meta_glob`/`meta_kind`/`resolve_data_file`/`read_hlo`.

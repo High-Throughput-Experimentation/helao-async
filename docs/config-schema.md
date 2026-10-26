@@ -85,6 +85,7 @@ issue it found:
 | `run_type` | str | Free-form label, lower-cased; used as the run type of any experiment, sequence or manual action that does not set its own. |
 | `servers` | map | Server key to server block. See [Server keys](#server-keys). |
 | `dummy` | bool | See the warning below. |
+| `log_port` | int | optional int; the launcher's log collector port on 127.0.0.1; default one above the highest port any server occupies. |
 
 `root` and `run_type` are required by `HelaoConfig`. Without `root`,
 `launch.py` itself fails with a `TypeError` before any server starts; without
@@ -185,8 +186,9 @@ is created without asking.
   RUNS/             the single run tree; records are written once and never move
   RUNS_SUPERSEDED/  sequences retired through /retire (the one exception)
   DIAG/             manual (diagnostic) actions, a sibling of RUNS/
-  LOGS/             <server_key>.log per server, rotated daily and gzipped
-                    (old archives are not pruned)
+  LOGS/             JSONL logs: helao_<prefix>.jsonl under a launcher,
+                    <server_key>.jsonl without; rotated every 300,000 records
+                    and gzipped; rotated logs deleted after 90 days
   STATES/           pid pickles, queue exports, per-server run-state journals
                     (runstate_<server_key>.jsonl), loaded_modules_<key>.json,
                     reflex-bundles/, /retire ledgers
@@ -197,10 +199,6 @@ is created without asking.
   FAULTS/           faulthandler crash dumps, <server_key>_faults.txt
                     (created at every FastAPI server's startup)
 ```
-
-When `helao_dirs` runs, it also zips and removes any `*.txt` left under
-`LOGS/<server_name>/` by the older per-directory logger, naming the archive
-from the first timestamp in the file.
 
 A record's lifecycle state (`active`, `unsynced`, `quarantined`, `done`) is
 kept in the `STATES/runstate_*.jsonl` journals, not in its directory name. The

@@ -231,3 +231,10 @@ def test_read_logs_skips_tmp_and_empty_dir(tmp_path):
     full = read_logs(tmp_path)
     assert str(full["ts"].dtype) == str(empty["ts"].dtype)
     assert str(full["pid"].dtype) == "int64"
+
+
+def test_rpc_port_offset_mirrors_zmq_rpc():
+    from helao.core.rpc import zmq_rpc
+    from helao.helpers import log_collector
+
+    assert log_collector.RPC_PORT_OFFSET == zmq_rpc.RPC_PORT_OFFSET

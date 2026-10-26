@@ -14,6 +14,7 @@ import shutil
 import sys
 import threading
 import time
+import zlib
 from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
@@ -567,6 +568,13 @@ class JsonlSinkHandler(logging.Handler):
             super().close()
 
 
+def _chunked(pd, src):
+    """Stream ``src`` through pandas in chunks: one-shot parsing of a 300k-record
+    file peaks near 1 GB."""
+    with pd.read_json(src, lines=True, dtype=False, chunksize=20000) as rd:
+        return pd.concat(list(rd), ignore_index=True)
+
+
 def _read_one(p: Path):
     """Records of one JSONL file as a DataFrame, or None. A partial last line
     (a writer mid-append) is trimmed; unparseable lines are skipped with one
@@ -575,25 +583,42 @@ def _read_one(p: Path):
 
     import pandas as pd
 
-    raw = (gzip.open(p, "rb") if p.name.endswith(".gz") else open(p, "rb")).read()
-    raw = raw[: raw.rfind(b"\n") + 1]
-    if not raw:
-        return None
+    gz = p.name.endswith(".gz")
+    opener = gzip.open if gz else open
     try:
-        return pd.read_json(io.BytesIO(raw), lines=True, dtype=False)
+        if gz:
+            # a rotated file is complete; a damaged tail falls to the line parser
+            with gzip.open(p, "rb") as f:
+                return _chunked(pd, f)
+        with open(p, "rb") as f:
+            f.seek(-1, os.SEEK_END)
+            complete = f.read(1) == b"\n"
+        if complete:  # no partial tail: let pandas read the path itself
+            return _chunked(pd, p)
+        with open(p, "rb") as f:
+            raw = f.read()
+        raw = raw[: raw.rfind(b"\n") + 1]
+        if not raw:
+            return None
+        buf = io.BytesIO(raw)
+        del raw  # the parse must not hold a second copy
+        return _chunked(pd, buf)
     except ValueError:
         pass
     good, bad = [], 0
-    for ln in raw.splitlines():
-        try:
-            rec = json.loads(ln)
-        except ValueError:
-            bad += 1
-            continue
-        if isinstance(rec, dict):
-            good.append(rec)
-        else:
-            bad += 1
+    with opener(p, "rb") as f:
+        for ln in f:
+            if not ln.endswith(b"\n"):
+                continue  # partial tail
+            try:
+                rec = json.loads(ln)
+            except ValueError:
+                bad += 1
+                continue
+            if isinstance(rec, dict):
+                good.append(rec)
+            else:
+                bad += 1
     sys.stderr.write(f"read_logs: skipped {bad} unparseable line(s) in {p}\n")
     return pd.DataFrame(good) if good else None
 
@@ -618,7 +643,7 @@ def read_logs(log_dir, server=None, *, ledger: bool = False):
             if not p.stat().st_size:
                 continue
             df = _read_one(p)
-        except (EOFError, OSError):
+        except (EOFError, OSError, ValueError, zlib.error):
             continue  # deleted or gzipped away between listing and reading
         if df is not None:
             frames.append(df)

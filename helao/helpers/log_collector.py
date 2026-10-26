@@ -16,6 +16,9 @@ from helao.helpers.log_jsonl import (
 
 __all__ = ["LogCollector", "log_endpoint", "resolve_log_port"]
 
+# mirrors helao.core.rpc.zmq_rpc.RPC_PORT_OFFSET (importing it would start make_logger sinks)
+RPC_PORT_OFFSET = 10000
+
 
 def log_endpoint(port: int) -> str:
     return f"tcp://127.0.0.1:{port}"
@@ -27,7 +30,6 @@ def resolve_log_port(config: dict) -> int:
     The port must be in 1..65535 and clear of every server's address and of the
     RPC port paired with each server port.
     """
-    from helao.core.rpc.zmq_rpc import derive_rpc_port
     from helao.ui.shared.discovery import reserved_addresses
 
     taken, http = set(), set()
@@ -39,7 +41,7 @@ def resolve_log_port(config: dict) -> int:
         taken |= ports
         # unsure which group kinds bind an RPC port: reserve it for every int port
         if isinstance(entry.get("port"), int):
-            taken.add(derive_rpc_port(entry["port"]))
+            taken.add(entry["port"] + RPC_PORT_OFFSET)
     port = config.get("log_port")
     if port is None:
         port = max(http, default=8000) + 1

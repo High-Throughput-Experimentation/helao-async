@@ -52,7 +52,7 @@ def test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance():
         root = Path(td) / "captroot"
         _write_action(root, status="finished", with_hlo=False)
         (root / "LOGS").mkdir(parents=True)
-        (root / "LOGS" / "SAMPLE.log").write_text("not captured", encoding="utf-8")
+        (root / "LOGS" / "SAMPLE.jsonl").write_text("not captured", encoding="utf-8")
 
         out = Path(td) / "golden" / "run1"
         snapshot(root=root, out_dir=out, config_prefix="samplegold")

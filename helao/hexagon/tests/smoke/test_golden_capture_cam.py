@@ -74,7 +74,7 @@ def test_snapshot_writes_roundtrippable_provenance_with_cam_masking():
         root = Path(td) / "captroot"
         _write_action(root, status="finished", with_hlo=True)
         (root / "LOGS").mkdir(parents=True)
-        (root / "LOGS" / "CAM.log").write_text("not captured", encoding="utf-8")
+        (root / "LOGS" / "CAM.jsonl").write_text("not captured", encoding="utf-8")
 
         out = Path(td) / "golden" / "run1"
         snapshot(

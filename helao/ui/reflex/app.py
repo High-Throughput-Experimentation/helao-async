@@ -669,11 +669,11 @@ def build_app(world_cfg: dict, server_key: str):
 
 
 def _install_backend_logger(cfg: dict) -> None:
-    """Send this child process's logs to ``<root>/LOGS/<key>_backend.log``.
+    """Send this child process's logs to ``<root>/LOGS/<key>_backend.jsonl`` (or the launcher's unified file).
 
     ``make_logger`` defaults to a fresh temp directory, so without this every
     panel warning raised in the Reflex backend lands somewhere no operator
-    looks. Its own file rather than the launcher's ``<key>.log``: two processes
+    looks. Its own file rather than the launcher's file: two processes
     rotating one file collide on Windows. Installed as the global logger before
     ``build_app`` imports the panel modules, which pick it up at import.
     """

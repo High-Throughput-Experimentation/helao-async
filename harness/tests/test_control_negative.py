@@ -441,7 +441,9 @@ def test_log_and_state_churn_is_not_a_tree_change(tmp_path):
     def churn_the_logs():
         logs = root / "LOGS"
         logs.mkdir(exist_ok=True)
-        (logs / "IOSIM.log").write_text("a control call was logged\n", encoding="utf-8")
+        (logs / "IOSIM.jsonl").write_text(
+            "a control call was logged\n", encoding="utf-8"
+        )
         states = root / "STATES"
         states.mkdir(exist_ok=True)
         (states / "pids_controlneg_.pck").write_bytes(b"\x00")
