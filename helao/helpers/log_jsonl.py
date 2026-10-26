@@ -70,6 +70,14 @@ def fingerprint(record: logging.LogRecord) -> tuple:
     )
 
 
+def _clean(value):
+    """Turn a lone surrogate into literal ``\\udcff`` text: the JSON escape of
+    one makes pandas and pyarrow reject the whole file."""
+    if isinstance(value, str):
+        return value.encode("utf-8", "backslashreplace").decode("utf-8")
+    return value
+
+
 def record_to_json(
     record: logging.LogRecord, seq: int, offset_seconds: float = 0.0
 ) -> bytes:
@@ -84,19 +92,17 @@ def record_to_json(
         "func": record.funcName,
         "file": record.filename,
         "line": record.lineno,
-        "msg": _message(record),
+        "msg": _clean(_message(record)),
     }
     exc = _exc_text(record)
     if exc:
-        doc["exc"] = exc
+        doc["exc"] = _clean(exc)
     for key in EXTRA_KEYS:
         value = getattr(record, key, None)
         if value is not None:
-            doc[key] = value
+            doc[key] = _clean(value)
     line = json.dumps(doc, ensure_ascii=False, default=str) + "\n"
-    # a lone surrogate (device bytes decoded with surrogateescape) cannot be
-    # encoded strictly; escape it rather than lose the record
-    return line.encode("utf-8", "backslashreplace")
+    return line.encode("utf-8")
 
 
 #: records written past a refused rename before trying again
@@ -109,9 +115,14 @@ class RotatingJsonlWriter:
     At rotation the live file is renamed to ``<stem>_<YYYYmmddTHHMMSS>.jsonl``
     and a fresh one is opened before the next write; a daemon thread gzips the
     renamed file and deletes the plain copy ``grace_s`` later (a viewer may
-    still be reading it). ``shared=True`` re-checks the inode before each write
-    so a second process with the same stem never appends into a file the first
-    one renamed.
+    still be reading it).
+
+    ``shared=True`` is for several writers (processes) with one stem. They keep
+    no persistent handle: each ``write()`` opens the live file in append mode,
+    writes the line and closes it, so a rename is never blocked (Windows) and
+    never appended past. The count is the live file's line count read at the
+    first write plus the writer's own writes, so k writers sharing a stem can
+    grow the file to about k x ``rotate_records`` before it rotates.
     """
 
     def __init__(
@@ -134,45 +145,43 @@ class RotatingJsonlWriter:
         self.rotated_re = re.compile(
             rf"^{re.escape(stem)}_\d{{8}}T\d{{6}}(?:_\d+)?\.jsonl(?:\.gz)?$"
         )
+        self._started = False
         self._fh = None
-        self._ino = None
         self._count = 0
         self._retry_at = None
         self._queue: queue.Queue = queue.Queue()
         self._stop = threading.Event()
         self._thread = None
 
-    def _open(self):
+    def _start(self):
         self.dir.mkdir(parents=True, exist_ok=True)
-        self._count = 0
         if self.path.exists():
             with open(self.path, "rb") as f:
                 self._count = sum(1 for _ in f)
-        self._fh = open(self.path, "ab", buffering=0)
-        self._ino = os.fstat(self._fh.fileno()).st_ino
-
-    def _moved(self) -> bool:
-        try:
-            return os.stat(self.path).st_ino != self._ino
-        except FileNotFoundError:
-            return True
+        for p in sorted(self.dir.iterdir()):
+            if p.suffix == ".jsonl" and self.rotated_re.match(p.name):
+                self._queue_compress(p)
+        self._prune()
+        self._started = True
 
     def write(self, data: bytes) -> None:
         """Append one serialized record; rotate when the count is reached."""
-        if self._fh is None:
-            self._open()
-            for p in sorted(self.dir.iterdir()):
-                if p.suffix == ".jsonl" and self.rotated_re.match(p.name):
-                    self._queue_compress(p)
-            self._prune()
-        elif self.shared and self._moved():
-            self._fh.close()
-            self._open()
-        self._fh.write(data)
+        if not self._started:
+            self._start()
+        if self.shared:
+            with open(self.path, "ab") as f:
+                f.write(data)
+        else:
+            if self._fh is None:
+                self._fh = open(self.path, "ab", buffering=0)
+            self._fh.write(data)
         self._count += 1
         due = self._retry_at if self._retry_at is not None else self.rotate_records
         if self._count >= due:
-            self._rotate()
+            try:
+                self._rotate()
+            except Exception as exc:  # the record is written; never raise now
+                sys.stderr.write(f"log rotation of {self.path} failed: {exc}\n")
 
     def _rotate(self):
         stamp = time.strftime("%Y%m%dT%H%M%S")
@@ -180,23 +189,26 @@ class RotatingJsonlWriter:
         while dest.exists() or Path(f"{dest}.gz").exists():
             n += 1
             dest = self.dir / f"{self.stem}_{stamp}_{n}.jsonl"
-        self._fh.close()
+        if self._fh is not None:
+            fh, self._fh = self._fh, None  # next write() reopens if we bail out
+            fh.close()
         try:
             os.rename(self.path, dest)
         except FileNotFoundError:
             dest = None  # a process sharing this stem rotated it first
-        except PermissionError:
-            # Windows: a reader holds the live file; keep appending, retry later
+        except OSError as exc:
+            # e.g. Windows: a reader holds the live file; keep appending, retry later
             if self._retry_at is None:
                 sys.stderr.write(
-                    f"log rotation of {self.path} refused (file in use); "
+                    f"log rotation of {self.path} refused ({exc}); "
                     f"retrying every {ROTATE_RETRY} records\n"
                 )
-            self._fh = open(self.path, "ab", buffering=0)
             self._retry_at = self._count + ROTATE_RETRY
             return
         self._retry_at = None
-        self._open()
+        self._count = 0
+        if not self.shared:
+            self._fh = open(self.path, "ab", buffering=0)
         if dest is not None:
             self._queue_compress(dest)
         self._prune()
@@ -214,11 +226,20 @@ class RotatingJsonlWriter:
             path = self._queue.get()
             if path is None:
                 return
+            tmp = f"{path}.gz.{os.getpid()}.tmp"
             try:
-                with open(path, "rb") as fin, gzip.open(f"{path}.gz", "wb") as fout:
+                try:
+                    fin = open(path, "rb")
+                except FileNotFoundError:
+                    continue  # a peer already finished this file
+                with fin, gzip.open(tmp, "wb") as fout:
                     shutil.copyfileobj(fin, fout, 1 << 20)
+                os.replace(tmp, f"{path}.gz")
                 self._stop.wait(self.grace_s)
-                os.remove(path)
+                try:
+                    os.remove(path)
+                except FileNotFoundError:
+                    pass
             except OSError as exc:
                 sys.stderr.write(f"log gzip of {path} failed: {exc}\n")
 
@@ -255,11 +276,15 @@ class SequenceDeduper:
     counted. A record that breaks the cycle emits one summary and then the
     held-back partial cycle. A summary is also emitted at a cycle boundary once
     ``interval`` seconds have passed since the cycle (or the last summary)
-    started. ``interval == 0`` disables dedup.
+    started. ``interval == 0`` disables dedup. Every fed fingerprint goes into
+    the history, so a cycle containing an adjacent repeat is still found.
     """
 
     def __init__(
-        self, max_period: int = MAX_PERIOD, interval: float = 10.0, clock=time.monotonic
+        self,
+        max_period: int = MAX_PERIOD,
+        interval: float = 10.0,
+        clock=time.monotonic,
     ):
         self.max_period = max_period
         self.interval = interval
@@ -270,6 +295,8 @@ class SequenceDeduper:
     def feed(self, fp, item) -> list:
         out = []
         c = self._cycle
+        if self.interval:
+            self._hist.append(fp)
         if c is not None:
             if fp == c["pattern"][c["pos"]]:
                 c["held"].append(item)
@@ -288,7 +315,6 @@ class SequenceDeduper:
         out.append(("record", item))
         if not self.interval:
             return out
-        self._hist.append(fp)
         hist = list(self._hist)
         for p in range(1, min(self.max_period, len(hist) // 2) + 1):
             if hist[-p:] == hist[-2 * p : -p]:
@@ -300,7 +326,6 @@ class SequenceDeduper:
                     "started": self.clock(),
                     "last": item,
                 }
-                self._hist.clear()
                 break
         return out
 

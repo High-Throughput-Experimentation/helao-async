@@ -56,10 +56,15 @@ def test_extra_keys_included_when_set():
     assert "reason" not in doc
 
 
-def test_surrogates_and_newlines_stay_one_line():
+def test_surrogates_and_newlines_stay_one_line(tmp_path):
     raw = record_to_json(_rec("a\nb\udcff\x00c"), 1)
     assert raw.endswith(b"\n") and raw.count(b"\n") == 1
-    assert json.loads(raw)["msg"].startswith("a\nb")
+    msg = json.loads(raw)["msg"]
+    assert msg.startswith("a\nb") and "\\udcff" in msg
+    p = tmp_path / "s.jsonl"  # a lone-surrogate JSON escape would break the file
+    p.write_bytes(raw + record_to_json(_rec("ok"), 2))
+    df = pd.read_json(p, lines=True, dtype=False)
+    assert list(df["seq"]) == [1, 2] and "\\udcff" in df["msg"][0]
 
 
 def test_round_trips_through_pandas(tmp_path):
@@ -86,6 +91,7 @@ def test_is_artifact_and_fingerprint():
 import gzip
 import os
 import re
+import threading
 import time
 from pathlib import Path
 
@@ -153,9 +159,12 @@ def test_retention_deletes_old_logs_not_ledger_or_other_stems(tmp_path):
     for n in names:
         (tmp_path / n).write_bytes(b"")
         os.utime(tmp_path / n, (old, old))
+    young = tmp_path / f"s_{time.strftime('%Y%m%dT%H%M%S')}.jsonl.gz"
+    young.write_bytes(b"")
     RotatingJsonlWriter(tmp_path, "s").write(b"x\n")
     RotatingJsonlWriter(tmp_path, "artifacts_s", retain_days=None).write(b"x\n")
     assert not (tmp_path / names[0]).exists()
+    assert young.exists()
     assert (tmp_path / names[1]).exists() and (tmp_path / names[2]).exists()
 
 
@@ -181,7 +190,7 @@ def test_rotation_retries_when_rename_is_refused(tmp_path, monkeypatch, capsys):
     w.close()
 
 
-def test_shared_writer_reopens_after_another_rotates(tmp_path):
+def test_shared_writer_counts_live_file_and_survives_peer_rotation(tmp_path):
     a = RotatingJsonlWriter(tmp_path, "s", rotate_records=2, grace_s=60, shared=True)
     b = RotatingJsonlWriter(tmp_path, "s", rotate_records=10, grace_s=60, shared=True)
     a.write(b"a1\n")
@@ -263,3 +272,59 @@ def test_longest_period_bound():
     d = SequenceDeduper(max_period=2, interval=10, clock=lambda: 0.0)
     out = _run(d, "ABC" * 4)
     assert all(o[0] == "record" for o in out)
+
+
+def test_cycle_containing_adjacent_repeat_collapses():
+    # "AAB"*20 + "Z": ABBA-style prefixes confirm p=1 first, but the history is
+    # never cleared, so p=3 is confirmed at item 6 (6 records emitted). The
+    # remaining 54 items are 18 whole cycles, all suppressed; Z closes it.
+    d = SequenceDeduper(interval=10, clock=lambda: 0.0)
+    out = _run(d, "AAB" * 20 + "Z")
+    assert [o for o in out if o[0] == "summary"] == [("summary", 3, 18, "B")]
+    assert sum(o[0] == "record" for o in out) == 61 - 54  # 7 incl. Z
+
+    # "ABB"*20 + "Z": p=1 starts at item 3 (BB), breaks at item 4, p=3 is
+    # confirmed at item 7 (7 emitted). Remaining 53 items = 17 whole cycles
+    # (51 suppressed) + 2 held ("BB"), which are emitted after the summary.
+    d = SequenceDeduper(interval=10, clock=lambda: 0.0)
+    out = _run(d, "ABB" * 20 + "Z")
+    assert [o for o in out if o[0] == "summary"] == [("summary", 3, 17, "A")]
+    assert sum(o[0] == "record" for o in out) == 61 - 51  # 10
+
+
+def test_unexpected_rename_error_keeps_writer_usable(tmp_path, monkeypatch):
+    real = os.rename
+    calls = {"n": 0}
+
+    def flaky(src, dst):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise FileExistsError("exists")
+        return real(src, dst)
+
+    monkeypatch.setattr(log_jsonl.os, "rename", flaky)
+    w = RotatingJsonlWriter(tmp_path, "s", rotate_records=2, grace_s=0)
+    for line in _lines(5):
+        w.write(line)  # must not raise
+    assert w.path.read_bytes() == b"".join(_lines(5))
+    w.close()
+
+
+def test_next_write_never_waits_for_compressor(tmp_path, monkeypatch):
+    gate = threading.Event()
+    real = gzip.open
+
+    def slow(*a, **k):
+        gate.wait(10)
+        return real(*a, **k)
+
+    monkeypatch.setattr(log_jsonl.gzip, "open", slow)
+    w = RotatingJsonlWriter(tmp_path, "s", rotate_records=2, grace_s=0)
+    w.write(b"a\n")
+    w.write(b"b\n")  # rotates; compressor now blocked
+    w.write(b"c\n")  # must return
+    assert w.path.read_bytes() == b"c\n"
+    assert not list(tmp_path.glob("s_*.jsonl.gz"))
+    gate.set()
+    assert _wait(lambda: list(tmp_path.glob("s_*.jsonl.gz")))
+    w.close()
