@@ -34,7 +34,11 @@ from typing import Optional
 import requests
 from colorlog import ColoredFormatter
 
-from helao.helpers.log_jsonl import LOG_ENDPOINT_ENV, JsonlSinkHandler
+from helao.helpers.log_jsonl import (
+    LOG_ENDPOINT_ENV,
+    JsonlSinkHandler,
+    read_logs,
+)  # noqa: F401
 from helao.helpers.time_utils import read_saved_offset
 
 ALERT_LEVEL = 60

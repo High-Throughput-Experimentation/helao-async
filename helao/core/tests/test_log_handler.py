@@ -8,6 +8,7 @@ import threading
 import time
 from pathlib import Path
 
+import pytest
 import zmq
 
 from helao.helpers.log_jsonl import HWM, LEDGER_FRAME, SOCK_BUF, JsonlSinkHandler
@@ -332,3 +333,20 @@ def test_failed_reconnect_spills_instead_of_losing(tmp_path, monkeypatch):
     assert [r["msg"] for r in _read(tmp_path / "SRV.jsonl")] == ["kept"]
     h.close()
     pull.close()
+
+
+def test_connect_failure_closes_sockets(tmp_path, monkeypatch):
+    ctx = zmq.Context.instance()
+    made = []
+    real = ctx.socket
+
+    def spy(*a, **k):
+        s = real(*a, **k)
+        made.append(s)
+        return s
+
+    monkeypatch.setattr(ctx, "socket", spy)
+    with pytest.raises(zmq.ZMQError):
+        JsonlSinkHandler("X", tmp_path, endpoint="tcp://")
+    monkeypatch.undo()
+    assert made and all(s.closed for s in made)

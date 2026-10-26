@@ -430,16 +430,21 @@ class JsonlSinkHandler(logging.Handler):
         sock.setsockopt(zmq.SNDBUF, SOCK_BUF)
         sock.setsockopt(zmq.LINGER, 500)
         mon = sock.get_monitor_socket(zmq.EVENT_HANDSHAKE_SUCCEEDED)
-        sock.connect(self.endpoint)
-        # with IMMEDIATE, sends before the ZMTP handshake completes raise Again;
-        # wait once (process start) so startup records reach the launcher
-        if self.endpoint in _NO_WAIT:
-            timeout_ms = 0
-        if mon.poll(timeout_ms):
-            mon.recv_multipart()
-        elif timeout_ms and flag:
-            _NO_WAIT.add(self.endpoint)
-        sock.disable_monitor()
+        try:
+            sock.connect(self.endpoint)
+            # with IMMEDIATE, sends before the ZMTP handshake completes raise Again;
+            # wait once (process start) so startup records reach the launcher
+            if self.endpoint in _NO_WAIT:
+                timeout_ms = 0
+            if mon.poll(timeout_ms):
+                mon.recv_multipart()
+            elif timeout_ms and flag:
+                _NO_WAIT.add(self.endpoint)
+            sock.disable_monitor()
+        except BaseException:
+            mon.close(linger=0)
+            sock.close(linger=0)
+            raise
         mon.close()
         self._sock = sock
 
@@ -560,3 +565,31 @@ class JsonlSinkHandler(logging.Handler):
         finally:
             self.release()
             super().close()
+
+
+def read_logs(log_dir, server=None, *, ledger: bool = False):
+    """All JSONL records under ``log_dir`` as one DataFrame sorted by ``ts``.
+
+    Reads live and rotated (``.gz``) files; ``ledger=True`` reads only the
+    ``artifacts_*`` ledger instead of the logs. Duplicates from replay are
+    dropped on ``(server, pid, seq)``.
+    """
+    import pandas as pd
+
+    frames = []
+    for p in sorted(Path(log_dir).iterdir()):
+        if not p.name.endswith((".jsonl", ".jsonl.gz")):
+            continue
+        if p.name.startswith("artifacts_") != ledger or not p.stat().st_size:
+            continue
+        try:
+            frames.append(pd.read_json(p, lines=True, compression="infer", dtype=False))
+        except (EOFError, OSError, ValueError):
+            continue  # a .gz still being written; its plain copy is read instead
+    if not frames:
+        return pd.DataFrame(columns=["ts", "level", "server", "pid", "seq", "msg"])
+    df = pd.concat(frames, ignore_index=True).drop_duplicates(["server", "pid", "seq"])
+    if server is not None:
+        df = df[df["server"] == server]
+    df["ts"] = pd.to_datetime(df["ts"], utc=True)
+    return df.sort_values(["ts", "pid", "seq"], kind="stable").reset_index(drop=True)
