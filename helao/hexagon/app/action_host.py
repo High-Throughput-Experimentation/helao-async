@@ -474,15 +474,15 @@ class ActionHost(HelaoFastAPI):
         """
         await self.meta_writer._write_meta_atomic(output_file, output_str)
 
-    async def write_act(self, action) -> None:
+    async def write_act(self, action, reason=None) -> None:
         """Write the action's ``-act.yml`` via the native meta writer.
 
         Reached from the finalizer at the end of every action. Its absence was
         silent in the suite and fatal on disk: the finalizer catches the error,
         logs "Failed to write act meta file", and the run completes having
-        written nothing.
+        written nothing. ``reason`` marks a post-finalize rewrite (spec §5).
         """
-        await self.meta_writer.write_act(action)
+        await self.meta_writer.write_act(action, reason=reason)
 
     async def write_exp(self, experiment) -> None:
         """Write the experiment's ``-exp.yml``."""
@@ -1451,7 +1451,7 @@ class ActionHost(HelaoFastAPI):
                 "The action server stopped while the action was running; the "
                 "record was reconciled at the next server startup."
             )
-            await self.write_act(action)
+            await self.write_act(action, reason="reconcile_interrupted")
             LOGGER.warning(f"Reconciled interrupted action {uuid} ({act_dir}).")
         try:
             await move_dir(action, base=self)

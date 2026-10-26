@@ -56,7 +56,7 @@ def test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance():
             "hlo_version: x\n%%\n", encoding="utf-8"
         )
         (root / "LOGS").mkdir(parents=True)
-        (root / "LOGS" / "SPEC.log").write_text("not captured", encoding="utf-8")
+        (root / "LOGS" / "SPEC.jsonl").write_text("not captured", encoding="utf-8")
 
         out = Path(td) / "golden" / "run1"
         snapshot(

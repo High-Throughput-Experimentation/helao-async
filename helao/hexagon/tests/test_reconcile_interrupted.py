@@ -410,3 +410,40 @@ async def test_reconcile_rewrites_the_record_in_its_own_format(finish_calls, ext
     assert _act_records(rec.parent) == [rec.name]
     assert _statuses(rec) == ["finished", "errored"]
     assert finish_calls == [str(rec)]
+
+
+@pytest.mark.asyncio
+async def test_reconcile_logs_a_rewritten_hash(finish_calls, tmp_path, monkeypatch):
+    import hashlib
+    import json
+    import logging
+
+    from helao.helpers import helao_logging
+    from helao.helpers.log_jsonl import JsonlSinkHandler
+
+    h = JsonlSinkHandler("SRV", tmp_path / "LOGS")
+    lg = logging.getLogger("t_reconcile_ledger")
+    lg.handlers[:] = [h]
+    lg.setLevel(10)
+    lg.propagate = False
+    monkeypatch.setattr(helao_logging, "LOGGER", lg)
+    try:
+        host = _host()
+        a = await _journalled(host, _action(1), [HloStatus.active])
+        await host.reconcile_interrupted()
+        h.flush()
+        rows = [
+            json.loads(x)
+            for x in (tmp_path / "LOGS" / "artifacts_SRV.jsonl")
+            .read_bytes()
+            .splitlines()
+        ]
+    finally:
+        h.close()
+    (r,) = [r for r in rows if r["event"] == "artifact_rewritten"]
+    assert (r["reason"], r["kind"], r["uuid"]) == (
+        "reconcile_interrupted",
+        "act",
+        mk_uuid(1),
+    )
+    assert r["sha256"] == hashlib.sha256(a.read_bytes()).hexdigest()

@@ -969,3 +969,60 @@ def test_record_dry_run_on_a_runs_sequence_reports_colocated_processes(
     assert _run(seq_dir, "--dry-run") == 0
     out = capsys.readouterr().out
     assert f"0__{PRC_SAMPLE}__GRID_scan-prc.json: samples_in[0].plate_id" in out
+
+
+@pytest.fixture(autouse=True)
+def _reset_logger():
+    """CLI mains install a root logger; keep it from leaking between tests."""
+    from helao.helpers import helao_logging
+
+    saved = helao_logging.LOGGER
+    yield
+    lg = helao_logging.LOGGER
+    if lg is not saved and lg is not None:
+        for h in list(lg.handlers):
+            lg.removeHandler(h)
+            h.close()
+    helao_logging.LOGGER = saved
+
+
+def _ledger_rows(root, tool):
+    import hashlib
+
+    from helao.helpers import helao_logging
+
+    for h in helao_logging.LOGGER.handlers:
+        h.flush()
+    p = root / "LOGS" / f"artifacts_{tool}.jsonl"
+    rows = [json.loads(x) for x in p.read_bytes().splitlines()]
+    for r in rows:
+        f = Path(r["path"])
+        f = f if f.is_absolute() else root / f
+        assert r["sha256"] == hashlib.sha256(f.read_bytes()).hexdigest()
+    return rows
+
+
+def test_record_main_ledgers_rewrites_beside_the_runs_tree(tmp_path):
+    seq_dir = build_runs_record(tmp_path)
+    assert _run(seq_dir) == 0
+    rows = _ledger_rows(tmp_path, "set_plate_id")
+    assert {r["event"] for r in rows} == {"artifact_rewritten"}
+    assert {r["reason"] for r in rows} == {"set_plate_id"}
+    assert {r["kind"] for r in rows} >= {"seq", "act", "prc"}
+
+
+def test_record_dry_run_logs_nothing(tmp_path):
+    seq_dir = build_runs_record(tmp_path)
+    assert _run(seq_dir, "--dry-run") == 0
+    assert not (tmp_path / "LOGS").exists()
+
+
+def test_analyses_main_ledgers_beside_the_analyses_tree(tmp_path, monkeypatch):
+    pdir, yml, _, _ = build_analysis(tmp_path, monkeypatch)
+    (tmp_path / "RUNS").mkdir(exist_ok=True)
+    assert _ana(pdir, tmp_path) == 0
+    rows = _ledger_rows(tmp_path, "set_plate_id")
+    (r,) = [r for r in rows if r["event"] == "artifact_rewritten"]
+    assert r["reason"] == "set_plate_id"
+    assert r["uuid"] == ANA_UUID
+    assert Path(r["path"]).name == yml.name

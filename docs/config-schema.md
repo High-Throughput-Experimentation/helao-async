@@ -108,7 +108,8 @@ issue it found:
 | `experiment_path` / `sequence_path` | str | `helao/deploy/<deployment>/{experiments,sequences}` | Overrides where library modules are looked up (`import_autolibs`). Undeclared in `HelaoConfig`. |
 | `allow_shadow` | bool | `False` | Preflight only: allow the same function name in two library modules (the later one wins in the flat namespace). |
 | `show_debug` | bool | `False` | **No effect in a launched group.** It is read only when a server builds its own logger, and every launcher builds the logger first without it. |
-| `log_level` | int | `20` | File-log threshold for `launch.py` and every launched server (FastAPI, Bokeh, Reflex launcher); a server-level `log_level` overrides it for that server. Console output stays at INFO, and the Reflex backend child's `<key>_backend.log` stays at 20. |
+| `log_level` | int | `20` | File-log threshold for `launch.py` and every launched server (FastAPI, Bokeh, Reflex launcher); a server-level `log_level` overrides it for that server. Console output stays at INFO, and the Reflex backend child's `<key>_backend.jsonl` stays at 20. Artefact hash records ignore this threshold and always reach the ledger. |
+| `log_port` | int | one above the highest port any server occupies (excluding RPC and plate-aligner ports) | The launcher's log collector port on 127.0.0.1. Never a server port, its RPC port or an aligner port. A `--reconnect` launcher re-binds the same port. A visualizer-only launcher (`extraopt` `liveonly` or `gpvis`) starts **no** collector and sets no log endpoint: its children write their own fallback `<key>.jsonl` files, because it shares this config, and so this port, with the full launcher of the group. |
 | `run_unit_tests` | bool | `False` | `launch.py` runs `run_unit_tests.py` before launching and aborts on failure. |
 | `hot_reload` | map | `{enabled: true, poll_seconds: 30}` | See [Hot reload](#hot-reload). |
 | `alert_config_path` | str | — | Alert config (email and webhook). Overridden by the `ALERT_CONFIG_PATH` env var. |
@@ -185,8 +186,9 @@ is created without asking.
   RUNS/             the single run tree; records are written once and never move
   RUNS_SUPERSEDED/  sequences retired through /retire (the one exception)
   DIAG/             manual (diagnostic) actions, a sibling of RUNS/
-  LOGS/             <server_key>.log per server, rotated daily and gzipped
-                    (old archives are not pruned)
+  LOGS/             JSONL logs: helao_<prefix>.jsonl under a launcher,
+                    <server_key>.jsonl without; rotated every 300,000 records
+                    and gzipped; rotated logs deleted after 90 days
   STATES/           pid pickles, queue exports, per-server run-state journals
                     (runstate_<server_key>.jsonl), loaded_modules_<key>.json,
                     reflex-bundles/, /retire ledgers
@@ -197,10 +199,6 @@ is created without asking.
   FAULTS/           faulthandler crash dumps, <server_key>_faults.txt
                     (created at every FastAPI server's startup)
 ```
-
-When `helao_dirs` runs, it also zips and removes any `*.txt` left under
-`LOGS/<server_name>/` by the older per-directory logger, naming the archive
-from the first timestamp in the file.
 
 A record's lifecycle state (`active`, `unsynced`, `quarantined`, `done`) is
 kept in the `STATES/runstate_*.jsonl` journals, not in its directory name. The
@@ -512,6 +510,7 @@ route, whatever its config says:
 | `/uvvis`, `/xafs`, `/xrds` | plate spectra | credentials (below); `/xafs` reads local analysis arrays under `root/ANALYSES` unless set to read from S3; the wafer-photo underlay also needs the plate API |
 | `/retire` | retire mis-identified sequences | credentials (below), `params.retire: true` on this Reflex server, and a `root` |
 | `/quarantine` | release or write off parked sync records | `params.sync_quarantine: true` on this Reflex server, and a `SYNC` server in the config |
+| `/logs` | live tail of the group's JSONL logs (`<root>/LOGS`) | the config's `root`; always registered |
 
 **Credential-gated pages.** `/composition`, `/uvvis`, `/xafs`, `/xrds` and
 `/retire` read the metadata API or S3. If the Reflex process has no
@@ -570,6 +569,7 @@ nothing checks the RPC port:
 | Reflex backend | `port + 1` | yes — `reserved_addresses` returns both |
 | Plate-aligner Bokeh (`params.enable_aligner`) | `params.bokeh_port`, else `port + 1000` | **no** (preflight checks it) |
 | ZMQ RPC (every FastAPI server) | `port + 10000` | **no** |
+| Log collector (launcher) | `log_port`, else one above the highest server port | no (`resolve_log_port` avoids server, RPC and aligner ports) |
 
 `validateConfig` rejects duplicate `host:port` pairs across the group. It does
 not model the RPC offset, so two servers 10000 apart pass validation and then

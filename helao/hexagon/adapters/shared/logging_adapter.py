@@ -3,7 +3,7 @@
 Wraps legacy helao.helpers.helao_logging -- nothing is vendored. The two
 legacy tempdir traps (make_logger(log_dir=None) -> mkdtemp(); OSError ->
 mkdtemp()) are unreachable through this port: file_logger RAISES on a falsy
-log root. Contractual path: <log_root>/<server_key>.log (flat file).
+log root. Contractual path: `<log_root>/<server_key>.jsonl` (the fallback file; under the launcher, records go to `<root>/LOGS/helao_<prefix>.jsonl`)
 """
 
 from typing import Optional

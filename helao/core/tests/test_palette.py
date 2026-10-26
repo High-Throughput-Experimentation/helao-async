@@ -128,6 +128,7 @@ CANONICAL_TAILWIND: Final[dict[str, str]] = {
     "rose-50": "#fff1f2",
     "orange-50": "#fff7ed",
     "red-50": "#fef2f2",
+    "indigo-50": "#eef2ff",
 }
 
 TW_KEY_RE: Final[re.Pattern[str]] = re.compile(r"^[a-z]+-(50|[1-9]00|950)$")
@@ -509,6 +510,7 @@ HEADING_ROWS: Final[dict[tuple[str, str], float]] = {
 BODY_TEXT_ROWS: Final[dict[tuple[str, str], float]] = {
     ("slate-500", "white"): 4.76,  # muted text on white
     ("slate-600", "slate-300"): 5.10,  # muted text on the panel
+    ("slate-600", "white"): 7.58,  # /logs DEBUG rows (REFLEX_MUTED_TEXT)
     ("amber-700", "white"): 5.02,  # warning text
     ("amber-700", "slate-50"): 4.80,  # the cell that makes 2 dp matter
     ("slate-900", "white"): 17.85,  # body text
@@ -592,6 +594,8 @@ PAGE_TINT_TEXT_ROWS: Final[dict[tuple[str, str], float]] = {
     ("slate-600", "orange-50"): 7.14,
     ("slate-900", "red-50"): 16.32,  # /quarantine
     ("slate-600", "red-50"): 6.93,
+    ("slate-900", "indigo-50"): 15.97,  # /logs
+    ("slate-600", "indigo-50"): 6.78,
 }
 
 # The shade slate-600 replaced, kept as a measurement rather than a comment.
@@ -602,6 +606,7 @@ SLATE_500_ON_TINT_ROWS: Final[dict[tuple[str, str], float]] = {
     ("slate-500", "rose-50"): 4.33,  # /control -- a third failing surface
     ("slate-500", "orange-50"): 4.48,  # /retire
     ("slate-500", "red-50"): 4.35,  # /quarantine
+    ("slate-500", "indigo-50"): 4.26,  # /logs
     ("slate-500", "slate-50"): 4.55,
     ("slate-500", "sky-50"): 4.46,
     ("slate-500", "violet-50"): 4.34,
@@ -629,15 +634,22 @@ REFLEX_HEADER_ROWS: Final[dict[tuple[str, str], float]] = {
 
 # Each table's 3px left border against its worst-case page tint. A border is a
 # non-text graphical object, so the 3:1 control floor applies, not 4.5. Every
-# one of the five is worst on violet-50, the darkest tint, so that is the only
-# background that needs declaring -- the four brighter tints are strictly
-# easier.
+# one of the five is worst on indigo-50, the darkest tint (/logs; violet-50 was
+# before it), so that is the background that needs declaring -- the brighter
+# tints are strictly easier. cyan-600 is the tightest cell, 3.29.
 REFLEX_BORDER_ROWS: Final[dict[tuple[str, str], float]] = {
     ("violet-600", "rose-50"): 5.19,
     ("blue-600", "rose-50"): 4.70,
     ("cyan-600", "rose-50"): 3.35,  # the tightest cell in the whole design
     ("slate-600", "rose-50"): 6.90,
     ("emerald-600", "rose-50"): 3.43,
+    # indigo-50 (/logs) is darker than rose-50 for every hue, so it is the
+    # worst tint now; the rose-50 rows above stay as the earlier measurement.
+    ("violet-600", "indigo-50"): 5.10,
+    ("blue-600", "indigo-50"): 4.62,
+    ("cyan-600", "indigo-50"): 3.29,
+    ("slate-600", "indigo-50"): 6.78,
+    ("emerald-600", "indigo-50"): 3.37,
 }
 
 
@@ -888,7 +900,7 @@ def test_page_tint_rows_cover_every_route_twice() -> None:
 def test_slate_500_is_measured_on_every_tint(pair: tuple[str, str]) -> None:
     """The shade the Reflex stack moved *away* from, pinned as a measurement.
 
-    Five of the twelve tints put ``slate-500`` under the 4.5 body floor, which
+    Six of the thirteen tints put ``slate-500`` under the 4.5 body floor, which
     is why ``REFLEX_MUTED_TEXT`` is ``slate-600``.
     Asserting the numbers here means a future edit that reintroduces
     ``slate-500`` cannot claim it was fine, and a Tailwind revision that changed
@@ -899,8 +911,8 @@ def test_slate_500_is_measured_on_every_tint(pair: tuple[str, str]) -> None:
     assert measured == pytest.approx(SLATE_500_ON_TINT_ROWS[pair], abs=0.01)
 
 
-def test_slate_500_fails_the_body_floor_on_five_of_the_twelve_tints() -> None:
-    """Exactly five, and named -- not "at least one".
+def test_slate_500_fails_the_body_floor_on_six_of_the_thirteen_tints() -> None:
+    """Exactly six, and named -- not "at least one".
 
     A count would pass if the failing set moved to four different tints, and
     the point of the row block above is that *which* surfaces fail is not
@@ -909,14 +921,22 @@ def test_slate_500_fails_the_body_floor_on_five_of_the_twelve_tints() -> None:
     ``slate-500`` any better, and it did not. ``lime-50`` arrived with
     ``/composition`` at 4.60 and did not join them, which is the other half of
     the same point -- the set is measured, not predicted. ``orange-50`` joined
-    them with ``/retire``, at 4.48, and ``red-50`` with ``/quarantine``, at 4.35.
+    them with ``/retire``, at 4.48, ``red-50`` with ``/quarantine``, at 4.35, and
+    ``indigo-50`` with ``/logs``, at 4.26.
     """
     failing = {
         bg
         for (fg, bg) in SLATE_500_ON_TINT_ROWS
         if contrast_ratio(_shade(fg), _shade(bg)) < FLOOR_BODY_TEXT
     }
-    assert failing == {"sky-50", "violet-50", "rose-50", "orange-50", "red-50"}
+    assert failing == {
+        "sky-50",
+        "violet-50",
+        "rose-50",
+        "orange-50",
+        "red-50",
+        "indigo-50",
+    }
 
 
 def test_slate_600_clears_every_tint_by_a_real_margin() -> None:
@@ -1449,6 +1469,12 @@ def test_exceptions_registry_is_empty() -> None:
     empty case rather than deleting the mechanism.
     """
     assert ACCEPTED_CONTRAST_EXCEPTIONS == {}
+
+
+def test_log_level_text_shades_have_body_rows_on_white() -> None:
+    hex_to_name = {v: k for k, v in TW.items()}
+    for colour in palette.LOG_LEVEL_TEXT.values():
+        assert (hex_to_name[colour], "white") in BODY_TEXT_ROWS
 
 
 def test_every_accepted_exception_is_a_declared_row() -> None:

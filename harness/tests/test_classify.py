@@ -61,7 +61,7 @@ def test_classify_rows():
     assert classify_file("ANALYSES/25.28/0716/x/u.yml") is ArtifactRow.ANALYSIS
     assert classify_file("S3_SIM/helao-sim/action/u.json") is ArtifactRow.S3_RECORD
     assert classify_file("RUNS_FINISHED/a/extra_output.csv") is ArtifactRow.AUX_FILE
-    assert classify_file("LOGS/ORCH.log") is ArtifactRow.IGNORE
+    assert classify_file("LOGS/ORCH.jsonl") is ArtifactRow.IGNORE
     assert classify_file("STATES/pids_golden_.pck") is ArtifactRow.IGNORE
 
 

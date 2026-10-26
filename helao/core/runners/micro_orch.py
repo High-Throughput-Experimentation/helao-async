@@ -45,11 +45,12 @@ from helao.core.hooks.loader import load_hook_set
 from helao.core.hooks.prefinish import run_prefinish
 from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.experiment import ExperimentModel, ShortExperimentModel
-from helao.core.models.hlostatus import HloStatus
+from helao.core.models.hlostatus import HloStatus, is_terminal
 from helao.core.models.run_dir import diag_root, run_root
 from helao.core.models.server import ActionServerModel
 from helao.core.rpc import RPCClient, RPCDispatcher, RPCError, derive_rpc_port
 from helao.helpers import helao_logging as logging
+from helao.helpers.artifact_hash import log_artifact_hashes
 from helao.helpers.file_utils import replace_when_free, staging_path
 from helao.helpers.meta_io import dumps_meta, meta_glob, resolve_meta_path
 from helao.helpers.premodels import Action, Experiment, Sequence
@@ -1036,6 +1037,13 @@ class MicroOrch:
         output_dict.setdefault("experiment_params", {})
         target = resolve_meta_path(output_file)
         await self._write_meta_atomic(str(target), dumps_meta(output_dict, target))
+        if is_terminal(experiment.experiment_status):
+            await log_artifact_hashes(
+                [target],
+                kind="exp",
+                owner_uuid=experiment.experiment_uuid,
+                event="artifact_final",
+            )
         return str(target)
 
     async def _write_seq(self, sequence: Sequence) -> str:
@@ -1053,6 +1061,13 @@ class MicroOrch:
         output_dict.setdefault("sequence_params", {})
         target = resolve_meta_path(output_file)
         await self._write_meta_atomic(str(target), dumps_meta(output_dict, target))
+        if is_terminal(sequence.sequence_status):
+            await log_artifact_hashes(
+                [target],
+                kind="seq",
+                owner_uuid=sequence.sequence_uuid,
+                event="artifact_final",
+            )
         return str(target)
 
     # ------------------------------------------------------------------

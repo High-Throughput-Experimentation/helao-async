@@ -60,6 +60,7 @@ from pathlib import Path
 from typing import Callable
 
 from helao.core.models.run_dir import RunDir, is_legacy_path
+from helao.helpers.artifact_hash import log_artifact_hashes_sync, record_uuid
 from helao.helpers.file_utils import staging_path
 from helao.helpers.meta_io import meta_glob, read_meta, write_meta
 from helao.helpers.run_state import _prg_is_complete
@@ -214,7 +215,11 @@ def run_reset_only(path: "str | os.PathLike[str]", *, dry_run: bool = False) -> 
 
 
 def rewrite_dir(
-    seq_dir: "str | os.PathLike[str]", apply: Apply, *, dry_run: bool = False
+    seq_dir: "str | os.PathLike[str]",
+    apply: Apply,
+    *,
+    dry_run: bool = False,
+    reason: str = "record_rewrite",
 ) -> "tuple[list[Edit], str | None]":
     """Run ``apply`` over the seq/exp/act records of a ``RUNS`` sequence directory.
 
@@ -238,7 +243,14 @@ def rewrite_dir(
                 sequence_uuid = str(uuid)
         changed, note = apply(doc, kind)
         if changed and not dry_run:
-            write_meta(path, doc)
+            written = write_meta(path, doc)
+            log_artifact_hashes_sync(
+                [written],
+                kind=meta_kind(path) or "record",
+                owner_uuid=record_uuid(doc),
+                event="artifact_rewritten",
+                reason=reason,
+            )
         if changed or note:
             edits.append(Edit(str(path), kind, changed, note))
     return edits, sequence_uuid
@@ -259,7 +271,11 @@ def reset_runs_dir(
 
 
 def rewrite_zip(
-    zip_path: "str | os.PathLike[str]", apply: Apply, *, dry_run: bool = False
+    zip_path: "str | os.PathLike[str]",
+    apply: Apply,
+    *,
+    dry_run: bool = False,
+    reason: str = "record_rewrite",
 ) -> "tuple[list[Edit], str | None]":
     """Run ``apply`` over every record yml inside one sequence zip.
 
@@ -333,6 +349,13 @@ def rewrite_zip(
     # Outside the read handle: on Windows the original cannot be replaced while
     # it is still open.
     os.replace(staged, zip_path)
+    log_artifact_hashes_sync(
+        [zip_path],
+        kind="zip",
+        owner_uuid=sequence_uuid,
+        event="artifact_rewritten",
+        reason=reason,
+    )
     return edits, sequence_uuid
 
 
@@ -493,6 +516,7 @@ def rewrite_processes(
     apply: Apply,
     *,
     dry_run: bool = False,
+    reason: str = "record_rewrite",
 ) -> list[Edit]:
     """Run ``apply`` over the ``-prc`` records (``.yml``/``.json``) under ``process_dir``.
 
@@ -526,7 +550,14 @@ def rewrite_processes(
             continue
         edits.append(Edit(str(path), "process", changed, note))
         if not dry_run:
-            write_meta(path, doc)
+            written = write_meta(path, doc)
+            log_artifact_hashes_sync(
+                [written],
+                kind="prc",
+                owner_uuid=record_uuid(doc),
+                event="artifact_rewritten",
+                reason=reason,
+            )
     return edits
 
 

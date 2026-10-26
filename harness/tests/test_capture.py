@@ -47,7 +47,7 @@ def test_snapshot_capture_layout_and_freshness(tmp_path):
         "file_type: sequence\n", encoding="utf-8"
     )
     (root / "LOGS").mkdir()
-    (root / "LOGS" / "ORCH.log").write_text("not captured", encoding="utf-8")
+    (root / "LOGS" / "ORCH.jsonl").write_text("not captured", encoding="utf-8")
     out = tmp_path / "golden" / "run1"
     snapshot_capture(
         root=root,

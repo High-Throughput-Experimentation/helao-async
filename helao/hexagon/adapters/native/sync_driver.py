@@ -58,6 +58,7 @@ from helao.core.models.run_dir import (
 
 # from filelock import FileLock
 from helao.helpers import helao_logging as logging
+from helao.helpers.artifact_hash import log_artifact_hashes
 from helao.helpers.run_state import (
     DONE,
     QUARANTINED,
@@ -70,7 +71,13 @@ from helao.helpers.run_state import (
     root_relative,
 )
 from helao.helpers.time_utils import gen_uuid
-from helao.helpers.meta_io import dumps_meta, meta_glob, read_meta, write_meta
+from helao.helpers.meta_io import (
+    dumps_meta,
+    meta_glob,
+    read_meta,
+    resolve_meta_path,
+    write_meta,
+)
 from helao.helpers.yml_tools import yml_dumps, yml_load
 from helao.hexagon.domain.naming import (
     DATA_SUFFIX,
@@ -2589,13 +2596,29 @@ class SyncDriver:
                 # every repair tool had to consult a parallel tree that might
                 # no longer be beside the zip it was repairing.
                 save_dir = str(exp_prog.yml.target.parent)
-                write_meta(
-                    os.path.join(
-                        save_dir,
-                        f"{pidx}__{uuid_key}__{meta['technique_name']}-prc.json",
-                    ),
-                    model,
+                prc_path = os.path.join(
+                    save_dir,
+                    f"{pidx}__{uuid_key}__{meta['technique_name']}-prc.json",
                 )
+                # an existing legacy -prc.yml is rewritten in place, so hash
+                # whatever write_meta resolves to, not the .json name
+                prior = resolve_meta_path(prc_path)
+                old_bytes = prior.read_bytes() if prior.exists() else None
+                written = write_meta(prc_path, model)
+                # a re-push after a write-off rewrites the record (spec §5);
+                # an S3 retry that leaves the bytes alone logs nothing
+                if old_bytes is None or old_bytes != written.read_bytes():
+                    await log_artifact_hashes(
+                        [written],
+                        kind="prc",
+                        owner_uuid=uuid_key,
+                        event=(
+                            "artifact_final"
+                            if old_bytes is None
+                            else "artifact_rewritten"
+                        ),
+                        reason=None if old_bytes is None else "process_repush",
+                    )
                 # sync to s3
                 meta_s3_key = f"process/{uuid_key}.json"
                 s3_success = await self.to_s3(model, meta_s3_key)

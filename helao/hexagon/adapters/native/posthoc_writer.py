@@ -219,8 +219,8 @@ class _PostHocBase:
     async def _write_meta_atomic(self, output_file: str, output_str: str):
         return await self.meta_writer._write_meta_atomic(output_file, output_str)
 
-    async def write_act(self, action: Action):
-        return await self.meta_writer.write_act(action)
+    async def write_act(self, action: Action, reason=None):
+        return await self.meta_writer.write_act(action, reason=reason)
 
 
 class _PostHocActive:

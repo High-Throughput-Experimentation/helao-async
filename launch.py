@@ -32,6 +32,7 @@ Note:
 
 __all__ = []
 
+import atexit
 import json
 
 # ``logging`` below is helao's logging helper, NOT the stdlib module, so the
@@ -39,13 +40,11 @@ import json
 import logging as pylogging
 import os
 import pickle
-import re
 import signal
 import subprocess
 import sys
 import threading
 import time
-import zipfile
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
@@ -56,6 +55,7 @@ import click
 import colorama
 import psutil
 import requests
+import zmq
 from colorama import Fore, Style
 from pyfiglet import figlet_format
 
@@ -65,6 +65,8 @@ from helao.helpers import helao_logging as logging
 from helao.helpers import win_job
 from helao.helpers.config_loader import read_config
 from helao.helpers.helao_dirs import helao_dirs
+from helao.helpers.log_collector import LogCollector, log_endpoint, resolve_log_port
+from helao.helpers.log_jsonl import LOG_ENDPOINT_ENV
 from helao.helpers.parent_death import (
     DETACH_MARKER_ENV,
     PARENT_PID_ENV,
@@ -278,7 +280,7 @@ class ConsoleMux:
             _mux_log(
                 "error",
                 f"Could not attach console mux to {server_key}; its output will "
-                f"not reach the terminal (LOGS/{server_key}.log is unaffected).",
+                f"not reach the terminal (its records still reach LOGS/ through the log collector).",
                 exc_info=True,
             )
 
@@ -1965,6 +1967,16 @@ def server_is_idle(group, server_entry):
     return False
 
 
+def wants_collector(extraopt: str) -> bool:
+    """False for a visualizer-only launcher (``liveonly``/``gpvis``).
+
+    Such a launcher shares its config, and so its ``log_port``, with the full
+    launcher of the same group; its children write their own fallback files
+    instead of binding or feeding a second collector.
+    """
+    return extraopt not in ("liveonly", "gpvis")
+
+
 def main():
     """
     Main function to initialize and launch the HELAO application.
@@ -1976,7 +1988,7 @@ def main():
     5. Runs the full unit-test suite when ``run_unit_tests: true`` is set in the loaded config.
     6. Clears the terminal screen and prints the HELAO banner.
     7. Displays the current branch and status of each local HELAO repository.
-    8. Compresses old log files.
+    8. Starts the group's log collector (not for a visualizer-only launcher).
     9. Launches the HELAO application using the provided configuration.
     10. Sets up hotkey listeners for terminating or restarting servers.
     The function also defines helper functions for printing messages, stopping servers,
@@ -2109,6 +2121,38 @@ def main():
     cprint(f"launching HELAO ({modestring} mode) in 5 seconds...\n\n", "white")
     time.sleep(5)
 
+    # One collector for the whole group, bound before anything logs so the
+    # launcher's own logger and every child (which inherits the env var, like
+    # PARENT_PID_ENV below) connect to it. Fixed by the config, so a
+    # --reconnect launcher re-binds the same port and detached children
+    # re-attach on their own. Without a `root` there is no LOGS dir; the check
+    # further down exits for that case.
+    collector = None
+    if helaodirs.log_root is not None and wants_collector(extraopt):
+        try:
+            log_port = resolve_log_port(config)
+        except ValueError as exc:
+            cprint(f"\n{exc}\n", "red", attrs=["bold"])
+            sys.exit(1)
+        log_prefix = os.path.splitext(os.path.basename(confArg))[0]
+        collector = LogCollector(log_endpoint(log_port), helaodirs.log_root, log_prefix)
+        try:
+            collector.start()
+        except zmq.ZMQError as exc:
+            cprint(
+                f"\nlog_port {log_port} is in use ({exc}). Most likely an earlier "
+                f"launcher of this group is still running (see the pids_*.pck file "
+                f"under STATES): stop it, or launch with --force-relaunch. Change "
+                f"log_port in the config only if a non-helao process holds the port.\n",
+                "red",
+                attrs=["bold"],
+            )
+            sys.exit(1)
+        # the launcher's final records are lost if it exits without teardown;
+        # stop() is idempotent
+        atexit.register(collector.stop)
+        os.environ[LOG_ENDPOINT_ENV] = log_endpoint(log_port)
+
     global LAUNCH_LOGGER
     LAUNCH_LOGGER = logging.make_logger(
         __file__, log_dir=helaodirs.log_root, log_level=config.get("log_level", 20)
@@ -2121,45 +2165,6 @@ def main():
     # to pipe their output through the mux. Opt in explicitly; fire-and-forget
     # callers of launcher() must not (see ConsoleMux.activate).
     CONSOLE.activate()
-    # compress old logs:
-    log_root = os.path.join(config["root"], "LOGS")
-    for server_name in ["_MASTER_", "bokeh_launcher", "fast_launcher"]:
-        old_log_txts = glob(os.path.join(log_root, server_name, "*.txt"))
-        nots_counter = 0
-        for old_log in old_log_txts:
-            LAUNCH_LOGGER.info(f"Compressing: {old_log}")
-            try:
-                timestamp_found = False
-                timestamp = ""
-                with open(old_log, "r", encoding="utf-8") as f:
-                    for line in f:
-                        if line.replace("error_[", "[").strip().startswith("["):
-                            timestamp_found = True
-                            timestamp = re.findall("[0-9]{2}:[0-9]{2}:[0-9]{2}", line)[
-                                0
-                            ].replace(":", "")
-                            zipname = old_log.replace(".txt", f"{timestamp}.zip")
-                            arcname = os.path.basename(old_log).replace(
-                                ".txt", f"{timestamp}.txt"
-                            )
-                            break
-                if not timestamp_found:
-                    while os.path.exists(
-                        old_log.replace(".txt", f"__{nots_counter}.zip")
-                    ):
-                        nots_counter += 1
-                    zipname = old_log.replace(".txt", f"__{nots_counter}.zip")
-                    arcname = os.path.basename(old_log).replace(
-                        ".txt", f"__{nots_counter}.txt"
-                    )
-                with zipfile.ZipFile(
-                    zipname, "w", compression=zipfile.ZIP_DEFLATED
-                ) as zf:
-                    zf.write(old_log, arcname)
-                os.remove(old_log)
-            except Exception:
-                LAUNCH_LOGGER.error(f"Error compressing log: {old_log}", exc_info=True)
-
     # Children inherit both of these through their environment, so they are set
     # before anything is spawned:
     #   PARENT_PID_ENV    lets a child tell "my launcher died" from "my
@@ -2360,8 +2365,13 @@ def main():
             # Orchestrators first (they detach subscribers and export non-empty
             # queues), then action servers. Visualizer/operator bokeh apps have
             # no /shutdown route, so pidd.close() signals those.
-            graceful_shutdown_all()
-            pidd.close()
+            try:
+                graceful_shutdown_all()
+                pidd.close()
+            finally:
+                # last: the shutdown sweep's records are in by now
+                if collector is not None:
+                    collector.stop()
         return True
 
     def restart_server(groupname, servername, restore=False):
@@ -2820,6 +2830,10 @@ def main():
                 f"Disconnecting action monitor. Launch "
                 f"'python launch.py {confArg} --reconnect' to reconnect."
             )
+            # children spill to their own files until a --reconnect launcher
+            # binds the endpoint again
+            if collector is not None:
+                collector.stop()
 
     x = threading.Thread(target=thread_waitforkey)
     x.start()
