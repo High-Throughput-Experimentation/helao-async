@@ -46,6 +46,11 @@ file larger. There is no byte backstop; add one if a real station's files exceed
 - `server`: the logger name (the server key, or the module name for a bare `make_logger`).
 - `seq`: a per-process counter, incremented for every record emitted. A gap shows loss.
 - `exc`: present only when the record carries `exc_info`; the formatted traceback.
+- `repeat_count`, `repeat_period`: present only on a dedup summary record (§1, recent-records
+  buffer). The summary says the preceding `repeat_period`-record sequence was suppressed
+  `repeat_count` more times.
+- `(server, pid, seq)` is unique per record. Replay (below) can write a record twice; readers
+  drop duplicates on that key.
 - Serialized with `ensure_ascii=False`, UTF-8, `\n`-terminated.
 
 ### Handlers built by `make_logger`
@@ -55,16 +60,56 @@ file larger. There is no byte backstop; add one if a real station's files exceed
 1. **Console**: the coloured text `StreamHandler`, unchanged. Under the launcher it still flows
    through `ConsoleMux` to the terminal.
 2. **`JsonlSinkHandler`** (new; replaces `DedupTimedRotatingFileHandler`). Per record:
-   1. **Dedup**: the existing collapse-repeated-consecutive-messages logic and
-      `dedup_interval` semantics, moved into this handler, so it applies to both sinks.
+   1. **Dedup** against the recent-records buffer (below). Replaces today's
+      consecutive-only dedup; `dedup_interval` keeps its meaning.
    2. **Format** the record to the §1 JSON bytes.
    3. **Send**: if `HELAO_LOG_ENDPOINT` is set, `send(NOBLOCK)` on a ZMQ PUSH socket connected
-      to it with `IMMEDIATE=1` and a bounded `SNDHWM`. `IMMEDIATE` makes the send raise
+      to it with `IMMEDIATE=1` and `SNDHWM=1000`. `IMMEDIATE` makes the send raise
       `zmq.Again` when no launcher is connected, as well as when the queue is full.
    4. **Fallback**: on `zmq.Again`, or when there is no endpoint, write the record to this
       process's own file through a `RotatingJsonlWriter` (§2), at `<log_dir>/<name>.jsonl`.
+      On the first `Again` after a run of successful sends, first **replay** the buffer
+      (below) into that file.
    5. **Re-attach marker**: the first successful send after one or more fallback writes is
       preceded by a WARNING record: `"<N> records went to <fallback path>"`.
+
+### Recent-records buffer
+
+Each `JsonlSinkHandler` keeps a `deque(maxlen=2000)` of the records it emitted: fingerprint,
+`seq`, the JSON bytes, and whether the bytes were sent to the launcher. About 500 KB per process.
+It serves two purposes.
+
+**Repeated-sequence dedup.** Today's dedup compares each message with the previous one only,
+so a loop logging `A B C A B C ...` (for example, a cascading exception) is never collapsed.
+
+- Fingerprint: level, `file`, `line`, the rendered message, and the exception type and text
+  when present. (Today's comparison ignores the level and the traceback, so two different
+  exceptions logged with the same message text collapse into one; this fixes that.)
+- For each new record, check every period `p` from 1 to 16 for which the buffer's record `p`
+  places back has the same fingerprint. A cycle of period `p` is confirmed when the last `p`
+  records equal the `p` before them.
+- While the cycle holds, each further record that continues it is held back rather than
+  written, and each completed cycle is counted.
+- When a record breaks the cycle, or `dedup_interval` (10 s) has passed since the cycle was
+  confirmed, write one summary record (`msg`: `"previous <p>-message sequence repeated <M>
+  times"`, with `repeat_count` and `repeat_period`). Then write the held-back records of the
+  incomplete cycle; they are real records, not repeats. An elapsed interval opens a new
+  window, so a sustained loop yields one summary every 10 s.
+- `p = 1` is today's behaviour. Messages that differ on every pass (a counter or a timestamp
+  inside the f-string) do not match and are not collapsed. Comparing message templates would
+  collapse them but hide the changing values; rendered text is kept on purpose.
+- The check costs at most 16 fingerprint comparisons per record and runs under the handler
+  lock that `emit` already holds.
+- `close()` (run by `logging.shutdown` at exit) writes any pending summary and held-back
+  records, so a process that stops mid-cycle does not lose the count. Today's handler loses it.
+
+**Replay on launcher loss (at-least-once delivery).** Records in the child's send queue, the
+kernel socket buffers, or the collector's receive queue when the launcher dies would be lost.
+On the first `Again` after a run of successful sends, the handler writes every buffered record
+that was sent to the launcher (oldest first) into its fallback file, then the new record. Some
+of them already reached the unified file; readers drop the duplicates on `(server, pid, seq)`.
+Records are lost only if more than 2,000 were in flight. The two high-water marks bound that at
+`SNDHWM + RCVHWM = 2000`.
 
    The socket is used only inside `emit`, which `logging.Handler.handle` already runs under
    the handler lock. That serializes access from executor threads and the event-loop thread.
@@ -90,10 +135,12 @@ socket is opened and every record goes to the process's own file: today's behavi
 
 ### `LogCollector`
 
-- One daemon thread owns the PULL socket (bounded `RCVHWM`) and the unified file
+- One daemon thread owns the PULL socket (`RCVHWM=1000`) and the unified file
   `<root>/LOGS/helao_<config_prefix>.jsonl`.
 - Loop: poll with a 0.5 s timeout, check the stop flag, and append each received message's
   bytes unchanged. The child already serialized it; the launcher does no JSON work.
+- The file is flushed after each drained batch, so a killed launcher loses nothing it already
+  wrote (it is in the OS page cache).
 - If the collector falls behind, the PULL queue fills, children get `zmq.Again`, and their
   records go to their own files. Nothing blocks.
 - The launcher's own `LAUNCH_LOGGER` uses the same `JsonlSinkHandler`, connected to its own
@@ -108,7 +155,8 @@ Backs both the unified file and each child's fallback file.
 - Counts records written. At 300,000 it closes the live file, renames it to
   `<stem>_<YYYYmmddTHHMMSS>.jsonl`, opens a fresh live file, and puts the renamed path on a
   queue. The next record is written at once; it never waits for compression.
-- A compressor thread gzips each queued file to `.jsonl.gz`, then deletes the plain copy.
+- A compressor thread gzips each queued file to `.jsonl.gz`. It deletes the plain copy 10 s
+  after the gzip finishes, so a live viewer can finish reading it (§4).
 - At startup, any rotated plain `<stem>_*.jsonl` left behind (a crash mid-compress) is queued.
 - Retention: rotated `.jsonl.gz` files older than 90 days are deleted at startup and after each
   rotation. This matches today's `backupCount=90` daily files.
@@ -144,7 +192,8 @@ The stale `.txt` log-zipping blocks in `launch.py` (`main`, after `LAUNCH_LOGGER
   the new writer. Private-deployment code that references the old handler is checked during
   planning.
 - **`read_logs(log_dir, server=None) -> DataFrame`** in `helao_logging.py`: reads the live
-  files and rotated `.gz` files, concatenates, filters by server, and sorts by `ts`. One helper,
+  files and rotated `.gz` files, concatenates, drops duplicates on `(server, pid, seq)`, filters
+  by server, and sorts by `ts`. One helper,
   so tests and pandas consumers do not each re-implement the glob and merge.
 - **Docs**: the root `CLAUDE.md` mentions of `LOGS/<server_key>.log`, and the `orch_effects.py`
   and `logging_adapter.py` docstrings.
@@ -153,7 +202,7 @@ The stale `.txt` log-zipping blocks in `launch.py` (`main`, after `LAUNCH_LOGGER
 
 | Event | Behaviour |
 |---|---|
-| Launcher dies or detaches | The next send raises `Again`; records go to the child's own file; a marker is sent on re-attach. Records already in socket buffers are lost (bounded by the HWMs). |
+| Launcher dies or detaches | The next send raises `Again`; records go to the child's own file, after the recent-records buffer is replayed there; a marker is sent on re-attach. Records are lost only if more than 2,000 were in flight. Replayed records may duplicate unified-file records; readers drop them on `(server, pid, seq)`. |
 | Collector behind | Children spill to their own files; no caller blocks. |
 | Collector disk error | stderr report, record dropped, no raise. |
 | `log_port` already bound | Launch aborts before spawning. |
@@ -169,8 +218,14 @@ Unit tests, under `run_tests.py`:
   Compression runs on a separate thread. A leftover plain file is compressed at startup.
   The 90-day retention.
 - Dedup behaves the same on both sinks.
+- Sequence dedup: `A A A` (p = 1) and `A B C` x 20 (p = 3) collapse to one cycle plus a summary
+  with the right `repeat_count` and `repeat_period`. A cycle broken mid-way writes the summary
+  and then the held-back partial cycle. Two records with the same message but different
+  exceptions are not collapsed. The 10 s interval yields periodic summaries.
 - With a real in-process PULL that is bound, then unbound, then rebound: `Again` sends records
   to the fallback file, and re-attaching emits the marker with the right count.
+- Replay: send records to a PULL that stops reading and then closes. Every record is present
+  in the union of the unified and fallback files once duplicates are dropped by `read_logs`.
 - Non-blocking: with the collector stopped reading, 10,000 `logger.info` calls finish without
   stalling, and the overflow is in the fallback file.
 - Each fallback and rotation test gets a mutation check (break the logic and see it fail).
@@ -190,9 +245,11 @@ fork.
   Returns the records and one cursor per file (path, inode, offset).
 - `tail_poll(cursors)`: reads only the bytes appended since each cursor, at most 2 MiB per file
   per tick, and splits on complete lines (a partial final line waits for the next tick).
-  A changed inode, or a size below the cursor, means the file rotated; the cursor resets to 0.
-  `ponytail:` records written in the final tick before a rotation can be missed (at most one
-  tick, once per 300k records). The upgrade is to read the renamed file's tail.
+  A changed inode, or a size below the cursor, means the file rotated. The poll then finds the
+  rotated plain `<stem>_*.jsonl` with the cursor's old inode, reads it to the end from the
+  cursor, and moves on to the new live file from offset 0. The writer keeps that plain copy
+  for 10 s after its gzip finishes (§2), which covers a 1 s poll. If the copy is already gone,
+  the poll emits one WARNING row saying records may be missing.
 - Filtering by server set, minimum level, and substring; records merge by `ts`.
 
 ### Page: `helao/ui/reflex/logs.py`, route `/logs`
@@ -200,7 +257,10 @@ fork.
 - `LogsState` holds the cursors and the newest 2,000 rows as `list[list[str]]`. `rx.foreach`
   needs the element annotation, or the frontend build fails.
 - Controls: a server multi-select (filled from the server keys seen), a level floor, a text
-  search, and a pause toggle. The table auto-scrolls unless paused.
+  search, and a pause toggle. The table auto-scrolls unless paused. Pause freezes the display
+  only; polling continues, so the viewer never misses the window during which a rotated file's
+  plain copy is still readable.
+- Rows are deduplicated on `(server, pid, seq)`, since a replay can write a record twice.
 - The message column is monospace. Level colours come from `helao/ui/shared/palette.py`.
 - It ticks from an `rx.moment(interval=1000)` in the page, never from a background loop, so a
   closed tab stops polling.
