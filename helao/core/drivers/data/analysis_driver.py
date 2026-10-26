@@ -78,7 +78,6 @@ from helao.core.drivers.data.analysis_layout import (
     analysis_dir,
     analysis_root,
     analysis_suffix,
-    local_output_path,
     parse_analysis_timestamp,
     publish_outputs,
     sequence_part_of,
@@ -88,7 +87,6 @@ from helao.core.drivers.data.loaders.helao_loader import HelaoLoader
 from helao.core.drivers.data.loaders.localfs import LocalLoader
 from helao.core.error import ErrorCodes
 from helao.helpers import config_loader
-from helao.helpers.artifact_hash import log_artifact_hashes
 from helao.helpers import helao_logging as logging
 from helao.helpers.executor import Executor
 from helao.helpers.param_alias import resolve_sequence_path
@@ -1238,23 +1236,9 @@ class AnalysisSyncer(NativeSyncer):
             # publish_outputs gates BOTH the model body and every output group
             # on -- one switch, no way to leave one of the two ungated.
             uploader = None if self.config_dict.get("local_only", False) else self.to_s3
-            published = await publish_outputs(
+            if await publish_outputs(
                 model_dict, output_dict, local_ana_dir, uploader=uploader
-            )
-            await log_artifact_hashes(
-                [os.path.join(local_ana_dir, f"{eua.analysis_uuid}-ana.json")],
-                kind="ana",
-                owner_uuid=eua.analysis_uuid,
-            )
-            await log_artifact_hashes(
-                [
-                    local_output_path(o, local_ana_dir)
-                    for o in model_dict.get("outputs", [])
-                ],
-                kind="output",
-                owner_uuid=eua.analysis_uuid,
-            )
-            if published:
+            ):
                 LOGGER.info(f"Successfully synced {eua.analysis_uuid}")
                 return True
 

@@ -67,7 +67,8 @@ from helao.core.models.analysis import AnalysisOutputModel
 from helao.core.models.s3locator import S3Locator
 from helao.helpers import helao_logging as logging
 from helao.helpers.time_utils import set_time
-from helao.helpers.meta_io import write_meta
+from helao.helpers.artifact_hash import log_artifact_hashes
+from helao.helpers.meta_io import resolve_meta_path, write_meta
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -428,33 +429,54 @@ async def publish_outputs(
         True when every upload succeeded (or none was attempted).
     """
     analysis_uuid = model_dict.get("analysis_uuid")
-    model_success = True
-    if uploader is not None:
-        LOGGER.info("uploading analysis model to S3 bucket")
-        try:
-            model_success = await uploader(
-                model_dict, analysis_model_key(analysis_uuid)
-            )
-        except Exception:
-            LOGGER.error(
-                f"Failed to upload analysis model {analysis_uuid} to S3.",
-                exc_info=True,
-            )
-            model_success = False
-    else:
-        LOGGER.info("Analysis publish is local_only, skipping S3/API push.")
-
-    output_successes = []
-    for output in model_dict.get("outputs", []):
-        keys = output["output_keys"]
-        body = {k: v for k, v in values.items() if k in keys}
-        target = output["analysis_output_path"]["key"]
-        local_json_out = local_output_path(output, local_ana_dir)
-        # Array outputs serialize to megabytes of JSON; keep that off the event
-        # loop for the same reason as the analysis itself.
-        await asyncio.to_thread(write_json, body, local_json_out)
+    try:
+        model_success = True
         if uploader is not None:
-            output_successes.append(await uploader(body, target, compress=False))
+            LOGGER.info("uploading analysis model to S3 bucket")
+            try:
+                model_success = await uploader(
+                    model_dict, analysis_model_key(analysis_uuid)
+                )
+            except Exception:
+                LOGGER.error(
+                    f"Failed to upload analysis model {analysis_uuid} to S3.",
+                    exc_info=True,
+                )
+                model_success = False
         else:
-            output_successes.append(True)
-    return model_success and all(output_successes)
+            LOGGER.info("Analysis publish is local_only, skipping S3/API push.")
+
+        output_successes = []
+        for output in model_dict.get("outputs", []):
+            keys = output["output_keys"]
+            body = {k: v for k, v in values.items() if k in keys}
+            target = output["analysis_output_path"]["key"]
+            local_json_out = local_output_path(output, local_ana_dir)
+            # Array outputs serialize to megabytes of JSON; keep that off the event
+            # loop for the same reason as the analysis itself.
+            await asyncio.to_thread(write_json, body, local_json_out)
+            if uploader is not None:
+                output_successes.append(await uploader(body, target, compress=False))
+            else:
+                output_successes.append(True)
+        return model_success and all(output_successes)
+    finally:
+        # the record and outputs are final on disk once publish ends, whether
+        # or not the uploads succeeded (spec §5)
+        await log_artifact_hashes(
+            [
+                resolve_meta_path(
+                    os.path.join(local_ana_dir, f"{analysis_uuid}-ana.json")
+                )
+            ],
+            kind="ana",
+            owner_uuid=analysis_uuid,
+        )
+        await log_artifact_hashes(
+            [
+                local_output_path(o, local_ana_dir)
+                for o in model_dict.get("outputs", [])
+            ],
+            kind="output",
+            owner_uuid=analysis_uuid,
+        )

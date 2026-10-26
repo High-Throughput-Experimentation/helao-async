@@ -29,7 +29,7 @@ from uuid import UUID
 
 import aiofiles
 
-from helao.core.models.hlostatus import HloStatus
+from helao.core.models.hlostatus import is_terminal
 from helao.core.models.run_dir import redirect_manual_dir
 from helao.helpers import helao_logging as logging
 from helao.helpers.artifact_hash import log_artifact_hashes
@@ -45,22 +45,7 @@ from helao.hexagon.domain.naming import (
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
-__all__ = ["NativeMetaFileWriter", "TERMINAL_STATUSES"]
-
-TERMINAL_STATUSES = frozenset(
-    {
-        HloStatus.finished,
-        HloStatus.errored,
-        HloStatus.aborted,
-        HloStatus.skipped,
-        HloStatus.estopped,
-        HloStatus.retired,
-    }
-)
-
-
-def _terminal(statuses) -> bool:
-    return any(s in TERMINAL_STATUSES for s in (statuses or []))
+__all__ = ["NativeMetaFileWriter"]
 
 
 def _event(reason):
@@ -141,7 +126,7 @@ class NativeMetaFileWriter:
             await self.base._write_meta_atomic(
                 str(target), dumps_meta(output_dict, target)
             )
-            if _terminal(action.action_status):
+            if is_terminal(action.action_status):
                 await log_artifact_hashes(
                     [target],
                     kind="act",
@@ -149,16 +134,23 @@ class NativeMetaFileWriter:
                     event=_event(reason),
                     reason=reason,
                 )
-                await log_artifact_hashes(
-                    _action_files(output_path, action),
-                    kind="data",
-                    owner_uuid=action.action_uuid,
-                    event=_event(reason),
-                    reason=reason,
-                )
         else:
             LOGGER.info(
                 f"writing meta file for action '{action.action_name}' is disabled."
+            )
+        # data files are artefacts whether or not the act record is saved
+        if is_terminal(action.action_status):
+            save_root = str(self.base.helaodirs.save_root)
+            if action.manual_action:
+                save_root = redirect_manual_dir(save_root)
+            await log_artifact_hashes(
+                _action_files(
+                    os.path.join(save_root, action.action_output_dir), action
+                ),
+                kind="data",
+                owner_uuid=action.action_uuid,
+                event=_event(reason),
+                reason=reason,
             )
 
     async def write_exp(self, experiment: Experiment, reason: Optional[str] = None):
@@ -182,7 +174,7 @@ class NativeMetaFileWriter:
         output_dict.update(exp_dict)
         target = resolve_meta_path(output_file)
         await self.base._write_meta_atomic(str(target), dumps_meta(output_dict, target))
-        if _terminal(experiment.experiment_status):
+        if is_terminal(experiment.experiment_status):
             await log_artifact_hashes(
                 [target],
                 kind="exp",
@@ -213,7 +205,7 @@ class NativeMetaFileWriter:
         output_dict.update(seq_dict)
         target = resolve_meta_path(output_file)
         await self.base._write_meta_atomic(str(target), dumps_meta(output_dict, target))
-        if _terminal(sequence.sequence_status):
+        if is_terminal(sequence.sequence_status):
             await log_artifact_hashes(
                 [target],
                 kind="seq",
