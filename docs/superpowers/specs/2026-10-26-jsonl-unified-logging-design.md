@@ -143,8 +143,8 @@ socket is opened and every record goes to the process's own file: today's behavi
   `<root>/LOGS/helao_<config_prefix>.jsonl`.
 - Loop: poll with a 0.5 s timeout, check the stop flag, and append each received message's
   bytes unchanged. The child already serialized it; the launcher does no JSON work.
-- The file is flushed after each drained batch, so a killed launcher loses nothing it already
-  wrote (it is in the OS page cache).
+- The file is opened unbuffered (one `write` per record), so a killed launcher loses nothing
+  it already wrote (it is in the OS page cache).
 - If the collector falls behind, the PULL queue fills, children get `zmq.Again`, and their
   records go to their own files. Nothing blocks.
 - The launcher's own `LAUNCH_LOGGER` uses the same `JsonlSinkHandler`, connected to its own
@@ -195,7 +195,8 @@ The stale `.txt` log-zipping blocks in `launch.py` (`main`, after `LAUNCH_LOGGER
   `helao/core/tests/unit_test_logging.py` and `test_gzip_rotator_fallback.py` are rewritten for
   the new writer. Private-deployment code that references the old handler is checked during
   planning.
-- **`read_logs(log_dir, server=None) -> DataFrame`** in `helao_logging.py`: reads the live
+- **`read_logs(log_dir, server=None, *, ledger=False) -> DataFrame`** in
+  `helao/helpers/log_jsonl.py`, re-exported by `helao_logging`: reads the live
   files and rotated `.gz` files, concatenates, drops duplicates on `(server, pid, seq)`, filters
   by server, and sorts by `ts`. One helper,
   so tests and pandas consumers do not each re-implement the glob and merge.
@@ -261,7 +262,8 @@ fork.
 - `LogsState` holds the cursors and the newest 2,000 rows as `list[list[str]]`. `rx.foreach`
   needs the element annotation, or the frontend build fails.
 - Controls: a server multi-select (filled from the server keys seen), a level floor, a text
-  search, and a pause toggle. The table auto-scrolls unless paused. Pause freezes the display
+  search, and a pause toggle. Rows are newest-first, so the latest records stay at the top
+  without scroll scripting. Pause freezes the display
   only; polling continues, so the viewer never misses the window during which a rotated file's
   plain copy is still readable.
 - Rows are deduplicated on `(server, pid, seq)`, since a replay can write a record twice.
@@ -294,7 +296,8 @@ the records themselves.
 
 ### `log_artifact_hashes(paths, *, kind, owner_uuid, event="artifact_final", reason=None)`
 
-- Lives in `helao_logging.py`. It is async: each file is hashed with
+- Lives in `helao/helpers/artifact_hash.py` (it imports `helao_logging`, so it cannot live
+  inside it). It is async: each file is hashed with
   `hashlib.file_digest(f, "sha256")` inside `asyncio.to_thread`, so a large raw file never
   blocks the event loop. A sync twin, `log_artifact_hashes_sync`, serves standalone tools and
   other non-async callers.
@@ -314,20 +317,26 @@ the records themselves.
 
 | Artefact | Point |
 |---|---|
-| `-act.json` and `files[]` | Action finalizer, after the final `write_act` (data files are already closed). |
-| `-exp.json`, `-seq.json` | After their final writes in the finalizer. |
+| `-act.json` and `files[]` | `MetaWriter.write_act`, after any write whose `action_status` holds a terminal status (`finished`, `errored`, `aborted`, `skipped`, `estopped`, `retired`). The finalizer's final write is such a write; data files are already closed. |
+| `-exp.json`, `-seq.json` | `MetaWriter.write_exp` / `write_seq`, on the same terminal-status rule. Every exp/seq record write goes through them. |
 | `-prc.json` | Where the sync driver writes it (`sync_driver.py`, the process-record `write_meta`). |
 | `-ana.json` and `outputs` | Analysis driver, after `write_model_json` and `publish_outputs` complete. |
 
 ### Rewrites after finalization (`event: "artifact_rewritten"`)
 
 Any code path that changes the bytes of a finalized artefact calls `log_artifact_hashes` with
-`event="artifact_rewritten"` and a `reason` naming the path (for example `"reset_sync"`,
-`"set_plate_id"`, `"write_off"`, `"reconcile_interrupted"`). Known sites, to be confirmed by an
-inventory during planning:
+`event="artifact_rewritten"` and a `reason` naming the path (for example `"set_run_use"`,
+`"set_plate_id"`, `"process_repush"`, `"reconcile_interrupted"`). A `MetaWriter` write with a
+terminal status logs `artifact_final` again; a caller that passes `reason=` logs
+`artifact_rewritten`. Consumers take the latest record per `path`. Sites found in planning:
 
-- the sync driver's record rewrites (`_record_rewrite`, `reset_sync`, `write_off`);
+- `_record_rewrite.rewrite_dir`, `rewrite_zip` and `rewrite_processes` (used by `set_run_use`);
+- the `-prc.json` re-push after a write-off (`sync_driver.py`, `reason="process_repush"`);
 - the interrupted-action reconcile (`ActionHost._reconcile_one`);
+
+`reset_sync` and `write_off` are not rewrite sites. `reset_sync` deletes `.prg`/`.lock`
+sidecars and extracts a zip, and `write_off` writes the `.prg` and a ledger line. Neither
+changes a record's bytes.
 - the standalone repair tools under `helao/core/tests/` that rewrite records or zips
   (`set_plate_id`, `set_run_use`), through the sync twin;
 - private-deployment tools that inject into or rewrite existing records, which are
@@ -365,7 +374,8 @@ fails the sweep.
   `.jsonl` and `.meta.json`. Each `sha256` equals `hashlib.sha256` of the file on disk, and
   each record is in both the log and the ledger.
 - An analysis with two outputs logs hashes for `-ana.json` and both outputs.
-- A rewrite through `reset_sync` logs `artifact_rewritten` with the new hash and the reason.
+- A rewrite through `_record_rewrite.rewrite_dir` logs `artifact_rewritten` with the new hash and
+  the reason; a `rewrite_zip` logs the new zip's hash.
 - A missing file logs `artifact_hash_failed` and the action still finishes.
 - A ledger file older than 90 days survives the retention sweep; a log file of that age does
   not.
