@@ -234,8 +234,8 @@ def test_replay_covers_everything_in_flight(tmp_path):
         if i % 500 == 0:
             time.sleep(0.01)  # let the io thread move bytes to the kernel
     assert after is not None, "sender never hit Again"
-    got = _recv_all(pull, 1.0)
-    pull.close()  # the launcher dies with the rest unread
+    got = [pull.recv_multipart() for _ in range(10)]  # a small prefix only
+    pull.close()  # the launcher dies with its queue undrained
     time.sleep(0.3)
     end = time.monotonic() + 5
     while (
@@ -315,4 +315,20 @@ def test_dedup_collapses_on_send_path(tmp_path):
     (s,) = [d for d in docs if "repeat_count" in d]
     assert (s["repeat_count"], s["repeat_period"]) == (18, 2)
     assert not (tmp_path / "SRV.jsonl").exists()
+    pull.close()
+
+
+def test_failed_reconnect_spills_instead_of_losing(tmp_path, monkeypatch):
+    pull, port = _pull()
+    h = JsonlSinkHandler("SRV", tmp_path, endpoint=f"tcp://127.0.0.1:{port}")
+    lg = _logger("t_reconn_fail", h)
+    h.close()  # as logging.shutdown does
+
+    def boom(*a, **k):
+        raise zmq.ZMQError(zmq.ETERM)
+
+    monkeypatch.setattr(h, "_connect", boom)
+    lg.info("kept")
+    assert [r["msg"] for r in _read(tmp_path / "SRV.jsonl")] == ["kept"]
+    h.close()
     pull.close()

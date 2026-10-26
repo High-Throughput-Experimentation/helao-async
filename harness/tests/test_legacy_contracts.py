@@ -22,7 +22,7 @@ from helao.helpers.time_utils import read_saved_offset, set_time
 
 # --- §9.1 logging -----------------------------------------------------------
 def test_log_file_lands_at_contract_path(tmp_path, monkeypatch):
-    """<root>/LOGS/<server_key>.log — flat file, no per-server subdir.
+    """<root>/LOGS/<server_key>.jsonl — flat file, no per-server subdir.
 
     DEVIATION FROM BRIEF (pinning real legacy, not intended behavior):
     legacy's ``make_logger`` (helao_logging.py) calls ``tempfile.mkdtemp()``

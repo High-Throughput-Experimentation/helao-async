@@ -423,7 +423,7 @@ class JsonlSinkHandler(logging.Handler):
     def fallback_path(self) -> Path:
         return self.log_dir / f"{self.stem}.jsonl"
 
-    def _connect(self, timeout_ms: int):
+    def _connect(self, timeout_ms: int, flag: bool = True):
         sock = zmq.Context.instance().socket(zmq.PUSH)
         sock.setsockopt(zmq.IMMEDIATE, 1)
         sock.setsockopt(zmq.SNDHWM, HWM)
@@ -437,7 +437,7 @@ class JsonlSinkHandler(logging.Handler):
             timeout_ms = 0
         if mon.poll(timeout_ms):
             mon.recv_multipart()
-        elif timeout_ms:
+        elif timeout_ms and flag:
             _NO_WAIT.add(self.endpoint)
         sock.disable_monitor()
         mon.close()
@@ -453,7 +453,7 @@ class JsonlSinkHandler(logging.Handler):
         self.recent.clear()
         self._spilled = 0
         if self.endpoint:
-            self._connect(200)
+            self._connect(200, flag=False)
 
     def _writer(self, ledger: bool) -> RotatingJsonlWriter:
         if ledger:
@@ -479,7 +479,10 @@ class JsonlSinkHandler(logging.Handler):
             elif self._sock is None and self.endpoint:
                 # closed behind our back (uvicorn's dictConfig runs
                 # logging.shutdown on every handler): reattach
-                self._connect(1000)
+                try:
+                    self._connect(1000)
+                except Exception:
+                    self._sock = None  # spill below rather than lose the record
             if is_artifact(record):
                 self._out(record)
                 return
