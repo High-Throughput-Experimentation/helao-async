@@ -12,7 +12,10 @@ conda) are rewritten against that solve:
   from ``requirements.txt`` (the dev pip list); one pip cannot resolve is
   kept as-is;
 * pip lines that install from a URL are kept verbatim and never pinned;
-* packages the solve adds that are not already pinned are reported, not added.
+* packages the solve adds that are not already pinned are reported, not added
+  (for pip, only ``requirements.txt`` specs are reported);
+* a pip spec with no wheel (sdist only) is resolved in a ``--no-deps`` pass, so
+  its dependencies must be in the dev env file.
 
 Before anything is written, the rewritten conda pins are solved again on
 their platform, so a file that would not install is never written. Windows
@@ -96,22 +99,51 @@ def conda_solve(
     return {p["name"]: p["version"] for p in result["actions"]["LINK"]}
 
 
-def pip_resolve(specs: list[str], platform: str, python: str) -> dict[str, str]:
-    """Resolve pip `specs` for the target platform; return {normalized name: version}."""
+NO_DIST = re.compile(r"No matching distribution found for ([A-Za-z0-9_.\-]+)")
+
+
+def _pip_report(specs: list[str], platform: str, python: str, deps: bool) -> dict:
     with tempfile.TemporaryDirectory() as tmp:
         report = Path(tmp) / "report.json"
         cmd = [sys.executable, "-m", "pip", "install", "--dry-run", "--quiet"]
         cmd += ["--ignore-installed", "--report", str(report)]
-        cmd += ["--target", str(Path(tmp) / "t"), "--only-binary=:all:"]
+        cmd += ["--target", str(Path(tmp) / "t")]
+        # pip allows sdists in a cross-platform resolve only with --no-deps
+        cmd += ["--only-binary=:all:"] if deps else ["--no-deps"]
         cmd += ["--python-version", python, "--implementation", "cp"]
         cmd += [a for p in PIP_PLATFORMS[platform] for a in ("--platform", p)]
         run = subprocess.run(cmd + specs, capture_output=True, text=True)
         if run.returncode:
-            raise SystemExit(
-                f"pip resolve for {platform} failed:\n{run.stderr[-2000:]}"
-            )
+            return {"error": run.stderr}
         items = json.loads(report.read_text(encoding="utf-8"))["install"]
     return {norm(i["metadata"]["name"]): i["metadata"]["version"] for i in items}
+
+
+def pip_resolve(specs: list[str], platform: str, python: str) -> dict[str, str]:
+    """Resolve pip `specs` for the target platform; return {normalized name: version}.
+
+    A spec with no wheel at all (an sdist-only package such as pyft232) is
+    moved to a second, --no-deps pass that may use sdists; its own
+    dependencies are then not resolved, so they must come from conda.
+    """
+
+    def name(spec: str) -> str:
+        return norm(re.match(r"[A-Za-z0-9_.\-]+", spec)[0])  # type: ignore[index]
+
+    wheels, sdists = list(specs), []
+    while True:
+        got = _pip_report(wheels, platform, python, deps=True) if wheels else {}
+        m = NO_DIST.search(got.get("error", ""))
+        if not m or norm(m[1]) not in {name(s) for s in wheels}:
+            break
+        sdists += [s for s in wheels if name(s) == norm(m[1])]
+        wheels = [s for s in wheels if name(s) != norm(m[1])]
+    if sdists and "error" not in got:
+        print(f"  sdist-only, resolved without deps: {', '.join(sdists)}")
+        got.update(_pip_report(sdists, platform, python, deps=False))
+    if "error" in got:
+        raise SystemExit(f"pip resolve for {platform} failed:\n{got['error'][-2000:]}")
+    return got
 
 
 def regenerate_pip(text: str, pip: dict[str, str]) -> tuple[str, list[str]]:
@@ -193,6 +225,14 @@ def main(argv: list[str] | None = None) -> int:
         print("\n".join(report) or "  no version changes")
         if added:
             print(f"  not pinned (solve installs them, not added): {', '.join(added)}")
+        # top-level specs only: pip resolves --ignore-installed, so its other
+        # packages include many that conda already supplies
+        pip_pinned = {
+            norm(m[1]) for ln in new_pip.splitlines() if (m := PIP_PIN.match(ln))
+        }
+        top = {norm(re.split(r"[\[<>=!~; ]", spec)[0]) for spec in pip_specs}
+        if pip_added := sorted(top - pip_pinned):
+            print(f"  pip spec not pinned (add it by hand): {', '.join(pip_added)}")
 
         conda_solve(channels, conda_pins(new), platform, args.solver)
         print(f"  rewritten pins solve on {platform}")

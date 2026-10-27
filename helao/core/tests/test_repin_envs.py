@@ -1,5 +1,8 @@
 """`repin_envs` rewrites pinned env and requirements files against solved versions."""
 
+import pytest
+
+import repin_envs as r
 from repin_envs import read_dev, regenerate, regenerate_pip
 
 PINNED = """name: helao
@@ -61,3 +64,24 @@ def test_read_dev_splits_channels_conda_and_pip(tmp_path):
     assert channels == ["conda-forge"]
     assert conda == ["python=3.14", "sqlmodel>=0.0.42"]
     assert pip == ["reflex", "xy[reflex]"]
+
+
+def test_pip_resolve_moves_an_sdist_only_spec_to_a_no_deps_pass(monkeypatch):
+    calls = []
+
+    def fake(specs, platform, python, deps):
+        calls.append((list(specs), deps))
+        if deps and "pyft232" in specs:
+            return {"error": "ERROR: No matching distribution found for pyft232"}
+        return {r.norm(s.split("[")[0]): "1" for s in specs}
+
+    monkeypatch.setattr(r, "_pip_report", fake)
+    got = r.pip_resolve(["uuid7", "pyft232", "xy[reflex]"], "linux-64", "3.14")
+    assert got == {"uuid7": "1", "pyft232": "1", "xy": "1"}
+    assert calls[-1] == (["pyft232"], False)  # sdist pass skips dependencies
+
+
+def test_pip_resolve_still_fails_on_other_errors(monkeypatch):
+    monkeypatch.setattr(r, "_pip_report", lambda *a, **k: {"error": "conflict"})
+    with pytest.raises(SystemExit, match="conflict"):
+        r.pip_resolve(["uuid7"], "linux-64", "3.14")
