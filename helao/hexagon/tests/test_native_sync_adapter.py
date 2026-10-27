@@ -21,6 +21,9 @@ from helao.hexagon.tests.sync_fixtures import teardown_driver
 @pytest.fixture(autouse=True)
 def _hermetic_aws(monkeypatch):
     monkeypatch.delenv("AWS_CONFIG_PATH", raising=False)
+    yield
+    # a constructor sets it raw; pop so neither it nor monkeypatch's undo leaks
+    os.environ.pop("AWS_CONFIG_PATH", None)
 
 
 def _host(tmp_path, local_params, world_db_params):
@@ -54,11 +57,7 @@ async def test_falls_back_to_db_params_without_aws_config_path(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_keeps_local_params_with_aws_config_path(tmp_path, monkeypatch):
-    # Record the true pre-test state (absent) so teardown restores "absent":
-    # __init__ sets AWS_CONFIG_PATH raw, and a delenv issued after that would
-    # make monkeypatch restore the temporary value at teardown.
-    monkeypatch.delenv("AWS_CONFIG_PATH", raising=False)
+async def test_keeps_local_params_with_aws_config_path(tmp_path):
     aws_cfg = tmp_path / "aws.ini"
     aws_cfg.write_text("[default]\n", encoding="utf-8")
     host = _host(
@@ -79,7 +78,6 @@ async def test_keeps_local_params_with_aws_config_path(tmp_path, monkeypatch):
         assert syncer.s3 is not None  # boto3 client built, never contacted
     finally:
         await teardown_driver(syncer)
-        os.environ.pop("AWS_CONFIG_PATH", None)  # __init__ set it
 
 
 @pytest.mark.asyncio

@@ -53,19 +53,30 @@ def _worker_band() -> range:
     """HTTP-port band private to this xdist worker (gwN), below the ephemeral
     range (32768+) even with the +10000 RPC mirror. Import-time picks from the
     ephemeral range collided across workers (birthday) and with outbound
-    sockets; disjoint bands cannot collide between workers."""
-    n = int(os.environ.get("PYTEST_XDIST_WORKER", "gw0").lstrip("gw") or 0) % 64
-    return range(10000 + n * 150, 10000 + (n + 1) * 150)
+    sockets; disjoint bands cannot collide between workers.
+
+    Limit: bands are 150 wide from 10000 and the HTTP half must stay below
+    20000, where the RPC half starts, so at most 66 workers (gw0..gw65)."""
+    n = int(os.environ.get("PYTEST_XDIST_WORKER", "gw0").lstrip("gw") or 0)
+    lo, hi = 10000 + n * 150, 10000 + (n + 1) * 150
+    if hi > 20000:
+        raise RuntimeError(
+            f"xdist worker gw{n}: live_group port band {lo}-{hi} reaches 20000 "
+            "(RPC half); supports at most 66 workers"
+        )
+    return range(lo, hi)
 
 
 def _free_port_pair(taken: set = frozenset()) -> int:
     """An HTTP port whose RPC mirror port is also bindable right now."""
     band = _worker_band()
-    while True:
-        p = random.choice(band)
+    for p in random.sample(band, len(band)):
         rpc = derive_rpc_port(p)
         if rpc <= 65535 and not {p, rpc} & taken and _bindable(p) and _bindable(rpc):
             return p
+    raise RuntimeError(
+        f"live_group: no free HTTP/RPC port pair in band {band.start}-{band.stop}"
+    )
 
 
 _ports: list = []

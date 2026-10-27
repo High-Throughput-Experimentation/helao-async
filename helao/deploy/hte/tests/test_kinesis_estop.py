@@ -192,7 +192,11 @@ def test_latched_kmove_is_refused_with_no_session_and_no_move(gated, tmp_path):
     host, client = gated
 
     def _files():
-        return sorted(f for _, _, fs in os.walk(tmp_path) for f in fs)
+        return sorted(
+            os.path.relpath(os.path.join(d, f), tmp_path)
+            for d, _, fs in os.walk(tmp_path)
+            for f in fs
+        )
 
     before = _files()  # whatever startup wrote (log layout varies with LOGGER)
     _latch(client, True)
@@ -205,7 +209,7 @@ def test_latched_kmove_is_refused_with_no_session_and_no_move(gated, tmp_path):
     # a rejected call creates no artifact: nothing was written under the root
     assert _files() == before
     # startup's own files (fault log or JSONL log, and the per-key lock) only
-    assert "action_host_KMOTOR.lock" in before
+    assert "action_host_KMOTOR.lock" in map(os.path.basename, before)
 
 
 def test_latched_move_axis_is_refused_and_sends_no_move(gated):
