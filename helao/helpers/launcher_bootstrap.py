@@ -5,7 +5,12 @@ auto-detect). The spawn path, parent-death arming and pid handling stay in the
 launchers; see ``helao/helpers/CLAUDE.md``.
 """
 
-__all__ = ["init_colorama", "launcher_bootstrap", "resolve_app_deployment"]
+__all__ = [
+    "init_colorama",
+    "launcher_bootstrap",
+    "load_alert_config",
+    "resolve_app_deployment",
+]
 
 import os
 import sys
@@ -29,6 +34,12 @@ def init_colorama() -> None:
         colorama.init(strip=not sys.stdout.isatty())
 
 
+def load_alert_config(config: dict) -> dict:
+    """The email/webhook alert settings named by ``alert_config_path``, else ``{}``."""
+    path = config.get("alert_config_path")
+    return yml_load(path) if path else {}
+
+
 def launcher_bootstrap(conf_arg: str, server_key: str):
     """Load the global config and logger. Returns (CONFIG, server_config, LOGGER)."""
     if config_loader.CONFIG is None:
@@ -38,16 +49,12 @@ def launcher_bootstrap(conf_arg: str, server_key: str):
     assert CONFIG is not None  # install_global_config just set it
     server_config = CONFIG["servers"][server_key]
     log_root = os.path.join(CONFIG["root"], "LOGS") if "root" in CONFIG else None
-    if CONFIG.get("alert_config_path", False):
-        email_config = yml_load(CONFIG["alert_config_path"])
-    else:
-        email_config = {}
     logging.set_server_key(server_key)
     if logging.LOGGER is None:
         logging.LOGGER = logging.make_logger(
             logger_name=server_key,
             log_dir=log_root,
-            email_config=email_config,
+            email_config=load_alert_config(CONFIG),
             log_level=server_config.get("log_level", CONFIG.get("log_level", 20)),
         )
     LOGGER = logging.LOGGER

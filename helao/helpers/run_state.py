@@ -37,6 +37,7 @@ __all__ = [
 ]
 
 import json
+import functools
 import os
 from datetime import datetime
 from pathlib import Path
@@ -45,7 +46,18 @@ from uuid import UUID
 
 from helao.helpers import helao_logging as logging
 
-LOGGER = logging.LOGGER if logging.LOGGER is not None else logging.make_logger(__file__)
+
+@functools.cache
+def _own_logger():
+    return logging.make_logger(__file__)
+
+
+def _log():
+    # Resolved per call: config_loader imports this module before any launcher
+    # installs the server logger, so a module-level binding would always be a
+    # standalone logger with no alert handlers.
+    return logging.LOGGER or _own_logger()
+
 
 ACTIVE = "active"
 UNSYNCED = "unsynced"
@@ -198,7 +210,7 @@ class RunStateJournal:
                 record = json.loads(line)
             except json.JSONDecodeError as exc:
                 if i == len(lines) - 1:
-                    LOGGER.warning(
+                    _log().warning(
                         f"Discarding torn final line of {self.path}: {exc}. "
                         "A crash during an append damages only the last record."
                     )
@@ -224,7 +236,7 @@ class RunStateJournal:
             return
         if line_count < COMPACT_RATIO * max(len(survivors), 1):
             return
-        LOGGER.debug(
+        _log().debug(
             f"Compacting {self.path.name}: {line_count} lines, "
             f"{len(survivors)} live records."
         )
@@ -391,7 +403,7 @@ def _identify(yml: Path, kind: str) -> tuple:
     try:
         own = str(UUID(found[self_key]))
     except (KeyError, TypeError, ValueError):
-        LOGGER.warning(
+        _log().warning(
             f"No parseable {self_key} in {yml}; keying its journal record by "
             "the file stem instead. A done tombstone carries the real uuid, "
             "so this entry will linger until the yml is repaired."
@@ -489,7 +501,7 @@ def rebuild_from_tree(runs_root, states_root, server_key: str) -> "RunStateJourn
     journal.unreadable_dirs = len(errors)
     if errors:
         shown = ", ".join(str(e.filename) for e in errors[:5])
-        LOGGER.warning(
+        _log().warning(
             f"{len(errors)} directory(ies) under {runs_root} could not be read "
             f"({shown}{', ...' if len(errors) > 5 else ''}). The rebuilt journal "
             "may be INCOMPLETE: a record under an unreadable directory is "
@@ -504,7 +516,7 @@ def rebuild_from_tree(runs_root, states_root, server_key: str) -> "RunStateJourn
         f.flush()
         os.fsync(f.fileno())
     os.replace(tmp, journal.path)
-    LOGGER.info(
+    _log().info(
         f"Rebuilt {journal.path.name} from {runs_root}: "
         f"{len(entries)} unsynced record(s)."
     )
