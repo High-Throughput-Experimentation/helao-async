@@ -202,10 +202,16 @@ def tail_poll(log_dir, cursors: list):
 
 
 def merge(old: list, new: list, keep: int) -> list:
-    """``old`` + ``new`` without duplicate ``(server, pid, seq, ts)``, by ``ts``, newest ``keep``."""
+    """``old`` + ``new`` without duplicate ``(server, logger, pid, seq, ts)``, by ``ts``, newest ``keep``."""
     seen, out = set(), []
     for r in old + new:
-        key = (r.get("server"), r.get("pid"), r.get("seq"), r.get("ts"))
+        key = (
+            r.get("server"),
+            r.get("logger", ""),
+            r.get("pid"),
+            r.get("seq"),
+            r.get("ts"),
+        )
         if not r.get("_note") and key in seen:
             continue
         seen.add(key)
@@ -222,7 +228,11 @@ def filter_records(records, servers, min_level: str, text: str) -> list:
         for r in records
         if (servers is None or r.get("server") in servers)
         and LEVELS.get(r.get("level"), 0) >= floor
-        and (not needle or needle in (_s(r.get("msg")) + _s(r.get("exc"))).lower())
+        and (
+            not needle
+            or needle
+            in (_s(r.get("msg")) + _s(r.get("exc")) + _s(r.get("logger"))).lower()
+        )
     ]
 
 
@@ -234,11 +244,14 @@ def to_rows(records) -> list:
         if r.get("exc"):
             msg = f"{msg}\n{_s(r['exc'])}"
         level = r.get("level", "")
+        server, lg = r.get("server", ""), r.get("logger")
+        if lg and lg != server:
+            server = f"{server} \u00b7 {lg}"
         rows.append(
             [
                 _s(r.get("ts")),
                 level,
-                r.get("server", ""),
+                server,
                 msg,
                 LOG_LEVEL_TEXT.get(level, LOG_LEVEL_TEXT["INFO"]),
             ]

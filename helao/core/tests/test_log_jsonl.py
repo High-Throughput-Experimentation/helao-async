@@ -5,6 +5,7 @@ import logging
 import sys
 
 import pandas as pd
+import pytest
 
 from helao.helpers.log_jsonl import fingerprint, is_artifact, record_to_json
 
@@ -25,6 +26,7 @@ def test_schema_keys_and_values():
         "ts": "2026-10-26T07:33:20.123456Z",
         "level": "INFO",
         "server": "PSTAT",
+        "logger": "PSTAT",
         "pid": doc["pid"],
         "seq": 7,
         "func": "setup",
@@ -428,3 +430,87 @@ def test_read_logs_reports_a_damaged_gz(tmp_path, capsys):
     df = read_logs(tmp_path)
     assert len(df) == 1
     assert "s_20260102T000000.jsonl.gz" in capsys.readouterr().err
+
+
+@pytest.fixture
+def no_server_key(monkeypatch):
+    from helao.helpers import helao_logging
+
+    monkeypatch.setattr(helao_logging, "SERVER_KEY", None)
+    return helao_logging
+
+
+def _named(name, seq=1):
+    r = _rec()
+    r.name = name
+    return json.loads(record_to_json(r, seq))
+
+
+def test_server_is_the_server_key_and_logger_is_the_module(no_server_key):
+    no_server_key.set_server_key("PSTAT")
+    doc = _named("dispatcher")
+    assert (doc["server"], doc["logger"]) == ("PSTAT", "dispatcher")
+
+
+def test_without_a_server_key_server_is_the_record_name(no_server_key):
+    doc = _named("dispatcher")
+    assert (doc["server"], doc["logger"]) == ("dispatcher", "dispatcher")
+
+
+def test_read_logs_keeps_records_differing_only_in_logger(tmp_path):
+    from helao.helpers.log_jsonl import read_logs
+
+    base = {"ts": "2026-01-01T00:00:00Z", "level": "INFO", "server": "S", "pid": 1}
+    a = {**base, "logger": "api", "seq": 1, "msg": "a"}
+    b = {**base, "logger": "app", "seq": 1, "msg": "b"}
+    old = {**base, "seq": 1, "msg": "old"}  # pre-logger record: no key
+    lines = [a, b, a, old, dict(old)]  # a and old are replayed
+    (tmp_path / "x.jsonl").write_text("".join(json.dumps(r) + "\n" for r in lines))
+    df = read_logs(tmp_path)
+    assert sorted(df["msg"]) == ["a", "b", "old"]
+
+
+def test_env_server_key_applies_to_import_time_loggers(tmp_path):
+    import os
+    import subprocess
+
+    code = (
+        "import json,logging;"
+        "from helao.helpers.log_jsonl import record_to_json;"
+        "r=logging.LogRecord('xafs',20,'f.py',1,'m',None,None);"
+        "print(json.loads(record_to_json(r,1))['server'])"
+    )
+    env = {**os.environ, "HELAO_SERVER_KEY": "PSTAT"}
+    out = subprocess.run(
+        [sys.executable, "-c", code], env=env, capture_output=True, text=True
+    )
+    assert out.stdout.strip() == "PSTAT", out.stderr
+
+
+def test_launchers_export_the_server_key_before_any_helao_import():
+    import ast
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[3]
+    for name in ("fast_launcher", "bokeh_launcher", "reflex_launcher"):
+        tree = ast.parse((root / f"{name}.py").read_text(encoding="utf-8"))
+        setter = first_helao = None
+        for node in tree.body:
+            if (
+                isinstance(node, ast.If)
+                and "HELAO_SERVER_KEY" in ast.unparse(node)
+                and setter is None
+            ):
+                setter = node.lineno
+            mod = getattr(node, "module", None) or ""
+            names = [a.name for a in getattr(node, "names", [])]
+            if (
+                isinstance(node, (ast.Import, ast.ImportFrom))
+                and first_helao is None
+                and (
+                    mod.startswith("helao") or any(n.startswith("helao") for n in names)
+                )
+            ):
+                first_helao = node.lineno
+        assert setter is not None, name
+        assert first_helao is None or setter < first_helao, name

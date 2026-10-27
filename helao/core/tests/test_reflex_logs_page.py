@@ -154,3 +154,24 @@ def test_overlapping_tick_is_dropped_while_busy(tmp_path):
     s._busy = True
     asyncio.run(logs._load_bg(s, tick=True))
     assert s.rows == [] and s._busy is True
+
+
+def test_server_list_holds_server_keys_not_module_loggers(tmp_path):
+    d = tmp_path / "LOGS"
+    d.mkdir()
+    lines = []
+    for i, lg in enumerate(["api", "app", "state", "ingest"], 1):
+        r = json.loads(_line(i, "UI"))
+        r["logger"] = lg
+        lines.append(json.dumps(r).encode() + b"\n")
+    (d / "helao_g.jsonl").write_bytes(b"".join(lines))
+    logs.configure_logs({"root": str(tmp_path)}, "UI")
+    s = FakeState()
+    s.start()
+    assert s.servers == ["UI"]
+    assert sorted(r[2] for r in s.rows) == [
+        "UI \u00b7 api",
+        "UI \u00b7 app",
+        "UI \u00b7 ingest",
+        "UI \u00b7 state",
+    ]

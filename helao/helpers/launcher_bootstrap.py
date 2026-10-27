@@ -42,6 +42,7 @@ def launcher_bootstrap(conf_arg: str, server_key: str):
         email_config = yml_load(CONFIG["alert_config_path"])
     else:
         email_config = {}
+    logging.set_server_key(server_key)
     if logging.LOGGER is None:
         logging.LOGGER = logging.make_logger(
             logger_name=server_key,

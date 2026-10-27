@@ -92,11 +92,16 @@ def record_to_json(
     record: logging.LogRecord, seq: int, offset_seconds: float = 0.0
 ) -> bytes:
     """One ``\\n``-terminated UTF-8 JSON line for ``record`` (spec §1)."""
+    # imported at call time: helao_logging imports this module, and the key
+    # is set after import (a module-level read would freeze None)
+    from helao.helpers import helao_logging
+
     ts = datetime.fromtimestamp(record.created + offset_seconds, tz=timezone.utc)
     doc = {
         "ts": ts.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
         "level": record.levelname,
-        "server": _clean(record.name),
+        "server": _clean(helao_logging.SERVER_KEY or record.name),
+        "logger": _clean(record.name),
         "pid": record.process,
         "seq": seq,
         "func": _clean(record.funcName),
@@ -656,8 +661,10 @@ def read_logs(log_dir, server=None, *, ledger: bool = False):
 
     Reads live and rotated (``.gz``) files; ``ledger=True`` reads only the
     ``artifacts_*`` ledger instead of the logs. Duplicates from replay are
-    dropped on ``(server, pid, seq, ts)``: pid and seq alone repeat when a PID
-    is reused by a later process.
+    dropped on ``(server, logger, pid, seq, ts)``: loggers of one process count
+    ``seq`` separately and share ``server``, and pid and seq alone repeat when a
+    PID is reused by a later process. Records written before ``logger`` existed
+    have none; it reads as ``""`` for them.
     """
     import pandas as pd
 
@@ -684,15 +691,18 @@ def read_logs(log_dir, server=None, *, ledger: bool = False):
                 "ts": pd.Series([], dtype="datetime64[us, UTC]"),
                 "level": pd.Series([], dtype=object),
                 "server": pd.Series([], dtype=object),
+                "logger": pd.Series([], dtype=object),
                 "pid": pd.Series([], dtype="int64"),
                 "seq": pd.Series([], dtype="int64"),
                 "msg": pd.Series([], dtype=object),
             }
         )
         return df
-    df = pd.concat(frames, ignore_index=True).drop_duplicates(
-        ["server", "pid", "seq", "ts"]
-    )
+    df = pd.concat(frames, ignore_index=True)
+    if "logger" not in df:
+        df["logger"] = ""
+    df["logger"] = df["logger"].fillna("")
+    df = df.drop_duplicates(["server", "logger", "pid", "seq", "ts"])
     if server is not None:
         df = df[df["server"] == server]
     df["ts"] = pd.to_datetime(df["ts"], utc=True).astype("datetime64[us, UTC]")
