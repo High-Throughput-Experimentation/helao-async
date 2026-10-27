@@ -31,7 +31,7 @@ server that constructs the host — import without a Bokeh document context.
 bokeh.server-outside-app/ rule) permits it. :class:`GalilAlignerHost` now
 takes a ``ui_host`` (``ports.ui_host.UiHostPort``) and calls
 ``start_document_host``/``stop`` on it instead of importing ``bokeh``.
-Same host/port derivation as before (``bokeh_port`` config, else
+Same host/port derivation as before (``bokeh_port`` config when not null, else
 ``server_cfg['port'] + 1000``) — only the construction site moved.
 """
 
@@ -39,6 +39,7 @@ from typing import Any, Optional
 
 from helao.core.error import ErrorCodes
 from helao.hexagon.adapters.errors import UnwiredPortError
+from helao.hexagon.preflight import aligner_bokeh_port
 
 __all__ = ["AlignerMotorContext", "GalilAlignerHost"]
 
@@ -159,7 +160,9 @@ class GalilAlignerHost:
                 "one and pass it in before calling start()"
             )
         serv_host = self._server_cfg["host"]
-        serv_port = self._config.get("bokeh_port", self._server_cfg["port"] + 1000)
+        serv_port = aligner_bokeh_port(
+            {"port": self._server_cfg["port"], "params": self._config}
+        )
         serv_py = "Aligner"
         self.bokehapp = self._ui_host.start_document_host(
             {f"/{serv_py}": self._make_bokeh_app},

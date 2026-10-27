@@ -257,3 +257,18 @@ def test_resolve_log_port_avoids_plate_aligner_ports():
     assert resolve_log_port({"log_port": 8100, "servers": only_b}) == 8100
     with pytest.raises(ValueError):
         resolve_log_port({"log_port": 8501, "servers": only_b})
+
+
+def test_resolve_log_port_null_aligner_bokeh_port():
+    servers = {
+        "A": {
+            "host": "h",
+            "port": 8001,
+            "params": {"enable_aligner": True, "bokeh_port": None},
+        }
+    }
+    # null bokeh_port == port + 1000 == 9001, which the log port must avoid
+    assert resolve_log_port({"log_port": 9000, "servers": servers}) == 9000
+    assert resolve_log_port({"servers": servers}) != 9001
+    with pytest.raises(ValueError):
+        resolve_log_port({"log_port": 9001, "servers": servers})

@@ -123,6 +123,15 @@ def test_aligner_implicit_default_bokeh_port_is_reserved():
     assert any("port + 1000" in i for i in issues), issues
 
 
+def test_aligner_null_bokeh_port_falls_back_to_port_plus_1000():
+    """`bokeh_port: null` is an unset key, not a crash."""
+    srv = {"port": 8001, "params": {"enable_aligner": True, "bokeh_port": None}}
+    assert preflight._aligner_port(srv) == 9001
+    srv["params"]["bokeh_port"] = 8123
+    assert preflight._aligner_port(srv) == 8123
+    assert preflight.aligner_bokeh_port({"port": 8001, "params": {}}) == 9001
+
+
 def test_aligner_without_enable_flag_claims_nothing():
     """`bokeh_port` sitting in `params` with no `enable_aligner: true` is not
     a live claim -- the aligner host is never constructed, so nothing binds
