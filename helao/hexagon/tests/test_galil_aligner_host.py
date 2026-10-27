@@ -166,6 +166,25 @@ def _host():
     return h, d
 
 
+def test_start_binds_port_plus_1000_when_bokeh_port_is_null():
+    class _UiHost:
+        def start_document_host(self, apps, host, port, allow_websocket_origin):
+            self.port = port
+            return object()
+
+    ui = _UiHost()
+    h = GalilAlignerHost(
+        driver=_FakeDriver(),
+        base="BASE",
+        server_cfg={"host": "127.0.0.1", "port": 8003},
+        server_name="MOTOR",
+        config={"enable_aligner": True, "bokeh_port": None},
+        ui_host=ui,
+    )
+    h.start()
+    assert ui.port == 9003
+
+
 def test_precheck_not_available_before_bokeh_start():
     h, _ = _host()
     # bokehapp is None until start(); precheck must report not_available

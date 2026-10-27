@@ -567,7 +567,7 @@ nothing checks the RPC port:
 |---|---|---|
 | The server itself | `port` | yes |
 | Reflex backend | `port + 1` | yes — `reserved_addresses` returns both |
-| Plate-aligner Bokeh (`params.enable_aligner`) | `params.bokeh_port`, else `port + 1000` | **no** (preflight checks it) |
+| Plate-aligner Bokeh (`params.enable_aligner`) | `params.bokeh_port`, else (absent or null) `port + 1000` | **no** (preflight checks it) |
 | ZMQ RPC (every FastAPI server) | `port + 10000` | **no** |
 | Log collector (launcher) | `log_port`, else one above the highest server port | no (`resolve_log_port` avoids server, RPC and aligner ports) |
 
@@ -595,7 +595,7 @@ Shared by every action server (`ActionHost`):
 | Param | Default | Effect |
 |---|---|---|
 | `allow_concurrent_actions` | `True` | `False`: an action whose endpoint is busy is parked in one server-wide queue, released when no endpoint is running an action; an action for an idle endpoint starts at once. `True`: parked per endpoint. `start_condition: no_wait` bypasses either. Some `hte` servers force `False` in code. |
-| `enable_aligner` / `bokeh_port` | — / `port + 1000` | Motion servers: host the Bokeh plate aligner on a second port. Preflight reserves it; `validateConfig` does not. |
+| `enable_aligner` / `bokeh_port` | — / `port + 1000` | Motion servers: host the Bokeh plate aligner on a second port; a null `bokeh_port` means the default. Preflight reserves it; `validateConfig` does not. |
 | `positions` | — | Sample-archive positions. At most one server per config may declare it (see [Validation rules](#validation-rules)). |
 
 `SYNC` (`sync_server`, `NativeSyncer`). An orchestrator or other host that

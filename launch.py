@@ -2131,7 +2131,7 @@ def main():
     if helaodirs.log_root is not None and wants_collector(extraopt):
         try:
             log_port = resolve_log_port(config)
-        except ValueError as exc:
+        except (ValueError, TypeError) as exc:
             cprint(f"\n{exc}\n", "red", attrs=["bold"])
             sys.exit(1)
         log_prefix = os.path.splitext(os.path.basename(confArg))[0]
