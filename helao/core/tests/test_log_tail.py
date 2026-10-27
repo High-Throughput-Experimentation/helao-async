@@ -208,6 +208,14 @@ def test_exc_is_joined_and_searched():
     assert log_tail.filter_records([r], None, "DEBUG", "zerodivision") == [r]
 
 
+def test_row_key_is_the_duplicate_key_and_unique_per_record():
+    recs = [json.loads(_line(i, "A")) for i in range(3)]
+    keys = [row[5] for row in log_tail.to_rows(recs)]
+    r = recs[2]
+    assert keys[0] == f"{r['server']}|{r.get('logger', '')}|{r['pid']}|2|{r['ts']}"
+    assert len(set(keys)) == 3
+
+
 def test_merge_sorts_out_of_order_and_across_files():
     unified = [json.loads(_line(5, "A")), json.loads(_line(2, "A"))]
     fallback = [json.loads(_line(3, "B"))]

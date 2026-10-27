@@ -170,13 +170,34 @@ def _server_box(server: rx.Var) -> rx.Component:
     )
 
 
+# A message is one line cut with an ellipsis until clicked; a native <details>
+# keeps the open/closed state in the browser, not in LogsState.
+_SUMMARY = {
+    "cursor": "pointer",
+    "list_style": "none",
+    "white_space": "nowrap",
+    "overflow": "hidden",
+    "text_overflow": "ellipsis",
+    "&::-webkit-details-marker": {"display": "none"},
+}
+_OPEN = {"&[open] > summary": {"white_space": "pre-wrap", "overflow_wrap": "anywhere"}}
+
+
 def _row(row: rx.Var) -> rx.Component:
     return rx.table.row(
         rx.table.cell(row[0], white_space="nowrap"),
         rx.table.cell(row[1]),
         rx.table.cell(row[2]),
-        rx.table.cell(row[3], font_family="monospace", white_space="pre-wrap"),
+        rx.table.cell(
+            rx.el.details(rx.el.summary(row[3], style=_SUMMARY), style=_OPEN),
+            font_family="monospace",
+            # max-width 0 lets the cell take the remaining width instead of
+            # growing to fit the unwrapped line, so the ellipsis can show
+            max_width="0",
+            width="100%",
+        ),
         style={"color": row[4]},
+        key=row[5],
     )
 
 

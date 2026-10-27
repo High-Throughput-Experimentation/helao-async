@@ -237,7 +237,11 @@ def filter_records(records, servers, min_level: str, text: str) -> list:
 
 
 def to_rows(records) -> list:
-    """Newest-first ``[ts, level, server, msg, color]`` rows for the table."""
+    """Newest-first ``[ts, level, server, msg, color, key]`` rows for the table.
+
+    ``key`` is the record's duplicate key, so a row the page has expanded stays
+    expanded as newer rows push it down.
+    """
     rows = []
     for r in reversed(records):
         msg = _s(r.get("msg"))
@@ -254,6 +258,9 @@ def to_rows(records) -> list:
                 server,
                 msg,
                 LOG_LEVEL_TEXT.get(level, LOG_LEVEL_TEXT["INFO"]),
+                "|".join(
+                    _s(r.get(k)) for k in ("server", "logger", "pid", "seq", "ts")
+                ),
             ]
         )
     return rows

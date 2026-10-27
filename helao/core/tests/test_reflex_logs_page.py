@@ -175,3 +175,12 @@ def test_server_list_holds_server_keys_not_module_loggers(tmp_path):
         "UI \u00b7 ingest",
         "UI \u00b7 state",
     ]
+
+
+def test_message_cell_collapses_and_rows_are_keyed_by_record():
+    js = str(logs._row(logs.LogsState.rows[0]))
+    assert 'jsx("details"' in js and 'jsx("summary"' in js
+    assert '["textOverflow"] : "ellipsis"' in js and "&[open] > summary" in js
+    # an index key would hand an expanded row's state to whichever row
+    # slides into its place when newer records arrive
+    assert "key:" in js and "at?.(5)" in js
