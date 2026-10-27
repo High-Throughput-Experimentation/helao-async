@@ -24,7 +24,13 @@ import pytest
 
 import launch
 
-launch.LAUNCH_LOGGER = _logging.getLogger("test_launch_parallel_teardown")
+
+@pytest.fixture(autouse=True)
+def _launch_logger(monkeypatch):
+    monkeypatch.setattr(
+        launch, "LAUNCH_LOGGER", _logging.getLogger("test_launch_parallel_teardown")
+    )
+
 
 EXIT_DELAY = 1.0
 CHILD = (

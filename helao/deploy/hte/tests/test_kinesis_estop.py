@@ -190,6 +190,15 @@ def test_latched_kmove_is_refused_with_no_session_and_no_move(gated, tmp_path):
     from helao.core.error import ErrorCodes
 
     host, client = gated
+
+    def _files():
+        return sorted(
+            os.path.relpath(os.path.join(d, f), tmp_path)
+            for d, _, fs in os.walk(tmp_path)
+            for f in fs
+        )
+
+    before = _files()  # whatever startup wrote (log layout varies with LOGGER)
     _latch(client, True)
     resp = _kmove(client)
     assert resp.status_code == 200, resp.text
@@ -198,9 +207,9 @@ def test_latched_kmove_is_refused_with_no_session_and_no_move(gated, tmp_path):
     assert _move_calls(host.driver) == []
     assert host.actives == {} and host.executors == {}
     # a rejected call creates no artifact: nothing was written under the root
-    written = [f for _, _, fs in os.walk(tmp_path) for f in fs]
-    # startup's fault log and its per-key lock file, nothing else
-    assert sorted(written) == ["KMOTOR_faults.txt", "action_host_KMOTOR.lock"]
+    assert _files() == before
+    # startup's own files (fault log or JSONL log, and the per-key lock) only
+    assert "action_host_KMOTOR.lock" in map(os.path.basename, before)
 
 
 def test_latched_move_axis_is_refused_and_sends_no_move(gated):

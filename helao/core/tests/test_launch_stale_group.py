@@ -21,7 +21,12 @@ import pytest
 
 import launch
 
-launch.LAUNCH_LOGGER = _logging.getLogger("test_launch_stale_group")
+
+@pytest.fixture(autouse=True)
+def _launch_logger(monkeypatch):
+    monkeypatch.setattr(
+        launch, "LAUNCH_LOGGER", _logging.getLogger("test_launch_stale_group")
+    )
 
 
 CONF = {

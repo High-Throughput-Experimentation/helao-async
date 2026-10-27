@@ -47,7 +47,10 @@ def test_probe_reports_the_measured_ceiling_when_one_exists(tmp_path, monkeypatc
     assert result.error is not None
     # It stopped where the cap is, not at zero -- that distinction is what
     # separates "long paths are off" from "the root is unwritable".
-    assert 0 < result.reached <= 260
+    # ``reached`` is the length of the probe FILE inside the deepest directory
+    # that could be made (cap 260), so it can exceed 260 by the file name;
+    # which side of 260 it lands on depends on the basetemp length.
+    assert 0 < result.reached <= 260 + len(os.sep + "probe.txt")
     assert result.cleaned and not result.leftover
     assert not os.path.exists(_probe_dir(tmp_path))
 
