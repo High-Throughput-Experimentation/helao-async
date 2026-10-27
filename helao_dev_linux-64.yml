@@ -55,6 +55,7 @@ dependencies:
   - pyright
   - pyserial
   - pytest-asyncio
+  - pytest-xdist
   - python-dotenv
   - python=3.14
   - pytorch-cpu
