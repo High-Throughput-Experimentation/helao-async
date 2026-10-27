@@ -513,4 +513,5 @@ def test_launchers_export_the_server_key_before_any_helao_import():
             ):
                 first_helao = node.lineno
         assert setter is not None, name
+        assert "os.environ['HELAO_SERVER_KEY'] = sys.argv[2]" in ast.unparse(tree), name
         assert first_helao is None or setter < first_helao, name

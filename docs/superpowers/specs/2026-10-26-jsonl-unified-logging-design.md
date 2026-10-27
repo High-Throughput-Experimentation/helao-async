@@ -49,7 +49,8 @@ file larger. There is no byte backstop; add one if a real station's files exceed
   launcher's own process is `launch`). Before a process has set one, the logger name stands in.
 - `logger`: the record's logger name (`record.name`), e.g. `dispatcher` or `api`. Records written
   before this field existed have none; readers treat it as `""`.
-- `seq`: a per-process counter, incremented for every record emitted. A gap shows loss.
+- `seq`: a per-logger counter (each `make_logger` sink counts its own), incremented for every record
+  that logger emits. A gap shows loss, per `(server, logger, pid)`.
 - `exc`: present only when the record carries `exc_info`; the formatted traceback.
 - `repeat_count`, `repeat_period`: present only on a dedup summary record (§1, recent-records
   buffer). The summary says the preceding `repeat_period`-record sequence was suppressed
@@ -470,6 +471,9 @@ fails the sweep.
 - Resolved: module logger names used to appear as servers in the unified file; they now go in
   `logger`, and `server` is the server key. The `/logs` server column reads `<server> · <logger>`
   when the two differ.
+- `HELAO_SERVER_KEY`: `fast_launcher.py`, `bokeh_launcher.py` and `reflex_launcher.py` export it from `sys.argv[2]` so that module-level loggers emit their import-time records already carrying the server key (`helao_logging.SERVER_KEY` reads it at import). Every subprocess a server spawns inherits it, and the export must stay above the first `helao` import or those records fall back to logger names.
+- Records written before this change show logger names as servers in the `/logs` server list until
+  they age out.
 - Windows `TIME_WAIT` can delay the collector re-bind on a quick `--reconnect`.
 - Co-hosted groups on one machine each derive a default `log_port` from their own ports; set
   `log_port` explicitly if two groups could pick the same one.

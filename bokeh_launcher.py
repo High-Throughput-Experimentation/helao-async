@@ -59,7 +59,7 @@ if sys.platform == "win32":
     asyncio.set_event_loop(asyncio.SelectorEventLoop())
 # The server key names this process in every log record, including the ones
 # module-level loggers emit while the imports below run (helao_logging reads it
-# at import); children, e.g. the Reflex backend, inherit it. Must stay above
+# at import); every subprocess this server spawns inherits it. Must stay above
 # the first helao import.
 if __name__ == "__main__" and len(sys.argv) > 2:
     os.environ["HELAO_SERVER_KEY"] = sys.argv[2]
