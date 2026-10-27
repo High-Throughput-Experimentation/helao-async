@@ -146,7 +146,7 @@ class GalilAlignerHost:
         """Start the document host serving the ``/Aligner`` app.
 
         Same host/port derivation as the legacy ``Galil.start_aligner`` /
-        ``makeBokehApp`` (``bokeh_port`` config, else
+        ``makeBokehApp`` (``bokeh_port`` config, else -- also when it is null --
         ``server_cfg['port'] + 1000``) — P7d moved the ``Server``
         construction itself behind the injected ``ui_host``
         (``ports.ui_host.UiHostPort``); this module no longer imports
