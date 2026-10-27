@@ -6,8 +6,10 @@ docs/superpowers/specs/2026-10-26-jsonl-unified-logging-design.md (section 4).
 
 import asyncio
 import os
+from typing import cast
 
 import reflex as rx
+from reflex.vars import ArrayVar
 
 from helao.ui.shared import log_tail
 
@@ -165,7 +167,8 @@ class LogsState(rx.State):
 def _server_box(server: rx.Var) -> rx.Component:
     return rx.checkbox(
         server,
-        checked=LogsState.selected.contains(server),
+        # class access yields a Var at runtime; pyright sees the list annotation
+        checked=cast(ArrayVar, LogsState.selected).contains(server),
         on_change=lambda on: LogsState.toggle_server(server, on),
     )
 
@@ -183,7 +186,7 @@ _SUMMARY = {
 _OPEN = {"&[open] > summary": {"white_space": "pre-wrap", "overflow_wrap": "anywhere"}}
 
 
-def _row(row: rx.Var) -> rx.Component:
+def _row(row: ArrayVar) -> rx.Component:
     return rx.table.row(
         rx.table.cell(row[0], white_space="nowrap"),
         rx.table.cell(row[1]),
