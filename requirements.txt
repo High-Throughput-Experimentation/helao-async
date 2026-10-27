@@ -1,5 +1,6 @@
 nidaqmx
 pydasher
+pyft232
 uuid7
 reflex
 xy[reflex]
