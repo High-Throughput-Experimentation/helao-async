@@ -28,6 +28,7 @@ class LegacyLoggingAdapter:
                 "root (F3: the legacy mkdtemp() fallback is banned); pass "
                 "<config root>/LOGS"
             )
+        helao_logging.set_server_key(server_key)
         return helao_logging.make_logger(logger_name=server_key, log_dir=log_root)
 
     def info(self, msg: str) -> None:

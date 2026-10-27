@@ -692,6 +692,8 @@ def _install_backend_logger(cfg: dict) -> None:
     if not root or logging.LOGGER is not None:
         return
     key = os.environ.get("HELAO_REFLEX_SERVER_KEY", "") or "reflex"
+    # frontend and backend are one server; ``logger`` tells them apart
+    logging.set_server_key(key)
     logging.LOGGER = logging.make_logger(
         logger_name=f"{key}_backend", log_dir=os.path.join(root, "LOGS")
     )

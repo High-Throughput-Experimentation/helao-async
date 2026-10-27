@@ -57,6 +57,13 @@ from bokeh.server.server import Server
 # selector loop on Windows.
 if sys.platform == "win32":
     asyncio.set_event_loop(asyncio.SelectorEventLoop())
+# The server key names this process in every log record, including the ones
+# module-level loggers emit while the imports below run (helao_logging reads it
+# at import); every subprocess this server spawns inherits it. Must stay above
+# the first helao import.
+if __name__ == "__main__" and len(sys.argv) > 2:
+    os.environ["HELAO_SERVER_KEY"] = sys.argv[2]
+
 from helao.core.version import get_hlo_version, hlo_version
 from helao.helpers.launcher_bootstrap import (
     init_colorama,

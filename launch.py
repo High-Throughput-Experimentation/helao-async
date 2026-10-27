@@ -2154,6 +2154,7 @@ def main():
         os.environ[LOG_ENDPOINT_ENV] = log_endpoint(log_port)
 
     global LAUNCH_LOGGER
+    logging.set_server_key("launch")
     LAUNCH_LOGGER = logging.make_logger(
         __file__, log_dir=helaodirs.log_root, log_level=config.get("log_level", 20)
     )

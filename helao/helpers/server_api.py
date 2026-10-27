@@ -67,6 +67,7 @@ class HelaoFastAPI(FastAPI):
         self.helao_srv = helao_srv
         self.server_cfg = self.helao_cfg["servers"][self.helao_srv]
         self.server_params = self.server_cfg.get("params", {})
+        logging.set_server_key(helao_srv)
         if logging.LOGGER is None:
             logging.LOGGER = logging.make_logger(
                 logger_name=helao_srv,
@@ -165,6 +166,7 @@ class HelaoBokehAPI:
         self.helao_cfg = helao_cfg if helao_cfg is not None else config_loader.CONFIG
         self.server_cfg = self.helao_cfg["servers"][self.helao_srv]
         self.server_params = self.server_cfg.get("params", {})
+        logging.set_server_key(helao_srv)
         if logging.LOGGER is None:
             logging.LOGGER = logging.make_logger(
                 logger_name=helao_srv,

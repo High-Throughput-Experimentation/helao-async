@@ -38,15 +38,19 @@ file larger. There is no byte backstop; add one if a real station's files exceed
 ### Record
 
 ```json
-{"ts": "2026-10-26T17:31:02.123456Z", "level": "INFO", "server": "PSTAT", "pid": 4242,
- "seq": 1834, "func": "setup_action", "file": "action_host.py", "line": 512,
+{"ts": "2026-10-26T17:31:02.123456Z", "level": "INFO", "server": "PSTAT", "logger": "dispatcher",
+ "pid": 4242, "seq": 1834, "func": "setup_action", "file": "action_host.py", "line": 512,
  "msg": "...", "exc": "Traceback (most recent call last): ..."}
 ```
 
 - `ts`: UTC, ISO-8601, microseconds, `Z` suffix, with the cached NTP offset applied (as
   `NtpOffsetFormatter` does today). `pd.to_datetime` parses it to `datetime64[ns, UTC]`.
-- `server`: the logger name (the server key, or the module name for a bare `make_logger`).
-- `seq`: a per-process counter, incremented for every record emitted. A gap shows loss.
+- `server`: the process's server key, set once with `helao_logging.set_server_key` (the
+  launcher's own process is `launch`). Before a process has set one, the logger name stands in.
+- `logger`: the record's logger name (`record.name`), e.g. `dispatcher` or `api`. Records written
+  before this field existed have none; readers treat it as `""`.
+- `seq`: a per-logger counter (each `make_logger` sink counts its own), incremented for every record
+  that logger emits. A gap shows loss, per `(server, logger, pid)`.
 - `exc`: present only when the record carries `exc_info`; the formatted traceback.
 - `repeat_count`, `repeat_period`: present only on a dedup summary record (§1, recent-records
   buffer). The summary says the preceding `repeat_period`-record sequence was suppressed
@@ -54,8 +58,9 @@ file larger. There is no byte backstop; add one if a real station's files exceed
 - `event`, `kind`, `uuid`, `path`, `bytes`, `sha256`, `reason`: present only on artefact hash
   records (§5). `uuid` is omitted when the owner is unknown. The artefact `msg` is short,
   `"<event> <kind>"` (for example `artifact_final act`); the path and hash are fields only.
-- `(server, pid, seq, ts)` identifies a record. Replay (below) can write a record twice; readers
-  drop duplicates on that key. `(pid, seq)` alone repeats when a PID is reused by a later process.
+- `(server, logger, pid, seq, ts)` identifies a record. Replay (below) can write a record twice;
+  readers drop duplicates on that key. `(pid, seq)` alone repeats when a PID is reused by a later
+  process, and the loggers of one process share `server` but each count `seq` themselves.
 - Serialized with `ensure_ascii=False`, UTF-8, `\n`-terminated.
 
 ### Handlers built by `make_logger`
@@ -130,7 +135,7 @@ so a loop logging `A B C A B C ...` (for example, a cascading exception) is neve
 kernel socket buffers, or the collector's receive queue when the launcher dies would be lost.
 On the first `Again` after a run of successful sends, the handler writes every buffered record
 that was sent to the launcher (oldest first) into its fallback file, then the new record. Some
-of them already reached the unified file; readers drop the duplicates on `(server, pid, seq, ts)`. Replay writes all the entries for a
+of them already reached the unified file; readers drop the duplicates on `(server, logger, pid, seq, ts)`. Replay writes all the entries for a
 file with one `write_many` call per writer, not one open/append/close per record.
 Records are lost only if more than 2,000 were in flight. The two high-water marks bound that at
 `SNDHWM + RCVHWM = 2000`; `SNDBUF` and `RCVBUF` are 65536 (`SOCK_BUF`) on both ends, so the kernel
@@ -236,7 +241,7 @@ The stale `.txt` log-zipping blocks in `launch.py` (`main`, after `LAUNCH_LOGGER
   chunks, trims a partial last line, skips unparseable lines with one stderr line per file, and
   skips a damaged `.gz` with a stderr line naming it) in
   `helao/helpers/log_jsonl.py`, re-exported by `helao_logging`: reads the live
-  files and rotated `.gz` files, concatenates, drops duplicates on `(server, pid, seq, ts)`, filters
+  files and rotated `.gz` files, concatenates, drops duplicates on `(server, logger, pid, seq, ts)`, filters
   by server, and sorts by `ts`. One helper,
   so tests and pandas consumers do not each re-implement the glob and merge.
 - **Docs**: the root `CLAUDE.md` mentions of `LOGS/<server_key>.log`, and the `orch_effects.py`
@@ -246,7 +251,7 @@ The stale `.txt` log-zipping blocks in `launch.py` (`main`, after `LAUNCH_LOGGER
 
 | Event | Behaviour |
 |---|---|
-| Launcher dies or detaches | The next send raises `Again`; records go to the child's own file, after the recent-records buffer is replayed there; a marker is sent on re-attach. Records are lost only if more than 2,000 were in flight. Replayed records may duplicate unified-file records; readers drop them on `(server, pid, seq, ts)`. |
+| Launcher dies or detaches | The next send raises `Again`; records go to the child's own file, after the recent-records buffer is replayed there; a marker is sent on re-attach. Records are lost only if more than 2,000 were in flight. Replayed records may duplicate unified-file records; readers drop them on `(server, logger, pid, seq, ts)`. |
 | Collector behind | Children spill to their own files; no caller blocks. |
 | Collector disk error | stderr report, record dropped, no raise. |
 | `log_port` already bound | Launch aborts before spawning. |
@@ -312,7 +317,7 @@ fork.
   only (it shows a frozen snapshot; filter changes still apply to it); polling continues, so
   the viewer never misses the window during which a rotated file's plain copy is still
   readable.
-- Rows are deduplicated on `(server, pid, seq, ts)`, since a replay can write a record twice.
+- Rows are deduplicated on `(server, logger, pid, seq, ts)`, since a replay can write a record twice.
 - The message column is monospace. Each row's text colour (a column of the row, `row[4]`) comes
   from `helao/ui/shared/palette.py` (`LOG_LEVEL_TEXT`). The table body is white
   (`palette.REFLEX_TABLE_HUES`) and the page uses the tint indigo-50.
@@ -430,7 +435,7 @@ fails the sweep.
   is **excluded from the 90-day retention**. The retention sweep matches only the log stems,
   never `artifacts_*`. At about 300 bytes per file, the ledger grows slowly.
 - Artefact records are included in the §1 replay, so a launcher death does not lose ledger
-  entries. Duplicates are dropped on `(server, pid, seq, ts)` as for the log.
+  entries. Duplicates are dropped on `(server, logger, pid, seq, ts)` as for the log.
 - A tool run with no config root logs a WARNING that the ledger entry went to a temporary
   directory, unless it called `use_root_logger`, which puts its log and ledger in `<root>/LOGS`.
 - A failed hash is a WARNING with `event: "artifact_hash_failed"`; it also goes to the ledger,
@@ -440,7 +445,8 @@ fails the sweep.
 - An artefact record bypasses the sink's level filter (§1), so the ledger is complete at any
   `log_level`.
 - Every `make_logger` call, including per-module loggers, gets its own sink; those loggers'
-  names appear as `server` in the unified file.
+  names appear as `logger` in the unified file (`server` stays the process's server key).
+  The sink's fallback file is still named after the logger.
 - Calling `make_logger` again for a name replaces that logger's sink, console and queue handlers
   instead of stacking duplicates.
 
@@ -462,7 +468,12 @@ fails the sweep.
 ## Known limits / follow-ups
 
 - Private-deployment rewrite tools are not hashed yet.
-- Module logger names appear as servers in the unified file.
+- Resolved: module logger names used to appear as servers in the unified file; they now go in
+  `logger`, and `server` is the server key. The `/logs` server column reads `<server> · <logger>`
+  when the two differ.
+- `HELAO_SERVER_KEY`: `fast_launcher.py`, `bokeh_launcher.py` and `reflex_launcher.py` export it from `sys.argv[2]` so that module-level loggers emit their import-time records already carrying the server key (`helao_logging.SERVER_KEY` reads it at import). Every subprocess a server spawns inherits it, and the export must stay above the first `helao` import or those records fall back to logger names.
+- Records written before this change show logger names as servers in the `/logs` server list until
+  they age out.
 - Windows `TIME_WAIT` can delay the collector re-bind on a quick `--reconnect`.
 - Co-hosted groups on one machine each derive a default `log_port` from their own ports; set
   `log_port` explicitly if two groups could pick the same one.

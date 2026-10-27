@@ -307,3 +307,28 @@ def test_rotated_name_match_is_anchored(tmp_path):
     assert [r["msg"] for r in rows] == [
         "UI.jsonl rotated; records written just before may be missing"
     ]
+
+
+def test_merge_keeps_records_differing_only_in_logger():
+    a = {**json.loads(_line(1)), "logger": "api"}
+    b = {**a, "logger": "app"}
+    assert log_tail.merge([a], [b, dict(a)], keep=10) == [a, b]
+
+
+def test_to_rows_server_cell_shows_logger_only_when_it_differs():
+    base = {"ts": "t", "level": "INFO", "msg": "m"}
+    recs = [
+        {**base, "server": "S", "logger": "S"},
+        {**base, "server": "S", "logger": "api"},
+        {**base, "server": "S"},  # pre-logger record
+    ]
+    assert [r[2] for r in log_tail.to_rows(recs)] == ["S", "S \u00b7 api", "S"]
+
+
+def test_text_search_matches_the_logger_name():
+    recs = [
+        {"server": "S", "logger": "dispatcher", "level": "INFO", "msg": "x"},
+        {"server": "S", "logger": "api", "level": "INFO", "msg": "y"},
+    ]
+    got = log_tail.filter_records(recs, None, "INFO", "DISPATCH")
+    assert [r["logger"] for r in got] == ["dispatcher"]

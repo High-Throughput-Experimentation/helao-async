@@ -41,6 +41,20 @@ from helao.helpers.log_jsonl import (
 )  # noqa: F401
 from helao.helpers.time_utils import read_saved_offset
 
+#: This process's server key, stamped on every JSONL record as ``server`` (the
+#: record's logger name goes in ``logger``). ``None`` until the process learns
+#: its key; records then fall back to the logger name. A launcher entry script
+#: exports ``HELAO_SERVER_KEY`` before importing helao so that records emitted
+#: at import time already carry it.
+SERVER_KEY: Optional[str] = os.environ.get("HELAO_SERVER_KEY") or None
+
+
+def set_server_key(key: str) -> None:
+    """Name this process's server in every record it logs from now on."""
+    global SERVER_KEY
+    SERVER_KEY = key
+
+
 ALERT_LEVEL = 60
 logging.addLevelName(ALERT_LEVEL, "ALERT")
 
