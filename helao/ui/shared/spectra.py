@@ -27,6 +27,36 @@ import numpy as np
 #: Concurrent spectrum fetches, as for the composition page's quant fetches.
 MAX_CONCURRENT_FETCHES = 30
 
+#: Items per ``read_processes_by_sequence`` page (the API's maximum). The API
+#: also ends a page before 4.5 MB, under its 6 MB per-response limit.
+PROCESS_PAGE = 1000
+
+
+async def read_processes_by_sequence(client, sequence_uuid: str) -> list:
+    """Every process of one sequence, read page by page.
+
+    Unpaged, a large sequence (an XAFS plate: 10 MB) is over the API's 6 MB
+    response limit and fails with a 500 ``response_too_large``. A plain-list
+    reply (an API or fake that ignores ``limit``) is taken as the whole set.
+    """
+    processes, key = [], None
+    while True:
+        page = await client.read_processes_by_sequence(
+            sequence_uuid=sequence_uuid, limit=PROCESS_PAGE, last_evaluated_key=key
+        )
+        if isinstance(page, list):
+            return processes + page
+        if not isinstance(page, dict) or "processes" not in page:
+            raise RuntimeError(
+                f"read_processes_by_sequence returned {type(page).__name__}; "
+                "expected a list or a page of processes"
+            )
+        processes += page["processes"] or []
+        key = page.get("exclusive_start_key")
+        if not key:
+            return processes
+
+
 #: Bytes of spectra kept in memory across sessions, least recently used
 #: evicted first. By bytes, not count: a UV-Vis spectrum is ~8 KB as float32,
 #: an XRD pattern (10600 points) ~85 KB.

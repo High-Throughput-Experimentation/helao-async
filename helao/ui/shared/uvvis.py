@@ -162,7 +162,7 @@ async def records_for_plate(client, plate_id: int) -> list:
 
     async def _one(sequence_uuid):
         async with semaphore:
-            return await client.read_processes_by_sequence(sequence_uuid=sequence_uuid)
+            return await spectra.read_processes_by_sequence(client, sequence_uuid)
 
     batches = await asyncio.gather(
         *(_one(s["sequence_uuid"]) for s in sequences if s.get("sequence_uuid"))

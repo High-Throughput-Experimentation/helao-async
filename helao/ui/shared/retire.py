@@ -27,6 +27,7 @@ from helao.helpers import helao_logging as logging
 from helao.helpers.meta_io import meta_glob
 from helao.helpers.run_state import _prg_is_complete, top_level_pair
 from helao.hexagon.domain.naming import meta_kind
+from helao.ui.shared import spectra
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -304,14 +305,12 @@ async def inventory(
     await progress("scan", n, n)
 
     seq_body = await _read(client, "SEQUENCE", sequence_uuid)
-    listed = await _list_or_empty(
-        client, "read_processes_by_sequence", sequence_uuid=sequence_uuid
-    )
-    if not isinstance(listed, list):
-        raise RuntimeError(
-            f"read_processes_by_sequence returned {type(listed).__name__}; "
-            "expected a list"
-        )
+    try:
+        listed = await spectra.read_processes_by_sequence(client, sequence_uuid)
+    except RuntimeError as exc:
+        if not is_not_found(exc):
+            raise
+        listed = []
     api_procs = {u for p in listed if (u := p.get("process_uuid"))}
     all_procs = local["PROCESS"] | api_procs
 

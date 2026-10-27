@@ -154,7 +154,7 @@ class FakeMetadataClient:
     async def read_analysis(self, *, analysis_uuid):
         return self._read("ANALYSIS", "read_analysis", analysis_uuid)
 
-    async def read_processes_by_sequence(self, *, sequence_uuid):
+    async def read_processes_by_sequence(self, *, sequence_uuid, **_page):
         self._maybe_fail("read_processes_by_sequence", sequence_uuid)
         return [{"process_uuid": u} for u in self.seq_processes.get(sequence_uuid, [])]
 
