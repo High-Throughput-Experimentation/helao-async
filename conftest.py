@@ -2,7 +2,8 @@
 
 run_tests.py runs one pytest process per file, which hid process-global leaks;
 pytest-xdist workers run many files in one process. Restore the two singletons
-tests are known to replace so one file cannot poison the next.
+tests are known to replace, plus the process server key, so one file cannot
+poison the next.
 """
 
 import logging
@@ -15,7 +16,9 @@ def _restore_helao_singletons():
     from helao.helpers import config_loader, helao_logging
 
     logger, config = helao_logging.LOGGER, config_loader.CONFIG
+    server_key = helao_logging.SERVER_KEY
     yield
+    helao_logging.SERVER_KEY = server_key
     cur = helao_logging.LOGGER
     if cur is not logger and isinstance(cur, logging.Logger):
         for h in list(cur.handlers):
