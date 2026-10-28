@@ -190,7 +190,8 @@ def log_artifact_hashes_sync(
             )
             continue
         log.info(
-            f"{event} {kind}",
+            # path and hash in the text too: the console and /logs show only msg
+            f"{event} {kind} {rel} sha256={digest}",
             extra={
                 "event": event,
                 "kind": kind,

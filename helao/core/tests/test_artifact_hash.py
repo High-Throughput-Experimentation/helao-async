@@ -308,6 +308,7 @@ def test_ledger_survives_a_high_log_level(tmp_path, monkeypatch):
             lg.removeHandler(h)
             h.close()
     (led,) = _rows(tmp_path / "artifacts_t_hi_level.jsonl")
-    assert led["event"] == "artifact_final" and led["msg"] == "artifact_final record"
+    assert led["event"] == "artifact_final"
+    assert led["msg"] == f"artifact_final record {led['path']} sha256={led['sha256']}"
     log = _rows(tmp_path / "t_hi_level.jsonl")
     assert "ordinary info" not in [r["msg"] for r in log]

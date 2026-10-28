@@ -56,8 +56,9 @@ file larger. There is no byte backstop; add one if a real station's files exceed
   buffer). The summary says the preceding `repeat_period`-record sequence was suppressed
   `repeat_count` more times.
 - `event`, `kind`, `uuid`, `path`, `bytes`, `sha256`, `reason`: present only on artefact hash
-  records (§5). `uuid` is omitted when the owner is unknown. The artefact `msg` is short,
-  `"<event> <kind>"` (for example `artifact_final act`); the path and hash are fields only.
+  records (§5). `uuid` is omitted when the owner is unknown. The artefact `msg` is
+  `"<event> <kind> <path> sha256=<hex>"`, because the console and `/logs` show only `msg`;
+  the same values are also fields, which is what the ledger readers use.
 - `(server, logger, pid, seq, ts)` identifies a record. Replay (below) can write a record twice;
   readers drop duplicates on that key. `(pid, seq)` alone repeats when a PID is reused by a later
   process, and the loggers of one process share `server` but each count `seq` themselves.
