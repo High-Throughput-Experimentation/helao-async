@@ -71,6 +71,7 @@ from helao.helpers.launcher_bootstrap import (
     resolve_app_deployment,
 )
 from helao.helpers.parent_death import arm_parent_death_signal
+from helao.hexagon.app.ui_host import on_loop_thread
 
 if __name__ == "__main__":
     # Die with launch.py rather than orphaning and holding this server's port if
@@ -136,13 +137,19 @@ if __name__ == "__main__":
 
     LOGGER.info(f" ---- starting  {server_key} ----")
 
+    # Server(io_loop=None) adopts IOLoop.current() -- the same loop here.
+    from tornado.ioloop import IOLoop
+
     bokehapp = Server(
         {
-            f"/{servPy}": partial(
-                makeApp,
-                confPrefix=confArg,
-                server_key=server_key,
-                helao_repo_root=helao_repo_root,
+            f"/{servPy}": on_loop_thread(
+                partial(
+                    makeApp,
+                    confPrefix=confArg,
+                    server_key=server_key,
+                    helao_repo_root=helao_repo_root,
+                ),
+                IOLoop.current().asyncio_loop,  # type: ignore[attr-defined]
             )
         },
         port=servPort,
