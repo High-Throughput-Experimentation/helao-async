@@ -24,7 +24,10 @@ from typing import Any, Awaitable, Callable
 import httpx
 
 from helao.helpers import helao_logging as logging
-from helao.helpers.run_state import _prg_is_complete
+from helao.helpers.meta_io import meta_glob
+from helao.helpers.run_state import _prg_is_complete, top_level_pair
+from helao.hexagon.domain.naming import meta_kind
+from helao.ui.shared import spectra
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -84,19 +87,18 @@ class RetireResult:
 
 
 def top_level(path: str, keys: tuple[str, ...]) -> dict[str, str]:
-    """First unindented ``key: value`` line per key; stops once all are seen.
+    """First top-level ``key: value`` line (YAML) or ``  "key": value`` line (JSON) per key; stops once all are seen.
 
     Values are stripped; null-like values are dropped from the result.
     """
     found: dict[str, str] = {}
     want = set(keys)
+    is_json = path.endswith(".json")
     with open(path, errors="replace", encoding="utf-8") as f:
         for line in f:
-            if not line or line[0] in " \t":
-                continue
-            key, sep, val = line.partition(":")
-            if sep and key in want and key not in found:
-                found[key] = val.strip()
+            key, val = top_level_pair(line.rstrip("\n"), is_json)
+            if key in want and key not in found:
+                found[key] = val
                 if len(found) == len(want):
                     break
     return {k: v for k, v in found.items() if v not in _NULLS}
@@ -116,7 +118,10 @@ _SEQ_KEYS = ("sequence_uuid", "sequence_label", "sequence_name", "campaign_name"
 
 def locate(root: str, sequence_uuid: str) -> list[SeqLocation]:
     out = []
-    for seq_yml in glob.glob(os.path.join(root, "RUNS*", "*", "*", "*", "*-seq.yml")):
+    for seq_yml in map(
+        str,
+        meta_glob(os.path.join(root, "RUNS*"), "seq", "*/*/*/*", wildcard_root=True),
+    ):
         seq_dir = os.path.dirname(seq_yml)
         run_tree = os.path.relpath(seq_dir, root).split(os.sep)[0]
         if run_tree == SUPERSEDED:
@@ -247,11 +252,11 @@ def _scan_local(locations: list[SeqLocation]) -> tuple[dict[str, set[str]], int]
     files = 0
     for loc in locations:
         seq_dir = os.path.dirname(loc.seq_yml)
-        for yml in glob.glob(os.path.join(seq_dir, "*", "*-exp.yml")):
+        for yml in map(str, meta_glob(seq_dir, "exp", "*/*")):
             files += 1
             if u := top_level(yml, ("experiment_uuid",)).get("experiment_uuid"):
                 local["EXPERIMENT"].add(u)
-        for yml in glob.glob(os.path.join(seq_dir, "*", "*", "*-act.yml")):
+        for yml in map(str, meta_glob(seq_dir, "act", "*/*/*")):
             files += 1
             found = top_level(yml, ("action_uuid", "process_uuid"))
             if "action_uuid" in found:
@@ -271,7 +276,9 @@ def _analysis_dirs(root: str, uuids: set[str]) -> list[str]:
             continue
         for name in os.listdir(d):
             path = os.path.join(d, name)
-            if not name.endswith(".yml") or not os.path.isfile(path):
+            if not (
+                name.endswith(".yml") or meta_kind(name) == "ana"
+            ) or not os.path.isfile(path):
                 continue
             try:
                 with open(path, errors="replace", encoding="utf-8") as f:
@@ -298,14 +305,12 @@ async def inventory(
     await progress("scan", n, n)
 
     seq_body = await _read(client, "SEQUENCE", sequence_uuid)
-    listed = await _list_or_empty(
-        client, "read_processes_by_sequence", sequence_uuid=sequence_uuid
-    )
-    if not isinstance(listed, list):
-        raise RuntimeError(
-            f"read_processes_by_sequence returned {type(listed).__name__}; "
-            "expected a list"
-        )
+    try:
+        listed = await spectra.read_processes_by_sequence(client, sequence_uuid)
+    except RuntimeError as exc:
+        if not is_not_found(exc):
+            raise
+        listed = []
     api_procs = {u for p in listed if (u := p.get("process_uuid"))}
     all_procs = local["PROCESS"] | api_procs
 

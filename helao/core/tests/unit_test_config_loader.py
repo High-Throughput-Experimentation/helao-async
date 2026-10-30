@@ -25,7 +25,6 @@ from helao.helpers.config_loader import (
     HelaoConfig,
     ServerConfig,
     install_global_config,
-    load_global_config,
     read_config,
     read_validated_config,
 )
@@ -153,26 +152,6 @@ def config_loader_unit_test() -> bool:
                 " (D3 contract, not a model_dump)",
                 lambda: config_loader.CONFIG is config_dict
                 and installed is config_dict,
-            )
-
-            config_loader.CONFIG = None
-            shim_returned = load_global_config(demo_path, set_global=True)
-            reporter.check(
-                "load_global_config shim returns the dict",
-                lambda: isinstance(shim_returned, dict),
-            )
-            reporter.check(
-                "load_global_config shim installs that same dict on CONFIG"
-                " (shim parity with read_validated_config + install_global_config)",
-                lambda: config_loader.CONFIG is shim_returned,
-            )
-
-            config_loader.CONFIG = None
-            pure_returned = load_global_config(demo_path)
-            reporter.check(
-                "load_global_config default flag is a pure read (CONFIG unchanged)",
-                lambda: config_loader.CONFIG is None
-                and isinstance(pure_returned, dict),
             )
         finally:
             config_loader.CONFIG = _saved_config

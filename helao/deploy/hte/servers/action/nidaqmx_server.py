@@ -153,21 +153,32 @@ def build_do_port_map(server_params: dict) -> tuple[dict, dict]:
     return do_ports, do_owners
 
 
-async def nidaqmx_dyn_endpoints(app: ActionHost):
-    """Open the NI-DAQ connection and wire the seams the driver needs from the server.
+async def _set_do(
+    app: ActionHost, ctx: ActionContext, abbr: str, ports: dict, key: str
+) -> dict:
+    """Drive the DO line ``ports[<param key>]`` to the requested ``on`` level."""
+    active = await ctx.begin(action_abbr=abbr)
+    params = active.action.action_params
+    # extra params so every DO action calls the same driver function
+    params["do_port"] = ports[params[key]]
+    params["do_name"] = params[key]
+    datadict = await app.driver.set_digital_out(**params)
+    active.action.error_code = datadict.get("error_code", ErrorCodes.unspecified)
+    await active.enqueue_data_dflt(datadict=datadict)
+    finished_act = await active.finish()
+    return finished_act.as_dict()
 
-    Called once at startup (after the driver is constructed): opens the
-    thermocouple monitor task and NEGATE3 scale via `connect()` (not in
-    `__init__`, per the HelaoDriver ABC's no-device-I/O-at-construction
-    rule), wires `_base_hook` so the NI-DAQmx hardware callback can do its
-    synchronous estop/live-buffer reads, and constructs the single shared
-    `UnifiedSampleDataAPI` instance the `cellIV` endpoint validates samples
-    against (mirrors the pre-migration one-instance-per-server pattern).
+
+async def nidaqmx_dyn_endpoints(app: ActionHost):
+    """Build the shared ``UnifiedSampleDataAPI`` the ``cellIV`` endpoint validates against.
+
+    Called once at startup, after the host has constructed and connected the driver
+    (``connect_on_startup``: the thermocouple monitor task and NEGATE3 scale open in
+    ``connect()``, and the host has set ``_base_hook``, which the NI-DAQmx hardware
+    callback uses for its synchronous estop/live-buffer reads). The one shared
+    sample-DB instance mirrors the pre-migration one-instance-per-server pattern.
     """
     app.driver: cNIMAX
-    connect_resp = app.driver.connect()
-    LOGGER.info(f"NI-MAX connect() returned status={connect_resp.status}")
-    app.driver._base_hook = app.base
 
     app.unified_db = UnifiedSampleDataAPI(app.base)
     await app.unified_db.init_db()
@@ -262,20 +273,7 @@ def makeApp(server_key) -> ActionHost:
             Returns:
                 The finished action dictionary.
             """
-            active = await ctx.begin(action_abbr="mcell")
-            # some additional params in order to call the same driver functions
-            # for all DO actions
-            active.action.action_params["do_port"] = dev_mastercell[
-                active.action.action_params["cell"]
-            ]
-            active.action.action_params["do_name"] = active.action.action_params["cell"]
-            datadict = await app.driver.set_digital_out(**active.action.action_params)
-            active.action.error_code = datadict.get(
-                "error_code", ErrorCodes.unspecified
-            )
-            await active.enqueue_data_dflt(datadict=datadict)
-            finished_act = await active.finish()
-            return finished_act.as_dict()
+            return await _set_do(app, ctx, "mcell", dev_mastercell, "cell")
 
     if dev_activecell:
 
@@ -296,20 +294,7 @@ def makeApp(server_key) -> ActionHost:
             Returns:
                 The finished action dictionary.
             """
-            active = await ctx.begin(action_abbr="acell")
-            # some additional params in order to call the same driver functions
-            # for all DO actions
-            active.action.action_params["do_port"] = dev_activecell[
-                active.action.action_params["cell"]
-            ]
-            active.action.action_params["do_name"] = active.action.action_params["cell"]
-            datadict = await app.driver.set_digital_out(**active.action.action_params)
-            active.action.error_code = datadict.get(
-                "error_code", ErrorCodes.unspecified
-            )
-            await active.enqueue_data_dflt(datadict=datadict)
-            finished_act = await active.finish()
-            return finished_act.as_dict()
+            return await _set_do(app, ctx, "acell", dev_activecell, "cell")
 
     if dev_pump:
 
@@ -330,20 +315,7 @@ def makeApp(server_key) -> ActionHost:
             Returns:
                 The finished action dictionary.
             """
-            active = await ctx.begin(action_abbr="pump")
-            # some additional params in order to call the same driver functions
-            # for all DO actions
-            active.action.action_params["do_port"] = dev_pump[
-                active.action.action_params["pump"]
-            ]
-            active.action.action_params["do_name"] = active.action.action_params["pump"]
-            datadict = await app.driver.set_digital_out(**active.action.action_params)
-            active.action.error_code = datadict.get(
-                "error_code", ErrorCodes.unspecified
-            )
-            await active.enqueue_data_dflt(datadict=datadict)
-            finished_act = await active.finish()
-            return finished_act.as_dict()
+            return await _set_do(app, ctx, "pump", dev_pump, "pump")
 
     if dev_gasvalve:
 
@@ -364,22 +336,7 @@ def makeApp(server_key) -> ActionHost:
             Returns:
                 The finished action dictionary.
             """
-            active = await ctx.begin(action_abbr="gfv")
-            # some additional params in order to call the same driver functions
-            # for all DO actions
-            active.action.action_params["do_port"] = dev_gasvalve[
-                active.action.action_params["gasvalve"]
-            ]
-            active.action.action_params["do_name"] = active.action.action_params[
-                "gasvalve"
-            ]
-            datadict = await app.driver.set_digital_out(**active.action.action_params)
-            active.action.error_code = datadict.get(
-                "error_code", ErrorCodes.unspecified
-            )
-            await active.enqueue_data_dflt(datadict=datadict)
-            finished_act = await active.finish()
-            return finished_act.as_dict()
+            return await _set_do(app, ctx, "gfv", dev_gasvalve, "gasvalve")
 
     if dev_liquidvalve:
 
@@ -400,22 +357,7 @@ def makeApp(server_key) -> ActionHost:
             Returns:
                 The finished action dictionary.
             """
-            active = await ctx.begin(action_abbr="lfv")
-            # some additional params in order to call the same driver functions
-            # for all DO actions
-            active.action.action_params["do_port"] = dev_liquidvalve[
-                active.action.action_params["liquidvalve"]
-            ]
-            active.action.action_params["do_name"] = active.action.action_params[
-                "liquidvalve"
-            ]
-            datadict = await app.driver.set_digital_out(**active.action.action_params)
-            active.action.error_code = datadict.get(
-                "error_code", ErrorCodes.unspecified
-            )
-            await active.enqueue_data_dflt(datadict=datadict)
-            finished_act = await active.finish()
-            return finished_act.as_dict()
+            return await _set_do(app, ctx, "lfv", dev_liquidvalve, "liquidvalve")
 
     if dev_multivalve:
 
@@ -436,22 +378,7 @@ def makeApp(server_key) -> ActionHost:
             Returns:
                 The finished action dictionary.
             """
-            active = await ctx.begin(action_abbr="lfv")
-            # some additional params in order to call the same driver functions
-            # for all DO actions
-            active.action.action_params["do_port"] = dev_multivalve[
-                active.action.action_params["multivalve"]
-            ]
-            active.action.action_params["do_name"] = active.action.action_params[
-                "multivalve"
-            ]
-            datadict = await app.driver.set_digital_out(**active.action.action_params)
-            active.action.error_code = datadict.get(
-                "error_code", ErrorCodes.unspecified
-            )
-            await active.enqueue_data_dflt(datadict=datadict)
-            finished_act = await active.finish()
-            return finished_act.as_dict()
+            return await _set_do(app, ctx, "lfv", dev_multivalve, "multivalve")
 
     if dev_led:
 
@@ -472,20 +399,7 @@ def makeApp(server_key) -> ActionHost:
             Returns:
                 The finished action dictionary.
             """
-            active = await ctx.begin(action_abbr="led")
-            # some additional params in order to call the same driver functions
-            # for all DO actions
-            active.action.action_params["do_port"] = dev_led[
-                active.action.action_params["led"]
-            ]
-            active.action.action_params["do_name"] = active.action.action_params["led"]
-            datadict = await app.driver.set_digital_out(**active.action.action_params)
-            active.action.error_code = datadict.get(
-                "error_code", ErrorCodes.unspecified
-            )
-            await active.enqueue_data_dflt(datadict=datadict)
-            finished_act = await active.finish()
-            return finished_act.as_dict()
+            return await _set_do(app, ctx, "led", dev_led, "led")
 
     if dev_fswbcd:
 
@@ -506,22 +420,7 @@ def makeApp(server_key) -> ActionHost:
             Returns:
                 The finished action dictionary.
             """
-            active = await ctx.begin(action_abbr="fswbcd")
-            # some additional params in order to call the same driver functions
-            # for all DO actions
-            active.action.action_params["do_port"] = dev_fswbcd[
-                active.action.action_params["fswbcd"]
-            ]
-            active.action.action_params["do_name"] = active.action.action_params[
-                "fswbcd"
-            ]
-            datadict = await app.driver.set_digital_out(**active.action.action_params)
-            active.action.error_code = datadict.get(
-                "error_code", ErrorCodes.unspecified
-            )
-            await active.enqueue_data_dflt(datadict=datadict)
-            finished_act = await active.finish()
-            return finished_act.as_dict()
+            return await _set_do(app, ctx, "fswbcd", dev_fswbcd, "fswbcd")
 
     if dev_fsw:
 
@@ -729,22 +628,7 @@ def makeApp(server_key) -> ActionHost:
             Returns:
                 The finished action dictionary.
             """
-            active = await ctx.begin(action_abbr="heat")
-            # some additional params in order to call the same driver functions
-            # for all DO actions
-            active.action.action_params["do_port"] = dev_heat[
-                active.action.action_params["heater"]
-            ]
-            active.action.action_params["do_name"] = active.action.action_params[
-                "heater"
-            ]
-            datadict = await app.driver.set_digital_out(**active.action.action_params)
-            active.action.error_code = datadict.get(
-                "error_code", ErrorCodes.unspecified
-            )
-            await active.enqueue_data_dflt(datadict=datadict)
-            finished_act = await active.finish()
-            return finished_act.as_dict()
+            return await _set_do(app, ctx, "heat", dev_heat, "heater")
 
     if dev_ttl:
 

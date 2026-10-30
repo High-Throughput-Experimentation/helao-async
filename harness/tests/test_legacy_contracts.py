@@ -22,7 +22,7 @@ from helao.helpers.time_utils import read_saved_offset, set_time
 
 # --- §9.1 logging -----------------------------------------------------------
 def test_log_file_lands_at_contract_path(tmp_path, monkeypatch):
-    """<root>/LOGS/<server_key>.log — flat file, no per-server subdir.
+    """<root>/LOGS/<server_key>.jsonl — flat file, no per-server subdir.
 
     DEVIATION FROM BRIEF (pinning real legacy, not intended behavior):
     legacy's ``make_logger`` (helao_logging.py) calls ``tempfile.mkdtemp()``
@@ -49,10 +49,12 @@ def test_log_file_lands_at_contract_path(tmp_path, monkeypatch):
     log_dir.mkdir()
     logger = make_logger("GOLDENKEY", log_dir=str(log_dir))
     logger.info("logging path contract check")
-    assert (log_dir / "GOLDENKEY.log").exists()
-    assert len(mkdtemp_calls) == 1, "legacy eagerly allocates one wasted temp dir"
+    assert (log_dir / "GOLDENKEY.jsonl").exists()
+    # make_logger used to mkdtemp() on every call; since the JSONL sink it only
+    # does so when the caller gave no log_dir (spec 3), so no wasted temp dir
+    assert mkdtemp_calls == [], "a supplied log_dir must not allocate a temp dir"
     assert not any(
-        (Path(d) / "GOLDENKEY.log").exists() for d in mkdtemp_calls
+        (Path(d) / "GOLDENKEY.jsonl").exists() for d in mkdtemp_calls
     ), "the wasted temp dir must never receive the actual log file"
 
 
@@ -80,7 +82,9 @@ def test_logger_handlers_gate_but_logger_is_debug():
     logger = make_logger("LEVELKEY_P0", log_dir=tempfile.mkdtemp(), log_level=30)
     assert logger.level <= 10
     assert logger.propagate is False
-    assert any(h.level == 30 for h in logger.handlers)
+    # the JSONL sink keeps handler level 0 (artefact records bypass the gate) and
+    # carries the gate itself as min_level
+    assert any(getattr(h, "min_level", h.level) == 30 for h in logger.handlers)
 
 
 # --- §9.2 config raw-dict identity -------------------------------------------

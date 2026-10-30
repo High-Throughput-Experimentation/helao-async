@@ -5,6 +5,15 @@ import pytest
 _LAST_CONTEXT: list = []
 
 
+@pytest.fixture(autouse=True)
+def _no_server_key(monkeypatch):
+    """A server key set by an earlier test (or the shell) must not rename ``server``."""
+    from helao.helpers import helao_logging
+
+    monkeypatch.setattr(helao_logging, "SERVER_KEY", None)
+    monkeypatch.delenv("HELAO_SERVER_KEY", raising=False)
+
+
 @pytest.fixture
 def reflex_registration():
     """Give each test a Reflex registration context with no App in it.

@@ -37,6 +37,7 @@ __all__ = [
 ]
 
 import json
+import functools
 import os
 from datetime import datetime
 from pathlib import Path
@@ -45,7 +46,18 @@ from uuid import UUID
 
 from helao.helpers import helao_logging as logging
 
-LOGGER = logging.LOGGER if logging.LOGGER is not None else logging.make_logger(__file__)
+
+@functools.cache
+def _own_logger():
+    return logging.make_logger(__file__)
+
+
+def _log():
+    # Resolved per call: config_loader imports this module before any launcher
+    # installs the server logger, so a module-level binding would always be a
+    # standalone logger with no alert handlers.
+    return logging.LOGGER or _own_logger()
+
 
 ACTIVE = "active"
 UNSYNCED = "unsynced"
@@ -198,7 +210,7 @@ class RunStateJournal:
                 record = json.loads(line)
             except json.JSONDecodeError as exc:
                 if i == len(lines) - 1:
-                    LOGGER.warning(
+                    _log().warning(
                         f"Discarding torn final line of {self.path}: {exc}. "
                         "A crash during an append damages only the last record."
                     )
@@ -224,7 +236,7 @@ class RunStateJournal:
             return
         if line_count < COMPACT_RATIO * max(len(survivors), 1):
             return
-        LOGGER.debug(
+        _log().debug(
             f"Compacting {self.path.name}: {line_count} lines, "
             f"{len(survivors)} live records."
         )
@@ -239,7 +251,7 @@ _UUID_KEY = {
 }
 _PARENT_KIND = {"action": "experiment", "experiment": "sequence"}
 
-#: A record yml is read only at its two ends, and both ends are needed. An
+#: A record (yml or json) is read only at its two ends, and both ends are needed. An
 #: action carries its own uuid on line 3 and its parent's on line 19, but a
 #: sequence's own uuid sits seven lines from the *end* of a file measured in
 #: hundreds of thousands of lines -- ``sequence_params`` and
@@ -249,6 +261,31 @@ _PARENT_KIND = {"action": "experiment", "experiment": "sequence"}
 #: 427k-560k lines: a head-only read would recover no sequence uuid at all.
 _HEAD_BYTES = 4096
 _TAIL_BYTES = 8192
+
+
+def top_level_pair(line: str, is_json: bool) -> tuple:
+    """``(key, value)`` of one top-level scalar line, else ``(None, None)``.
+
+    YAML: ``key: value``. JSON as ``dumps_meta`` writes it (two-space indent):
+    ``  "key": value,`` with a scalar value -- an opening ``{``/``[`` or a
+    deeper indent is not top level. Values come back as strings, ``null`` as
+    ``"None"``.
+    """
+    if not is_json:
+        key, sep, value = line.partition(": ")
+        return (key, value.strip()) if sep else (None, None)
+    if not line.startswith('  "') or line.startswith("   "):
+        return None, None
+    key, sep, value = line[2:].partition(": ")
+    if not sep:
+        return None, None
+    try:
+        key, value = json.loads(key), json.loads(value.rstrip().rstrip(","))
+    except ValueError:
+        return None, None
+    if isinstance(value, (dict, list)):
+        return None, None
+    return key, str(value)
 
 
 def _prg_is_complete(prg_path: Path) -> bool:
@@ -264,7 +301,7 @@ def _prg_is_complete(prg_path: Path) -> bool:
     mid-rebuild.
     """
     try:
-        lines = prg_path.read_text(encoding="utf-8").splitlines()
+        lines = prg_path.read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError:
         return False
     # A record that entered the post-finish chain carries `synced` (the chain
@@ -290,7 +327,7 @@ def _prg_is_quarantined(prg_path: Path) -> bool:
     unquarantined record is merely retried.
     """
     try:
-        lines = prg_path.read_text(encoding="utf-8").splitlines()
+        lines = prg_path.read_text(encoding="utf-8", errors="replace").splitlines()
     except (OSError, ValueError):
         return False
     for line in lines:
@@ -326,19 +363,20 @@ def _scan_top_level(path: Path, keys: set) -> dict:
     tail_lines = tail.decode("utf-8", "replace").splitlines()
     lines += tail_lines[1:] if size > _TAIL_BYTES else tail_lines
     found: dict = {}
+    is_json = path.name.endswith(".json")
     for line in lines:
-        key, sep, value = line.partition(": ")
-        if sep and key in keys:
-            found.setdefault(key, value.strip())
+        key, value = top_level_pair(line, is_json)
+        if key in keys:
+            found.setdefault(key, value)
     if found.keys() < keys and size > _HEAD_BYTES + _TAIL_BYTES:
         # A large sequence_params (a plate preset) pushes sequence_uuid past
         # the head window. Stream the middle, stopping once every key is found.
         try:
             with path.open("r", encoding="utf-8", errors="replace") as f:
                 for line in f:
-                    key, sep, value = line.rstrip("\n").partition(": ")
-                    if sep and key in keys:
-                        found.setdefault(key, value.strip())
+                    key, value = top_level_pair(line.rstrip("\n"), is_json)
+                    if key in keys:
+                        found.setdefault(key, value)
                         if found.keys() >= keys:
                             break
         except OSError:
@@ -365,7 +403,7 @@ def _identify(yml: Path, kind: str) -> tuple:
     try:
         own = str(UUID(found[self_key]))
     except (KeyError, TypeError, ValueError):
-        LOGGER.warning(
+        _log().warning(
             f"No parseable {self_key} in {yml}; keying its journal record by "
             "the file stem instead. A done tombstone carries the real uuid, "
             "so this entry will linger until the yml is repaired."
@@ -435,7 +473,7 @@ def rebuild_from_tree(runs_root, states_root, server_key: str) -> "RunStateJourn
     for dirpath, dirnames, filenames in os.walk(runs_root, onerror=errors.append):
         dirnames.sort()  # deterministic journal order across filesystems
         for name in sorted(filenames):
-            if not name.endswith(".yml"):
+            if not name.endswith((".json", ".yml")):
                 continue
             yml = Path(dirpath) / name
             kind = _KIND_BY_SUFFIX.get(yml.stem[-4:])
@@ -463,7 +501,7 @@ def rebuild_from_tree(runs_root, states_root, server_key: str) -> "RunStateJourn
     journal.unreadable_dirs = len(errors)
     if errors:
         shown = ", ".join(str(e.filename) for e in errors[:5])
-        LOGGER.warning(
+        _log().warning(
             f"{len(errors)} directory(ies) under {runs_root} could not be read "
             f"({shown}{', ...' if len(errors) > 5 else ''}). The rebuilt journal "
             "may be INCOMPLETE: a record under an unreadable directory is "
@@ -478,7 +516,7 @@ def rebuild_from_tree(runs_root, states_root, server_key: str) -> "RunStateJourn
         f.flush()
         os.fsync(f.fileno())
     os.replace(tmp, journal.path)
-    LOGGER.info(
+    _log().info(
         f"Rebuilt {journal.path.name} from {runs_root}: "
         f"{len(entries)} unsynced record(s)."
     )

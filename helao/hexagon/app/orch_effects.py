@@ -3,8 +3,8 @@
 Every effect is THIN DELEGATION onto the legacy Orch surface (behavior
 identical by construction); the five marked commands re-read live state
 immediately before executing (DD-3, spec §4.2.2 option (a)) — the same three
-guard sites orch_dispatch.py carries. State deltas follow DD-2. Never issues
-an RPC/HTTP call to its own server (KEEP #3)."""
+guard sites the retired legacy dispatch loop carried. State deltas follow
+DD-2. Never issues an RPC/HTTP call to its own server (KEEP #3)."""
 
 import asyncio
 from datetime import datetime
@@ -58,7 +58,7 @@ class _LazyServerLogger:
     stdlib ``logging.getLogger(__name__)`` at import time: the latter always
     returns a real (but unrouted, unhandled) logger object, so it never
     raises -- it just silently drops every record instead of reaching
-    ``<root>/LOGS/<server_key>.log``. Same call-time-resolution rationale as
+    the server's JSONL log. Same call-time-resolution rationale as
     ``LegacyLoggingAdapter._log()`` (logging_adapter.py): the launcher installs
     the per-server singleton onto ``helao_logging.LOGGER`` after this module
     is imported, and bare unit tests never install it at all (``None``)."""
@@ -81,7 +81,8 @@ class _LazyServerLogger:
 
 LOGGER = _LazyServerLogger()
 
-# driver-health retry cadence (verbatim orch_dispatch._exec_driver_health:
+# driver-health retry cadence (verbatim from the retired legacy
+# DispatchRunner._exec_driver_health:
 # <=5 x 5 s); module-level so tests can compress it without patching asyncio
 DRIVER_HEALTH_RETRY_DELAY_S: float = 5.0
 
@@ -199,14 +200,15 @@ class OrchCommandRunner:
                             return ErrorCodes.none
             LOGGER.info("!!!checking conditions for next action")
             rc = await orch.loop_task_dispatch_action()
-            # history poll (orch_dispatch.py:621-622) — ingestion registers
+            # history poll (the only copy; the legacy twin is deleted) —
+            # ingestion registers
             # the uuid. P2a health-aware exit (Q3): a dead peer's pruned
             # uuid breaks the poll (the prune also registers history, so
             # either condition releases it).
             # Skipped on a failed dispatch: an endpoint that errors before
             # opening an action session never publishes a status package, so
             # nothing would ever register the uuid and release the poll.
-            # `is not None`: see the twin in orch_dispatch.py -- a dispatch
+            # `is not None`: a dispatch
             # that bailed before dispatching leaves the uuid unset, and polling
             # for None would never terminate.
             while (
@@ -395,7 +397,7 @@ class OrchCommandRunner:
     async def execute_retry_driver_health(
         self, cmd: RetryDriverHealth
     ) -> "tuple[str, ...]":
-        """Verbatim orch_dispatch._exec_driver_health retry cadence, MINUS
+        """Verbatim the retired legacy _exec_driver_health retry cadence, MINUS
         the exhaustion stop: the remainder is returned so HexRuntime can
         feed the DriverHealthUnrecovered event (P2a — the reducer's
         SetStopMessage wording is identical to the removed direct write)."""

@@ -31,7 +31,7 @@ import reflex as rx
 
 from helao.helpers import helao_logging as logging
 from helao.ui.reflex import plots
-from helao.ui.reflex.plate_photo import PlatePhotoState, photo_controls
+from helao.ui.reflex.plate_photo import PlatePhotoState, photo_adjust, photo_select
 from helao.ui.shared import platemap
 from helao.ui.shared.composition import api, grouping, interp, model
 from helao.ui.shared.composition import ternary as _ternary
@@ -1006,17 +1006,6 @@ def _controls():
                 width="14em",
             ),
             rx.button("Plot", on_click=CompositionState.plot("")),
-            rx.text("point size", size="1", class_name=reflex_muted_text_class()),
-            # Commit, not change: each value redraws both charts, and a drag
-            # would otherwise redraw them on every step.
-            rx.slider(
-                default_value=[1.0],
-                min=1.0,
-                max=MAX_POINT_SCALE,
-                step=0.5,
-                on_value_commit=CompositionState.set_point_scale,
-                width="10em",
-            ),
             spacing="3",
             align="center",
         ),
@@ -1034,7 +1023,24 @@ def _map_panel():
                 checked=CompositionState.interpolate,
                 on_change=CompositionState.set_interpolate,
             ),
-            photo_controls(CompositionState),
+            photo_select(CompositionState),
+            spacing="3",
+            align="center",
+            flex_wrap="wrap",
+        ),
+        rx.hstack(
+            rx.text("point size", size="1", class_name=reflex_muted_text_class()),
+            # Commit, not change: each value redraws both charts, and a drag
+            # would otherwise redraw them on every step.
+            rx.slider(
+                default_value=[1.0],
+                min=1.0,
+                max=MAX_POINT_SCALE,
+                step=0.5,
+                on_value_commit=CompositionState.set_point_scale,
+                width="10em",
+            ),
+            photo_adjust(CompositionState),
             spacing="3",
             align="center",
             flex_wrap="wrap",

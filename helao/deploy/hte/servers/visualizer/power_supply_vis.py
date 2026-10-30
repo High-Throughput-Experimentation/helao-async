@@ -5,23 +5,18 @@ Exposes :class:`C_vis`, a per-server visualizer that subscribes to
 """
 
 from datetime import datetime
-from functools import partial
 
-from bokeh.layouts import Spacer, layout
-from bokeh.models import ColumnDataSource, DatetimeTickFormatter, TextInput
-from bokeh.models.widgets import DataTable, Div, TableColumn
-from bokeh.plotting import figure
 
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from helao.ui.shared.palette import PANEL_BG, SERIES, panel_styles
-from helao.ui.bokeh.theme import SECTION_MARGIN, stretch_section
+from helao.ui.shared.palette import SERIES
 from helao.ui.bokeh.vis import Vis
+from ._live_panel import LivePanel
 from helao.ui.bokeh.vis_subscriber import ActionVisualizer
 
 
-class C_vis(ActionVisualizer):
+class C_vis(LivePanel, ActionVisualizer):
     """Bokeh visualizer for a power-supply action server.
 
     Subscribes to the server's ``ws_data`` WebSocket and renders voltage and
@@ -41,6 +36,13 @@ class C_vis(ActionVisualizer):
     """
 
     SUBSCRIBE_LABEL = "Power supply visualizer"
+    Y_LABEL = "Voltage (V) / Current (A)"
+    TICK_FORMATS = {
+        "minsec": "%T",
+        "minutes": "%T",
+        "hourmin": "%T",
+        "hours": "%T",
+    }
     DEFAULT_UPDATE_RATE = 0.5
 
     def __init__(self, vis_serv: Vis, serv_key: str):
@@ -55,8 +57,6 @@ class C_vis(ActionVisualizer):
         super().__init__(vis_serv, serv_key)
         if not self.connected:
             return
-        pws_host = self.host
-        pws_port = self.port
 
         # Common variables to monitor: voltage, current, power, status (if available)
         # "datetime" first, as every sibling live panel does: `add_points`
@@ -69,73 +69,7 @@ class C_vis(ActionVisualizer):
             "current_a",
             # "status",
         ]
-        self.datasource = ColumnDataSource(data={k: [] for k in self.data_dict_keys})
-        self.datasource_table = ColumnDataSource(
-            data={k: [] for k in ["name", "value"]}
-        )
-
-        # create visual elements
-        self.layout = []
-
-        self.input_max_points = TextInput(
-            value=f"{self.max_points}",
-            title="max datapoints",
-            disabled=False,
-            width=150,
-            height=40,
-        )
-        self.input_max_points.on_change(
-            "value",
-            partial(self.callback_input_max_points, sender=self.input_max_points),
-        )
-
-        self.input_update_rate = TextInput(
-            value=f"{self.update_rate}",
-            title="update sec",
-            disabled=False,
-            width=150,
-            height=40,
-        )
-        self.input_update_rate.on_change(
-            "value",
-            partial(self.callback_input_update_rate, sender=self.input_update_rate),
-        )
-
-        self.plot = figure(height=300, sizing_mode="stretch_width")
-        self.plot.xaxis.formatter = DatetimeTickFormatter(
-            minsec="%T",
-            minutes="%T",
-            hourmin="%T",
-            hours="%T",
-        )
-        self.plot.xaxis.axis_label = "Time (HH:MM:SS)"
-        self.plot.yaxis.axis_label = "Voltage (V) / Current (A)"
-
-        self.table = DataTable(
-            source=self.datasource_table,
-            columns=[
-                TableColumn(field="name", title="name"),
-                TableColumn(field="value", title="value"),
-            ],
-            height=300,
-            width=400,
-        )
-        # combine all sublayouts into a single one
-        docs_url = f"http://{pws_host}:{pws_port}/docs#/"
-        server_link = f'<a href="{docs_url}" target="_blank">\'{self.serv_key}\'</a>'
-        headerbar = f"<b>Live vis module for server {server_link}</b>"
-        self.layout = layout(
-            [
-                [Div(text=headerbar, sizing_mode="stretch_width", height=15)],
-                [self.input_max_points, self.input_update_rate],
-                Spacer(height=10),
-                [self.plot, Spacer(width=20), self.table],
-                Spacer(height=10),
-            ],
-            styles=panel_styles(PANEL_BG),
-            margin=SECTION_MARGIN,
-        )
-        stretch_section(self.layout)
+        self._build_panel()
 
         self._mount()
 
@@ -196,12 +130,3 @@ class C_vis(ActionVisualizer):
             legend_label="Current (A)",
             source=self.datasource,
         )
-
-    def reset_plot(self, forceupdate: bool = False):
-        """Rebuild the figure renderers.
-
-        Args:
-            forceupdate: Accepted for parity with other visualizers; the plot
-                is always rebuilt.
-        """
-        self._add_plots()

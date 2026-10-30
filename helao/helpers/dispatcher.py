@@ -17,13 +17,20 @@ __all__ = [
 ]
 
 import asyncio
+from uuid import uuid4
 
 import aiohttp
 import requests
 import zmq
 
 from helao.core.error import ErrorCodes
-from helao.core.rpc import RPCClient, RPCError, RPCSyncClient, derive_rpc_port
+from helao.core.rpc import (
+    RPCClient,
+    RPCError,
+    RPCHandlerError,
+    RPCSyncClient,
+    derive_rpc_port,
+)
 from helao.helpers import helao_logging as logging
 
 from .premodels import Action
@@ -129,11 +136,12 @@ async def async_action_dispatcher(
     """Dispatch an action to its action server, trying RPC then HTTP.
 
     Resolves the destination from ``world_config_dict['servers'][A.action_server.server_name]``,
-    attempts a ZMQ RPC call to ``<server>/<action>``, and on any RPC error
-    or timeout retries over HTTP. The HTTP fallback is the legacy path
-    that runs through the action-queuing middleware in
-    :class:`ActionHost`; the RPC fast path bypasses that middleware and
-    relies on orchestrator-side endpoint coordination instead.
+    attempts a ZMQ RPC call to ``<server>/<action>``, and on a timeout, a
+    transport error or an unregistered route retries over HTTP. A handler that
+    ran and raised is *not* retried: it is returned as the same error an HTTP
+    5xx gives. Both transports go through :class:`ActionAdmission` on the
+    server, which answers a repeated ``action_uuid`` with the original's result
+    instead of running it again.
 
     Args:
         world_config_dict: Loaded HELAO config dict containing the
@@ -164,6 +172,9 @@ async def async_action_dispatcher(
     rpc_args: dict = {}
     rpc_args.update(params or {})
     rpc_args["action"] = A.as_dict()
+    # One id per send, on both copies, so the server can tell this send's own
+    # HTTP copy from the orchestrator's later resume of the same uuid.
+    dispatch_id = str(uuid4())
     try:
         client = await _get_rpc_client(act_addr, act_port)
         # Pass params via `args=` (not `**rpc_args`) so an action param named
@@ -173,8 +184,13 @@ async def async_action_dispatcher(
             rpc_method,
             timeout=min(timeout, _RPC_PROBE_TIMEOUT),
             args=rpc_args,
+            dispatch_id=dispatch_id,
         )
         return result, ErrorCodes.none
+    except RPCHandlerError as e:
+        # The handler ran and raised. Re-sending would run it twice.
+        LOGGER.error(f"RPC {rpc_method} handler failed: {e}")
+        return None, ErrorCodes.http
     except (RPCError, asyncio.TimeoutError, zmq.ZMQError, OSError) as e:
         LOGGER.debug(
             f"RPC {rpc_method} fast-path failed "
@@ -212,6 +228,7 @@ async def async_action_dispatcher(
                     url,
                     params=_query_safe(params),
                     json={"action": A.as_dict()},
+                    headers={"X-Helao-Dispatch-Id": dispatch_id},
                 ) as resp:
                     if resp.status != 200:
                         # Status BEFORE body, as in async_private_dispatcher:

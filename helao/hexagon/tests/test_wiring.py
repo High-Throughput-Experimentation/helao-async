@@ -3,7 +3,7 @@ any unwired port — there are no default fakes)."""
 
 import pytest
 
-from helao.hexagon.adapters.fakes import FakeClock, FakeTransport
+from helao.hexagon.adapters.fakes import FakeClock
 from helao.hexagon.app.wiring import (
     ACTION_REQUIRED,
     ORCH_REQUIRED,
@@ -15,15 +15,15 @@ from helao.hexagon.app.wiring import (
 def test_require_raises_listing_every_missing_port():
     w = PortWiring(clock=FakeClock())
     with pytest.raises(UnwiredPortError) as ei:
-        w.require("config", "clock", "transport")
+        w.require("config", "clock", "health")
     msg = str(ei.value)
-    assert "config" in msg and "transport" in msg
+    assert "config" in msg and "health" in msg
     assert "clock" not in msg  # wired ports are not reported
 
 
 def test_require_passes_when_all_wired():
-    w = PortWiring(clock=FakeClock(), transport=FakeTransport())
-    w.require("clock", "transport")  # no raise
+    w = PortWiring(clock=FakeClock())
+    w.require("clock")  # no raise
 
 
 def test_require_rejects_unknown_port_name():
@@ -32,9 +32,5 @@ def test_require_rejects_unknown_port_name():
 
 
 def test_required_sets_are_frozen_tuples():
-    assert set(ACTION_REQUIRED) <= set(ORCH_REQUIRED) | {
-        "transport",
-        "artifact_store",
-        "data_sink",
-    }
+    assert set(ACTION_REQUIRED) <= set(ORCH_REQUIRED) | {"artifact_store"}
     assert "state_persistence" in ORCH_REQUIRED

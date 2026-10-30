@@ -12,10 +12,37 @@ whatever composes it -- stays importable without a live Bokeh document
 context or event loop.
 """
 
+import asyncio
 from collections.abc import Callable
 from typing import Any, Optional
 
-__all__ = ["BokehServerUiHost"]
+__all__ = ["BokehServerUiHost", "on_loop_thread"]
+
+
+def on_loop_thread(
+    func: Callable[[Any], Any], loop: asyncio.AbstractEventLoop
+) -> Callable[[Any], Any]:
+    """Run a Bokeh document factory on ``loop`` (the server's event loop).
+
+    Bokeh 3.10 builds ``FunctionHandler`` documents in a worker thread
+    (``asyncio.to_thread``). helao apps start asyncio tasks while building
+    the document (``WsSubscriber``, operator backend), which needs a running
+    loop, so hop back onto the server's loop. Older Bokeh calls the factory on
+    the loop thread already; it then runs directly.
+    """
+
+    def wrapped(doc):
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+
+            async def call():
+                return func(doc)
+
+            return asyncio.run_coroutine_threadsafe(call(), loop).result()
+        return func(doc)
+
+    return wrapped
 
 
 class BokehServerUiHost:
@@ -30,9 +57,12 @@ class BokehServerUiHost:
         allow_websocket_origin: Optional[list[str]] = None,
     ) -> object:
         from bokeh.server.server import Server
+        from tornado.ioloop import IOLoop
 
+        # Server(io_loop=None) adopts IOLoop.current() -- the same loop here.
+        loop = IOLoop.current().asyncio_loop  # type: ignore[attr-defined]
         server = Server(
-            routes,
+            {path: on_loop_thread(f, loop) for path, f in routes.items()},
             port=port,
             address=host,
             allow_websocket_origin=allow_websocket_origin or [f"{host}:{port}"],
@@ -42,12 +72,3 @@ class BokehServerUiHost:
 
     def stop(self, handle: object) -> None:
         handle.stop()  # type: ignore[attr-defined]
-
-    def build_ui_app(self, config: dict) -> object:
-        """P7f's Reflex hosting seam consumes this; not exercised until
-        then (Amendment §6 gate item for the Reflex half is P7f's)."""
-        from helao.hexagon.adapters.errors import HexagonDeferred
-
-        raise HexagonDeferred(
-            "BokehServerUiHost.build_ui_app: Reflex hosting lands in P7f"
-        )

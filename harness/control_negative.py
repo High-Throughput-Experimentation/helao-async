@@ -208,7 +208,10 @@ async def drive_control_surface(
     """Exercise every control route on every target; report what was observed.
 
     Args:
-        surface: A :class:`~helao.hexagon.ports.control_surface.ControlSurfacePort`.
+        surface: An object with the five wrappers of ``helao.ui.shared.io_control`` and
+            ``helao.ui.shared.motion_control`` as methods (``read_digital_outs``,
+            ``set_digital_out``, ``read_axis_positions``, ``move_axis``,
+            ``stop_motion``).
         targets: The servers to drive. A target contributes IO probes when it
             names a ``do_name`` and motion probes when it names an ``axis``.
         none_code: The error code meaning success. Defaults to
@@ -281,7 +284,7 @@ async def drive_control_surface(
                 target.port,
                 target.axis,
                 float(MOVE_COUNTS),
-                "counts",
+                units="counts",
                 mode="relative",
             )
             probes.append(
@@ -326,10 +329,10 @@ async def run_negative(
     Args:
         root: The launched group's config ``root``.
         targets: The servers to drive.
-        surface: The control surface to drive them through. Defaults to the
-            hexagon's :class:`~helao.hexagon.adapters.vis.control_surface.ControlSurface`,
-            which delegates to the same shared wrappers both UI stacks use --
-            so this exercises the panels' actual path, not a parallel client.
+        surface: The control surface to drive them through. Defaults to a
+            namespace of the shared module functions both UI stacks use
+            (``io_control`` and ``motion_control``) -- so this exercises the
+            panels' actual path, not a parallel client.
         workdir: Staging directory for the exploded copies (two are made).
         none_code: Success code; see :func:`drive_control_surface`.
 
@@ -337,9 +340,17 @@ async def run_negative(
         NegativeResult: Carrying both halves of the verdict.
     """
     if surface is None:
-        from helao.hexagon.adapters.vis.control_surface import ControlSurface
+        from types import SimpleNamespace
 
-        surface = ControlSurface()
+        from helao.ui.shared import io_control, motion_control
+
+        surface = SimpleNamespace(
+            read_digital_outs=io_control.read_digital_outs,
+            set_digital_out=io_control.set_digital_out,
+            read_axis_positions=motion_control.read_axis_positions,
+            move_axis=motion_control.move_axis,
+            stop_motion=motion_control.stop_motion,
+        )
 
     root = Path(root)
     stage = Path(workdir) if workdir else Path(tempfile.mkdtemp())

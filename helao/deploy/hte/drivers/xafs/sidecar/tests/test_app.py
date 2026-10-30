@@ -7,6 +7,8 @@ from io import BytesIO
 
 import numpy as np
 import pytest
+
+pytest.importorskip("easyxafs")  # vendor package; absent from the main helao env
 from fastapi.testclient import TestClient
 
 from helao.deploy.hte.drivers.xafs.sidecar import xafs_sidecar

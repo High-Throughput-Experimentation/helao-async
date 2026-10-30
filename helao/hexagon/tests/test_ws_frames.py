@@ -2,9 +2,7 @@
 transport decoders (`WsSubscriber`, `WsSyncClient`), for both producer
 families.
 
-`helao/hexagon/tests/test_ws_publish_bridge.py` already proves this for the
-`base_api` family via `WsSubscriber` alone -- exactly the single-decoder
-coverage §10.1(3) names as insufficient. This file is the substrate every
+This file is the substrate every
 later consumer-parity test (`test_ws_consumer_parity.py`, and the per-
 deployment `add_points` conformance suites) builds on: `harness/ws_frames.py`
 produces frame bytes through the real encoder, this file proves those bytes

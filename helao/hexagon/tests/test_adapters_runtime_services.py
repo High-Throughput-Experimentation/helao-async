@@ -63,8 +63,8 @@ def test_file_logger_writes_contractual_path(tmp_path):
     a = LegacyLoggingAdapter()
     lg = a.file_logger("HEXT4", str(tmp_path))
     lg.info("hexagon logging adapter behavior test")  # type: ignore[attr-defined]
-    logfile = tmp_path / "HEXT4.log"
-    assert logfile.is_file()  # <log_root>/<server_key>.log, flat (spec §9.1)
+    logfile = tmp_path / "HEXT4.jsonl"
+    assert logfile.is_file()  # <log_root>/<server_key>.jsonl, flat (spec §9.1)
 
 
 def test_level_methods_delegate():

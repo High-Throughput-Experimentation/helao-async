@@ -91,6 +91,10 @@ def _version_tuple(text: str) -> tuple[int, ...]:
 class BiologicOleDriver(HelaoDriver):
     """Drive a BioLogic potentiostat by piloting EC-Lab over OLE COM."""
 
+    connect_on_startup = (
+        True  # the host connects after _base_hook, before dyn_endpoints
+    )
+
     def __init__(self, config: dict = {}):
         """Store configuration. Opens nothing -- ``connect()`` does that.
 

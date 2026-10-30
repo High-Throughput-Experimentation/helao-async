@@ -357,11 +357,11 @@ async def _drive_zip_runs(reporter: TestReporter) -> None:
                 names = zf.namelist()
             reporter.check(
                 "zip contains a seq yml entry",
-                lambda: any(n.endswith("-seq.yml") for n in names),
+                lambda: any(n.endswith("-seq.json") for n in names),
             )
             reporter.check(
                 "zip contains an exp yml entry",
-                lambda: any(n.endswith("-exp.yml") for n in names),
+                lambda: any(n.endswith("-exp.json") for n in names),
             )
             reporter.check(
                 "zip contains an act yml entry",

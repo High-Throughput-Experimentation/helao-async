@@ -123,6 +123,15 @@ def test_aligner_implicit_default_bokeh_port_is_reserved():
     assert any("port + 1000" in i for i in issues), issues
 
 
+def test_aligner_null_bokeh_port_falls_back_to_port_plus_1000():
+    """`bokeh_port: null` is an unset key, not a crash."""
+    srv = {"port": 8001, "params": {"enable_aligner": True, "bokeh_port": None}}
+    assert preflight._aligner_port(srv) == 9001
+    srv["params"]["bokeh_port"] = 8123
+    assert preflight._aligner_port(srv) == 8123
+    assert preflight.aligner_bokeh_port({"port": 8001, "params": {}}) == 9001
+
+
 def test_aligner_without_enable_flag_claims_nothing():
     """`bokeh_port` sitting in `params` with no `enable_aligner: true` is not
     a live claim -- the aligner host is never constructed, so nothing binds
@@ -139,17 +148,25 @@ def test_aligner_without_enable_flag_claims_nothing():
     assert preflight._config_sanity(servers) == []
 
 
-def test_library_collision_detected():
-    cfg = {
-        "experiment_libraries": ["CCSI_exp", "CSIL_exp"],  # share CCSI_sub_* names
-    }
+def _twin_libraries(tmp_path):
+    """Two synthetic experiment libraries that define the same function name."""
+    paths = []
+    for mod in ("twin_a_exp", "twin_b_exp"):
+        p = tmp_path / f"{mod}.py"
+        p.write_text("def shared_sub_exp():\n    return []\n", encoding="utf-8")
+        paths.append(str(p))
+    return paths
+
+
+def test_library_collision_detected(tmp_path):
+    cfg = {"experiment_libraries": _twin_libraries(tmp_path)}
     issues = preflight._library_collisions(cfg)
-    assert any("collision" in i for i in issues)
+    assert any("collision" in i and "shared_sub_exp" in i for i in issues)
 
 
-def test_library_collision_overridable():
+def test_library_collision_overridable(tmp_path):
     cfg = {
-        "experiment_libraries": ["CCSI_exp", "CSIL_exp"],
+        "experiment_libraries": _twin_libraries(tmp_path),
         "allow_shadow": True,
     }
     assert preflight._library_collisions(cfg) == []

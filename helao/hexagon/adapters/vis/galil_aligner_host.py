@@ -31,7 +31,7 @@ server that constructs the host — import without a Bokeh document context.
 bokeh.server-outside-app/ rule) permits it. :class:`GalilAlignerHost` now
 takes a ``ui_host`` (``ports.ui_host.UiHostPort``) and calls
 ``start_document_host``/``stop`` on it instead of importing ``bokeh``.
-Same host/port derivation as before (``bokeh_port`` config, else
+Same host/port derivation as before (``bokeh_port`` config when not null, else
 ``server_cfg['port'] + 1000``) — only the construction site moved.
 """
 
@@ -39,6 +39,7 @@ from typing import Any, Optional
 
 from helao.core.error import ErrorCodes
 from helao.hexagon.adapters.errors import UnwiredPortError
+from helao.hexagon.preflight import aligner_bokeh_port
 
 __all__ = ["AlignerMotorContext", "GalilAlignerHost"]
 
@@ -116,7 +117,12 @@ class GalilAlignerHost:
     Constructed by the action server after the driver connects (when
     ``enable_aligner`` is set). Owns the Bokeh ``Server`` and the
     aligner-orchestration verbs formerly on the driver.
+
+    ``_context_class`` is the seam for deployments whose aligner session needs
+    more state than :class:`AlignerMotorContext` carries.
     """
+
+    _context_class = AlignerMotorContext
 
     def __init__(
         self,
@@ -133,14 +139,14 @@ class GalilAlignerHost:
         self._server_name = server_name
         self._config = config or {}
         self._ui_host = ui_host
-        self.context = AlignerMotorContext(driver, base)
+        self.context = self._context_class(driver, base)
         self.bokehapp: Any = None
 
     def start(self) -> None:
         """Start the document host serving the ``/Aligner`` app.
 
         Same host/port derivation as the legacy ``Galil.start_aligner`` /
-        ``makeBokehApp`` (``bokeh_port`` config, else
+        ``makeBokehApp`` (``bokeh_port`` config, else -- also when it is null --
         ``server_cfg['port'] + 1000``) — P7d moved the ``Server``
         construction itself behind the injected ``ui_host``
         (``ports.ui_host.UiHostPort``); this module no longer imports
@@ -154,7 +160,9 @@ class GalilAlignerHost:
                 "one and pass it in before calling start()"
             )
         serv_host = self._server_cfg["host"]
-        serv_port = self._config.get("bokeh_port", self._server_cfg["port"] + 1000)
+        serv_port = aligner_bokeh_port(
+            {"port": self._server_cfg["port"], "params": self._config}
+        )
         serv_py = "Aligner"
         self.bokehapp = self._ui_host.start_document_host(
             {f"/{serv_py}": self._make_bokeh_app},
@@ -167,9 +175,9 @@ class GalilAlignerHost:
         """Bokeh document factory: attach an ``Aligner`` bound to the context.
 
         Wires the legacy driver's position-notify sink to the aligner's
-        ``motorpos_q`` so ``Galil.update_aligner`` (called from
-        ``query_axis_position``/``query_axis_moving``) keeps feeding live
-        positions to the Bokeh widgets.
+        ``motorpos_q`` so the driver's ``update_aligner`` (called from
+        its position queries) keeps feeding live positions to the Bokeh
+        widgets.
         """
         from helao.ui.bokeh.vis import HelaoVis
         from helao.deploy.hte.layouts.aligner import Aligner

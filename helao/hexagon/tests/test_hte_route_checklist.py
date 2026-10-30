@@ -55,8 +55,10 @@ PARAM_ADDITIONS_PATH = OUT / "_param_additions.json"
 #: spec first quoted 175/81 from a grep over source, which counted seven
 #: commented-out decorators and two docstring mentions; the AST extractor
 #: ignores both. These are the measured numbers, and deliberate additions
-#: are added to them rather than folded into them.
-FROZEN_ACTION_TOTAL = 168
+#: are added to them rather than folded into them. Two owner-approved
+#: retirements (SAMPLE ``convert_v1DB``, HTEdata ``get_rcp_plateid``,
+#: 2026-10-23) took 168 down to 166.
+FROZEN_ACTION_TOTAL = 166
 FROZEN_PRIVATE_TOTAL = 79
 
 
@@ -153,7 +155,8 @@ def test_every_addition_entry_is_well_formed() -> None:
 def test_the_gate_covers_the_whole_measured_surface() -> None:
     """Pin the totals, so a module silently dropped from SERVERS is caught.
 
-    168 and 79 are counted from the frozen JSONs. B5's spec first quoted 175
+    166 and 79 are counted from the frozen JSONs (168 before the two 2026-10-23
+    retirements). B5's spec first quoted 175
     and 81, from a grep for ``tags=["action"]`` over the source -- which counts
     seven commented-out decorators (``# @app.post(...)`` in diapump, nidaqmx,
     pal and mfc) and two mentions in ``sample_server``'s module docstring. The

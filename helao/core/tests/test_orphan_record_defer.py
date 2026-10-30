@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from helao.core.drivers.data.sync_driver import HelaoYml, SyncDriver
+from helao.hexagon.adapters.native.sync_driver import HelaoYml, SyncDriver
 from helao.hexagon.tests.sync_fixtures import make_sync_driver, teardown_driver
 
 

@@ -88,6 +88,10 @@ class AndorDriver(HelaoDriver):
     #: own output, whether the calibration they just ran changed anything.
     uses_lamp_calibration: bool = False
 
+    connect_on_startup = (
+        True  # the host connects after _base_hook, before dyn_endpoints
+    )
+
     def __init__(self, config: dict = {}, server_key: str = "ANDOR"):
         """Construct the driver WITHOUT opening the camera (§10.4
         disconnected-construct).
@@ -441,6 +445,12 @@ class AndorDriver(HelaoDriver):
         Returns:
             A success :class:`DriverResponse` on connect, ``failed`` on error.
         """
+        # The host connects before ``dyn_endpoints`` could assign the key, and the
+        # calibrated variant names its calibration file after it.
+        self.server_key = (
+            getattr(getattr(self, "_base_hook", None), "server_key", None)
+            or self.server_key
+        )
         try:
             if self.sdk3 is None:
                 _load_camera()

@@ -37,19 +37,26 @@ def find(root, tops, names):
 
 
 def seq_text(match):
-    """Text of the sequence's *-seq.yml, from the directory or from the zip."""
+    """Text of the sequence's -seq record (.yml or .json), from the directory or the zip."""
     if match.is_dir():
-        ymls = sorted(match.glob("*-seq.yml"))
+        ymls = sorted([*match.glob("*-seq.yml"), *match.glob("*-seq.json")])
         return ymls[0].read_text(errors="replace", encoding="utf-8") if ymls else ""
     with zipfile.ZipFile(match) as z:
         ymls = sorted(
-            (n for n in z.namelist() if n.endswith("-seq.yml")),
+            (n for n in z.namelist() if n.endswith(("-seq.yml", "-seq.json"))),
             key=lambda n: n.count("/"),
         )
         return z.read(ymls[0]).decode(errors="replace") if ymls else ""
 
 
 def scalar(text, key):
+    t = text.lstrip("\ufeff").lstrip()
+    if t.startswith("{"):  # a .json record: top-level key lookup
+        try:
+            v = json.loads(t).get(key)
+        except (ValueError, AttributeError):
+            v = None
+        return None if v is None or isinstance(v, (dict, list)) else str(v) or None
     # splitlines, not re.M: `$` only knows "\n", so a "\r"-, "\x85"- or
     # " "-separated yml hid a key that was plainly there (eche10, 2026-09-30)
     for line in text.lstrip("﻿").splitlines():
@@ -85,7 +92,7 @@ def main():
     if not matches:
         die(f"{seq} not found under {a.root}")
 
-    # first match that holds a -seq.yml: a sync_data=False sequence also leaves
+    # first match that holds a -seq record: a sync_data=False sequence also leaves
     # a same-name RUNS_NOSYNC dir with only .hlo files, which sorts first
     ordered = sorted(matches, key=lambda p: p.suffix == ".zip")
     text = next((t for m in ordered if (t := seq_text(m))), "")
@@ -101,10 +108,14 @@ def main():
     if legacy:
         uuid = scalar(text, "sequence_uuid")
         if not uuid:
-            die(f"no sequence_uuid in the sequence's *-seq.yml under {legacy[0]}")
+            die(f"no sequence_uuid in the sequence's -seq record under {legacy[0]}")
         proc = a.root / "PROCESSES"
         # the process's own top-level line, not a mention in its params
-        for p in sorted(proc.rglob("*-prc.yml")) if proc.is_dir() else []:
+        for p in (
+            sorted([*proc.rglob("*-prc.yml"), *proc.rglob("*-prc.json")])
+            if proc.is_dir()
+            else []
+        ):
             if (
                 scalar(p.read_text(errors="replace", encoding="utf-8"), "sequence_uuid")
                 == uuid

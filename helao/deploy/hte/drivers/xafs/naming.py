@@ -18,7 +18,9 @@ def sample_savename(
 
 def reference_savename(element: str, run_use: str, name: str) -> str:
     if run_use not in _REF_TAG:
-        raise ValueError(f"run_use {run_use!r} is not a reference (energy_calib, izero)")
+        raise ValueError(
+            f"run_use {run_use!r} is not a reference (energy_calib, izero)"
+        )
     return f"{element}_{_REF_TAG[run_use]}_{name}"
 
 
@@ -28,4 +30,3 @@ def apply_affine(m: List[List[float]], px: float, py: float) -> Tuple[float, flo
         m[0][0] * px + m[0][1] * py + m[0][2],
         m[1][0] * px + m[1][1] * py + m[1][2],
     )
-

@@ -424,15 +424,6 @@
     ]
   },
   {
-    "path": "/SAMPLE/convert_v1DB",
-    "method": "post",
-    "tags": [
-      "action"
-    ],
-    "handler": "convert_v1DB",
-    "params": []
-  },
-  {
     "path": "/SAMPLE/db_get_samples",
     "method": "post",
     "tags": [

@@ -5,14 +5,25 @@ fix the harness FIRST (systematic-debugging), never weaken it to a stub."""
 
 import pytest
 
+from helao.core.rpc.zmq_rpc import derive_rpc_port
 from helao.hexagon.domain.models import LoopStatus
 from helao.hexagon.tests.live_group import (
+    DB_PORT,
+    ORCH_PORT,
+    SIM_PORT,
     build_ws_sequence,
     live_group,
     orch_call,
     wait_for_glob,
     wait_parked,
 )
+
+
+def test_live_group_ports_distinct_and_in_range():
+    ports = [ORCH_PORT, SIM_PORT, DB_PORT]
+    rpc = [derive_rpc_port(p) for p in ports]
+    assert len(set(ports + rpc)) == 6
+    assert all(1024 <= p and r <= 65535 for p, r in zip(ports, rpc))
 
 
 @pytest.mark.asyncio
@@ -30,9 +41,9 @@ async def test_live_group_runs_one_experiment_to_finished(tmp_path):
         # Records are written once under RUNS and never move (spec §2), so
         # this is the same directory they were created in.
         finished_dir = tmp_path / "RUNS"
-        finished = await wait_for_glob(str(finished_dir), "*-seq.yml", timeout_s=60.0)
+        finished = await wait_for_glob(str(finished_dir), "*-seq.json", timeout_s=60.0)
         assert finished, "sequence yml missing from RUNS"
-        exp_ymls = await wait_for_glob(str(finished_dir), "*-exp.yml", timeout_s=60.0)
+        exp_ymls = await wait_for_glob(str(finished_dir), "*-exp.json", timeout_s=60.0)
         assert len(exp_ymls) == 1
         # B3b: the HOST is the drainer, so its own runtime is the one the
         # loop runs on. There is no graft to look through any more -- and

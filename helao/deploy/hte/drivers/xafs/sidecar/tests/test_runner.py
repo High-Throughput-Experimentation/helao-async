@@ -1,4 +1,5 @@
 """Python 3.9 sim env: ScanRunner drives the vendor easyxafs scan loop on fakes."""
+
 import re
 import time
 from io import BytesIO
@@ -7,6 +8,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+pytest.importorskip("easyxafs")  # vendor package; absent from the main helao env
+
 from helao.deploy.hte.drivers.xafs.sidecar import sim_hw
 from helao.deploy.hte.drivers.xafs.sidecar.runner import (
     BusyError,
@@ -14,19 +17,32 @@ from helao.deploy.hte.drivers.xafs.sidecar.runner import (
     ScanRunner,
 )
 
-NAME_RE = re.compile(r"^Zn_Scan\d{4}_Sample\d+_X-?\d+\.\d{3}_Y-?\d+\.\d{3}_\d{3}_exd\.csv\.zip$")
+NAME_RE = re.compile(
+    r"^Zn_Scan\d{4}_Sample\d+_X-?\d+\.\d{3}_Y-?\d+\.\d{3}_\d{3}_exd\.csv\.zip$"
+)
 SAVENAME = "Zn_Scan0000_Sample1_X1.000_Y2.000"
 
 
 def scan_def(n_points=4):
     return {
-        "type": "NormalScan", "element": "Zn", "measurement_mode": "XAFS_Fluorescence",
-        "crystal2d": "Si(5,5,3)", "beta_offset": 0, "theta_offset": 0,
-        "analyzer_radius": 500, "alpha": 0,
+        "type": "NormalScan",
+        "element": "Zn",
+        "measurement_mode": "XAFS_Fluorescence",
+        "crystal2d": "Si(5,5,3)",
+        "beta_offset": 0,
+        "theta_offset": 0,
+        "analyzer_radius": 500,
+        "alpha": 0,
         "ROI": {"roi_bragg": 80, "roi_min": 800, "roi_max": 1000},
-        "zone_defs": [{"mode": "constant_step", "energy_min": 9600,
-                       "energy_max": 9600 + 5 * n_points, "energy_step": 5,
-                       "duration": 0.01}],
+        "zone_defs": [
+            {
+                "mode": "constant_step",
+                "energy_min": 9600,
+                "energy_max": 9600 + 5 * n_points,
+                "energy_step": 5,
+                "duration": 0.01,
+            }
+        ],
     }
 
 
@@ -72,7 +88,12 @@ def test_rows_since(env):
     out = r.rows(sid, 2)
     assert len(out["rows"]) == 2
     assert out["columns"][0] == "Time" and "MCA" not in out["columns"]
-    assert out["columns"][-4:] == ["Beta_encoder", "Detector_encoder", "Rho_encoder", "Theta_encoder"]
+    assert out["columns"][-4:] == [
+        "Beta_encoder",
+        "Detector_encoder",
+        "Rho_encoder",
+        "Theta_encoder",
+    ]
     assert len(out["rows"][0]) == len(out["columns"])
     assert all(type(v) in (int, float, str) for row in out["rows"] for v in row)
 
@@ -238,7 +259,10 @@ def test_stop_before_first_point_is_stopped(env):
     sid = go(r, env)
     t0 = time.time()
     # wait until scan.start() has begun (stop event exists) so stop() reaches the vendor scan
-    while getattr(r._scans[sid].scan, "_stop_event", None) is None and time.time() - t0 < 10:
+    while (
+        getattr(r._scans[sid].scan, "_stop_event", None) is None
+        and time.time() - t0 < 10
+    ):
         time.sleep(0.01)
     r.stop(sid)
     h.ketek.hang = False
@@ -249,12 +273,14 @@ def test_stop_before_first_point_is_stopped(env):
 def _saved_roi(path):
     import json
     import zipfile
+
     with zipfile.ZipFile(path) as z:
         return json.loads(z.read("scan_def.json"))["ROI"]
 
 
 def test_roi_element_rewrites_roi(env):
     import easyxafs.scan
+
     r = ScanRunner()
     h, save_dir = env
     sid = r.start(scan_def(), 1.0, 2.0, None, SAVENAME, save_dir, roi_element="Fe")

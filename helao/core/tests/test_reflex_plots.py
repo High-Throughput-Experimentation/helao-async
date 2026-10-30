@@ -498,8 +498,9 @@ def test_underlay_is_trace_zero_a_truecolor_heatmap_spanning_the_extent():
     # Load-bearing for hover: xy 0.0.7's client skips hover on truecolor
     # heatmaps (_hoverAt needs _cpuHeatmap, built only for non-truecolor), so
     # the figure-level tooltip never labels photo pixels as the measurement.
-    # Re-check on any xy upgrade.
-    assert importlib.metadata.version("xy") == "0.0.7", (
+    # Re-check on any xy upgrade. 0.0.8 checked 2026-10-20 on the composition
+    # visualizer: no tooltip on a photo-only region, tooltip on a sample point.
+    assert importlib.metadata.version("xy") == "0.0.8", (
         "xy was upgraded: re-check that hover skips truecolor heatmaps (hover a "
         "photo-only region, then a sample point); see the plate-photo note in "
         "helao/ui/reflex/CLAUDE.md"

@@ -47,13 +47,33 @@ def test_start_serves_a_document_and_stop_cleans_up():
         host.stop(handle)
 
 
-def test_build_ui_app_is_deferred_to_p7f():
-    from helao.hexagon.adapters.errors import HexagonDeferred
+def test_document_factory_can_start_asyncio_tasks():
+    """Bokeh 3.10 builds FunctionHandler documents in a worker thread; helao
+    factories call asyncio.create_task (WsSubscriber, operator backend), so
+    the host must run them on the server loop or every page 500s."""
+    import asyncio
+
+    from tornado.httpclient import AsyncHTTPClient
+
+    ran = []
+
+    def _task_doc(doc):
+        ran.append(asyncio.create_task(asyncio.sleep(0)))
+        _trivial_doc(doc)
 
     host = BokehServerUiHost()
+    port = _free_port()
+    handle = host.start_document_host(
+        {"/Aligner": _task_doc}, host="127.0.0.1", port=port
+    )
     try:
-        host.build_ui_app({})
-        raised = False
-    except HexagonDeferred:
-        raised = True
-    assert raised, "build_ui_app must raise HexagonDeferred until P7f wires Reflex"
+        resp = handle.io_loop.run_sync(  # type: ignore[attr-defined]
+            lambda: AsyncHTTPClient().fetch(
+                f"http://127.0.0.1:{port}/Aligner", raise_error=False
+            ),
+            timeout=10,
+        )
+        assert resp.code == 200
+        assert ran
+    finally:
+        host.stop(handle)

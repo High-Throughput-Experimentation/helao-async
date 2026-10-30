@@ -19,12 +19,8 @@ from scipy.signal import savgol_filter
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from helao.core.drivers.helao_driver import (
-    DriverResponse,
-    DriverResponseType,
-    DriverStatus,
-    HelaoDriver,
-)
+from helao.core.drivers.helao_driver import NoDeviceDriver
+from helao.hexagon.domain.naming import meta_kind
 from helao.helpers.file_mapper import FileMapper
 from helao.helpers.premodels import Experiment
 
@@ -103,7 +99,7 @@ def squeeze_foms(d) -> dict:
     return sd
 
 
-class Calc(HelaoDriver):
+class Calc(NoDeviceDriver):
     """In-sequence figure-of-merit and loop-control driver."""
 
     def __init__(self, config: dict = {}):
@@ -116,38 +112,6 @@ class Calc(HelaoDriver):
         self.config_dict = self.config
         self.yaml = YAML(typ="safe")
 
-    def connect(self) -> DriverResponse:
-        """No physical device to connect to; always succeeds."""
-        return DriverResponse(
-            response=DriverResponseType.success,
-            message="no device",
-            status=DriverStatus.ok,
-        )
-
-    def get_status(self) -> DriverResponse:
-        """No physical device to poll; always reports ok."""
-        return DriverResponse(
-            response=DriverResponseType.success, status=DriverStatus.ok
-        )
-
-    def stop(self) -> DriverResponse:
-        """No active activity to abort; always succeeds."""
-        return DriverResponse(
-            response=DriverResponseType.success, status=DriverStatus.ok
-        )
-
-    def reset(self) -> DriverResponse:
-        """No device state to reinitialize; always succeeds."""
-        return DriverResponse(
-            response=DriverResponseType.success, status=DriverStatus.ok
-        )
-
-    def disconnect(self) -> DriverResponse:
-        """No physical connection to release; always succeeds."""
-        return DriverResponse(
-            response=DriverResponseType.success, status=DriverStatus.ok
-        )
-
     def gather_seq_data(self, seq_absdir: str, action_name: str) -> dict:
         """Load ``.hlo``/``.yml`` action results for one action name.
 
@@ -158,8 +122,8 @@ class Calc(HelaoDriver):
         """
         FM = FileMapper(seq_absdir)
         paths = [x for x in FM.relstrs if action_name in x]
-        hlos = sorted([x for x in paths if x.endswith(".hlo")])
-        ymls = sorted([x for x in paths if x.endswith(".yml")])
+        hlos = sorted([x for x in paths if x.endswith((".hlo", ".jsonl"))])
+        ymls = sorted([x for x in paths if meta_kind(x) == "act"])
 
         if len(hlos) != len(ymls):
             LOGGER.error(
@@ -177,7 +141,7 @@ class Calc(HelaoDriver):
                 x
                 for x in FM.relstrs
                 if x.startswith(expp)
-                and x.endswith(".yml")
+                and meta_kind(x) == "exp"
                 and os.path.dirname(x) == expp
             ][0]
             expd = FM.read_yml(ep)
@@ -201,7 +165,7 @@ class Calc(HelaoDriver):
             paths = FM.relstrs
         else:
             paths = [x for x in FM.relstrs if exp_name in x]
-        ymls = sorted([x for x in paths if x.endswith("exp.yml")])
+        ymls = sorted([x for x in paths if meta_kind(x) == "exp"])
         yml_dict = {}
         for ep in ymls:
             expd = FM.read_yml(ep)
@@ -211,7 +175,7 @@ class Calc(HelaoDriver):
     def get_seq_dict(self, seq_absdir: str) -> dict:
         """Return the parsed ``seq.yml`` dict for the given sequence directory."""
         FM = FileMapper(seq_absdir)
-        ymls = [x for x in FM.relstrs if x.endswith("seq.yml")]
+        ymls = [x for x in FM.relstrs if meta_kind(x) == "seq"]
         yml_dict = {}
         for sp in ymls:
             seqd = FM.read_yml(sp)

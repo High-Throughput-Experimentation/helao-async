@@ -25,7 +25,7 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
-from helao.core.drivers.data.sync_driver import HelaoYml
+from helao.hexagon.adapters.native.sync_driver import HelaoYml
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.run_dir import RunDir
 from helao.core.tests._test_utils import TestReporter

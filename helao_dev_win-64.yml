@@ -33,7 +33,6 @@ dependencies:
   - mendeleev
   - mpltern
   - msgspec
-  - munch
   - nodejs>=22.12
   - ntplib
   - numpy
@@ -43,12 +42,10 @@ dependencies:
   - paramiko=3
   - pip
   - plotly
-  - plumbum
   - psutil
   - psycopg2
   - pyaml
   - pyarrow
-  - pybase64
   - pydantic
   - pydantic-core
   - pydantic-settings
@@ -59,8 +56,8 @@ dependencies:
   - pyright
   - pyserial
   - pytest-asyncio
+  - pytest-xdist
   - python-dotenv
-  - python-multipart
   - python=3.14
   - pytorch-cpu
   - pyusb
@@ -76,14 +73,10 @@ dependencies:
   - setuptools<82
   - shortuuid
   - sqlalchemy
-  - sqlmodel>=0.0.42
-  - sshtunnel
   - starlette
   - statsmodels
-  - termcolor
   - tqdm
   - uv
   - uvicorn
   - websockets
-  - zeroconf
   - zeromq

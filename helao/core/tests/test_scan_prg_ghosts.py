@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from helao.core.drivers.data.sync_driver import HelaoYml
+from helao.hexagon.adapters.native.sync_driver import HelaoYml
 from helao.core.tests.scan_prg_ghosts import (
     Findings,
     _might_hold_ghost,

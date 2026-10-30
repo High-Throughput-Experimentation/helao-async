@@ -738,10 +738,7 @@ def test_both_browsers_share_one_numeric_guard():
 def test_shims_expose_makebokehapp():
     import importlib
 
-    for mod in (
-        "helao.deploy.hte.servers.visualizer.data_browser",
-        "helao.deploy.test.servers.visualizer.data_browser",
-    ):
+    for mod in ("helao.deploy.hte.servers.visualizer.data_browser",):
         m = importlib.import_module(mod)
         assert hasattr(m, "makeBokehApp"), mod
         import inspect

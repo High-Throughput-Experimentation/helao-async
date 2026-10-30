@@ -53,11 +53,6 @@ class HTELegacyAPI:
             [os.path.exists(pp) for pp in self.PLATEFOLDERS]
         )
 
-    def get_rcp_plateid(self, plateid: int):
-        """Log a lookup request and return ``None`` (RCP lookup is unimplemented)."""
-        LOGGER.info(f" ... get rcp for plateid: {plateid}")
-        return None
-
     def get_info_plateid(self, plateid: int):
         """Return the platemap dict-list for a plate, or ``None`` if missing.
 

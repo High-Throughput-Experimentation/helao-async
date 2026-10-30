@@ -14,6 +14,7 @@ from helao.helpers.run_state import (
     RunStateJournal,
     rebuild_from_tree,
     _prg_is_complete,
+    _prg_is_quarantined,
 )
 
 UUID_A = "11111111-1111-1111-1111-111111111111"
@@ -413,3 +414,22 @@ def test_prg_synced_false_is_incomplete_even_with_legacy_flags(tmp_path: Path):
 def test_prg_without_synced_key_uses_legacy_rule(tmp_path: Path):
     assert _prg_is_complete(_prg(tmp_path, "yml: /r/x.yml\napi: true\ns3: true\n"))
     assert not _prg_is_complete(_prg(tmp_path, "yml: /r/x.yml\napi: false\ns3: true\n"))
+
+
+def test_prg_with_cp1252_bytes_is_still_classified(tmp_path: Path):
+    """Legacy stations wrote cp1252; a stray 0x92/0xE9 must not crash or flip
+    detection (keys are ASCII)."""
+    from helao.core.tests._record_rewrite import _prg_has_write_off
+
+    junk = b"note: it\x92s caf\xe9\n"
+    done = tmp_path / "a.prg"
+    done.write_bytes(b"yml: /r/x.yml\n" + junk + b"synced: true\n")
+    assert _prg_is_complete(done)
+    assert not _prg_is_quarantined(done)
+    assert not _prg_has_write_off(done)
+    wo = tmp_path / "b.prg"
+    wo.write_bytes(junk + b"write_off:\n  at: now\n")
+    assert _prg_has_write_off(wo)
+    q = tmp_path / "c.prg"
+    q.write_bytes(junk + b"quarantine:\n  quarantined_at: 2026-10-26\n")
+    assert _prg_is_quarantined(q)

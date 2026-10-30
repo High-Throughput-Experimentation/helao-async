@@ -174,10 +174,6 @@ class HTEdata(HelaoDriver):
         """Persist an XY calibration for ``plateid`` (stub, returns ``None``)."""
         return None
 
-    def get_rcp_plateid(self, plateid: int, *args, **kwargs):
-        """Return the run-config (``.rcp``) record for ``plateid``."""
-        return self.dataAPI.get_rcp_plateid(plateid)
-
     def get_info_plateid(self, plateid: int, *args, **kwargs):
         """Return the info-file contents associated with ``plateid``."""
         return self.dataAPI.get_info_plateid(plateid)

@@ -131,6 +131,24 @@ def test_elements_survive_failed_print_lookup(api, monkeypatch):
     assert api.get_elements_plateid(str(PLATE)) is None
 
 
+def test_legacy_plate_without_print_sources_uses_legacy_elements(api, monkeypatch):
+    # a pre-GAIA plate with a live record whose print has no sources (3273 shape)
+    monkeypatch.setattr(api, "get_info", lambda plateid: {"screening_print_id": 7})
+    monkeypatch.setattr(api, "get_print", lambda print_id: {})
+    monkeypatch.setattr(api, "get_print_plateid", lambda plateid: None)
+    monkeypatch.setattr(
+        api.legacy_api,
+        "get_elements_plateid",
+        lambda plateid, **kw: ["Ta", "Co", "Ar", "O"],
+    )
+    assert api.get_elements_plateid(5000) == ["Ta", "Co"]
+    # ... and one whose live record names no print at all
+    monkeypatch.setattr(api, "get_info", lambda plateid: {"screening_print_id": None})
+    assert api.get_elements_plateid(5000) == ["Ta", "Co"]
+    # a GAIA-era plate never falls back
+    assert api.get_elements_plateid(PLATE) is None
+
+
 def test_legacy_printrecord_false_not_none(api, monkeypatch):
     monkeypatch.setattr(api.legacy_api, "importinfo", lambda plateid: None)
     assert api.legacy_api.check_printrecord_plateid(5) is False

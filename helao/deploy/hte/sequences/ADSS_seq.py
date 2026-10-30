@@ -22,7 +22,442 @@ from helao.helpers.lib_decorators import sequence
 from helao.helpers.premodels import ExperimentPlanMaker
 
 
-@sequence(version=9)
+def _adss_seq_rinses(washmod):
+    """The 4-way PAL rinse rotation (rinse_1..rinse_4) for the ``washmod``-th liquid handling step."""
+    return tuple((washmod + k) % 4 % 3 % 2 for k in range(4))
+
+
+def _adss_sample_aliquot(
+    epm, washmod, aliquot_volume_ul, PAL_Injector, PAL_Injector_id
+):
+    """Queue one ADSS_sub_sample_aliquot on the next rinse rotation; return it."""
+    washmod += 1
+    washone, washtwo, washthree, washfour = _adss_seq_rinses(washmod)
+    epm.add(
+        "ADSS_sub_sample_aliquot",
+        {
+            "aliquot_volume_ul": aliquot_volume_ul,
+            "EquilibrationTime_s": 0,
+            "PAL_Injector": PAL_Injector,
+            "PAL_Injector_id": PAL_Injector_id,
+            "rinse_1": washone,
+            "rinse_2": washtwo,
+            "rinse_3": washthree,
+            "rinse_4": washfour,
+        },
+    )
+    return washmod
+
+
+def _adss_fill_recirculate_refill(
+    epm,
+    fill_recirculate_wait_time_sec,
+    pump_reversal_during_filling,
+    fill_recirculate_reverse_wait_time_sec,
+    use_current_electrolyte,
+    liquid_sample_volume_ul,
+    n2flow=None,
+):
+    """Queue ADSS_sub_recirculate, ADSS_sub_recirculate, ADSS_sub_recirculate, ADSS_sub_refill_syringe.
+
+    n2flow not None folds the O2/N2 valve toggle into the first recirculate.
+    """
+    if n2flow is None:
+        epm.add(
+            "ADSS_sub_recirculate",
+            {
+                "direction_forward_or_reverse": "forward",
+                "wait_time_s": fill_recirculate_wait_time_sec,
+            },
+        )
+    else:
+        epm.add(
+            "ADSS_sub_recirculate",
+            {
+                "direction_forward_or_reverse": "forward",
+                "wait_time_s": fill_recirculate_wait_time_sec,
+                "N2flow": n2flow,
+            },
+        )
+    # pump recirculate reverse (for bubbles)
+    if pump_reversal_during_filling:
+        epm.add(
+            "ADSS_sub_recirculate",
+            {
+                "direction_forward_or_reverse": "reverse",
+                "wait_time_s": fill_recirculate_reverse_wait_time_sec,
+            },
+        )
+
+        # pump recirculate forward
+        epm.add(
+            "ADSS_sub_recirculate",
+            {
+                "direction_forward_or_reverse": "forward",
+                "wait_time_s": 5,
+            },
+        )
+
+    # refill electrolyte syringe here so that ADSS can recirculate and N2 saturate while filling syringe
+    if not use_current_electrolyte:
+        epm.add(
+            "ADSS_sub_refill_syringe",
+            {
+                "syringe": "electrolyte",
+                "fill_volume_ul": liquid_sample_volume_ul,
+                "Syringe_rate_ulsec": 300,
+            },
+        )
+
+
+def _adss_electrolyte_rinse_recirculate_drain_refill(
+    epm,
+    rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
+    rinse_with_electrolyte_bf_prefill_drain_time_sec,
+    rinse_with_electrolyte_bf_prefill_volume_uL,
+    Syringe_rate_ulsec,
+):
+    """Queue ADSS_sub_recirculate, ADSS_sub_drain_cell, ADSS_sub_refill_syringe."""
+    epm.add(
+        "ADSS_sub_recirculate",
+        {
+            "direction_forward_or_reverse": "forward",
+            "wait_time_s": rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
+        },
+    )
+    epm.add(
+        "ADSS_sub_drain_cell",
+        {
+            "DrainWait_s": rinse_with_electrolyte_bf_prefill_drain_time_sec,
+            "ReturnLineReverseWait_s": 5,
+            #    "ResidualWait_s": ResidualWait_s,
+        },
+    )
+    epm.add(
+        "ADSS_sub_refill_syringe",
+        {
+            "syringe": "electrolyte",
+            "fill_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
+            "Syringe_rate_ulsec": Syringe_rate_ulsec,
+        },
+    )
+
+
+def _adss_unload_customs_drain_cell(epm, cell_draintime_sec, ReturnLineReverseWait_sec):
+    """Queue ADSS_sub_drain_cell with the unload of all customs folded in."""
+    # drain cell
+    epm.add(
+        "ADSS_sub_drain_cell",
+        {
+            "unload_first": True,
+            "DrainWait_s": cell_draintime_sec,
+            "ReturnLineReverseWait_s": ReturnLineReverseWait_sec,
+            #    "ResidualWait_s": ResidualWait_s,
+        },
+    )
+
+
+def _adss_switch_gas_to_o2(
+    epm,
+):
+    """Queue ADSS_sub_gasvalve_N2flow, ADSS_sub_unload_gas_only, ADSS_sub_PAL_load_gas."""
+    epm.add(
+        "ADSS_sub_gasvalve_N2flow",
+        {
+            "open": False,
+        },
+    )
+    # need to remove N2 gas sample
+    epm.add("ADSS_sub_unload_gas_only", {})
+    # test need
+    epm.add(
+        "ADSS_sub_PAL_load_gas",
+        {
+            "bubbled_gas": "O2",
+            "reservoir_gas_sample_no": 2,
+        },
+    )
+
+
+def _adss_prefill_set_n2(
+    epm, liquid_sample_volume_ul, Syringe_rate_ulsec, set_valve=True
+):
+    """Queue ADSS_sub_cellfill_prefilled, ADSS_sub_gasvalve_N2flow.
+
+    set_valve=False omits the valve; the caller folds it into the next
+    ADSS_sub_recirculate (n2flow=True of _adss_fill_recirculate_refill).
+    """
+    epm.add(
+        "ADSS_sub_cellfill_prefilled",
+        {
+            "Solution_volume_ul": liquid_sample_volume_ul,
+            "Syringe_rate_ulsec": Syringe_rate_ulsec,
+        },
+    )
+
+    # set initial gas to N2
+    if set_valve:
+        epm.add(
+            "ADSS_sub_gasvalve_N2flow",
+            {
+                "open": True,
+            },
+        )
+
+
+def _adss_load_n2_gas(
+    epm,
+):
+    """Queue ADSS_sub_gasvalve_N2flow, ADSS_sub_PAL_load_gas."""
+    epm.add(
+        "ADSS_sub_gasvalve_N2flow",
+        {
+            "open": True,
+        },
+    )
+    epm.add(
+        "ADSS_sub_PAL_load_gas",
+        {
+            "bubbled_gas": "N2",
+            "reservoir_gas_sample_no": 1,
+        },
+    )
+
+
+def _adss_flush_drain_cell(
+    epm,
+    flush_volume_ul,
+    Syringe_rate_ulsec,
+    ReturnLineWait_s,
+    Cell_draintime_s,
+    ReturnLineReverseWait_s,
+):
+    """Queue ADSS_sub_cellfill_flush, ADSS_sub_drain_cell."""
+    epm.add(
+        "ADSS_sub_cellfill_flush",
+        {
+            "Solution_volume_ul": flush_volume_ul,
+            "Syringe_rate_ulsec": Syringe_rate_ulsec,
+            "ReturnLineWait_s": ReturnLineWait_s,
+        },
+    )
+    epm.add(
+        "ADSS_sub_drain_cell",
+        {
+            "DrainWait_s": Cell_draintime_s,
+            "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
+            #        "ResidualWait_s": ResidualWait_s,
+        },
+    )
+
+
+def _adss_prefill_recirculate(
+    epm, liquid_sample_volume_ul, Syringe_rate_ulsec, recirculate_wait_time_m
+):
+    """Queue ADSS_sub_cellfill_prefilled, ADSS_sub_recirculate."""
+    epm.add(
+        "ADSS_sub_cellfill_prefilled",
+        {
+            "Solution_volume_ul": liquid_sample_volume_ul,
+            "Syringe_rate_ulsec": Syringe_rate_ulsec,
+        },
+    )
+    # redundant?
+    # epm.add(
+    #     "ADSS_sub_load_liquid",
+    #     {
+    #         "liquid_custom_position": liquid_custom_position,
+    #         "liquid_sample_no": liquid_sample_no,
+    #     }
+    # )
+    # epm.add(
+    #     "ADSS_sub_load_solid",
+    #     {
+    #         "solid_custom_position": solid_custom_position,
+    #         "solid_plate_id": plate_id,
+    #         "solid_sample_no": plate_sample_no,
+    #     }
+    # )
+    epm.add(
+        "ADSS_sub_recirculate",
+        {
+            "wait_time_s": recirculate_wait_time_m * 60,
+        },
+    )
+
+
+def _adss_unload_customs_drain_cell_s(epm, Cell_draintime_s, ReturnLineReverseWait_s):
+    """Queue ADSS_sub_drain_cell with the unload of all customs folded in."""
+    epm.add(
+        "ADSS_sub_drain_cell",
+        {
+            "unload_first": True,
+            "DrainWait_s": Cell_draintime_s,
+            "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
+            #    "ResidualWait_s": ResidualWait_s,
+        },
+    )
+
+
+def _adss_move_clean_cell_with_return_line(
+    epm,
+    clean_volume_ul,
+    Syringe_rate_ulsec,
+    ReturnLineWait_s,
+    Cell_draintime_s,
+    ReturnLineReverseWait_s,
+):
+    """Queue ADSS_sub_move_to_clean_cell, ADSS_sub_clean_cell."""
+    epm.add("ADSS_sub_move_to_clean_cell", {})
+
+    epm.add(
+        "ADSS_sub_clean_cell",
+        {
+            "Clean_volume_ul": clean_volume_ul,
+            "Syringe_rate_ulsec": Syringe_rate_ulsec,
+            "ReturnLineWait_s": ReturnLineWait_s,
+            "DrainWait_s": Cell_draintime_s,
+            "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
+            #    "ResidualWait_s": ResidualWait_s,
+        },
+    )
+
+
+def _adss_move_to_ref_end_load(
+    epm,
+    name_ref_Pt_at_end,
+    plate_id_ref_Pt,
+    use_current_electrolyte,
+    liquid_sample_no,
+    liquid_sample_volume_ul,
+):
+    """Queue ADSS_sub_move_to_ref_measurement, ADSS_sub_load."""
+    epm.add(
+        "ADSS_sub_move_to_ref_measurement",
+        {
+            "reference_position_name": name_ref_Pt_at_end,
+        },
+    )
+
+    epm.add(
+        "ADSS_sub_load",
+        {
+            "solid_custom_position": "cell1_we",
+            "solid_plate_id": plate_id_ref_Pt,
+            "solid_sample_no": 1,  ################### can i use the sample id for all ref measurements?
+            "previous_liquid": use_current_electrolyte,
+            "liquid_custom_position": "cell1_we",
+            "liquid_sample_no": liquid_sample_no,
+            "liquid_sample_volume_ul": liquid_sample_volume_ul,
+        },
+    )
+
+
+def _adss_prefill_unless_electrolyte_recirculate(
+    epm,
+    use_electrolyte,
+    liquid_sample_volume_ul,
+    Syringe_rate_ulsec,
+    recirculate_wait_time_m,
+):
+    """Queue ADSS_sub_cellfill_prefilled, ADSS_sub_recirculate."""
+    if not use_electrolyte:
+
+        epm.add(
+            "ADSS_sub_cellfill_prefilled",
+            {
+                "Solution_volume_ul": liquid_sample_volume_ul,
+                "Syringe_rate_ulsec": Syringe_rate_ulsec,
+            },
+        )
+
+    # pump recirculate forward
+    epm.add(
+        "ADSS_sub_recirculate",
+        {
+            "wait_time_s": recirculate_wait_time_m * 60,
+        },
+    )
+
+
+def _adss_move_to_ref_begin_load(
+    epm,
+    name_ref_Pt_at_beginning,
+    plate_id_ref_Pt,
+    use_current_electrolyte,
+    liquid_sample_no,
+    liquid_sample_volume_ul,
+):
+    """Queue ADSS_sub_move_to_ref_measurement, ADSS_sub_load."""
+    epm.add(
+        "ADSS_sub_move_to_ref_measurement",
+        {"reference_position_name": name_ref_Pt_at_beginning},
+    )
+
+    epm.add(
+        "ADSS_sub_load",
+        {
+            "solid_custom_position": "cell1_we",
+            "solid_plate_id": plate_id_ref_Pt,
+            "solid_sample_no": 1,  ################### can i use the sample id for all ref measurements?
+            "previous_liquid": use_current_electrolyte,
+            "liquid_custom_position": "cell1_we",
+            "liquid_sample_no": liquid_sample_no,
+            "liquid_sample_volume_ul": liquid_sample_volume_ul,
+        },
+    )
+
+
+def _adss_switch_gas_to_n2(
+    epm,
+):
+    """Queue ADSS_sub_gasvalve_N2flow, ADSS_sub_unload_gas_only, ADSS_sub_PAL_load_gas."""
+    epm.add(
+        "ADSS_sub_gasvalve_N2flow",
+        {
+            "open": True,
+        },
+    )
+    # need to remove O2 gas sample
+    epm.add("ADSS_sub_unload_gas_only", {})
+    # test need
+    epm.add(
+        "ADSS_sub_PAL_load_gas",
+        {
+            "bubbled_gas": "N2",
+            "reservoir_gas_sample_no": 1,
+        },
+    )
+
+
+def _adss_move_clean_cell_simple(epm, Clean_volume_ul, CleanDrainWait_s):
+    """Queue ADSS_sub_move_to_clean_cell, ADSS_sub_clean_cell."""
+    epm.add("ADSS_sub_move_to_clean_cell", {})
+    epm.add(
+        "ADSS_sub_clean_cell",
+        {
+            "Clean_volume_ul": Clean_volume_ul,
+            "DrainWait_s": CleanDrainWait_s,
+            #    "ResidualWait_s": ResidualWait_s,
+        },
+    )
+
+
+def _adss_move_clean_cell_prefill_nosampleload(
+    epm, rinse_with_electrolyte_bf_prefill_volume_uL, Syringe_rate_ulsec
+):
+    """Queue ADSS_sub_move_to_clean_cell, ADSS_sub_cellfill_prefilled_nosampleload."""
+    epm.add("ADSS_sub_move_to_clean_cell", {})
+    epm.add(
+        "ADSS_sub_cellfill_prefilled_nosampleload",
+        {
+            "Solution_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
+            "Syringe_rate_ulsec": Syringe_rate_ulsec,
+        },
+    )
+
+
+@sequence(version=10)
 def ADSS_CA_cell_1potential(
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
@@ -327,21 +762,13 @@ def ADSS_CA_cell_1potential(
             },
         )
     if stay_sample:
-        epm.add(
-            "ADSS_sub_cellfill_flush",
-            {
-                "Solution_volume_ul": flush_volume_ul,
-                "Syringe_rate_ulsec": Syringe_rate_ulsec,
-                "ReturnLineWait_s": ReturnLineWait_s,
-            },
-        )
-        epm.add(
-            "ADSS_sub_drain_cell",
-            {
-                "DrainWait_s": Cell_draintime_s,
-                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-                #        "ResidualWait_s": ResidualWait_s,
-            },
+        _adss_flush_drain_cell(
+            epm,
+            flush_volume_ul,
+            Syringe_rate_ulsec,
+            ReturnLineWait_s,
+            Cell_draintime_s,
+            ReturnLineReverseWait_s,
         )
     if keep_electrolyte:
         epm.add("ADSS_sub_unload_solid", {})
@@ -352,25 +779,28 @@ def ADSS_CA_cell_1potential(
 
     if clean:
 
-        epm.add("ADSS_sub_move_to_clean_cell", {})
-
-        epm.add(
-            "ADSS_sub_clean_cell",
-            {
-                "Clean_volume_ul": clean_volume_ul,
-                "Syringe_rate_ulsec": Syringe_rate_ulsec,
-                "ReturnLineWait_s": ReturnLineWait_s,
-                "DrainWait_s": Cell_draintime_s,
-                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-                #    "ResidualWait_s": ResidualWait_s,
-            },
+        _adss_move_clean_cell_with_return_line(
+            epm,
+            clean_volume_ul,
+            Syringe_rate_ulsec,
+            ReturnLineWait_s,
+            Cell_draintime_s,
+            ReturnLineReverseWait_s,
         )
     if refill:
         epm.add(
-            "ADSS_sub_refill_syringes",
+            "ADSS_sub_refill_syringe",
             {
-                "Waterclean_volume_ul": water_refill_volume_ul,
-                "Solution_volume_ul": refill_volume_ul,
+                "syringe": "waterclean",
+                "fill_volume_ul": water_refill_volume_ul,
+                "Syringe_rate_ulsec": 300,
+            },
+        )
+        epm.add(
+            "ADSS_sub_refill_syringe",
+            {
+                "syringe": "electrolyte",
+                "fill_volume_ul": refill_volume_ul,
                 "Syringe_rate_ulsec": 300,
             },
         )
@@ -382,7 +812,7 @@ def ADSS_CA_cell_1potential(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=6)
+@sequence(version=7)
 def ADSS_PA_CVs_CAs_cell(
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
@@ -528,34 +958,8 @@ def ADSS_PA_CVs_CAs_cell(
     #     )
     # if not use_electrolyte:
 
-    epm.add(
-        "ADSS_sub_cellfill_prefilled",
-        {
-            "Solution_volume_ul": liquid_sample_volume_ul,
-            "Syringe_rate_ulsec": Syringe_rate_ulsec,
-        },
-    )
-    # redundant?
-    # epm.add(
-    #     "ADSS_sub_load_liquid",
-    #     {
-    #         "liquid_custom_position": liquid_custom_position,
-    #         "liquid_sample_no": liquid_sample_no,
-    #     }
-    # )
-    # epm.add(
-    #     "ADSS_sub_load_solid",
-    #     {
-    #         "solid_custom_position": solid_custom_position,
-    #         "solid_plate_id": plate_id,
-    #         "solid_sample_no": plate_sample_no,
-    #     }
-    # )
-    epm.add(
-        "ADSS_sub_recirculate",
-        {
-            "wait_time_s": recirculate_wait_time_m * 60,
-        },
+    _adss_prefill_recirculate(
+        epm, liquid_sample_volume_ul, Syringe_rate_ulsec, recirculate_wait_time_m
     )
     washmod = 0
 
@@ -579,24 +983,8 @@ def ADSS_PA_CVs_CAs_cell(
             },
         )
         if aliquot_postCV[i] == 1:
-            washmod += 1
-            washone = washmod % 4 % 3 % 2
-            washtwo = (washmod + 1) % 4 % 3 % 2
-            washthree = (washmod + 2) % 4 % 3 % 2
-            washfour = (washmod + 3) % 4 % 3 % 2
-
-            epm.add(
-                "ADSS_sub_sample_aliquot",
-                {
-                    "aliquot_volume_ul": aliquot_volume_ul,
-                    "EquilibrationTime_s": 0,
-                    "PAL_Injector": PAL_Injector,
-                    "PAL_Injector_id": PAL_Injector_id,
-                    "rinse_1": washone,
-                    "rinse_2": washtwo,
-                    "rinse_3": washthree,
-                    "rinse_4": washfour,
-                },
+            washmod = _adss_sample_aliquot(
+                epm, washmod, aliquot_volume_ul, PAL_Injector, PAL_Injector_id
             )
 
     for i, CA_potential_vs in enumerate(CA_potentials_vs):
@@ -616,24 +1004,8 @@ def ADSS_PA_CVs_CAs_cell(
             },
         )
         if aliquot_postCA[i] == 1:
-            washmod += 1
-            washone = washmod % 4 % 3 % 2
-            washtwo = (washmod + 1) % 4 % 3 % 2
-            washthree = (washmod + 2) % 4 % 3 % 2
-            washfour = (washmod + 3) % 4 % 3 % 2
-
-            epm.add(
-                "ADSS_sub_sample_aliquot",
-                {
-                    "aliquot_volume_ul": aliquot_volume_ul,
-                    "EquilibrationTime_s": 0,
-                    "PAL_Injector": PAL_Injector,
-                    "PAL_Injector_id": PAL_Injector_id,
-                    "rinse_1": washone,
-                    "rinse_2": washtwo,
-                    "rinse_3": washthree,
-                    "rinse_4": washfour,
-                },
+            washmod = _adss_sample_aliquot(
+                epm, washmod, aliquot_volume_ul, PAL_Injector, PAL_Injector_id
             )
 
     if Drain:
@@ -647,21 +1019,13 @@ def ADSS_PA_CVs_CAs_cell(
         )
 
     if stay_sample:
-        epm.add(
-            "ADSS_sub_cellfill_flush",
-            {
-                "Solution_volume_ul": flush_volume_ul,
-                "Syringe_rate_ulsec": Syringe_rate_ulsec,
-                "ReturnLineWait_s": ReturnLineWait_s,
-            },
-        )
-        epm.add(
-            "ADSS_sub_drain_cell",
-            {
-                "DrainWait_s": Cell_draintime_s,
-                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-                #        "ResidualWait_s": ResidualWait_s,
-            },
+        _adss_flush_drain_cell(
+            epm,
+            flush_volume_ul,
+            Syringe_rate_ulsec,
+            ReturnLineWait_s,
+            Cell_draintime_s,
+            ReturnLineReverseWait_s,
         )
     # if keep_electrolyte:
     #     epm.add("ADSS_sub_unload_solid",{})
@@ -672,25 +1036,28 @@ def ADSS_PA_CVs_CAs_cell(
 
     if clean:
 
-        epm.add("ADSS_sub_move_to_clean_cell", {})
-
-        epm.add(
-            "ADSS_sub_clean_cell",
-            {
-                "Clean_volume_ul": clean_volume_ul,
-                "Syringe_rate_ulsec": Syringe_rate_ulsec,
-                "ReturnLineWait_s": ReturnLineWait_s,
-                "DrainWait_s": Cell_draintime_s,
-                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-                #    "ResidualWait_s": ResidualWait_s,
-            },
+        _adss_move_clean_cell_with_return_line(
+            epm,
+            clean_volume_ul,
+            Syringe_rate_ulsec,
+            ReturnLineWait_s,
+            Cell_draintime_s,
+            ReturnLineReverseWait_s,
         )
     if refill:
         epm.add(
-            "ADSS_sub_refill_syringes",
+            "ADSS_sub_refill_syringe",
             {
-                "Waterclean_volume_ul": water_refill_volume_ul,
-                "Solution_volume_ul": refill_volume_ul,
+                "syringe": "waterclean",
+                "fill_volume_ul": water_refill_volume_ul,
+                "Syringe_rate_ulsec": 300,
+            },
+        )
+        epm.add(
+            "ADSS_sub_refill_syringe",
+            {
+                "syringe": "electrolyte",
+                "fill_volume_ul": refill_volume_ul,
                 "Syringe_rate_ulsec": 300,
             },
         )
@@ -702,7 +1069,7 @@ def ADSS_PA_CVs_CAs_cell(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=9)
+@sequence(version=10)
 def ADSS_PA_CVs_CAs_CVs_cell_simple(
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
@@ -878,22 +1245,12 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
         #         }
 
         #     )
-        if not use_electrolyte:
-
-            epm.add(
-                "ADSS_sub_cellfill_prefilled",
-                {
-                    "Solution_volume_ul": liquid_sample_volume_ul,
-                    "Syringe_rate_ulsec": Syringe_rate_ulsec,
-                },
-            )
-
-        # pump recirculate forward
-        epm.add(
-            "ADSS_sub_recirculate",
-            {
-                "wait_time_s": recirculate_wait_time_m * 60,
-            },
+        _adss_prefill_unless_electrolyte_recirculate(
+            epm,
+            use_electrolyte,
+            liquid_sample_volume_ul,
+            Syringe_rate_ulsec,
+            recirculate_wait_time_m,
         )
 
         # pump recirculate reverse (for bubbles)
@@ -917,24 +1274,8 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
 
         if aliquot_init:  # stops gas purge, takes aliquote, starts gas purge again
 
-            washmod += 1
-            washone = washmod % 4 % 3 % 2
-            washtwo = (washmod + 1) % 4 % 3 % 2
-            washthree = (washmod + 2) % 4 % 3 % 2
-            washfour = (washmod + 3) % 4 % 3 % 2
-
-            epm.add(
-                "ADSS_sub_sample_aliquot",
-                {
-                    "aliquot_volume_ul": aliquot_volume_ul,
-                    "EquilibrationTime_s": 0,
-                    "PAL_Injector": PAL_Injector,
-                    "PAL_Injector_id": PAL_Injector_id,
-                    "rinse_1": washone,
-                    "rinse_2": washtwo,
-                    "rinse_3": washthree,
-                    "rinse_4": washfour,
-                },
+            washmod = _adss_sample_aliquot(
+                epm, washmod, aliquot_volume_ul, PAL_Injector, PAL_Injector_id
             )
 
         for i, CV_cycle in enumerate(CV_cycles):
@@ -958,24 +1299,8 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
             )
             if aliquot_postCV[i] == 1:
 
-                washmod += 1
-                washone = washmod % 4 % 3 % 2
-                washtwo = (washmod + 1) % 4 % 3 % 2
-                washthree = (washmod + 2) % 4 % 3 % 2
-                washfour = (washmod + 3) % 4 % 3 % 2
-
-                epm.add(
-                    "ADSS_sub_sample_aliquot",
-                    {
-                        "aliquot_volume_ul": aliquot_volume_ul,
-                        "EquilibrationTime_s": 0,
-                        "PAL_Injector": PAL_Injector,
-                        "PAL_Injector_id": PAL_Injector_id,
-                        "rinse_1": washone,
-                        "rinse_2": washtwo,
-                        "rinse_3": washthree,
-                        "rinse_4": washfour,
-                    },
+                washmod = _adss_sample_aliquot(
+                    epm, washmod, aliquot_volume_ul, PAL_Injector, PAL_Injector_id
                 )
 
         for i, CA_potential_vs in enumerate(CA_potentials_vs):
@@ -996,24 +1321,8 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
             )
             if aliquot_postCA[i] == 1:
 
-                washmod += 1
-                washone = washmod % 4 % 3 % 2
-                washtwo = (washmod + 1) % 4 % 3 % 2
-                washthree = (washmod + 2) % 4 % 3 % 2
-                washfour = (washmod + 3) % 4 % 3 % 2
-
-                epm.add(
-                    "ADSS_sub_sample_aliquot",
-                    {
-                        "aliquot_volume_ul": aliquot_volume_ul,
-                        "EquilibrationTime_s": 0,
-                        "PAL_Injector": PAL_Injector,
-                        "PAL_Injector_id": PAL_Injector_id,
-                        "rinse_1": washone,
-                        "rinse_2": washtwo,
-                        "rinse_3": washthree,
-                        "rinse_4": washfour,
-                    },
+                washmod = _adss_sample_aliquot(
+                    epm, washmod, aliquot_volume_ul, PAL_Injector, PAL_Injector_id
                 )
 
         # epm.add(
@@ -1044,24 +1353,8 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
             )
             if aliquot_postCV[i] == 1:
 
-                washmod += 1
-                washone = washmod % 4 % 3 % 2
-                washtwo = (washmod + 1) % 4 % 3 % 2
-                washthree = (washmod + 2) % 4 % 3 % 2
-                washfour = (washmod + 3) % 4 % 3 % 2
-
-                epm.add(
-                    "ADSS_sub_sample_aliquot",
-                    {
-                        "aliquot_volume_ul": aliquot_volume_ul,
-                        "EquilibrationTime_s": 0,
-                        "PAL_Injector": PAL_Injector,
-                        "PAL_Injector_id": PAL_Injector_id,
-                        "rinse_1": washone,
-                        "rinse_2": washtwo,
-                        "rinse_3": washthree,
-                        "rinse_4": washfour,
-                    },
+                washmod = _adss_sample_aliquot(
+                    epm, washmod, aliquot_volume_ul, PAL_Injector, PAL_Injector_id
                 )
 
         if keep_electrolyte:
@@ -1069,14 +1362,8 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
 
         else:
 
-            epm.add("ADSS_sub_unloadall_customs", {})
-            epm.add(
-                "ADSS_sub_drain_cell",
-                {
-                    "DrainWait_s": Cell_draintime_s,
-                    "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-                    #    "ResidualWait_s": ResidualWait_s,
-                },
+            _adss_unload_customs_drain_cell_s(
+                epm, Cell_draintime_s, ReturnLineReverseWait_s
             )
 
         if Move_to_clean_and_clean:
@@ -1094,331 +1381,6 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
 
 
 @sequence(version=3)
-def ADSS_CA_cell_multipotential(
-    # solid_custom_position: str = "cell1_we",
-    plate_id: int = 5917,
-    plate_sample_no: int = 14050,  #  instead of map select
-    same_sample: bool = False,
-    stay_sample: bool = False,
-    # liquid_custom_position: str = "elec_res1",
-    liquid_sample_no: int = 220,
-    liquid_sample_volume_ul: float = 4000,
-    CA_potentials_vs: list[float] = [-0.5, 0.0, 0.5, 1.0],
-    potential_versus: str = "oer",
-    ph: float = 9.53,
-    ref_type: str = "leakless",
-    ref_offset__V: float = 0.0,
-    CA_duration_sec: float = 1320,
-    aliquot_times_sec: list[float] = [60, 600, 1140],
-    aliquot_volume_ul: int = 200,
-    OCV_duration: float = 60,
-    OCValiquot_times_sec: list[float] = [20],
-    samplerate_sec: float = 1,
-    led_illumination: bool = False,
-    led_dutycycle: float = 1,
-    led_wavelength: str = "385",
-    Syringe_rate_ulsec: float = 300,
-    Cell_draintime_s: float = 60,
-    ReturnLineWait_s: float = 30,
-    ReturnLineReverseWait_s: float = 3,
-    ResidualWait_s: float = 15,
-    flush_volume_ul: float = 2000,
-    clean: bool = False,
-    clean_volume_ul: float = 5000,
-    refill: bool = False,
-    refill_volume_ul: float = 6000,
-    water_refill_volume_ul: float = 6000,
-    PAL_Injector: str = "LS 4",
-    PAL_Injector_id: str = "LS4_newsyringe040923",
-) -> list:
-    """Run an OCV/CA/OCV cycle at each potential in ``CA_potentials_vs``.
-
-    Loads the sample (or uses the same one), fills the cell, then for each
-    potential adds OCV before, CA at the potential, and OCV after. The
-    ``led_illumination`` flag selects the ``*_photo`` variants. After the
-    measurement the cell is drained and optionally flushed/cleaned/refilled.
-
-    Args:
-        plate_id: Plate id of the solid sample.
-        plate_sample_no: Sample number on the plate.
-        same_sample: Skip the move-to-sample step.
-        stay_sample: Flush+drain after the experiment.
-        liquid_sample_no: Reservoir liquid sample number.
-        liquid_sample_volume_ul: Cell fill volume (uL).
-        CA_potentials_vs: CA potentials to sweep through (V).
-        potential_versus: Frame label for CAs (``"oer"``/``"rhe"``).
-        ph: Solution pH.
-        ref_type: Reference electrode type label.
-        ref_offset__V: Reference electrode offset (V).
-        CA_duration_sec: CA hold duration (s) for each potential.
-        aliquot_times_sec: CA-relative aliquot timestamps (s).
-        aliquot_volume_ul: Aliquot volume (uL).
-        OCV_duration: OCV duration (s) before and after each CA.
-        OCValiquot_times_sec: OCV-relative aliquot timestamps (s).
-        samplerate_sec: Sample interval (s).
-        led_illumination: Use photo-CA/OCV variants when True.
-        led_dutycycle: LED toggle duty cycle (0-1).
-        led_wavelength: LED wavelength string.
-        Syringe_rate_ulsec: Syringe rate (uL/s).
-        Cell_draintime_s: Drain duration (s).
-        ReturnLineWait_s: Forward return-line wait (s).
-        ReturnLineReverseWait_s: Reverse return-line wait (s).
-        ResidualWait_s: Passthrough residual wait (s).
-        flush_volume_ul: Flush volume (uL) when ``stay_sample`` is True.
-        clean: Move-to-clean-cell and clean.
-        clean_volume_ul: Cleaning volume (uL).
-        refill: Refill syringes at end.
-        refill_volume_ul: Refill volume for working solution (uL).
-        water_refill_volume_ul: Refill volume for water (uL).
-        PAL_Injector: PAL injector key.
-        PAL_Injector_id: PAL injector identifier.
-
-    Returns:
-        List of planned experiments to dispatch.
-    """
-
-    epm = ExperimentPlanMaker()
-
-    # for solid_sample_no in plate_sample_no_list:  # have to indent add expts if used
-
-    if same_sample:
-        epm.add(
-            "ADSS_sub_load",
-            {
-                "solid_custom_position": "cell1_we",
-                "solid_plate_id": plate_id,
-                "solid_sample_no": plate_sample_no,
-                "liquid_custom_position": "cell1_we",
-                "liquid_sample_no": liquid_sample_no,
-                "liquid_sample_volume_ul": liquid_sample_volume_ul,
-            },
-        )
-    else:
-        epm.add(
-            "ADSS_sub_sample_start",
-            {
-                "solid_custom_position": "cell1_we",
-                "solid_plate_id": plate_id,
-                "solid_sample_no": plate_sample_no,
-                "liquid_custom_position": "cell1_we",
-                "liquid_sample_no": liquid_sample_no,
-                "liquid_sample_volume_ul": liquid_sample_volume_ul,
-            },
-        )
-    if led_illumination:
-        epm.add(
-            "ADSS_sub_cell_illumination",
-            {
-                "led_wavelength": led_wavelength,
-                "illumination_on": led_illumination,
-            },
-        )
-    epm.add(
-        "ADSS_sub_cellfill_prefilled",
-        {
-            "Solution_volume_ul": liquid_sample_volume_ul,
-            "Syringe_rate_ulsec": Syringe_rate_ulsec,
-        },
-    )
-    # redundant?
-    # epm.add(
-    #     "ADSS_sub_load_liquid",
-    #     {
-    #         "liquid_custom_position": liquid_custom_position,
-    #         "liquid_sample_no": liquid_sample_no,
-    #     }
-    # )
-    # epm.add(
-    #     "ADSS_sub_load_solid",
-    #     {
-    #         "solid_custom_position": solid_custom_position,
-    #         "solid_plate_id": plate_id,
-    #         "solid_sample_no": plate_sample_no,
-    #     }
-    # )
-    epm.add("ADSS_sub_recirculate", {})
-
-    for CA_potential_vs in CA_potentials_vs:
-        if led_illumination:
-
-            epm.add(
-                "ADSS_sub_OCV_photo",
-                {
-                    "Tval__s": OCV_duration,
-                    "samplerate_sec": samplerate_sec,
-                    "ph": ph,
-                    "ref_type": ref_type,
-                    "ref_offset__V": ref_offset__V,
-                    "led_wavelength": led_wavelength,
-                    "toggle_illum_duty": led_dutycycle,
-                    "aliquot_volume_ul": aliquot_volume_ul,
-                    "aliquot_times_sec": OCValiquot_times_sec,
-                    "aliquot_insitu": True,
-                    "PAL_Injector": PAL_Injector,
-                    "PAL_Injector_id": PAL_Injector_id,
-                    "rinse_1": 1,
-                },
-            )
-            epm.add(
-                "ADSS_sub_CA_photo",
-                {
-                    "CA_potential": CA_potential_vs,
-                    "ph": ph,
-                    "ref_type": ref_type,
-                    "ref_offset__V": ref_offset__V,
-                    "potential_versus": potential_versus,
-                    "samplerate_sec": samplerate_sec,
-                    "CA_duration_sec": CA_duration_sec,
-                    "led_wavelength": led_wavelength,
-                    "toggle_illum_duty": led_dutycycle,
-                    "aliquot_volume_ul": aliquot_volume_ul,
-                    "aliquot_times_sec": aliquot_times_sec,
-                    "aliquot_insitu": True,
-                    "PAL_Injector": PAL_Injector,
-                    "PAL_Injector_id": PAL_Injector_id,
-                },
-            )
-            epm.add(
-                "ADSS_sub_OCV_photo",
-                {
-                    "Tval__s": OCV_duration,
-                    "samplerate_sec": samplerate_sec,
-                    "ph": ph,
-                    "ref_type": ref_type,
-                    "ref_offset__V": ref_offset__V,
-                    "led_wavelength": led_wavelength,
-                    "toggle_illum_duty": led_dutycycle,
-                    "aliquot_volume_ul": aliquot_volume_ul,
-                    "aliquot_times_sec": OCValiquot_times_sec,
-                    "aliquot_insitu": True,
-                    "PAL_Injector": PAL_Injector,
-                    "PAL_Injector_id": PAL_Injector_id,
-                    "rinse_1": 0,
-                    "rinse_4": 1,
-                },
-            )
-            epm.add(
-                "ADSS_sub_cell_illumination",
-                {
-                    "led_wavelength": led_wavelength,
-                    "illumination_on": False,
-                },
-            )
-        else:
-
-            epm.add(
-                "ADSS_sub_OCV",
-                {
-                    "Tval__s": OCV_duration,
-                    "samplerate_sec": samplerate_sec,
-                    "ph": ph,
-                    "ref_type": ref_type,
-                    "ref_offset__V": ref_offset__V,
-                    "aliquot_volume_ul": aliquot_volume_ul,
-                    "aliquot_times_sec": OCValiquot_times_sec,
-                    "aliquot_insitu": True,
-                    "PAL_Injector": PAL_Injector,
-                    "PAL_Injector_id": PAL_Injector_id,
-                    "rinse_1": 1,
-                },
-            )
-            epm.add(
-                "ADSS_sub_CA",
-                {
-                    "CA_potential": CA_potential_vs,
-                    "ph": ph,
-                    "ref_type": ref_type,
-                    "ref_offset__V": ref_offset__V,
-                    "potential_versus": potential_versus,
-                    "samplerate_sec": samplerate_sec,
-                    "CA_duration_sec": CA_duration_sec,
-                    "aliquot_volume_ul": aliquot_volume_ul,
-                    "aliquot_times_sec": aliquot_times_sec,
-                    "aliquot_insitu": True,
-                    "PAL_Injector": PAL_Injector,
-                    "PAL_Injector_id": PAL_Injector_id,
-                },
-            )
-            epm.add(
-                "ADSS_sub_OCV",
-                {
-                    "Tval__s": OCV_duration,
-                    "samplerate_sec": samplerate_sec,
-                    "ph": ph,
-                    "ref_type": ref_type,
-                    "ref_offset__V": ref_offset__V,
-                    "aliquot_volume_ul": aliquot_volume_ul,
-                    "aliquot_times_sec": OCValiquot_times_sec,
-                    "aliquot_insitu": True,
-                    "PAL_Injector": PAL_Injector,
-                    "PAL_Injector_id": PAL_Injector_id,
-                    "rinse_1": 0,
-                    "rinse_4": 1,
-                },
-            )
-
-    epm.add(
-        "ADSS_sub_drain_cell",
-        {
-            "DrainWait_s": Cell_draintime_s,
-            "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-            #    "ResidualWait_s": ResidualWait_s,
-        },
-    )
-    if stay_sample:
-        epm.add(
-            "ADSS_sub_cellfill_flush",
-            {
-                "Solution_volume_ul": flush_volume_ul,
-                "Syringe_rate_ulsec": Syringe_rate_ulsec,
-                "ReturnLineWait_s": ReturnLineWait_s,
-            },
-        )
-        epm.add(
-            "ADSS_sub_drain_cell",
-            {
-                "DrainWait_s": Cell_draintime_s,
-                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-                #        "ResidualWait_s": ResidualWait_s,
-            },
-        )
-    epm.add("ADSS_sub_unload_liquid", {})
-
-    epm.add("ADSS_sub_unloadall_customs", {})
-
-    if clean:
-
-        epm.add("ADSS_sub_move_to_clean_cell", {})
-
-        epm.add(
-            "ADSS_sub_clean_cell",
-            {
-                "Clean_volume_ul": clean_volume_ul,
-                "Syringe_rate_ulsec": Syringe_rate_ulsec,
-                "ReturnLineWait_s": ReturnLineWait_s,
-                "DrainWait_s": Cell_draintime_s,
-                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-                #        "ResidualWait_s": ResidualWait_s,
-            },
-        )
-    if refill:
-        epm.add(
-            "ADSS_sub_refill_syringes",
-            {
-                "Waterclean_volume_ul": water_refill_volume_ul,
-                "Solution_volume_ul": refill_volume_ul,
-                "Syringe_rate_ulsec": 300,
-            },
-        )
-
-    #    epm.add("ADSS_sub_tray_unload",{})
-
-    # epm.add("ADSS_sub_shutdown", {})
-
-    return epm.planned_experiments  # returns complete experiment list
-
-
-@sequence(version=2)
 def ADSS_PA_CVs_testing(
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 6307,
@@ -1571,21 +1533,12 @@ def ADSS_PA_CVs_testing(
     #         }
 
     #     )
-    if not use_electrolyte:
-
-        epm.add(
-            "ADSS_sub_cellfill_prefilled",
-            {
-                "Solution_volume_ul": liquid_sample_volume_ul,
-                "Syringe_rate_ulsec": Syringe_rate_ulsec,
-            },
-        )
-
-    epm.add(
-        "ADSS_sub_recirculate",
-        {
-            "wait_time_s": recirculate_wait_time_m * 60,
-        },
+    _adss_prefill_unless_electrolyte_recirculate(
+        epm,
+        use_electrolyte,
+        liquid_sample_volume_ul,
+        Syringe_rate_ulsec,
+        recirculate_wait_time_m,
     )
     washmod = 0
     # N2clean cvs
@@ -1726,24 +1679,10 @@ def ADSS_PA_CVs_testing(
 
     else:
 
-        epm.add("ADSS_sub_unloadall_customs", {})
-        epm.add(
-            "ADSS_sub_drain_cell",
-            {
-                "DrainWait_s": Cell_draintime_s,
-                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-                #    "ResidualWait_s": ResidualWait_s,
-            },
+        _adss_unload_customs_drain_cell_s(
+            epm, Cell_draintime_s, ReturnLineReverseWait_s
         )
-        epm.add("ADSS_sub_move_to_clean_cell", {})
-        epm.add(
-            "ADSS_sub_clean_cell",
-            {
-                "Clean_volume_ul": Clean_volume_ul,
-                "DrainWait_s": CleanDrainWait_s,
-                #    "ResidualWait_s": ResidualWait_s,
-            },
-        )
+        _adss_move_clean_cell_simple(epm, Clean_volume_ul, CleanDrainWait_s)
         epm.add(
             "ADSS_sub_interrupt",
             {"reason": "Pause for switch to nitrogen"},
@@ -1773,19 +1712,8 @@ def ADSS_PA_CVs_testing(
             },
         )
 
-        epm.add(
-            "ADSS_sub_cellfill_prefilled",
-            {
-                "Solution_volume_ul": liquid_sample_volume_ul,
-                "Syringe_rate_ulsec": Syringe_rate_ulsec,
-            },
-        )
-
-        epm.add(
-            "ADSS_sub_recirculate",
-            {
-                "wait_time_s": recirculate_wait_time_m * 60,
-            },
+        _adss_prefill_recirculate(
+            epm, liquid_sample_volume_ul, Syringe_rate_ulsec, recirculate_wait_time_m
         )
         washmod = 0
         # N2clean cvs
@@ -1821,20 +1749,14 @@ def ADSS_PA_CVs_testing(
 
         else:
 
-            epm.add("ADSS_sub_unloadall_customs", {})
-            epm.add(
-                "ADSS_sub_drain_cell",
-                {
-                    "DrainWait_s": Cell_draintime_s,
-                    "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-                    #    "ResidualWait_s": ResidualWait_s,
-                },
+            _adss_unload_customs_drain_cell_s(
+                epm, Cell_draintime_s, ReturnLineReverseWait_s
             )
 
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ADSS_PA_CVs_CAs_CVs_autogasswitching(
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 6307,
@@ -2035,38 +1957,17 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
         )
     # N2 gas for initial cleaning
     epm.add(
-        "ADSS_sub_gasvalve_N2flow",
-        {
-            "open": True,
-        },
-    )
-    epm.add(
         "ADSS_sub_recirculate",
         {
+            "N2flow": True,
             "wait_time_s": recirculate_wait_time_m * 60,
         },
     )
 
     if aliquot_init:
 
-        washmod += 1
-        washone = washmod % 4 % 3 % 2
-        washtwo = (washmod + 1) % 4 % 3 % 2
-        washthree = (washmod + 2) % 4 % 3 % 2
-        washfour = (washmod + 3) % 4 % 3 % 2
-
-        epm.add(
-            "ADSS_sub_sample_aliquot",
-            {
-                "aliquot_volume_ul": aliquot_volume_ul,
-                "EquilibrationTime_s": 0,
-                "PAL_Injector": PAL_Injector,
-                "PAL_Injector_id": PAL_Injector_id,
-                "rinse_1": washone,
-                "rinse_2": washtwo,
-                "rinse_3": washthree,
-                "rinse_4": washfour,
-            },
+        washmod = _adss_sample_aliquot(
+            epm, washmod, aliquot_volume_ul, PAL_Injector, PAL_Injector_id
         )
 
     # N2clean cvs
@@ -2090,14 +1991,9 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
     )
     # switch back to oxygen
     epm.add(
-        "ADSS_sub_gasvalve_N2flow",
-        {
-            "open": False,
-        },
-    )
-    epm.add(
         "ADSS_sub_recirculate",
         {
+            "N2flow": False,
             "wait_time_s": postN2_recirculate_wait_time_m * 60,
         },
     )
@@ -2124,24 +2020,8 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
             },
         )
         if aliquot_postCV[i] == 1:
-            washmod += 1
-            washone = washmod % 4 % 3 % 2
-            washtwo = (washmod + 1) % 4 % 3 % 2
-            washthree = (washmod + 2) % 4 % 3 % 2
-            washfour = (washmod + 3) % 4 % 3 % 2
-
-            epm.add(
-                "ADSS_sub_sample_aliquot",
-                {
-                    "aliquot_volume_ul": aliquot_volume_ul,
-                    "EquilibrationTime_s": 0,
-                    "PAL_Injector": PAL_Injector,
-                    "PAL_Injector_id": PAL_Injector_id,
-                    "rinse_1": washone,
-                    "rinse_2": washtwo,
-                    "rinse_3": washthree,
-                    "rinse_4": washfour,
-                },
+            washmod = _adss_sample_aliquot(
+                epm, washmod, aliquot_volume_ul, PAL_Injector, PAL_Injector_id
             )
 
     for i, CA_potential_vs in enumerate(CA_potentials_vs):
@@ -2161,24 +2041,8 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
             },
         )
         if aliquot_postCA[i] == 1:
-            washmod += 1
-            washone = washmod % 4 % 3 % 2
-            washtwo = (washmod + 1) % 4 % 3 % 2
-            washthree = (washmod + 2) % 4 % 3 % 2
-            washfour = (washmod + 3) % 4 % 3 % 2
-
-            epm.add(
-                "ADSS_sub_sample_aliquot",
-                {
-                    "aliquot_volume_ul": aliquot_volume_ul,
-                    "EquilibrationTime_s": 0,
-                    "PAL_Injector": PAL_Injector,
-                    "PAL_Injector_id": PAL_Injector_id,
-                    "rinse_1": washone,
-                    "rinse_2": washtwo,
-                    "rinse_3": washthree,
-                    "rinse_4": washfour,
-                },
+            washmod = _adss_sample_aliquot(
+                epm, washmod, aliquot_volume_ul, PAL_Injector, PAL_Injector_id
             )
     # epm.add(
     #         "ADSS_sub_interrupt",
@@ -2232,24 +2096,8 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
             },
         )
         if aliquot_postCV[i] == 1:
-            washmod += 1
-            washone = washmod % 4 % 3 % 2
-            washtwo = (washmod + 1) % 4 % 3 % 2
-            washthree = (washmod + 2) % 4 % 3 % 2
-            washfour = (washmod + 3) % 4 % 3 % 2
-
-            epm.add(
-                "ADSS_sub_sample_aliquot",
-                {
-                    "aliquot_volume_ul": aliquot_volume_ul,
-                    "EquilibrationTime_s": 0,
-                    "PAL_Injector": PAL_Injector,
-                    "PAL_Injector_id": PAL_Injector_id,
-                    "rinse_1": washone,
-                    "rinse_2": washtwo,
-                    "rinse_3": washthree,
-                    "rinse_4": washfour,
-                },
+            washmod = _adss_sample_aliquot(
+                epm, washmod, aliquot_volume_ul, PAL_Injector, PAL_Injector_id
             )
 
     if keep_electrolyte:
@@ -2257,30 +2105,16 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
 
     else:
 
-        epm.add("ADSS_sub_unloadall_customs", {})
-        epm.add(
-            "ADSS_sub_drain_cell",
-            {
-                "DrainWait_s": Cell_draintime_s,
-                "ReturnLineReverseWait_s": ReturnLineReverseWait_s,
-                #    "ResidualWait_s": ResidualWait_s,
-            },
+        _adss_unload_customs_drain_cell_s(
+            epm, Cell_draintime_s, ReturnLineReverseWait_s
         )
         if clean_cell:
-            epm.add("ADSS_sub_move_to_clean_cell", {})
-            epm.add(
-                "ADSS_sub_clean_cell",
-                {
-                    "Clean_volume_ul": Clean_volume_ul,
-                    "DrainWait_s": CleanDrainWait_s,
-                    #    "ResidualWait_s": ResidualWait_s,
-                },
-            )
+            _adss_move_clean_cell_simple(epm, Clean_volume_ul, CleanDrainWait_s)
 
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=5)
+@sequence(version=6)
 def ADSS_PA_CV_TRI(
     # note: str = "need as many samples as you expect combinations of UPL and LPL",
     # sample info
@@ -2520,22 +2354,13 @@ def ADSS_PA_CV_TRI(
 
     # ref measurement at beginning of sequence
     if measure_ref_Pt_at_beginning:
-        epm.add(
-            "ADSS_sub_move_to_ref_measurement",
-            {"reference_position_name": name_ref_Pt_at_beginning},
-        )
-
-        epm.add(
-            "ADSS_sub_load",
-            {
-                "solid_custom_position": "cell1_we",
-                "solid_plate_id": plate_id_ref_Pt,
-                "solid_sample_no": 1,  ################### can i use the sample id for all ref measurements?
-                "previous_liquid": use_current_electrolyte,
-                "liquid_custom_position": "cell1_we",
-                "liquid_sample_no": liquid_sample_no,
-                "liquid_sample_volume_ul": liquid_sample_volume_ul,
-            },
+        _adss_move_to_ref_begin_load(
+            epm,
+            name_ref_Pt_at_beginning,
+            plate_id_ref_Pt,
+            use_current_electrolyte,
+            liquid_sample_no,
+            liquid_sample_volume_ul,
         )
 
         # rinse with electrolyte to remove cleaning liquid residuals
@@ -2547,85 +2372,29 @@ def ADSS_PA_CV_TRI(
                     "Syringe_rate_ulsec": Syringe_rate_ulsec,
                 },
             )
-            epm.add(
-                "ADSS_sub_recirculate",
-                {
-                    "direction_forward_or_reverse": "forward",
-                    "wait_time_s": rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
-                },
-            )
-            epm.add(
-                "ADSS_sub_drain_cell",
-                {
-                    "DrainWait_s": rinse_with_electrolyte_bf_prefill_drain_time_sec,
-                    "ReturnLineReverseWait_s": 5,
-                    #    "ResidualWait_s": ResidualWait_s,
-                },
-            )
-            epm.add(
-                "ADSS_sub_refill_syringe",
-                {
-                    "syringe": "electrolyte",
-                    "fill_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
-                    "Syringe_rate_ulsec": Syringe_rate_ulsec,
-                },
+            _adss_electrolyte_rinse_recirculate_drain_refill(
+                epm,
+                rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
+                rinse_with_electrolyte_bf_prefill_drain_time_sec,
+                rinse_with_electrolyte_bf_prefill_volume_uL,
+                Syringe_rate_ulsec,
             )
 
         # electrolyte filling for experiment
-        epm.add(
-            "ADSS_sub_cellfill_prefilled",
-            {
-                "Solution_volume_ul": liquid_sample_volume_ul,
-                "Syringe_rate_ulsec": Syringe_rate_ulsec,
-            },
+        _adss_prefill_set_n2(
+            epm, liquid_sample_volume_ul, Syringe_rate_ulsec, set_valve=False
         )
 
-        # set initial gas to N2
-        epm.add(
-            "ADSS_sub_gasvalve_N2flow",
-            {
-                "open": True,
-            },
+        # pump recirculate forward (N2 valve folded into the first recirculate)
+        _adss_fill_recirculate_refill(
+            epm,
+            fill_recirculate_wait_time_sec,
+            pump_reversal_during_filling,
+            fill_recirculate_reverse_wait_time_sec,
+            use_current_electrolyte,
+            liquid_sample_volume_ul,
+            n2flow=True,
         )
-
-        # pump recirculate forward
-        epm.add(
-            "ADSS_sub_recirculate",
-            {
-                "direction_forward_or_reverse": "forward",
-                "wait_time_s": fill_recirculate_wait_time_sec,
-            },
-        )
-
-        # pump recirculate reverse (for bubbles)
-        if pump_reversal_during_filling:
-            epm.add(
-                "ADSS_sub_recirculate",
-                {
-                    "direction_forward_or_reverse": "reverse",
-                    "wait_time_s": fill_recirculate_reverse_wait_time_sec,
-                },
-            )
-
-            # pump recirculate forward
-            epm.add(
-                "ADSS_sub_recirculate",
-                {
-                    "direction_forward_or_reverse": "forward",
-                    "wait_time_s": 5,
-                },
-            )
-
-        # refill electrolyte syringe here so that ADSS can recirculate and N2 saturate while filling syringe
-        if not use_current_electrolyte:
-            epm.add(
-                "ADSS_sub_refill_syringe",
-                {
-                    "syringe": "electrolyte",
-                    "fill_volume_ul": liquid_sample_volume_ul,
-                    "Syringe_rate_ulsec": 300,
-                },
-            )
 
         # check for bubbles that could interfere with echem measurments with OCV
         if use_bubble_removal:
@@ -2763,23 +2532,14 @@ def ADSS_PA_CV_TRI(
             )
 
         # switch from O2 to N2 and saturate
-        epm.add(
-            "ADSS_sub_gasvalve_N2flow",
-            {
-                "open": True,
-            },
-        )
-
-        # unload sample
-        epm.add("ADSS_sub_unloadall_customs", {})
-
-        # drain cell
+        # (valve toggle folded into the drain experiment, which unloads first)
         epm.add(
             "ADSS_sub_drain_cell",
             {
+                "N2flow": True,
+                "unload_first": True,
                 "DrainWait_s": cell_draintime_sec,
                 "ReturnLineReverseWait_s": ReturnLineReverseWait_sec,
-                #    "ResidualWait_s": ResidualWait_s,
             },
         )
 
@@ -2860,28 +2620,12 @@ def ADSS_PA_CV_TRI(
                     "Syringe_rate_ulsec": Syringe_rate_ulsec,
                 },
             )
-            epm.add(
-                "ADSS_sub_recirculate",
-                {
-                    "direction_forward_or_reverse": "forward",
-                    "wait_time_s": rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
-                },
-            )
-            epm.add(
-                "ADSS_sub_drain_cell",
-                {
-                    "DrainWait_s": rinse_with_electrolyte_bf_prefill_drain_time_sec,
-                    "ReturnLineReverseWait_s": 5,
-                    #    "ResidualWait_s": ResidualWait_s,
-                },
-            )
-            epm.add(
-                "ADSS_sub_refill_syringe",
-                {
-                    "syringe": "electrolyte",
-                    "fill_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
-                    "Syringe_rate_ulsec": Syringe_rate_ulsec,
-                },
+            _adss_electrolyte_rinse_recirculate_drain_refill(
+                epm,
+                rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
+                rinse_with_electrolyte_bf_prefill_drain_time_sec,
+                rinse_with_electrolyte_bf_prefill_volume_uL,
+                Syringe_rate_ulsec,
             )
 
         # electrolyte filling for experiment
@@ -2894,75 +2638,23 @@ def ADSS_PA_CV_TRI(
                 },
             )
 
-        # set initial gas to N2
-        epm.add(
-            "ADSS_sub_gasvalve_N2flow",
-            {
-                "open": True,
-            },
+        # set initial gas to N2 (valve folded into the first recirculate)
+        _adss_fill_recirculate_refill(
+            epm,
+            fill_recirculate_wait_time_sec,
+            pump_reversal_during_filling,
+            fill_recirculate_reverse_wait_time_sec,
+            use_current_electrolyte,
+            liquid_sample_volume_ul,
+            n2flow=True,
         )
-
-        # pump recirculate forward
-        epm.add(
-            "ADSS_sub_recirculate",
-            {
-                "direction_forward_or_reverse": "forward",
-                "wait_time_s": fill_recirculate_wait_time_sec,
-            },
-        )
-
-        # pump recirculate reverse (for bubbles)
-        if pump_reversal_during_filling:
-            epm.add(
-                "ADSS_sub_recirculate",
-                {
-                    "direction_forward_or_reverse": "reverse",
-                    "wait_time_s": fill_recirculate_reverse_wait_time_sec,
-                },
-            )
-
-            # pump recirculate forward
-            epm.add(
-                "ADSS_sub_recirculate",
-                {
-                    "direction_forward_or_reverse": "forward",
-                    "wait_time_s": 5,
-                },
-            )
-
-        # refill electrolyte syringe here so that ADSS can recirculate and N2 saturate while filling syringe
-        if not use_current_electrolyte:
-            epm.add(
-                "ADSS_sub_refill_syringe",
-                {
-                    "syringe": "electrolyte",
-                    "fill_volume_ul": liquid_sample_volume_ul,
-                    "Syringe_rate_ulsec": 300,
-                },
-            )
 
         washmod = 0
 
         if aliquot_init:  # stops gas purge, takes aliquote, starts gas purge again
 
-            washmod += 1
-            washone = washmod % 4 % 3 % 2
-            washtwo = (washmod + 1) % 4 % 3 % 2
-            washthree = (washmod + 2) % 4 % 3 % 2
-            washfour = (washmod + 3) % 4 % 3 % 2
-
-            epm.add(
-                "ADSS_sub_sample_aliquot",
-                {
-                    "aliquot_volume_ul": aliquot_volume_ul,
-                    "EquilibrationTime_s": 0,
-                    "PAL_Injector": PAL_Injector,
-                    "PAL_Injector_id": PAL_Injector_id,
-                    "rinse_1": washone,
-                    "rinse_2": washtwo,
-                    "rinse_3": washthree,
-                    "rinse_4": washfour,
-                },
+            washmod = _adss_sample_aliquot(
+                epm, washmod, aliquot_volume_ul, PAL_Injector, PAL_Injector_id
             )
 
         # check for bubbles that could interfere with echem measurments with OCV
@@ -3029,24 +2721,8 @@ def ADSS_PA_CV_TRI(
             )
             if aliquot_after_cleaningCV[i] == 1:
 
-                washmod += 1
-                washone = washmod % 4 % 3 % 2
-                washtwo = (washmod + 1) % 4 % 3 % 2
-                washthree = (washmod + 2) % 4 % 3 % 2
-                washfour = (washmod + 3) % 4 % 3 % 2
-
-                epm.add(
-                    "ADSS_sub_sample_aliquot",
-                    {
-                        "aliquot_volume_ul": aliquot_volume_ul,
-                        "EquilibrationTime_s": 0,
-                        "PAL_Injector": PAL_Injector,
-                        "PAL_Injector_id": PAL_Injector_id,
-                        "rinse_1": washone,
-                        "rinse_2": washtwo,
-                        "rinse_3": washthree,
-                        "rinse_4": washfour,
-                    },
+                washmod = _adss_sample_aliquot(
+                    epm, washmod, aliquot_volume_ul, PAL_Injector, PAL_Injector_id
                 )
 
         # start background CVs in N2
@@ -3070,24 +2746,8 @@ def ADSS_PA_CV_TRI(
             )
             if aliquote_after_CV_init[i] == 1:
 
-                washmod += 1
-                washone = washmod % 4 % 3 % 2
-                washtwo = (washmod + 1) % 4 % 3 % 2
-                washthree = (washmod + 2) % 4 % 3 % 2
-                washfour = (washmod + 3) % 4 % 3 % 2
-
-                epm.add(
-                    "ADSS_sub_sample_aliquot",
-                    {
-                        "aliquot_volume_ul": aliquot_volume_ul,
-                        "EquilibrationTime_s": 0,
-                        "PAL_Injector": PAL_Injector,
-                        "PAL_Injector_id": PAL_Injector_id,
-                        "rinse_1": washone,
-                        "rinse_2": washtwo,
-                        "rinse_3": washthree,
-                        "rinse_4": washfour,
-                    },
+                washmod = _adss_sample_aliquot(
+                    epm, washmod, aliquot_volume_ul, PAL_Injector, PAL_Injector_id
                 )
 
         # switch from N2 to O2 and saturate
@@ -3139,33 +2799,14 @@ def ADSS_PA_CV_TRI(
             )
             if aliquote_CV_O2[i] == 1:
 
-                washmod += 1
-                washone = washmod % 4 % 3 % 2
-                washtwo = (washmod + 1) % 4 % 3 % 2
-                washthree = (washmod + 2) % 4 % 3 % 2
-                washfour = (washmod + 3) % 4 % 3 % 2
-
-                epm.add(
-                    "ADSS_sub_sample_aliquot",
-                    {
-                        "aliquot_volume_ul": aliquot_volume_ul,
-                        "EquilibrationTime_s": 0,
-                        "PAL_Injector": PAL_Injector,
-                        "PAL_Injector_id": PAL_Injector_id,
-                        "rinse_1": washone,
-                        "rinse_2": washtwo,
-                        "rinse_3": washthree,
-                        "rinse_4": washfour,
-                    },
+                washmod = _adss_sample_aliquot(
+                    epm, washmod, aliquot_volume_ul, PAL_Injector, PAL_Injector_id
                 )
 
         # inject phosphoric acid
         if Inject_PA:
             washmod += 1
-            washone = washmod % 4 % 3 % 2
-            washtwo = (washmod + 1) % 4 % 3 % 2
-            washthree = (washmod + 2) % 4 % 3 % 2
-            washfour = (washmod + 3) % 4 % 3 % 2
+            washone, washtwo, washthree, washfour = _adss_seq_rinses(washmod)
 
             epm.add(
                 "ADSS_sub_transfer_liquid_in",
@@ -3217,24 +2858,8 @@ def ADSS_PA_CV_TRI(
 
             if aliquote_CV_O2[i] == 1:
 
-                washmod += 1
-                washone = washmod % 4 % 3 % 2
-                washtwo = (washmod + 1) % 4 % 3 % 2
-                washthree = (washmod + 2) % 4 % 3 % 2
-                washfour = (washmod + 3) % 4 % 3 % 2
-
-                epm.add(
-                    "ADSS_sub_sample_aliquot",
-                    {
-                        "aliquot_volume_ul": aliquot_volume_ul,
-                        "EquilibrationTime_s": 0,
-                        "PAL_Injector": PAL_Injector,
-                        "PAL_Injector_id": PAL_Injector_id,
-                        "rinse_1": washone,
-                        "rinse_2": washtwo,
-                        "rinse_3": washthree,
-                        "rinse_4": washfour,
-                    },
+                washmod = _adss_sample_aliquot(
+                    epm, washmod, aliquot_volume_ul, PAL_Injector, PAL_Injector_id
                 )
 
         # switch from O2 to N2 and saturate
@@ -3287,24 +2912,8 @@ def ADSS_PA_CV_TRI(
 
             if aliquote_CV_final[i] == 1:
 
-                washmod += 1
-                washone = washmod % 4 % 3 % 2
-                washtwo = (washmod + 1) % 4 % 3 % 2
-                washthree = (washmod + 2) % 4 % 3 % 2
-                washfour = (washmod + 3) % 4 % 3 % 2
-
-                epm.add(
-                    "ADSS_sub_sample_aliquot",
-                    {
-                        "aliquot_volume_ul": aliquot_volume_ul,
-                        "EquilibrationTime_s": 0,
-                        "PAL_Injector": PAL_Injector,
-                        "PAL_Injector_id": PAL_Injector_id,
-                        "rinse_1": washone,
-                        "rinse_2": washtwo,
-                        "rinse_3": washthree,
-                        "rinse_4": washfour,
-                    },
+                washmod = _adss_sample_aliquot(
+                    epm, washmod, aliquot_volume_ul, PAL_Injector, PAL_Injector_id
                 )
 
         if keep_electrolyte_at_end:
@@ -3312,14 +2921,8 @@ def ADSS_PA_CV_TRI(
 
         else:
 
-            epm.add("ADSS_sub_unloadall_customs", {})
-            epm.add(
-                "ADSS_sub_drain_cell",
-                {
-                    "DrainWait_s": cell_draintime_sec,
-                    "ReturnLineReverseWait_s": ReturnLineReverseWait_sec,
-                    #    "ResidualWait_s": ResidualWait_s,
-                },
+            _adss_unload_customs_drain_cell(
+                epm, cell_draintime_sec, ReturnLineReverseWait_sec
             )
 
         if move_to_clean_and_clean:
@@ -3354,24 +2957,13 @@ def ADSS_PA_CV_TRI(
 
     # ref measurement at end of sequence
     if measure_ref_Pt_at_end:
-        epm.add(
-            "ADSS_sub_move_to_ref_measurement",
-            {
-                "reference_position_name": name_ref_Pt_at_end,
-            },
-        )
-
-        epm.add(
-            "ADSS_sub_load",
-            {
-                "solid_custom_position": "cell1_we",
-                "solid_plate_id": plate_id_ref_Pt,
-                "solid_sample_no": 1,  ################### can i use the sample id for all ref measurements?
-                "previous_liquid": use_current_electrolyte,
-                "liquid_custom_position": "cell1_we",
-                "liquid_sample_no": liquid_sample_no,
-                "liquid_sample_volume_ul": liquid_sample_volume_ul,
-            },
+        _adss_move_to_ref_end_load(
+            epm,
+            name_ref_Pt_at_end,
+            plate_id_ref_Pt,
+            use_current_electrolyte,
+            liquid_sample_no,
+            liquid_sample_volume_ul,
         )
 
         # rinse with electrolyte to remove cleaning liquid residuals
@@ -3383,85 +2975,29 @@ def ADSS_PA_CV_TRI(
                     "Syringe_rate_ulsec": Syringe_rate_ulsec,
                 },
             )
-            epm.add(
-                "ADSS_sub_recirculate",
-                {
-                    "direction_forward_or_reverse": "forward",
-                    "wait_time_s": rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
-                },
-            )
-            epm.add(
-                "ADSS_sub_drain_cell",
-                {
-                    "DrainWait_s": rinse_with_electrolyte_bf_prefill_drain_time_sec,
-                    "ReturnLineReverseWait_s": 5,
-                    #    "ResidualWait_s": ResidualWait_s,
-                },
-            )
-            epm.add(
-                "ADSS_sub_refill_syringe",
-                {
-                    "syringe": "electrolyte",
-                    "fill_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
-                    "Syringe_rate_ulsec": Syringe_rate_ulsec,
-                },
+            _adss_electrolyte_rinse_recirculate_drain_refill(
+                epm,
+                rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
+                rinse_with_electrolyte_bf_prefill_drain_time_sec,
+                rinse_with_electrolyte_bf_prefill_volume_uL,
+                Syringe_rate_ulsec,
             )
 
         # electrolyte filling for experiment
-        epm.add(
-            "ADSS_sub_cellfill_prefilled",
-            {
-                "Solution_volume_ul": liquid_sample_volume_ul,
-                "Syringe_rate_ulsec": Syringe_rate_ulsec,
-            },
+        _adss_prefill_set_n2(
+            epm, liquid_sample_volume_ul, Syringe_rate_ulsec, set_valve=False
         )
 
-        # set initial gas to N2
-        epm.add(
-            "ADSS_sub_gasvalve_N2flow",
-            {
-                "open": True,
-            },
+        # pump recirculate forward (N2 valve folded into the first recirculate)
+        _adss_fill_recirculate_refill(
+            epm,
+            fill_recirculate_wait_time_sec,
+            pump_reversal_during_filling,
+            fill_recirculate_reverse_wait_time_sec,
+            use_current_electrolyte,
+            liquid_sample_volume_ul,
+            n2flow=True,
         )
-
-        # pump recirculate forward
-        epm.add(
-            "ADSS_sub_recirculate",
-            {
-                "direction_forward_or_reverse": "forward",
-                "wait_time_s": fill_recirculate_wait_time_sec,
-            },
-        )
-
-        # pump recirculate reverse (for bubbles)
-        if pump_reversal_during_filling:
-            epm.add(
-                "ADSS_sub_recirculate",
-                {
-                    "direction_forward_or_reverse": "reverse",
-                    "wait_time_s": fill_recirculate_reverse_wait_time_sec,
-                },
-            )
-
-            # pump recirculate forward
-            epm.add(
-                "ADSS_sub_recirculate",
-                {
-                    "direction_forward_or_reverse": "forward",
-                    "wait_time_s": 5,
-                },
-            )
-
-        # refill electrolyte syringe here so that ADSS can recirculate and N2 saturate while filling syringe
-        if not use_current_electrolyte:
-            epm.add(
-                "ADSS_sub_refill_syringe",
-                {
-                    "syringe": "electrolyte",
-                    "fill_volume_ul": liquid_sample_volume_ul,
-                    "Syringe_rate_ulsec": 300,
-                },
-            )
 
         # check for bubbles that could interfere with echem measurments with OCV
         if use_bubble_removal:
@@ -3599,23 +3135,14 @@ def ADSS_PA_CV_TRI(
             )
 
         # switch from O2 to N2 and saturate
-        epm.add(
-            "ADSS_sub_gasvalve_N2flow",
-            {
-                "open": True,
-            },
-        )
-
-        # unload sample
-        epm.add("ADSS_sub_unloadall_customs", {})
-
-        # drain cell
+        # (valve toggle folded into the drain experiment, which unloads first)
         epm.add(
             "ADSS_sub_drain_cell",
             {
+                "N2flow": True,
+                "unload_first": True,
                 "DrainWait_s": cell_draintime_sec,
                 "ReturnLineReverseWait_s": ReturnLineReverseWait_sec,
-                #    "ResidualWait_s": ResidualWait_s,
             },
         )
 
@@ -3649,7 +3176,7 @@ def ADSS_PA_CV_TRI(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=9)
+@sequence(version=10)
 def ADSS_PA_CV_TRI_new(
     # note: str = "need as many samples as you expect combinations of UPL and LPL",
     # sample info
@@ -3888,36 +3415,15 @@ def ADSS_PA_CV_TRI_new(
     epm = ExperimentPlanMaker()
 
     if rinse_with_electrolyte_bf_prefill:
-        epm.add("ADSS_sub_move_to_clean_cell", {})
-        epm.add(
-            "ADSS_sub_cellfill_prefilled_nosampleload",
-            {
-                "Solution_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
-                "Syringe_rate_ulsec": Syringe_rate_ulsec,
-            },
+        _adss_move_clean_cell_prefill_nosampleload(
+            epm, rinse_with_electrolyte_bf_prefill_volume_uL, Syringe_rate_ulsec
         )
-        epm.add(
-            "ADSS_sub_recirculate",
-            {
-                "direction_forward_or_reverse": "forward",
-                "wait_time_s": rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
-            },
-        )
-        epm.add(
-            "ADSS_sub_drain_cell",
-            {
-                "DrainWait_s": rinse_with_electrolyte_bf_prefill_drain_time_sec,
-                "ReturnLineReverseWait_s": 5,
-                #    "ResidualWait_s": ResidualWait_s,
-            },
-        )
-        epm.add(
-            "ADSS_sub_refill_syringe",
-            {
-                "syringe": "electrolyte",
-                "fill_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
-                "Syringe_rate_ulsec": Syringe_rate_ulsec,
-            },
+        _adss_electrolyte_rinse_recirculate_drain_refill(
+            epm,
+            rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
+            rinse_with_electrolyte_bf_prefill_drain_time_sec,
+            rinse_with_electrolyte_bf_prefill_volume_uL,
+            Syringe_rate_ulsec,
         )
 
     ###################################################################
@@ -3926,40 +3432,17 @@ def ADSS_PA_CV_TRI_new(
 
     # ref measurement at beginning of sequence
     if measure_ref_Pt_at_beginning:
-        epm.add(
-            "ADSS_sub_move_to_ref_measurement",
-            {"reference_position_name": name_ref_Pt_at_beginning},
-        )
-
-        epm.add(
-            "ADSS_sub_load",
-            {
-                "solid_custom_position": "cell1_we",
-                "solid_plate_id": plate_id_ref_Pt,
-                "solid_sample_no": 1,  ################### can i use the sample id for all ref measurements?
-                "previous_liquid": use_current_electrolyte,
-                "liquid_custom_position": "cell1_we",
-                "liquid_sample_no": liquid_sample_no,
-                "liquid_sample_volume_ul": liquid_sample_volume_ul,
-            },
+        _adss_move_to_ref_begin_load(
+            epm,
+            name_ref_Pt_at_beginning,
+            plate_id_ref_Pt,
+            use_current_electrolyte,
+            liquid_sample_no,
+            liquid_sample_volume_ul,
         )
 
         # electrolyte filling for experiment
-        epm.add(
-            "ADSS_sub_cellfill_prefilled",
-            {
-                "Solution_volume_ul": liquid_sample_volume_ul,
-                "Syringe_rate_ulsec": Syringe_rate_ulsec,
-            },
-        )
-
-        # set initial gas to N2
-        epm.add(
-            "ADSS_sub_gasvalve_N2flow",
-            {
-                "open": True,
-            },
-        )
+        _adss_prefill_set_n2(epm, liquid_sample_volume_ul, Syringe_rate_ulsec)
         epm.add(
             "ADSS_sub_PAL_load_gas",
             {
@@ -3969,43 +3452,14 @@ def ADSS_PA_CV_TRI_new(
         )
 
         # pump recirculate forward
-        epm.add(
-            "ADSS_sub_recirculate",
-            {
-                "direction_forward_or_reverse": "forward",
-                "wait_time_s": fill_recirculate_wait_time_sec,
-            },
+        _adss_fill_recirculate_refill(
+            epm,
+            fill_recirculate_wait_time_sec,
+            pump_reversal_during_filling,
+            fill_recirculate_reverse_wait_time_sec,
+            use_current_electrolyte,
+            liquid_sample_volume_ul,
         )
-
-        # pump recirculate reverse (for bubbles)
-        if pump_reversal_during_filling:
-            epm.add(
-                "ADSS_sub_recirculate",
-                {
-                    "direction_forward_or_reverse": "reverse",
-                    "wait_time_s": fill_recirculate_reverse_wait_time_sec,
-                },
-            )
-
-            # pump recirculate forward
-            epm.add(
-                "ADSS_sub_recirculate",
-                {
-                    "direction_forward_or_reverse": "forward",
-                    "wait_time_s": 5,
-                },
-            )
-
-        # refill electrolyte syringe here so that ADSS can recirculate and N2 saturate while filling syringe
-        if not use_current_electrolyte:
-            epm.add(
-                "ADSS_sub_refill_syringe",
-                {
-                    "syringe": "electrolyte",
-                    "fill_volume_ul": liquid_sample_volume_ul,
-                    "Syringe_rate_ulsec": 300,
-                },
-            )
 
         # check for bubbles that could interfere with echem measurments with OCV
         if use_bubble_removal:
@@ -4099,21 +3553,8 @@ def ADSS_PA_CV_TRI_new(
             )
 
         # switch from N2 to O2 and saturate
-        epm.add(
-            "ADSS_sub_gasvalve_N2flow",
-            {
-                "open": False,
-            },
-        )
-        # need to remove N2 gas sample
-        epm.add("ADSS_sub_unload_gas_only", {})
-        # test need
-        epm.add(
-            "ADSS_sub_PAL_load_gas",
-            {
-                "bubbled_gas": "O2",
-                "reservoir_gas_sample_no": 2,
-            },
+        _adss_switch_gas_to_o2(
+            epm,
         )
         epm.add(
             "ADSS_sub_OCV",
@@ -4159,34 +3600,13 @@ def ADSS_PA_CV_TRI_new(
             )
 
         # switch from O2 to N2 and saturate
-        epm.add(
-            "ADSS_sub_gasvalve_N2flow",
-            {
-                "open": True,
-            },
-        )
-        # need to remove O2 gas sample
-        epm.add("ADSS_sub_unload_gas_only", {})
-        # test need
-        epm.add(
-            "ADSS_sub_PAL_load_gas",
-            {
-                "bubbled_gas": "N2",
-                "reservoir_gas_sample_no": 1,
-            },
+        _adss_switch_gas_to_n2(
+            epm,
         )
 
         # unload sample
-        epm.add("ADSS_sub_unloadall_customs", {})
-
-        # drain cell
-        epm.add(
-            "ADSS_sub_drain_cell",
-            {
-                "DrainWait_s": cell_draintime_sec,
-                "ReturnLineReverseWait_s": ReturnLineReverseWait_sec,
-                #    "ResidualWait_s": ResidualWait_s,
-            },
+        _adss_unload_customs_drain_cell(
+            epm, cell_draintime_sec, ReturnLineReverseWait_sec
         )
 
         # clean cell
@@ -4225,28 +3645,12 @@ def ADSS_PA_CV_TRI_new(
                         "Syringe_rate_ulsec": Syringe_rate_ulsec,
                     },
                 )
-                epm.add(
-                    "ADSS_sub_recirculate",
-                    {
-                        "direction_forward_or_reverse": "forward",
-                        "wait_time_s": rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
-                    },
-                )
-                epm.add(
-                    "ADSS_sub_drain_cell",
-                    {
-                        "DrainWait_s": rinse_with_electrolyte_bf_prefill_drain_time_sec,
-                        "ReturnLineReverseWait_s": 5,
-                        #    "ResidualWait_s": ResidualWait_s,
-                    },
-                )
-                epm.add(
-                    "ADSS_sub_refill_syringe",
-                    {
-                        "syringe": "electrolyte",
-                        "fill_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
-                        "Syringe_rate_ulsec": Syringe_rate_ulsec,
-                    },
+                _adss_electrolyte_rinse_recirculate_drain_refill(
+                    epm,
+                    rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
+                    rinse_with_electrolyte_bf_prefill_drain_time_sec,
+                    rinse_with_electrolyte_bf_prefill_volume_uL,
+                    Syringe_rate_ulsec,
                 )
 
     ###################################################################
@@ -4305,58 +3709,19 @@ def ADSS_PA_CV_TRI_new(
             previous_liquid_injected = ""
 
         # set initial gas to N2
-        epm.add(
-            "ADSS_sub_gasvalve_N2flow",
-            {
-                "open": True,
-            },
-        )
-        epm.add(
-            "ADSS_sub_PAL_load_gas",
-            {
-                "bubbled_gas": "N2",
-                "reservoir_gas_sample_no": 1,
-            },
+        _adss_load_n2_gas(
+            epm,
         )
 
         # pump recirculate forward
-        epm.add(
-            "ADSS_sub_recirculate",
-            {
-                "direction_forward_or_reverse": "forward",
-                "wait_time_s": fill_recirculate_wait_time_sec,
-            },
+        _adss_fill_recirculate_refill(
+            epm,
+            fill_recirculate_wait_time_sec,
+            pump_reversal_during_filling,
+            fill_recirculate_reverse_wait_time_sec,
+            use_current_electrolyte,
+            liquid_sample_volume_ul,
         )
-
-        # pump recirculate reverse (for bubbles)
-        if pump_reversal_during_filling:
-            epm.add(
-                "ADSS_sub_recirculate",
-                {
-                    "direction_forward_or_reverse": "reverse",
-                    "wait_time_s": fill_recirculate_reverse_wait_time_sec,
-                },
-            )
-
-            # pump recirculate forward
-            epm.add(
-                "ADSS_sub_recirculate",
-                {
-                    "direction_forward_or_reverse": "forward",
-                    "wait_time_s": 5,
-                },
-            )
-
-        # refill electrolyte syringe here so that ADSS can recirculate and N2 saturate while filling syringe
-        if not use_current_electrolyte:
-            epm.add(
-                "ADSS_sub_refill_syringe",
-                {
-                    "syringe": "electrolyte",
-                    "fill_volume_ul": liquid_sample_volume_ul,
-                    "Syringe_rate_ulsec": 300,
-                },
-            )
 
         # washmod = 0
 
@@ -4484,21 +3849,8 @@ def ADSS_PA_CV_TRI_new(
             )
 
         # switch from N2 to O2 and saturate
-        epm.add(
-            "ADSS_sub_gasvalve_N2flow",
-            {
-                "open": False,
-            },
-        )
-        # need to remove N2 gas sample
-        epm.add("ADSS_sub_unload_gas_only", {})
-        # test need
-        epm.add(
-            "ADSS_sub_PAL_load_gas",
-            {
-                "bubbled_gas": "O2",
-                "reservoir_gas_sample_no": 2,
-            },
+        _adss_switch_gas_to_o2(
+            epm,
         )
 
         epm.add(
@@ -4579,10 +3931,6 @@ def ADSS_PA_CV_TRI_new(
             ########################### actual syringe injection
             previous_liquid_injected = "phosphoric"
             washmod += 1
-            washone = washmod % 4 % 3 % 2
-            washtwo = (washmod + 1) % 4 % 3 % 2
-            washthree = (washmod + 2) % 4 % 3 % 2
-            washfour = (washmod + 3) % 4 % 3 % 2
 
             epm.add(
                 "ADSS_sub_transfer_liquid_in",
@@ -4653,21 +4001,8 @@ def ADSS_PA_CV_TRI_new(
             )
 
         # switch from O2 to N2 and saturate
-        epm.add(
-            "ADSS_sub_gasvalve_N2flow",
-            {
-                "open": True,
-            },
-        )
-        # need to remove O2 gas sample
-        epm.add("ADSS_sub_unload_gas_only", {})
-        # test need
-        epm.add(
-            "ADSS_sub_PAL_load_gas",
-            {
-                "bubbled_gas": "N2",
-                "reservoir_gas_sample_no": 1,
-            },
+        _adss_switch_gas_to_n2(
+            epm,
         )
 
         # measure OCP (default of OCV exp is to not take any aliquots)
@@ -4735,14 +4070,8 @@ def ADSS_PA_CV_TRI_new(
         # test need
         else:
 
-            epm.add("ADSS_sub_unloadall_customs", {})
-            epm.add(
-                "ADSS_sub_drain_cell",
-                {
-                    "DrainWait_s": cell_draintime_sec,
-                    "ReturnLineReverseWait_s": ReturnLineReverseWait_sec,
-                    #    "ResidualWait_s": ResidualWait_s,
-                },
+            _adss_unload_customs_drain_cell(
+                epm, cell_draintime_sec, ReturnLineReverseWait_sec
             )
 
         if move_to_clean_and_clean:
@@ -4779,28 +4108,12 @@ def ADSS_PA_CV_TRI_new(
                         "Syringe_rate_ulsec": Syringe_rate_ulsec,
                     },
                 )
-                epm.add(
-                    "ADSS_sub_recirculate",
-                    {
-                        "direction_forward_or_reverse": "forward",
-                        "wait_time_s": rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
-                    },
-                )
-                epm.add(
-                    "ADSS_sub_drain_cell",
-                    {
-                        "DrainWait_s": rinse_with_electrolyte_bf_prefill_drain_time_sec,
-                        "ReturnLineReverseWait_s": 5,
-                        #    "ResidualWait_s": ResidualWait_s,
-                    },
-                )
-                epm.add(
-                    "ADSS_sub_refill_syringe",
-                    {
-                        "syringe": "electrolyte",
-                        "fill_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
-                        "Syringe_rate_ulsec": Syringe_rate_ulsec,
-                    },
+                _adss_electrolyte_rinse_recirculate_drain_refill(
+                    epm,
+                    rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
+                    rinse_with_electrolyte_bf_prefill_drain_time_sec,
+                    rinse_with_electrolyte_bf_prefill_volume_uL,
+                    Syringe_rate_ulsec,
                 )
     ################# extra clean of syringe used for phos injection
     # if Inject_PA:
@@ -4877,42 +4190,17 @@ def ADSS_PA_CV_TRI_new(
 
     # ref measurement at end of sequence
     if measure_ref_Pt_at_end:
-        epm.add(
-            "ADSS_sub_move_to_ref_measurement",
-            {
-                "reference_position_name": name_ref_Pt_at_end,
-            },
-        )
-
-        epm.add(
-            "ADSS_sub_load",
-            {
-                "solid_custom_position": "cell1_we",
-                "solid_plate_id": plate_id_ref_Pt,
-                "solid_sample_no": 1,  ################### can i use the sample id for all ref measurements?
-                "previous_liquid": use_current_electrolyte,
-                "liquid_custom_position": "cell1_we",
-                "liquid_sample_no": liquid_sample_no,
-                "liquid_sample_volume_ul": liquid_sample_volume_ul,
-            },
+        _adss_move_to_ref_end_load(
+            epm,
+            name_ref_Pt_at_end,
+            plate_id_ref_Pt,
+            use_current_electrolyte,
+            liquid_sample_no,
+            liquid_sample_volume_ul,
         )
 
         # electrolyte filling for experiment
-        epm.add(
-            "ADSS_sub_cellfill_prefilled",
-            {
-                "Solution_volume_ul": liquid_sample_volume_ul,
-                "Syringe_rate_ulsec": Syringe_rate_ulsec,
-            },
-        )
-
-        # set initial gas to N2
-        epm.add(
-            "ADSS_sub_gasvalve_N2flow",
-            {
-                "open": True,
-            },
-        )
+        _adss_prefill_set_n2(epm, liquid_sample_volume_ul, Syringe_rate_ulsec)
         epm.add(
             "ADSS_sub_PAL_load_gas",
             {
@@ -4922,43 +4210,14 @@ def ADSS_PA_CV_TRI_new(
         )
 
         # pump recirculate forward
-        epm.add(
-            "ADSS_sub_recirculate",
-            {
-                "direction_forward_or_reverse": "forward",
-                "wait_time_s": fill_recirculate_wait_time_sec,
-            },
+        _adss_fill_recirculate_refill(
+            epm,
+            fill_recirculate_wait_time_sec,
+            pump_reversal_during_filling,
+            fill_recirculate_reverse_wait_time_sec,
+            use_current_electrolyte,
+            liquid_sample_volume_ul,
         )
-
-        # pump recirculate reverse (for bubbles)
-        if pump_reversal_during_filling:
-            epm.add(
-                "ADSS_sub_recirculate",
-                {
-                    "direction_forward_or_reverse": "reverse",
-                    "wait_time_s": fill_recirculate_reverse_wait_time_sec,
-                },
-            )
-
-            # pump recirculate forward
-            epm.add(
-                "ADSS_sub_recirculate",
-                {
-                    "direction_forward_or_reverse": "forward",
-                    "wait_time_s": 5,
-                },
-            )
-
-        # refill electrolyte syringe here so that ADSS can recirculate and N2 saturate while filling syringe
-        if not use_current_electrolyte:
-            epm.add(
-                "ADSS_sub_refill_syringe",
-                {
-                    "syringe": "electrolyte",
-                    "fill_volume_ul": liquid_sample_volume_ul,
-                    "Syringe_rate_ulsec": 300,
-                },
-            )
 
         # check for bubbles that could interfere with echem measurments with OCV
         if use_bubble_removal:
@@ -5052,21 +4311,8 @@ def ADSS_PA_CV_TRI_new(
             )
 
         # switch from N2 to O2 and saturate
-        epm.add(
-            "ADSS_sub_gasvalve_N2flow",
-            {
-                "open": False,
-            },
-        )
-        # need to remove N2 gas sample
-        epm.add("ADSS_sub_unload_gas_only", {})
-        # test need
-        epm.add(
-            "ADSS_sub_PAL_load_gas",
-            {
-                "bubbled_gas": "O2",
-                "reservoir_gas_sample_no": 2,
-            },
+        _adss_switch_gas_to_o2(
+            epm,
         )
 
         epm.add(
@@ -5113,23 +4359,14 @@ def ADSS_PA_CV_TRI_new(
             )
 
         # switch from O2 to N2 and saturate
-        epm.add(
-            "ADSS_sub_gasvalve_N2flow",
-            {
-                "open": True,
-            },
-        )
-
-        # unload sample
-        epm.add("ADSS_sub_unloadall_customs", {})
-
-        # drain cell
+        # (valve toggle folded into the drain experiment, which unloads first)
         epm.add(
             "ADSS_sub_drain_cell",
             {
+                "N2flow": True,
+                "unload_first": True,
                 "DrainWait_s": cell_draintime_sec,
                 "ReturnLineReverseWait_s": ReturnLineReverseWait_sec,
-                #    "ResidualWait_s": ResidualWait_s,
             },
         )
 
@@ -5169,28 +4406,12 @@ def ADSS_PA_CV_TRI_new(
                         "Syringe_rate_ulsec": Syringe_rate_ulsec,
                     },
                 )
-                epm.add(
-                    "ADSS_sub_recirculate",
-                    {
-                        "direction_forward_or_reverse": "forward",
-                        "wait_time_s": rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
-                    },
-                )
-                epm.add(
-                    "ADSS_sub_drain_cell",
-                    {
-                        "DrainWait_s": rinse_with_electrolyte_bf_prefill_drain_time_sec,
-                        "ReturnLineReverseWait_s": 5,
-                        #    "ResidualWait_s": ResidualWait_s,
-                    },
-                )
-                epm.add(
-                    "ADSS_sub_refill_syringe",
-                    {
-                        "syringe": "electrolyte",
-                        "fill_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
-                        "Syringe_rate_ulsec": Syringe_rate_ulsec,
-                    },
+                _adss_electrolyte_rinse_recirculate_drain_refill(
+                    epm,
+                    rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
+                    rinse_with_electrolyte_bf_prefill_drain_time_sec,
+                    rinse_with_electrolyte_bf_prefill_volume_uL,
+                    Syringe_rate_ulsec,
                 )
     epm.add(
         "ADSS_sub_gasvalve_N2flow",
@@ -5202,7 +4423,7 @@ def ADSS_PA_CV_TRI_new(
     return epm.planned_experiments  # returns complete experiment list
 
 
-@sequence(version=2)
+@sequence(version=3)
 def ADSS_PA_CV_single(
     # sample info
     plate_id: int = 6307,
@@ -5329,35 +4550,15 @@ def ADSS_PA_CV_single(
     epm = ExperimentPlanMaker()
 
     if rinse_with_electrolyte_bf_prefill:
-        epm.add("ADSS_sub_move_to_clean_cell", {})
-        epm.add(
-            "ADSS_sub_cellfill_prefilled_nosampleload",
-            {
-                "Solution_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
-                "Syringe_rate_ulsec": Syringe_rate_ulsec,
-            },
+        _adss_move_clean_cell_prefill_nosampleload(
+            epm, rinse_with_electrolyte_bf_prefill_volume_uL, Syringe_rate_ulsec
         )
-        epm.add(
-            "ADSS_sub_recirculate",
-            {
-                "direction_forward_or_reverse": "forward",
-                "wait_time_s": rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
-            },
-        )
-        epm.add(
-            "ADSS_sub_drain_cell",
-            {
-                "DrainWait_s": rinse_with_electrolyte_bf_prefill_drain_time_sec,
-                "ReturnLineReverseWait_s": 5,
-            },
-        )
-        epm.add(
-            "ADSS_sub_refill_syringe",
-            {
-                "syringe": "electrolyte",
-                "fill_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
-                "Syringe_rate_ulsec": Syringe_rate_ulsec,
-            },
+        _adss_electrolyte_rinse_recirculate_drain_refill(
+            epm,
+            rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
+            rinse_with_electrolyte_bf_prefill_drain_time_sec,
+            rinse_with_electrolyte_bf_prefill_volume_uL,
+            Syringe_rate_ulsec,
         )
 
     ###################################################################
@@ -5401,58 +4602,19 @@ def ADSS_PA_CV_single(
         )
 
     # set initial gas to N2
-    epm.add(
-        "ADSS_sub_gasvalve_N2flow",
-        {
-            "open": True,
-        },
-    )
-    epm.add(
-        "ADSS_sub_PAL_load_gas",
-        {
-            "bubbled_gas": "N2",
-            "reservoir_gas_sample_no": 1,
-        },
+    _adss_load_n2_gas(
+        epm,
     )
 
     # pump recirculate forward
-    epm.add(
-        "ADSS_sub_recirculate",
-        {
-            "direction_forward_or_reverse": "forward",
-            "wait_time_s": fill_recirculate_wait_time_sec,
-        },
+    _adss_fill_recirculate_refill(
+        epm,
+        fill_recirculate_wait_time_sec,
+        pump_reversal_during_filling,
+        fill_recirculate_reverse_wait_time_sec,
+        use_current_electrolyte,
+        liquid_sample_volume_ul,
     )
-
-    # pump recirculate reverse (for bubbles)
-    if pump_reversal_during_filling:
-        epm.add(
-            "ADSS_sub_recirculate",
-            {
-                "direction_forward_or_reverse": "reverse",
-                "wait_time_s": fill_recirculate_reverse_wait_time_sec,
-            },
-        )
-
-        # pump recirculate forward
-        epm.add(
-            "ADSS_sub_recirculate",
-            {
-                "direction_forward_or_reverse": "forward",
-                "wait_time_s": 5,
-            },
-        )
-
-    # refill electrolyte syringe here so that ADSS can recirculate and N2 saturate while filling syringe
-    if not use_current_electrolyte:
-        epm.add(
-            "ADSS_sub_refill_syringe",
-            {
-                "syringe": "electrolyte",
-                "fill_volume_ul": liquid_sample_volume_ul,
-                "Syringe_rate_ulsec": 300,
-            },
-        )
 
     # check for bubbles that could interfere with echem measurments with OCV
     if use_bubble_removal:
@@ -5493,21 +4655,8 @@ def ADSS_PA_CV_single(
     )
 
     # switch from N2 to O2 and saturate
-    epm.add(
-        "ADSS_sub_gasvalve_N2flow",
-        {
-            "open": False,
-        },
-    )
-    # need to remove N2 gas sample
-    epm.add("ADSS_sub_unload_gas_only", {})
-    # load O2 gas
-    epm.add(
-        "ADSS_sub_PAL_load_gas",
-        {
-            "bubbled_gas": "O2",
-            "reservoir_gas_sample_no": 2,
-        },
+    _adss_switch_gas_to_o2(
+        epm,
     )
 
     epm.add(
@@ -5546,24 +4695,8 @@ def ADSS_PA_CV_single(
 
     # take aliquot after CV
     washmod = 0
-    washmod += 1
-    washone = washmod % 4 % 3 % 2
-    washtwo = (washmod + 1) % 4 % 3 % 2
-    washthree = (washmod + 2) % 4 % 3 % 2
-    washfour = (washmod + 3) % 4 % 3 % 2
-
-    epm.add(
-        "ADSS_sub_sample_aliquot",
-        {
-            "aliquot_volume_ul": aliquot_volume_ul,
-            "EquilibrationTime_s": 0,
-            "PAL_Injector": PAL_Injector,
-            "PAL_Injector_id": PAL_Injector_id,
-            "rinse_1": washone,
-            "rinse_2": washtwo,
-            "rinse_3": washthree,
-            "rinse_4": washfour,
-        },
+    washmod = _adss_sample_aliquot(
+        epm, washmod, aliquot_volume_ul, PAL_Injector, PAL_Injector_id
     )
 
     if keep_electrolyte_at_end:
@@ -5571,13 +4704,8 @@ def ADSS_PA_CV_single(
         # unload gas too
         epm.add("ADSS_sub_unload_gas_only", {})
     else:
-        epm.add("ADSS_sub_unloadall_customs", {})
-        epm.add(
-            "ADSS_sub_drain_cell",
-            {
-                "DrainWait_s": cell_draintime_sec,
-                "ReturnLineReverseWait_s": ReturnLineReverseWait_sec,
-            },
+        _adss_unload_customs_drain_cell(
+            epm, cell_draintime_sec, ReturnLineReverseWait_sec
         )
 
     if move_to_clean_and_clean:
@@ -5614,27 +4742,12 @@ def ADSS_PA_CV_single(
                     "Syringe_rate_ulsec": Syringe_rate_ulsec,
                 },
             )
-            epm.add(
-                "ADSS_sub_recirculate",
-                {
-                    "direction_forward_or_reverse": "forward",
-                    "wait_time_s": rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
-                },
-            )
-            epm.add(
-                "ADSS_sub_drain_cell",
-                {
-                    "DrainWait_s": rinse_with_electrolyte_bf_prefill_drain_time_sec,
-                    "ReturnLineReverseWait_s": 5,
-                },
-            )
-            epm.add(
-                "ADSS_sub_refill_syringe",
-                {
-                    "syringe": "electrolyte",
-                    "fill_volume_ul": rinse_with_electrolyte_bf_prefill_volume_uL,
-                    "Syringe_rate_ulsec": Syringe_rate_ulsec,
-                },
+            _adss_electrolyte_rinse_recirculate_drain_refill(
+                epm,
+                rinse_with_electrolyte_bf_prefill_recirculate_wait_time_sec,
+                rinse_with_electrolyte_bf_prefill_drain_time_sec,
+                rinse_with_electrolyte_bf_prefill_volume_uL,
+                Syringe_rate_ulsec,
             )
 
     epm.add(

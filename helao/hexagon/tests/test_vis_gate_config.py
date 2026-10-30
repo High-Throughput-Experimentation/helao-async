@@ -1,7 +1,7 @@
-"""Gate-config checks for the two bokeh-hosting configs, `goldenhexvis.yml` and
-`goldenhexgraft.yml`. Both name the hte bokeh modules directly (no routing key);
-they resolve, validate, and import-resolve, and every hte visualizer module
-imports without hardware/vendor runtime."""
+"""Gate-config checks for the bokeh-hosting config, `goldenhexvis.yml`. It names
+the hte bokeh modules directly (no routing key); it resolves, validates, and
+import-resolves, and every hte visualizer module imports without hardware/vendor
+runtime."""
 
 import os
 import types
@@ -14,9 +14,6 @@ _REPO_ROOT = os.path.dirname(
 )
 _CFG = os.path.join(
     _REPO_ROOT, "helao", "deploy", "test", "configs", "goldenhexvis.yml"
-)
-_GRAFT_CFG = os.path.join(
-    _REPO_ROOT, "helao", "deploy", "test", "configs", "goldenhexgraft.yml"
 )
 
 
@@ -32,23 +29,21 @@ def _bokeh_entries(conf):
     }
 
 
-@pytest.mark.parametrize("path", [_CFG, _GRAFT_CFG])
-def test_gate_configs_validate(path):
+def test_gate_configs_validate():
     from launch import validateConfig
 
-    conf = _load(path)
+    conf = _load()
     pidd = types.SimpleNamespace(
         reqKeys=("host", "port", "group"), codeKeys=("fast", "bokeh")
     )
     assert validateConfig(pidd, conf, _REPO_ROOT) is True
 
 
-@pytest.mark.parametrize("path", [_CFG, _GRAFT_CFG])
-def test_gate_bokeh_entries_name_hte_modules_with_no_routing_key(path):
+def test_gate_bokeh_entries_name_hte_modules_with_no_routing_key():
     """Every bokeh server names its hte module directly: no `deployment` key, no
     `bokeh_port`, and the module resolves under helao.deploy.hte and exposes
     makeBokehApp. (The retired routing keys are the ratchet's business.)"""
-    bokeh_entries = _bokeh_entries(_load(path))
+    bokeh_entries = _bokeh_entries(_load())
     assert set(bokeh_entries) == {"OPERATOR", "LIVE", "ACTVIS"}
     for scfg in bokeh_entries.values():
         assert "deployment" not in scfg
@@ -57,18 +52,16 @@ def test_gate_bokeh_entries_name_hte_modules_with_no_routing_key(path):
         assert callable(mod.makeBokehApp)
 
 
-@pytest.mark.parametrize("path", [_CFG, _GRAFT_CFG])
-def test_gate_configs_preflight_clean(path):
+def test_gate_configs_preflight_clean():
     from helao.hexagon import preflight
 
-    assert preflight.preflight_config(path) == []
+    assert preflight.preflight_config(_CFG) == []
 
 
-@pytest.mark.parametrize("path", [_CFG, _GRAFT_CFG])
-def test_gate_config_ws_sources_present(path):
+def test_gate_config_ws_sources_present():
     """The operator needs ORCH ws_status, live vis needs SIM ws_live — the
     action/orch group must be in the gate config (reviewer point 3)."""
-    conf = _load(path)
+    conf = _load()
     servers = conf["servers"]
     # no server carries a routing key: every host is natively an ActionHost
     assert all("deployment" not in v for v in servers.values())

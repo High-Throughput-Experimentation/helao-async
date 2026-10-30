@@ -29,7 +29,7 @@ from helao.core.models.machine import MachineModel
 from helao.core.models.process_contrib import ProcessContrib
 from helao.core.models.run_use import RunUse
 from helao.core.models.sample import GasSample, LiquidSample, SolidSample
-from helao.deploy.hte.drivers.motion.galil_motion_driver import (
+from helao.deploy.hte.drivers.motion.enum import (
     MoveModes,
     TransformationModes,
 )

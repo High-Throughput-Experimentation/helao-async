@@ -13,14 +13,11 @@ import os
 import tempfile
 import traceback
 
-from helao.core import version as version_mod
 from helao.core.tests._test_utils import TestReporter
 from helao.core.version import (
     get_branch_commithash,
-    get_caller_filehash,
     get_filehash,
     get_hlo_version,
-    get_object_filehash,
     hlo_version,
 )
 
@@ -69,27 +66,6 @@ def version_unit_test() -> bool:
         reporter.check(
             "module-level hlo_version mirrors get_hlo_version()",
             lambda: isinstance(hlo_version, str),
-        )
-
-        reporter.section("get_object_filehash / get_caller_filehash")
-        obj_hash, obj_file = get_object_filehash(version_mod)
-        reporter.check(
-            "get_object_filehash returns (str, str)",
-            lambda: isinstance(obj_hash, str) and isinstance(obj_file, str),
-        )
-        reporter.check(
-            "get_object_filehash filename ends with version.py",
-            lambda: obj_file.endswith("version.py"),
-        )
-
-        caller_hash, caller_file = get_caller_filehash()
-        reporter.check(
-            "get_caller_filehash returns (str, str)",
-            lambda: isinstance(caller_hash, str) and isinstance(caller_file, str),
-        )
-        reporter.check(
-            "get_caller_filehash filename points at this test module",
-            lambda: caller_file.endswith("unit_test_version.py"),
         )
 
         return reporter.success()

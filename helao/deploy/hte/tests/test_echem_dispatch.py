@@ -9,9 +9,8 @@ UnboundLocalError.
 
 Covers potential_versus (ECHE_sub_CA), ref_type (ECHE_sub_CA), and WE_versus
 (ECMS_sub_CV) dispatch. ANEC_exp.py's and ADSS_exp.py's ref_type/WE_versus
-sites are hardened identically but are not exercised here — neither is
-offline-importable on Linux (Windows-only gclib dependency); see the import
-comment below.
+sites are hardened identically but are not exercised here (both modules
+import offline, but ECMS_exp.py is the simpler vehicle; see the comment below).
 
 Also covers ref_type dispatch in the hte SEQUENCE module ECHE_seq.py (Task
 4b), via ECHE_CV's "ECHE_sub_preCV" experiment_params, captured with a
@@ -27,12 +26,10 @@ import helao.helpers.premodels as premodels_mod
 from helao.core.tests._test_utils import TestReporter
 from helao.deploy.hte.experiments.ECHE_exp import ECHE_sub_CA
 
-# ANEC_exp.py is NOT offline-importable on Linux (it imports
-# helao.deploy.hte.drivers.motion.galil_motion_driver -> gclib, a Windows-only
-# dependency), same constraint hit for ADSS_exp.py in Task 2. Its WE_versus
-# dispatch sites are hardened as construction-proof-only (source edit +
-# py_compile), not exercised here. ECMS_exp.py has no such import and is used
-# below to exercise the real WE_versus dispatch behavior.
+# ANEC_exp.py and ADSS_exp.py are offline-importable (no gclib import since
+# the Galil motion driver went away), but their WE_versus dispatch sites are
+# not exercised here; ECMS_exp.py is used below to exercise the real
+# WE_versus dispatch behavior.
 from helao.deploy.hte.experiments.ECMS_exp import ECMS_sub_CV
 from helao.deploy.hte.sequences.ECHE_seq import ECHE_CV
 from helao.helpers.constants import REF_TABLE

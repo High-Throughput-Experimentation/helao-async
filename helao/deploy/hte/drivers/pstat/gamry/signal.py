@@ -85,13 +85,6 @@ VSIGNAL_CONST = GamrySignal(
     mode=ControlMode.PstatMode,
 )
 
-EISSIGNAL_CONST = GamrySignal(
-    name="GamryCOM.GamrySignalConst",
-    param_keys=["Vval__V", "Tval__s", "AcqInterval__s"],
-    mode=ControlMode.PstatMode,
-    init_keys=["Freq", "RMS", "Precision"],
-)
-
 OCVSIGNAL_CONST = GamrySignal(
     name="GamryCOM.GamrySignalConst",
     param_keys=["Vval__V", "Tval__s", "AcqInterval__s"],
@@ -132,34 +125,9 @@ VSIGNAL_RUPDN = GamrySignal(
     },
 )
 
-ISIGNAL_RUPDN = GamrySignal(
-    name="GamryCOM.GamrySignalRupdn",
-    param_keys=[
-        "Iinit__A",
-        "Iapex1__A",
-        "Iapex2__A",
-        "Ifinal__A",
-        "ScanInit__A_s",
-        "ScanApex__A_s",
-        "ScanFinal__A_s",
-        "holdtime0__s",
-        "holdtime1__s",
-        "holdtime2__s",
-        "AcqInterval__s",
-        "cycles",
-    ],
-    mode=ControlMode.GstatMode,
-)
-
 
 VSIGNAL_ARRAY = GamrySignal(
     name="GamryCOM.GamrySignalArray",
     param_keys=["Cycles", "AcqInterval__s", "AcqPointsPerCycle", "SignalArray__V"],
     mode=ControlMode.PstatMode,
-)
-
-ISIGNAL_ARRAY = GamrySignal(
-    name="GamryCOM.GamrySignalArray",
-    param_keys=["Cycles", "AcqInterval__s", "AcqPointsPerCycle", "SignalArray__V"],
-    mode=ControlMode.GstatMode,
 )

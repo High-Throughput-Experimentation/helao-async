@@ -27,11 +27,12 @@ Example:
     default; pass --no-hot-reload (or set `hot_reload.enabled: false` in the
     config) to disable it. Flags may appear anywhere on the command line.
 Note:
-    This script requires the 'click', 'termcolor', 'pyfiglet', 'colorama', 'psutil', and 'requests' libraries.
+    This script requires the 'click', 'pyfiglet', 'colorama', 'psutil', and 'requests' libraries.
 """
 
 __all__ = []
 
+import atexit
 import json
 
 # ``logging`` below is helao's logging helper, NOT the stdlib module, so the
@@ -39,13 +40,11 @@ import json
 import logging as pylogging
 import os
 import pickle
-import re
 import signal
 import subprocess
 import sys
 import threading
 import time
-import zipfile
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
@@ -56,8 +55,9 @@ import click
 import colorama
 import psutil
 import requests
+import zmq
+from colorama import Fore, Style
 from pyfiglet import figlet_format
-from termcolor import cprint
 
 from helao.ui.shared.discovery import reserved_addresses
 from helao.core.version import get_hlo_version
@@ -65,6 +65,8 @@ from helao.helpers import helao_logging as logging
 from helao.helpers import win_job
 from helao.helpers.config_loader import read_config
 from helao.helpers.helao_dirs import helao_dirs
+from helao.helpers.log_collector import LogCollector, log_endpoint, resolve_log_port
+from helao.helpers.log_jsonl import LOG_ENDPOINT_ENV
 from helao.helpers.parent_death import (
     DETACH_MARKER_ENV,
     PARENT_PID_ENV,
@@ -73,6 +75,14 @@ from helao.helpers.parent_death import (
     write_detach_marker,
 )
 from helao.helpers.time_utils import get_ntp_time
+
+
+def cprint(text, color, attrs=()):
+    """Print ``text`` in a colorama foreground colour; ``attrs=["bold"]`` for bold."""
+    bold = Style.BRIGHT if "bold" in attrs else ""
+    fore = Fore.LIGHTWHITE_EX if color == "white" else getattr(Fore, color.upper())
+    print(f"{bold}{fore}{text}{Style.RESET_ALL}")
+
 
 # Upper bound (seconds) for a blocking POST /shutdown. The server's shutdown
 # hook runs its driver shutdown (e.g. gamry disconnect + kill GamryCOM) before
@@ -270,7 +280,7 @@ class ConsoleMux:
             _mux_log(
                 "error",
                 f"Could not attach console mux to {server_key}; its output will "
-                f"not reach the terminal (LOGS/{server_key}.log is unaffected).",
+                f"not reach the terminal (its records still reach LOGS/ through the log collector).",
                 exc_info=True,
             )
 
@@ -1559,6 +1569,7 @@ def launch_server_groups(
     pidd.orchServs = []
     for group in LAUNCH_ORDER:
         LAUNCH_LOGGER.info(f"Launching {group} group.")
+        launched_fast, launched_other = [], []
         if group in pidd.servers.keys():
             G = pidd.servers[group]
             for server in G.keys():
@@ -1650,10 +1661,58 @@ def launch_server_groups(
                         continue
                     pidd.store_pid(server, servHost, servPort, ppid)
                     pidd.procs[server] = p
+                    if codeKey == "fast":
+                        launched_fast.append((server, servHost, servPort, p))
+                    else:
+                        launched_other.append(server)
                     time.sleep(0.5)
         if group != LAUNCH_ORDER[-1]:
-            time.sleep(3)
+            wait_group_ready(group, launched_fast, launched_other)
     return pidd
+
+
+#: Upper bound on how long one launched FastAPI server may take to answer
+#: ``/get_status`` before the next group starts anyway (with a warning).
+GROUP_READY_TIMEOUT_S = 60.0
+
+
+def wait_group_ready(
+    group, launched_fast, launched_other, sleep=time.sleep, now=time.time
+):
+    """Hold the next launch group until this group's servers answer.
+
+    A fixed pause used to sit here, but the orchestrator's ``subscribe_all``
+    gives each action server only ~30 s of retries; on a slow machine, with
+    every server of a group booting at once, an action server could come up
+    after that and leave the orchestrator unable to run experiments. So each
+    FastAPI server launched in the group is polled on ``/get_status`` (it
+    serves only after its startup, driver connect included, has finished).
+    A server whose process has already exited is not waited on; the
+    early-exit supervision reports it. Bokeh/Reflex servers have no
+    ``/get_status``: a group that launched only those keeps the old pause.
+    """
+    if not launched_fast:
+        if launched_other:
+            sleep(3)
+        return
+    LAUNCH_LOGGER.info(
+        f"Waiting for {len(launched_fast)} {group} server(s) to answer before "
+        "the next group."
+    )
+    for server, host, port, proc in launched_fast:
+        deadline = now() + GROUP_READY_TIMEOUT_S
+        while not wait_for_server_ready(host, port, timeout=2.0):
+            if proc.poll() is not None:
+                LAUNCH_LOGGER.warning(f"{server} exited before answering; not waiting.")
+                break
+            if now() > deadline:
+                LAUNCH_LOGGER.warning(
+                    f"{server} not answering after {GROUP_READY_TIMEOUT_S:.0f} s; "
+                    "starting the next group anyway."
+                )
+                break
+        else:
+            LAUNCH_LOGGER.info(f"{server} is up.")
 
 
 # ---------------------------------------------------------------------------
@@ -1908,6 +1967,16 @@ def server_is_idle(group, server_entry):
     return False
 
 
+def wants_collector(extraopt: str) -> bool:
+    """False for a visualizer-only launcher (``liveonly``/``gpvis``).
+
+    Such a launcher shares its config, and so its ``log_port``, with the full
+    launcher of the same group; its children write their own fallback files
+    instead of binding or feeding a second collector.
+    """
+    return extraopt not in ("liveonly", "gpvis")
+
+
 def main():
     """
     Main function to initialize and launch the HELAO application.
@@ -1919,7 +1988,7 @@ def main():
     5. Runs the full unit-test suite when ``run_unit_tests: true`` is set in the loaded config.
     6. Clears the terminal screen and prints the HELAO banner.
     7. Displays the current branch and status of each local HELAO repository.
-    8. Compresses old log files.
+    8. Starts the group's log collector (not for a visualizer-only launcher).
     9. Launches the HELAO application using the provided configuration.
     10. Sets up hotkey listeners for terminating or restarting servers.
     The function also defines helper functions for printing messages, stopping servers,
@@ -2052,7 +2121,40 @@ def main():
     cprint(f"launching HELAO ({modestring} mode) in 5 seconds...\n\n", "white")
     time.sleep(5)
 
+    # One collector for the whole group, bound before anything logs so the
+    # launcher's own logger and every child (which inherits the env var, like
+    # PARENT_PID_ENV below) connect to it. Fixed by the config, so a
+    # --reconnect launcher re-binds the same port and detached children
+    # re-attach on their own. Without a `root` there is no LOGS dir; the check
+    # further down exits for that case.
+    collector = None
+    if helaodirs.log_root is not None and wants_collector(extraopt):
+        try:
+            log_port = resolve_log_port(config)
+        except (ValueError, TypeError) as exc:
+            cprint(f"\n{exc}\n", "red", attrs=["bold"])
+            sys.exit(1)
+        log_prefix = os.path.splitext(os.path.basename(confArg))[0]
+        collector = LogCollector(log_endpoint(log_port), helaodirs.log_root, log_prefix)
+        try:
+            collector.start()
+        except zmq.ZMQError as exc:
+            cprint(
+                f"\nlog_port {log_port} is in use ({exc}). Most likely an earlier "
+                f"launcher of this group is still running (see the pids_*.pck file "
+                f"under STATES): stop it, or launch with --force-relaunch. Change "
+                f"log_port in the config only if a non-helao process holds the port.\n",
+                "red",
+                attrs=["bold"],
+            )
+            sys.exit(1)
+        # the launcher's final records are lost if it exits without teardown;
+        # stop() is idempotent
+        atexit.register(collector.stop)
+        os.environ[LOG_ENDPOINT_ENV] = log_endpoint(log_port)
+
     global LAUNCH_LOGGER
+    logging.set_server_key("launch")
     LAUNCH_LOGGER = logging.make_logger(
         __file__, log_dir=helaodirs.log_root, log_level=config.get("log_level", 20)
     )
@@ -2064,45 +2166,6 @@ def main():
     # to pipe their output through the mux. Opt in explicitly; fire-and-forget
     # callers of launcher() must not (see ConsoleMux.activate).
     CONSOLE.activate()
-    # compress old logs:
-    log_root = os.path.join(config["root"], "LOGS")
-    for server_name in ["_MASTER_", "bokeh_launcher", "fast_launcher"]:
-        old_log_txts = glob(os.path.join(log_root, server_name, "*.txt"))
-        nots_counter = 0
-        for old_log in old_log_txts:
-            LAUNCH_LOGGER.info(f"Compressing: {old_log}")
-            try:
-                timestamp_found = False
-                timestamp = ""
-                with open(old_log, "r", encoding="utf-8") as f:
-                    for line in f:
-                        if line.replace("error_[", "[").strip().startswith("["):
-                            timestamp_found = True
-                            timestamp = re.findall("[0-9]{2}:[0-9]{2}:[0-9]{2}", line)[
-                                0
-                            ].replace(":", "")
-                            zipname = old_log.replace(".txt", f"{timestamp}.zip")
-                            arcname = os.path.basename(old_log).replace(
-                                ".txt", f"{timestamp}.txt"
-                            )
-                            break
-                if not timestamp_found:
-                    while os.path.exists(
-                        old_log.replace(".txt", f"__{nots_counter}.zip")
-                    ):
-                        nots_counter += 1
-                    zipname = old_log.replace(".txt", f"__{nots_counter}.zip")
-                    arcname = os.path.basename(old_log).replace(
-                        ".txt", f"__{nots_counter}.txt"
-                    )
-                with zipfile.ZipFile(
-                    zipname, "w", compression=zipfile.ZIP_DEFLATED
-                ) as zf:
-                    zf.write(old_log, arcname)
-                os.remove(old_log)
-            except Exception:
-                LAUNCH_LOGGER.error(f"Error compressing log: {old_log}", exc_info=True)
-
     # Children inherit both of these through their environment, so they are set
     # before anything is spawned:
     #   PARENT_PID_ENV    lets a child tell "my launcher died" from "my
@@ -2303,8 +2366,13 @@ def main():
             # Orchestrators first (they detach subscribers and export non-empty
             # queues), then action servers. Visualizer/operator bokeh apps have
             # no /shutdown route, so pidd.close() signals those.
-            graceful_shutdown_all()
-            pidd.close()
+            try:
+                graceful_shutdown_all()
+                pidd.close()
+            finally:
+                # last: the shutdown sweep's records are in by now
+                if collector is not None:
+                    collector.stop()
         return True
 
     def restart_server(groupname, servername, restore=False):
@@ -2763,6 +2831,10 @@ def main():
                 f"Disconnecting action monitor. Launch "
                 f"'python launch.py {confArg} --reconnect' to reconnect."
             )
+            # children spill to their own files until a --reconnect launcher
+            # binds the endpoint again
+            if collector is not None:
+                collector.stop()
 
     x = threading.Thread(target=thread_waitforkey)
     x.start()

@@ -1,7 +1,7 @@
 """Native Galil motion driver over the command-channel port (P3a galil-3, native-1).
 
-Unlike the slice-3 ``GalilMotionHardwareAdapter`` (which delegated every call to
-the legacy ``Galil``), ``NativeGalilMotion`` OWNS the motion logic: it issues
+Unlike a delegating wrapper over the legacy ``Galil``, ``NativeGalilMotion`` OWNS
+the motion logic: it issues
 Galil command strings through a
 :class:`~helao.hexagon.ports.galil_command_channel.GalilCommandChannel` and does
 the coordinate/parse math itself, reusing the slice-1 ``TransformXY`` and slice-2
@@ -17,7 +17,7 @@ clamp, ``SP``/``PR|PA|HM``/``BG`` sequence, settle-poll) and ``setaxisref``
 (homing). native-3 completes the full galil-server surface so this can be the
 sole ``app.driver``: it is now a ``HelaoDriver`` (with ``stop``/``reset``) and
 adds the public ``motor_move(active)``, ``motor_disconnect``, calibration-matrix
-management (``save``/``load``/``update``/``reset_plate_transfermatrix``) and the
+management (``save``/``update``/``reset_plate_transfermatrix``) and the
 ``solid_get_platemap``/``solid_get_samples_xy`` platemap lookups. All faithfully
 ported from the legacy driver. gclib I/O + at-station validation are the gate.
 """
@@ -26,10 +26,9 @@ import asyncio
 import json
 import os
 import time
-import traceback
 from copy import deepcopy
 from socket import gethostname
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
 
@@ -39,12 +38,19 @@ from helao.core.drivers.helao_driver import (
     DriverStatus,
     HelaoDriver,
 )
+
+if TYPE_CHECKING:
+    from helao.hexagon.ports.hardware import DriverHostPort
 from helao.core.error import ErrorCodes
 from helao.core.models.sample import SolidSample
 from helao.deploy.hte.drivers.motion.enum import MoveModes, TransformationModes
 from helao.helpers import helao_logging as logging
 from helao.hexagon.adapters.shared.calibration_store import JsonFileCalibrationStore
-from helao.hexagon.domain.motion_transform import TransformXY
+from helao.hexagon.domain.motion_transform import (
+    TransformXY,
+    plan_move_target,
+    wants_counts,
+)
 from helao.hexagon.ports.galil_command_channel import (
     GalilChannelError,
     GalilCommandChannel,
@@ -59,18 +65,6 @@ _AXIS_LETTERS = "ABCDEFGH"
 _AXIS_INIT = [("MT", 2), ("CE", 4), ("TW", 32000), ("SD", 256000)]
 
 
-def _wants_counts(units: Any) -> bool:
-    """True when ``units`` selects the counts domain rather than mm.
-
-    Accepts the shared ``Units`` str-enum or a bare string: a ``(str, Enum)``
-    member carries its own value, so one comparison covers both and no
-    spelling can fall through silently -- anything that is not exactly
-    ``"counts"`` is mm, and the endpoint's typed enum is what rejects a
-    misspelling with a 422 before it ever reaches here.
-    """
-    return getattr(units, "value", units) == "counts"
-
-
 class NativeGalilMotion(HelaoDriver):
     """Galil motion driver implemented directly over a GalilCommandChannel.
 
@@ -79,6 +73,10 @@ class NativeGalilMotion(HelaoDriver):
     command channel defaults to the real gclib-backed channel when none is
     injected (tests inject a fake).
     """
+
+    connect_on_startup = (
+        True  # the host connects after _base_hook, before dyn_endpoints
+    )
 
     def __init__(
         self,
@@ -100,7 +98,7 @@ class NativeGalilMotion(HelaoDriver):
 
             channel = GclibCommandChannel()
         self._channel: GalilCommandChannel = channel
-        self._base_hook = base_hook
+        self._base_hook: "Optional[DriverHostPort]" = base_hook
         # Optional aligner position-notify queue (object with async `put`);
         # preserves the legacy query -> update_aligner feed. None = no feed.
         self._position_sink = position_sink
@@ -538,7 +536,7 @@ class NativeGalilMotion(HelaoDriver):
         stopping = False
         mode = MoveModes(mode)
         transformation = TransformationModes(transformation)
-        counts_mode = _wants_counts(units)
+        counts_mode = wants_counts(units)
 
         if counts_mode and transformation != TransformationModes.motorxy:
             # The platexy/instrxy branches below do mm arithmetic on d_mm; a
@@ -560,77 +558,11 @@ class NativeGalilMotion(HelaoDriver):
             }
 
         tmpmotorpos = await self.query_axis_position(axis=self.get_all_axis())
-        current_positionvec = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        req_positionvec: list = [None, None, None, None, None, None]
-        reqdict = dict(zip(axis, d_mm))
-
-        for idx, ax in enumerate(["x", "y", "z", "Rx", "Ry", "Rz"]):
-            if ax in tmpmotorpos["ax"]:
-                current_positionvec[idx] = tmpmotorpos["position"][
-                    tmpmotorpos["ax"].index(ax)
-                ]
-                if ax in reqdict:
-                    req_positionvec[idx] = reqdict[ax]
-
-        if transformation == TransformationModes.motorxy:
-            pass
-        elif transformation == TransformationModes.platexy:
-            motorxy = [0.0, 0.0, 1.0]
-            motorxy[0] = current_positionvec[0]
-            motorxy[1] = current_positionvec[1]
-            current_platexy = tf.transform_motorxy_to_platexy(motorxy)
-            if mode == MoveModes.relative:
-                new_platexy = [0.0, 0.0, 1.0]
-                if req_positionvec[0] is not None:
-                    new_platexy[0] = current_platexy[0] + req_positionvec[0]
-                else:
-                    new_platexy[0] = current_platexy[0]
-                if req_positionvec[1] is not None:
-                    new_platexy[1] = current_platexy[1] + req_positionvec[1]
-                else:
-                    new_platexy[1] = current_platexy[1]
-                new_motorxy = tf.transform_platexy_to_motorxy(new_platexy)
-                axis = ["x", "y"]
-                d_mm = [d for d in new_motorxy[0:2]]
-                mode = MoveModes.absolute
-            elif mode == MoveModes.absolute:
-                new_platexy = [0.0, 0.0, 1.0]
-                if req_positionvec[0] is not None:
-                    new_platexy[0] = req_positionvec[0]
-                else:
-                    new_platexy[0] = current_platexy[0]
-                if req_positionvec[1] is not None:
-                    new_platexy[1] = req_positionvec[1]
-                else:
-                    new_platexy[1] = current_platexy[1]
-                new_motorxy = tf.transform_platexy_to_motorxy(new_platexy)
-                axis = ["x", "y"]
-                d_mm = [d for d in new_motorxy[0:2]]
-            elif mode == MoveModes.homing:
-                pass
-        elif transformation == TransformationModes.instrxy:
-            current_instrxyz = tf.transform_motorxyz_to_instrxyz(
-                current_positionvec[0:3]
-            )
-            if mode == MoveModes.relative:
-                new_instrxyz = current_instrxyz
-                for i in range(3):
-                    if req_positionvec[i] is not None:
-                        new_instrxyz[i] = new_instrxyz[i] + req_positionvec[i]
-                new_motorxyz = tf.transform_instrxyz_to_motorxyz(new_instrxyz[0:3])
-                axis = ["x", "y", "z"]
-                d_mm = [d for d in new_motorxyz[0:3]]
-                mode = MoveModes.absolute
-            elif mode == MoveModes.absolute:
-                new_instrxyz = current_instrxyz
-                for i in range(3):
-                    if req_positionvec[i] is not None:
-                        new_instrxyz[i] = req_positionvec[i]
-                new_motorxyz = tf.transform_instrxyz_to_motorxyz(new_instrxyz[0:3])
-                axis = ["x", "y", "z"]
-                d_mm = [d for d in new_motorxyz[0:3]]
-            elif mode == MoveModes.homing:
-                pass
+        axis, d_mm, rebased = plan_move_target(
+            tf, tmpmotorpos, axis, d_mm, mode, transformation
+        )
+        if rebased:
+            mode = MoveModes.absolute
 
         ret_moved_axis: list = []
         ret_speed: list = []
@@ -898,20 +830,6 @@ class NativeGalilMotion(HelaoDriver):
                 os.makedirs(filedir, exist_ok=True)
             with open(file, "w", encoding="utf-8") as f:
                 f.write(json.dumps(self.plate_transfermatrix.tolist()))
-
-    def load_transfermatrix(self, file):
-        """Read a JSON matrix from ``file`` (None if missing/malformed/wrong-shape)."""
-        if os.path.exists(file):
-            with open(file, "r", encoding="utf-8") as f:
-                try:
-                    new_matrix = np.matrix(json.loads(f.readline()))
-                    if new_matrix.shape != self.dflt_matrix.shape:
-                        return None
-                    return new_matrix
-                except Exception:
-                    traceback.print_exc()
-                    return None
-        return None
 
     def update_plate_transfermatrix(self, newtransfermatrix):
         """Replace the plate matrix, propagate to the transform, persist to disk."""

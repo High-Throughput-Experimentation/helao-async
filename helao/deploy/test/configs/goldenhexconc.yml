@@ -1,6 +1,6 @@
 # P1b2b CONCURRENCY config (§10.3 launched-group items 4/6/7).
 # Copy of goldenhex.yml with a fast orch heartbeat (item 6 needs the
-# active_action_monitor to notice a killed SIM quickly) and its own root.
+# HexHealthMonitor to notice a killed SIM quickly) and its own root.
 dummy: true
 simulation: true
 show_debug: true

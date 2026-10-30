@@ -60,8 +60,8 @@ def test_each_page_state_owns_its_photo_vars_and_handlers(name):
     _module, state = PAGES[name]
     for var in PHOTO_VARS:
         assert var in state.vars
-        assert var not in state.inherited_vars, f"{name} shares '{var}'"
-    assert "_photos" in state.backend_vars
+        assert var in state.base_vars, f"{name} shares '{var}'"
+    assert state.__fields__["_photos"]._backend
     for handler in ("set_photo_choice", "set_photo_opacity"):
         assert handler in state.event_handlers
 

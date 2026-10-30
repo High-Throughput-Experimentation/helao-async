@@ -65,8 +65,9 @@ issue it found:
   `host:port` collisions, including a Reflex server's `port + 1` and a plate
   aligner's port;
 - module resolution: every `fast:`/`bokeh:` module exists in a deployment the
-  launcher searches; the retired `legacy_module:` and `deployment: hexagon`
-  keys, a `fast:`/`bokeh:` value of `graft`, and a blank `deployment:` are
+  launcher searches; the two retired hexagon-routing keys (the legacy-module
+  key and a `deployment:` naming the hexagon shim), a `fast:`/`bokeh:` value of
+  `graft`, and a blank `deployment:` are
   reported;
 - an `hte` action module whose endpoint checklist was frozen at B7c still has
   it (any other missing checklist prints as a note and does not fail);
@@ -106,9 +107,9 @@ issue it found:
 | `sequence_params` | dict | — | The same, for sequence functions. |
 | `experiment_path` / `sequence_path` | str | `helao/deploy/<deployment>/{experiments,sequences}` | Overrides where library modules are looked up (`import_autolibs`). Undeclared in `HelaoConfig`. |
 | `allow_shadow` | bool | `False` | Preflight only: allow the same function name in two library modules (the later one wins in the flat namespace). |
-| `sync_finished` | bool | `True` | Declared in `HelaoConfig` and given a helper (`sync_finished_enabled`), but **no production code reads it yet**, so setting it changes nothing. Not the same as the per-record `sync_data` field. |
 | `show_debug` | bool | `False` | **No effect in a launched group.** It is read only when a server builds its own logger, and every launcher builds the logger first without it. |
-| `log_level` | int | `20` | File-log threshold for `launch.py` and every launched server (FastAPI, Bokeh, Reflex launcher); a server-level `log_level` overrides it for that server. Console output stays at INFO, and the Reflex backend child's `<key>_backend.log` stays at 20. |
+| `log_level` | int | `20` | File-log threshold for `launch.py` and every launched server (FastAPI, Bokeh, Reflex launcher); a server-level `log_level` overrides it for that server. Console output stays at INFO, and the Reflex backend child's `<key>_backend.jsonl` stays at 20. Artefact hash records ignore this threshold and always reach the ledger. |
+| `log_port` | int | one above the highest port any server occupies (excluding RPC and plate-aligner ports) | The launcher's log collector port on 127.0.0.1. Never a server port, its RPC port or an aligner port. A `--reconnect` launcher re-binds the same port. A visualizer-only launcher (`extraopt` `liveonly` or `gpvis`) starts **no** collector and sets no log endpoint: its children write their own fallback `<key>.jsonl` files, because it shares this config, and so this port, with the full launcher of the group. |
 | `run_unit_tests` | bool | `False` | `launch.py` runs `run_unit_tests.py` before launching and aborts on failure. |
 | `hot_reload` | map | `{enabled: true, poll_seconds: 30}` | See [Hot reload](#hot-reload). |
 | `alert_config_path` | str | — | Alert config (email and webhook). Overridden by the `ALERT_CONFIG_PATH` env var. |
@@ -185,8 +186,9 @@ is created without asking.
   RUNS/             the single run tree; records are written once and never move
   RUNS_SUPERSEDED/  sequences retired through /retire (the one exception)
   DIAG/             manual (diagnostic) actions, a sibling of RUNS/
-  LOGS/             <server_key>.log per server, rotated daily and gzipped
-                    (old archives are not pruned)
+  LOGS/             JSONL logs: helao_<prefix>.jsonl under a launcher,
+                    <server_key>.jsonl without; rotated every 300,000 records
+                    and gzipped; rotated logs deleted after 90 days
   STATES/           pid pickles, queue exports, per-server run-state journals
                     (runstate_<server_key>.jsonl), loaded_modules_<key>.json,
                     reflex-bundles/, /retire ledgers
@@ -197,10 +199,6 @@ is created without asking.
   FAULTS/           faulthandler crash dumps, <server_key>_faults.txt
                     (created at every FastAPI server's startup)
 ```
-
-When `helao_dirs` runs, it also zips and removes any `*.txt` left under
-`LOGS/<server_name>/` by the older per-directory logger, naming the archive
-from the first timestamp in the file.
 
 A record's lifecycle state (`active`, `unsynced`, `quarantined`, `done`) is
 kept in the `STATES/runstate_*.jsonl` journals, not in its directory name. The
@@ -374,7 +372,7 @@ All four keys are **server-level keys, not `params:`**:
 | `prefinish_sequence_hooks` | the orchestrator | sequences |
 | `postfinish_hooks` | the `SYNC` server | `action:` / `experiment:` / `sequence:` sub-maps |
 
-`MicroOrch` reads the two orchestrator keys (or their aliases) from the first
+`MicroOrch` reads the two orchestrator keys from the first
 `group: orchestrator` entry in the config, unless its constructor is given
 `prefinish_experiment_hooks` / `prefinish_sequence_hooks`.
 
@@ -412,7 +410,7 @@ is valid at action level only (`prefinish_hooks`). Helper code under
 | Hook | Phase | Levels | Blocking | Args |
 |---|---|---|---|---|
 | `s3_upload` | post-finish | all | yes: a failure keeps the record unsynced and counts a strike (see [Sync quarantine](#sync-quarantine)) | — |
-| `dispatch_analysis` | post-finish | experiment, sequence | no: a failure is recorded and the chain continues | `server_key` and `endpoint` (required); `params` (alias `analysis_params`); optional `host` + `port` |
+| `dispatch_analysis` | post-finish | experiment, sequence | no: a failure is recorded and the chain continues | `server_key` and `endpoint` (required); `params`; optional `host` + `port` |
 
 `dispatch_analysis` checks its args when it runs, not at startup. A missing
 `server_key`/`endpoint`, or a `server_key` that is neither given with
@@ -435,9 +433,7 @@ Private deployments may add their own under
 ### Post-finish defaults
 
 When `postfinish_hooks` is absent, the chain is `s3_upload: ["*"]` at every
-level. If the SYNC server has `params.auto_analyze_sequences`, that value is
-translated to `sequence: {dispatch_analysis: ...}`, with a deprecation
-warning. **A present `postfinish_hooks` owns the whole chain.** Leave out
+level. **A present `postfinish_hooks` owns the whole chain.** Leave out
 `s3_upload` and nothing uploads:
 
 ```yaml
@@ -469,26 +465,21 @@ disables parking (strikes are still recorded). `/tasks` lists parked records,
 and `POST /finish_yml` on a parked record releases and re-queues it. Spec:
 `docs/superpowers/specs/2026-10-14-sync-quarantine-design.md`.
 
-### Deprecated aliases
+### Removed keys
 
-| Alias | Replacement |
-|---|---|
-| `hlo_postprocess_libs` | `prefinish_hooks` |
-| `exp_postprocess_libs` | `prefinish_experiment_hooks` |
-| `seq_postprocess_libs` | `prefinish_sequence_hooks` |
-| SYNC `params.auto_analyze_sequences` | `postfinish_hooks.sequence.dispatch_analysis` |
-
-A list alias `[a, b]` means `{a: ["*"], b: ["*"]}`. `auto_analyze_sequences`
-is a mapping (sequence name → analysis block) and becomes the
-`dispatch_analysis` args unchanged. Each alias logs one deprecation warning.
+`hlo_postprocess_libs`, `exp_postprocess_libs`, `seq_postprocess_libs` and SYNC
+`params.auto_analyze_sequences` are refused at startup with a `HookConfigError`
+naming the replacement, so an old config fails loudly instead of running
+without hooks. The `analysis_params` arg of `dispatch_analysis` is no longer
+read. Use `prefinish_hooks`, `prefinish_experiment_hooks`, `prefinish_sequence_hooks`,
+`postfinish_hooks.sequence.dispatch_analysis` (a mapping of sequence name to
+analysis block) and `params`.
 
 ### Errors that stop startup
 
 A bad hook config never quietly becomes "no hooks". Startup fails with
 `HookConfigError` when:
 
-- an alias and its replacement are both set, or a list alias is not a list of
-  names;
 - a map has the wrong shape (not a mapping, an empty list or mapping, a
   non-string record name, or args that are not a mapping);
 - `postfinish_hooks` has a key other than `action`, `experiment` or
@@ -519,6 +510,7 @@ route, whatever its config says:
 | `/uvvis`, `/xafs`, `/xrds` | plate spectra | credentials (below); `/xafs` reads local analysis arrays under `root/ANALYSES` unless set to read from S3; the wafer-photo underlay also needs the plate API |
 | `/retire` | retire mis-identified sequences | credentials (below), `params.retire: true` on this Reflex server, and a `root` |
 | `/quarantine` | release or write off parked sync records | `params.sync_quarantine: true` on this Reflex server, and a `SYNC` server in the config |
+| `/logs` | live tail of the group's JSONL logs (`<root>/LOGS`) | the config's `root`; always registered |
 
 **Credential-gated pages.** `/composition`, `/uvvis`, `/xafs`, `/xrds` and
 `/retire` read the metadata API or S3. If the Reflex process has no
@@ -575,8 +567,9 @@ nothing checks the RPC port:
 |---|---|---|
 | The server itself | `port` | yes |
 | Reflex backend | `port + 1` | yes — `reserved_addresses` returns both |
-| Plate-aligner Bokeh (`params.enable_aligner`) | `params.bokeh_port`, else `port + 1000` | **no** (preflight checks it) |
+| Plate-aligner Bokeh (`params.enable_aligner`) | `params.bokeh_port`, else (absent or null) `port + 1000` | **no** (preflight checks it) |
 | ZMQ RPC (every FastAPI server) | `port + 10000` | **no** |
+| Log collector (launcher) | `log_port`, else one above the highest server port | no (`resolve_log_port` avoids server, RPC and aligner ports) |
 
 `validateConfig` rejects duplicate `host:port` pairs across the group. It does
 not model the RPC offset, so two servers 10000 apart pass validation and then
@@ -602,10 +595,10 @@ Shared by every action server (`ActionHost`):
 | Param | Default | Effect |
 |---|---|---|
 | `allow_concurrent_actions` | `True` | `False`: an action whose endpoint is busy is parked in one server-wide queue, released when no endpoint is running an action; an action for an idle endpoint starts at once. `True`: parked per endpoint. `start_condition: no_wait` bypasses either. Some `hte` servers force `False` in code. |
-| `enable_aligner` / `bokeh_port` | — / `port + 1000` | Motion servers: host the Bokeh plate aligner on a second port. Preflight reserves it; `validateConfig` does not. |
+| `enable_aligner` / `bokeh_port` | — / `port + 1000` | Motion servers: host the Bokeh plate aligner on a second port; a null `bokeh_port` means the default. Preflight reserves it; `validateConfig` does not. |
 | `positions` | — | Sample-archive positions. At most one server per config may declare it (see [Validation rules](#validation-rules)). |
 
-`SYNC` (`sync_server`, `HelaoSyncer`). An orchestrator or other host that
+`SYNC` (`sync_server`, `NativeSyncer`). An orchestrator or other host that
 builds a syncer without its own `aws_config_path` reads these from the `SYNC`
 entry:
 
@@ -618,7 +611,6 @@ entry:
 | `sync_pending_on_startup` | `True` | Sweep and enqueue unsynced records at startup. `False` leaves them for `/finish_pending`. |
 | `quarantine_strikes` | `5` | See [Sync quarantine](#sync-quarantine). `0` disables parking. |
 | `quarantine_hours` | `24` | See [Sync quarantine](#sync-quarantine). |
-| `auto_analyze_sequences` | — | Deprecated; see [Deprecated aliases](#deprecated-aliases). |
 | `testing` | — | **Nothing reads it.** |
 
 `ANA` (`analysis_server`):
@@ -806,8 +798,8 @@ server, so nothing it records is uploaded.
 - [ ] at most one server declares `params.positions`
 - [ ] the Bokeh operator names the right `orch_key`, and each operator UI
       carries its own `seqspec_*` params
-- [ ] finish hooks use `prefinish_*` / `postfinish_hooks`, not the deprecated
-      `*_postprocess_libs` lists
+- [ ] finish hooks use `prefinish_*` / `postfinish_hooks`; the removed
+      `*_postprocess_libs` and `auto_analyze_sequences` keys are refused at startup
 - [ ] a `postfinish_hooks` block still lists `s3_upload` at every level that
       should upload
 - [ ] the syncer server is keyed `SYNC`, and `ignore_heartbeats` entries are

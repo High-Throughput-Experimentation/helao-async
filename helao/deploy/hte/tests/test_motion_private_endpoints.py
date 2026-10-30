@@ -253,6 +253,7 @@ def _galil_app(config=None, responses=None, busy_on=()):
 
     channel = FakeChannel(responses=responses or _galil_responses())
     driver = NativeGalilMotion(dict(config or GALIL_CFG), channel=channel)
+    driver.connect()  # the host connects before dyn_endpoints runs
     app = _FakeApp(driver, server_params=dict(config or GALIL_CFG))
 
     # The sample DB is server state this feature never touches, and building a
@@ -390,7 +391,7 @@ def test_galil_mm_move_of_the_same_distance_loses_a_count():
 
 def test_galil_absolute_counts_move_emits_pa_not_pr():
     app, ch = _galil_app()
-    from helao.deploy.hte.drivers.motion.galil_motion_driver import MoveModes
+    from helao.deploy.hte.drivers.motion.enum import MoveModes
 
     _galil_move(app, axis="y", value=4321, mode=MoveModes.absolute, units=Units.counts)
     assert "PAB=4321" in ch.commands, ch.commands
@@ -869,6 +870,7 @@ def make_kinesis_app(monkeypatch):
     def _make(config=None, busy_on=(), position=0, status=()):
         config = config or _kinesis_cfg()
         driver = KinesisMotor(config=config)
+        driver.connect()  # the host connects after construction
         for motor in driver.motors.values():
             motor.position = position
             motor._status = list(status)
@@ -1050,3 +1052,27 @@ def test_kinesis_move_requires_an_axis_and_a_value(kinesis_client):
     )
     assert app.driver.motors["z"].calls == []
     print("test_kinesis_move_requires_an_axis_and_a_value PASS")
+
+
+def test_a_raising_connect_keeps_galil_motion_up_with_no_motion_routes(
+    monkeypatch, tmp_path, caplog
+):
+    from helao.hexagon.tests.hosted_server import start_with_raising_connect
+
+    out = start_with_raising_connect(
+        monkeypatch,
+        tmp_path,
+        caplog,
+        module="galil_motion",
+        prefix="adss3",
+        server_key="MOTOR",
+        driver_class=NativeGalilMotion,
+        ready=lambda app: hasattr(app, "unified_db"),  # dyn_endpoints has run
+        probe=lambda app: hasattr(app, "unified_db"),
+    )
+    assert len(out.startup_errors) == 1
+    assert "NativeGalilMotion" in out.startup_errors[0].getMessage()
+    assert out.get_status_code == 200
+    assert out.probe is True  # dyn_endpoints ran to completion against the driver
+    # galil_enabled is never set True, so the gated motion routes do not register
+    assert not any(p.endswith("/move") for p in out.route_paths if p)

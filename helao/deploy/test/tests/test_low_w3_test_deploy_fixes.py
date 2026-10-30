@@ -5,12 +5,9 @@ import importlib
 import runpy
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 from bokeh.document import Document
-
-from helao.core.error import ErrorCodes
 
 SERV_KEY = "SIM"
 
@@ -57,44 +54,3 @@ def test_demo_helper_exits_nonzero_on_a_bad_argument(monkeypatch):
     with pytest.raises(SystemExit) as exc:
         runpy.run_path(str(helper), run_name="__main__")
     assert exc.value.code == 1
-
-
-def test_query_plate_with_no_matching_plate_finishes_with_an_error(monkeypatch):
-    from helao.deploy.test.servers.action import archive_simulator as mod
-
-    routes = {}
-
-    class _Host:
-        def __init__(self, *a, **k):
-            self.server_params = {}
-            self.driver = SimpleNamespace(
-                list_spaces=lambda: [
-                    {"solution_ph": 7, "elements": ["Ni"], "plate_id": 1}
-                ]
-            )
-
-        def action(self, **k):
-            def deco(fn):
-                routes[fn.__name__] = fn
-                return fn
-
-            return deco
-
-        def post(self, *a, **k):
-            return lambda fn: fn
-
-    monkeypatch.setattr(mod, "ActionHost", _Host)
-    mod.makeApp("K")
-    action = SimpleNamespace(
-        action_params={"ph": 13, "elements": ["Ni", "Fe"]}, error_code=ErrorCodes.none
-    )
-    action.as_dict = lambda: {"error_code": action.error_code}
-
-    async def finish():
-        return action
-
-    async def begin(**k):
-        return SimpleNamespace(action=action, finish=finish)
-
-    out = asyncio.run(routes["query_plate"](SimpleNamespace(begin=begin)))
-    assert out == {"error_code": ErrorCodes.not_available}

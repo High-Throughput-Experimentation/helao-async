@@ -13,6 +13,7 @@ Part 1 (these tests): a step re-checks the record after each await and returns
 """
 
 import asyncio
+import functools
 import tempfile
 from collections import deque
 from types import SimpleNamespace
@@ -60,7 +61,7 @@ def _dispatch_ready(orch, monkeypatch, use_sync=True):
     async def _to_s3(*a, **k):
         orch.s3_uploads.append(a)
 
-    orch.syncer = SimpleNamespace(to_s3=_to_s3)
+    orch.hexagon_wiring = PortWiring(sync=SimpleNamespace(to_s3=_to_s3))  # type: ignore[arg-type]
     # the crash site is gated on both; force it so the test is not host-dependent
     orch.verify_plates = True
     monkeypatch.setattr(
@@ -98,7 +99,7 @@ def _park(orch, name):
     """Park the first call of ``orch.<name>`` on an Event the test controls."""
     entered, release = asyncio.Event(), asyncio.Event()
     owner, _, attr = name.rpartition(".")
-    owner = getattr(orch, owner) if owner else orch
+    owner = functools.reduce(getattr, owner.split("."), orch) if owner else orch
     real = getattr(owner, attr)
     seen = []
 
@@ -131,7 +132,7 @@ async def _estop_then_clear(orch):
         # crash regression only: the to_s3 guard also catches it; the write_seq
         # guard's own effect is pinned by the stale-S3-upload assert below
         ("write_seq", False),
-        ("syncer.to_s3", True),
+        ("hexagon_wiring.sync.to_s3", True),
     ],
 )
 async def test_sequence_step_parked_across_estop_and_clear_returns_estop(
@@ -159,7 +160,9 @@ async def test_sequence_step_parked_across_estop_and_clear_returns_estop(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("cls,init", FLAVOURS)
-@pytest.mark.parametrize("parked", ["put_lbuf", "write_exp", "syncer.to_s3"])
+@pytest.mark.parametrize(
+    "parked", ["put_lbuf", "write_exp", "hexagon_wiring.sync.to_s3"]
+)
 async def test_experiment_step_parked_across_estop_and_clear_returns_estop(
     cls, init, parked, move_dir_noop, monkeypatch  # noqa: F811
 ):

@@ -6,8 +6,8 @@ live-data appender, the ``enqueue_data*`` -> ``data_q`` publish path (queued
 counter bumped only for data-bearing packets), and the ``log_data_task``
 drain loop -- subscribe, listen-uuid filter, LAZY file open on the first
 matching packet (json_data_keys inferred from the first row when unset),
-``%%`` separator exactly once via ``added_hlo_separator``, ``hlo_json_dumps``
-rows, non-serializable payload -> ``{"error": "data was not serializable"}``,
+``hlo_json_dumps`` rows (the header is ``X.meta.json``, written at open),
+non-serializable payload -> ``{"error": "data was not serializable"}``,
 string payloads written raw, ``num_data_written`` bump per data-bearing
 packet, subscription removal on cancel. Method bodies were byte-identical to
 the legacy engine (source-parity-pinned by ``test_native_data_stream.py``)
@@ -35,8 +35,9 @@ exactly as legacy.
 # pyright: reportArgumentType=false, reportOptionalMemberAccess=false
 
 import asyncio
+import collections
 import traceback
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 
 import numpy as np
@@ -71,6 +72,14 @@ class NativeDataStreamer:
 
     def __init__(self, active):
         self.active = active
+        # drain bookkeeping only (see :meth:`drain`); the queue, counters and
+        # uuid lists stay on ``Active``/``Base``
+        self._drain_waiters: dict = {}  # id(marker) -> (marker, event), per call
+        self._consumed = 0
+        # (package, has_data) rows a foreign thread produced, in production order,
+        # waiting for the loop to put them (see :meth:`enqueue_data_nowait`)
+        self._xthread: collections.deque = collections.deque()
+        self._closed_warned = False
 
     async def get_realtime(
         self, epoch_ns: Optional[int] = None, offset: Optional[float] = None
@@ -120,8 +129,20 @@ class NativeDataStreamer:
             datamodel.data
         )
 
+    def _put_queued(self, msg: Any, has_data: bool) -> None:
+        """Put one built package on the data queue (loop thread only)."""
+        self.active.base.data_q.put_nowait(msg)
+        if has_data:
+            self.active.num_data_queued += 1
+
+    def _flush_xthread(self) -> None:
+        """Put every pending foreign-thread row, FIFO by production order (loop thread)."""
+        while self._xthread:
+            self._put_queued(*self._xthread.popleft())
+
     async def enqueue_data(self, datamodel: DataModel, action: Optional[Action] = None):
         """Publish ``datamodel`` onto the data queue and bump the queued counter if it had data."""
+        self._flush_xthread()
         msg, has_data = self.active._build_data_package(datamodel, action)
         await self.active.base.data_q.put(msg)
         if has_data:
@@ -130,11 +151,43 @@ class NativeDataStreamer:
     def enqueue_data_nowait(
         self, datamodel: DataModel, action: Optional[Action] = None
     ):
-        """Non-awaiting variant of :meth:`enqueue_data`."""
+        """Non-awaiting variant of :meth:`enqueue_data`; safe from a foreign thread.
+
+        The package is built on the calling thread, so a row keeps the action that
+        was current when the hardware produced it. The put runs on ``host.aloop``:
+        a foreign thread appends the row to a thread-safe deque and schedules a
+        flush with ``call_soon_threadsafe``, which also wakes the selector. Every
+        on-loop enqueue and :meth:`drain` flush the deque first, so rows reach the
+        queue in the order they were produced. "Foreign" means the running loop on
+        this thread is not ``host.aloop`` (or there is none). The put is marshalled
+        only when ``host.aloop`` is set; a host with no loop yet (unit tests) puts
+        directly.
+        """
         msg, has_data = self.active._build_data_package(datamodel, action)
-        self.active.base.data_q.put_nowait(msg)
-        if has_data:
-            self.active.num_data_queued += 1
+        aloop = getattr(self.active.base, "aloop", None)
+        try:
+            running = asyncio.get_running_loop()
+        except RuntimeError:
+            running = None
+        if aloop is not None and running is not aloop:  # foreign thread
+            # a closed loop will never flush: drop the row, do not grow the deque
+            if aloop.is_closed():
+                self._warn_closed()
+                return
+            self._xthread.append((msg, has_data))  # deque.append is thread-safe
+            try:
+                aloop.call_soon_threadsafe(self._flush_xthread)
+            except RuntimeError:  # closed between the check and the call
+                self._xthread.clear()
+                self._warn_closed()
+            return
+        self._flush_xthread()
+        self._put_queued(msg, has_data)
+
+    def _warn_closed(self) -> None:
+        if not self._closed_warned:
+            self._closed_warned = True
+            LOGGER.warning("enqueue_data_nowait after the loop closed; rows dropped")
 
     def assemble_data_msg(
         self, datamodel: DataModel, action: Optional[Action] = None
@@ -152,6 +205,70 @@ class NativeDataStreamer:
     def add_new_listen_uuid(self, new_uuid: UUID):
         """Track ``new_uuid`` as a data-stream source for this active's data logger."""
         self.active.listen_uuids.append(new_uuid)
+
+    async def drain(self, timeout_s: float) -> bool:
+        """Return once everything queued before this call is written (FIFO marker).
+
+        Puts one data-less ``finished`` package, the marker, on ``data_q``; the
+        logger sets this call's event when it consumes that exact object. Each
+        subscriber queue is FIFO, so every package queued before the marker has
+        been written by then. Marker and event are per call, because two finishes
+        of one session can overlap (``/estop`` finishing it while the stopped
+        executor finishes it too). Re-puts the marker only if the logger consumed
+        nothing since the last check (a logger that subscribed late), so a busy
+        one is not buried under markers. Returns ``False`` after logging a
+        WARNING on timeout; data that arrives after the marker is still dropped,
+        as before.
+
+        Returns at once, without a marker, when the session never streamed: no
+        action's ``data_stream_status`` is active and nothing is queued unwritten.
+        A non-streaming action publishes no data-less ``finished`` packet.
+        """
+        # First, before any guard or marker: a cross-thread row still waiting in the
+        # deque has not bumped ``num_data_queued``, so the guard below would skip
+        # the drain and lose it, and the marker must not overtake it.
+        self._flush_xthread()
+        logger: Any = self.active.data_logger
+        base: Any = self.active.base
+        if logger is None or logger.done():
+            return True
+        streamed = any(
+            a.data_stream_status == HloStatus.active for a in self.active.action_list
+        )
+        if not streamed and self.active.num_data_queued <= self.active.num_data_written:
+            return True
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout_s
+        marker = self.active.assemble_data_msg(
+            DataModel(data={}, errors=[], status=HloStatus.finished)
+        )
+        event = asyncio.Event()
+        self._drain_waiters[id(marker)] = (marker, event)
+        try:
+            await base.data_q.put(marker)
+            seen = self._consumed
+            while True:
+                if logger.done():
+                    # the logger exited mid-drain; nothing is left to wait for
+                    return True
+                try:
+                    await asyncio.wait_for(event.wait(), 0.1)
+                    return True
+                except asyncio.TimeoutError:
+                    if loop.time() >= deadline:
+                        LOGGER.warning(
+                            f"finish drain timed out after {timeout_s}s: "
+                            f"num_queued {self.active.num_data_queued} > "
+                            f"num_written {self.active.num_data_written}; "
+                            f"rows queued after this are dropped"
+                        )
+                        return False
+                    if self._consumed == seen:
+                        # nothing moved: the marker may have been missed
+                        await base.data_q.put(marker)
+                    seen = self._consumed
+        finally:
+            self._drain_waiters.pop(id(marker), None)
 
     async def log_data_task(self):
         """Subscribe to the data queue and write matching packets to the active's HLO files.
@@ -173,6 +290,7 @@ class NativeDataStreamer:
 
         try:
             async for data_msg in dq_sub:
+                self._consumed += 1
                 # check if the new data_msg is in listen_uuids
                 if data_msg.action_uuid not in self.active.listen_uuids:
                     continue
@@ -181,6 +299,9 @@ class NativeDataStreamer:
                 data_dict = data_msg.datamodel.data
 
                 self.active.action.data_stream_status = data_status
+                waiter = self._drain_waiters.get(id(data_msg))
+                if waiter is not None and waiter[0] is data_msg:
+                    waiter[1].set()
 
                 if data_status not in (None, HloStatus.active):
                     LOGGER.debug(
@@ -235,19 +356,6 @@ class NativeDataStreamer:
 
                     # write only data if the file connection is open
                     if self.active.file_conn_dict[file_conn_key].file:
-                        # check if separator was already written
-                        # else add it
-                        if not self.active.file_conn_dict[
-                            file_conn_key
-                        ].added_hlo_separator:
-                            self.active.file_conn_dict[
-                                file_conn_key
-                            ].added_hlo_separator = True
-                            await self.active.write_live_data(
-                                output_str="%%\n",
-                                file_conn_key=file_conn_key,
-                            )
-
                         if isinstance(sample_data, dict):
                             try:
                                 output_str = hlo_json_dumps(sample_data)

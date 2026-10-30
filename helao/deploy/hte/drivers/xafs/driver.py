@@ -60,7 +60,9 @@ class XafsSidecarDriver(HelaoDriver):
         self.current_scan_id: Optional[str] = None
         self._proc: Optional[subprocess.Popen] = None
         self._init_flags: Optional[dict] = None
-        self._verified: Optional[dict] = None  # {"pid", "simulate"} from last good connect
+        self._verified: Optional[dict] = (
+            None  # {"pid", "simulate"} from last good connect
+        )
 
     def _call(self, method: str, path: str, desc: str, **kw) -> DriverResponse:
         """One HTTP request. Success -> data is parsed JSON (or bytes if
@@ -149,7 +151,13 @@ class XafsSidecarDriver(HelaoDriver):
             args.append("--simulate")
         try:
             self._proc = subprocess.Popen(
-                [c["sidecar_python"], c["sidecar_script"], "--port", str(self.port), *args]
+                [
+                    c["sidecar_python"],
+                    c["sidecar_script"],
+                    "--port",
+                    str(self.port),
+                    *args,
+                ]
             )
         except Exception as exc:
             return _fail(f"could not spawn sidecar: {type(exc).__name__}: {exc}")

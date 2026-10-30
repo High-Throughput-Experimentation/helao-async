@@ -113,6 +113,10 @@ class BiologicDriver(HelaoDriver):
 
     device_name: str
 
+    connect_on_startup = (
+        True  # the host connects after _base_hook, before dyn_endpoints
+    )
+
     def __init__(self, config: dict = {}):
         """Store configuration only. No device I/O here -- the action server
         calls ``connect()`` at startup (P3a-2 constructor-connect fix).

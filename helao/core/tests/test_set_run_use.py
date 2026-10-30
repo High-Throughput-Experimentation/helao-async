@@ -5,6 +5,7 @@ zip is large, and the interesting cases (a file entry with no ``run_use``, a
 process yml belonging to another sequence) do not all occur in any one record.
 """
 
+import json
 import zipfile
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from helao.core.tests.set_run_use import (
     rewrite_processes,
     rewrite_zip,
 )
+from helao.helpers.meta_io import meta_glob, write_meta
 from helao.helpers.yml_tools import yml_dumps, yml_load
 
 SEQ_UUID = "068dfbb3-3b21-7544-8000-ca3f3342fd63"
@@ -435,3 +437,313 @@ def test_reset_refuses_a_non_empty_runs_finished_twin(tmp_path):
     # An empty twin is not a collision.
     (twin / "earlier-record.txt").unlink()
     assert reset_to_finished(z)[0]
+
+
+# ------------------------------------------------------- RUNS-layout sequence
+
+RUNS_SEQ = "120155__XRDS_generic_scan__CoO-987655"
+ACT_DIR = f"{EXP_DIR}/0__0__XRDS__acquire_frame"
+PRC_NAME = "0__0690e558-0b51-7466-8000-ccac06b55692__xrds_frame"
+SYNCED_PRG = "yml: x\nsynced: true\n"
+
+
+def _build_runs_dir(tmp_path: Path, fmt: str = "json") -> Path:
+    """A synced sequence in the single ``RUNS`` tree, every record with its ``.prg``.
+
+    ``fmt="json"``: every record ``.json``. ``fmt="mixed"``: a ``-seq.yml``
+    carrying a comment above ``.json`` experiment/action/process records -- a
+    sequence that straddled the storage upgrade.
+    """
+    seq_dir = tmp_path / "RUNS" / "2025" / "1003" / RUNS_SEQ
+    (seq_dir / ACT_DIR).mkdir(parents=True)
+    seq = seq_dir / "251003.120155695637-seq.json"
+    if fmt == "mixed":
+        seq.with_suffix(".yml").write_text(
+            "# written by an old build\n" + _seq_yml(), encoding="utf-8"
+        )
+    else:
+        write_meta(seq, yml_load(_seq_yml(), fast=True))
+    seq.with_suffix(".prg").write_text(SYNCED_PRG, encoding="utf-8")
+    for rel, text in (
+        (f"{EXP_DIR}/251003.120155695637-exp", _exp_yml()),
+        (f"{ACT_DIR}/251003.120155695637-act", _act_yml("ref")),
+    ):
+        write_meta(seq_dir / f"{rel}.json", yml_load(text, fast=True))
+        (seq_dir / f"{rel}.prg").write_text(SYNCED_PRG, encoding="utf-8")
+    write_meta(
+        seq_dir / EXP_DIR / f"{PRC_NAME}-prc.json", yml_load(_prc_yml(), fast=True)
+    )
+    (seq_dir / ACT_DIR / "X0-000-0000.jsonl").write_text('{"v": 1}\n', "utf-8")
+    return seq_dir
+
+
+def _pending(tmp_path: Path) -> list:
+    """What the syncer's startup sweep would enqueue from ``<tmp_path>/RUNS``."""
+    from types import SimpleNamespace
+
+    from helao.hexagon.adapters.native.sync_driver import SyncDriver
+
+    me = SimpleNamespace(helaodirs=SimpleNamespace(save_root=tmp_path / "RUNS"))
+    return (
+        SyncDriver.list_pending(me)  # type: ignore[arg-type]
+        + SyncDriver.list_pending_exps(me)  # type: ignore[arg-type]
+        + SyncDriver.list_pending_acts(me)  # type: ignore[arg-type]
+    )
+
+
+@pytest.mark.parametrize("fmt", ["json", "mixed"])
+def test_a_runs_sequence_is_retagged_in_place_in_each_files_own_format(
+    tmp_path, capsys, fmt
+):
+    seq_dir = _build_runs_dir(tmp_path, fmt)
+    assert _pending(tmp_path) == []  # synced: nothing for the syncer to do
+
+    assert main([str(seq_dir), "--run-use", "data"]) == 0
+    out = capsys.readouterr().out
+
+    act = seq_dir / ACT_DIR / "251003.120155695637-act.json"
+    exp = seq_dir / EXP_DIR / "251003.120155695637-exp.json"
+    prc = seq_dir / EXP_DIR / f"{PRC_NAME}-prc.json"
+    for path in (act, exp, prc):
+        text = path.read_text(encoding="utf-8")
+        assert text.startswith("{\n  "), path  # still pretty JSON
+        assert json.loads(text)["run_use"] == "data"
+    assert json.loads(act.read_text(encoding="utf-8"))["files"][0]["run_use"] == (
+        "data"
+    )
+    if fmt == "mixed":
+        seq = seq_dir / "251003.120155695637-seq.yml"
+        assert seq.read_text(encoding="utf-8").startswith("# written by an old build")
+        assert not seq.with_suffix(".json").exists()
+    assert not list(seq_dir.rglob("*.prg"))
+    assert "retagged 3 yml(s) to run_use=data" in out
+    (seq_record,) = meta_glob(seq_dir, "seq")
+    assert f"/finish_yml?yml_path={seq_record}" in out
+    # Every record is pending again, so the next sweep re-pushes the sequence.
+    assert len(_pending(tmp_path)) == 3
+
+
+@pytest.mark.parametrize("prg", ["missing", "unsynced"])
+def test_a_runs_sequence_not_fully_synced_is_refused_with_nothing_written(
+    tmp_path, capsys, prg
+):
+    seq_dir = _build_runs_dir(tmp_path)
+    act_prg = seq_dir / ACT_DIR / "251003.120155695637-act.prg"
+    if prg == "missing":
+        act_prg.unlink()
+    else:
+        act_prg.write_text("yml: x\nsynced: false\n", encoding="utf-8")
+    before = {p: p.read_bytes() for p in seq_dir.rglob("*") if p.is_file()}
+
+    for extra in ([], ["--no-reset"], ["--dry-run"]):
+        assert main([str(seq_dir), *extra]) != 0
+        err = capsys.readouterr().err
+        assert "251003.120155695637-act.json" in err
+        assert {p: p.read_bytes() for p in seq_dir.rglob("*") if p.is_file()} == before
+
+
+def test_dry_run_on_a_runs_sequence_reports_and_writes_nothing(tmp_path, capsys):
+    seq_dir = _build_runs_dir(tmp_path)
+    before = {p: p.read_bytes() for p in seq_dir.rglob("*") if p.is_file()}
+    assert main([str(seq_dir), "--dry-run"]) == 0
+    out = capsys.readouterr().out
+    assert "would retag 3 yml(s)" in out
+    assert "would delete 3 .prg" in out
+    assert {p: p.read_bytes() for p in seq_dir.rglob("*") if p.is_file()} == before
+
+
+def test_no_reset_on_a_runs_sequence_keeps_the_prg_files(tmp_path):
+    seq_dir = _build_runs_dir(tmp_path)
+    assert main([str(seq_dir), "--no-reset"]) == 0
+    assert len(list(seq_dir.rglob("*.prg"))) == 3
+
+
+@pytest.mark.parametrize(
+    "source, no_reset",
+    [("zip", ["--no-reset"]), ("runs", []), ("runs", ["--no-reset"])],
+)
+def test_an_already_retagged_record_is_nothing_to_change_and_exits_zero(
+    tmp_path, capsys, source, no_reset
+):
+    """An idempotent re-run succeeds; a RUNS sequence then keeps its ``.prg``s."""
+    if source == "zip":
+        path = _build_zip(tmp_path, run_use="data")
+        rewrite_zip(path, "data")  # adds the experiment's missing key too
+    else:
+        path = _build_runs_dir(tmp_path)
+        assert main([str(path), "--no-reset"]) == 0
+    before = {
+        p: p.read_bytes()
+        for p in tmp_path.rglob("*")
+        if p.is_file() and "LOGS" not in p.parts  # the tool's own log
+    }
+    capsys.readouterr()
+
+    assert main([str(path), *no_reset]) == 0
+
+    assert "nothing to change" in capsys.readouterr().out
+    assert {
+        p: p.read_bytes()
+        for p in tmp_path.rglob("*")
+        if p.is_file() and "LOGS" not in p.parts  # the tool's own log
+    } == before
+
+
+def test_a_zip_with_no_record_in_it_exits_non_zero(tmp_path, capsys):
+    """Nothing recognised is not "nothing to change": it is the vacuous case."""
+    day = tmp_path / "RUNS_SYNCED" / "25.39" / "1003"
+    day.mkdir(parents=True)
+    z = day / "120155__XRDS_generic_scan__CoO-987655.zip"
+    with zipfile.ZipFile(z, "w") as zf:
+        zf.writestr(HLO_MEMBER, b"payload")
+    assert main([str(z), "--no-reset"]) != 0
+    assert "no record" in capsys.readouterr().err
+
+
+def test_a_json_member_of_a_zip_is_left_byte_for_byte(tmp_path):
+    """Legacy archives hold yml only; a .json record member is never re-emitted."""
+    z = _build_zip(tmp_path)
+    member = f"{EXP_DIR}/0__0__XRDS__acquire_frame/251003.120155695638-act.json"
+    payload = b'{"run_use": "ref"}'
+    with zipfile.ZipFile(z, "a") as zf:
+        zf.writestr(member, payload)
+    edits, _ = rewrite_zip(z, "data")
+    assert member not in [e.path for e in edits]
+    with zipfile.ZipFile(z) as zf:
+        assert zf.read(member) == payload
+
+
+WRITE_OFF_PRG = (
+    "yml: x\nsynced: true\nwrite_off:\n  at: 2026-10-01\n  operator: op\n"
+    "  reason: lost\n  groups:\n    0:\n    - 0\n"
+)
+
+
+@pytest.mark.parametrize(
+    "extra", [[], ["--no-reset"], ["--dry-run"], ["--reset-only"]], ids=str
+)
+def test_a_written_off_runs_sequence_is_refused_with_nothing_written(
+    tmp_path, capsys, extra
+):
+    """A reset would drop the operator's write_off and re-park the experiment."""
+    seq_dir = _build_runs_dir(tmp_path)
+    (seq_dir / EXP_DIR / "251003.120155695637-exp.prg").write_text(
+        WRITE_OFF_PRG, encoding="utf-8"
+    )
+    before = {p: p.read_bytes() for p in seq_dir.rglob("*") if p.is_file()}
+    assert main([str(seq_dir), *extra]) != 0
+    assert "write_off" in capsys.readouterr().err
+    assert {p: p.read_bytes() for p in seq_dir.rglob("*") if p.is_file()} == before
+
+
+def test_no_reset_then_reset_only_hands_the_sequence_back(tmp_path, capsys):
+    """Probes P1 + P3: the edits are already on disk, the .prg files still synced."""
+    seq_dir = _build_runs_dir(tmp_path)
+    assert main([str(seq_dir), "--no-reset"]) == 0
+    capsys.readouterr()
+
+    assert main([str(seq_dir)]) == 0  # P1: nothing to change, and says how to go on
+    out = capsys.readouterr().out
+    assert "nothing to change" in out and "--reset-only" in out
+    assert len(list(seq_dir.rglob("*.prg"))) == 3
+
+    assert main([str(seq_dir), "--reset-only", "--dry-run"]) == 0
+    assert "would delete 3 .prg" in capsys.readouterr().out
+    assert len(list(seq_dir.rglob("*.prg"))) == 3
+
+    assert main([str(seq_dir), "--reset-only"]) == 0
+    out = capsys.readouterr().out
+    assert not list(seq_dir.rglob("*.prg"))
+    assert "/finish_yml?yml_path=" in out
+    assert len(_pending(tmp_path)) == 3  # P3: re-queued
+
+
+def test_an_interrupted_reset_is_refused_then_finished_by_reset_only(tmp_path, capsys):
+    """Probe P2: some .prg already deleted by a reset that did not finish."""
+    seq_dir = _build_runs_dir(tmp_path)
+    assert main([str(seq_dir), "--no-reset"]) == 0
+    (seq_dir / "251003.120155695637-seq.prg").unlink()
+    capsys.readouterr()
+
+    assert main([str(seq_dir)]) != 0
+    assert "--reset-only" in capsys.readouterr().err
+
+    assert main([str(seq_dir), "--reset-only"]) == 0
+    assert not list(seq_dir.rglob("*.prg"))
+    assert len(_pending(tmp_path)) == 3
+
+
+def test_reset_only_refuses_a_sync_in_flight(tmp_path, capsys):
+    seq_dir = _build_runs_dir(tmp_path)
+    act_prg = seq_dir / ACT_DIR / "251003.120155695637-act.prg"
+    act_prg.write_text("yml: x\nsynced: false\n", encoding="utf-8")
+    assert main([str(seq_dir), "--reset-only"]) != 0
+    assert str(act_prg) in capsys.readouterr().err
+    assert len(list(seq_dir.rglob("*.prg"))) == 3
+
+
+def test_reset_only_refuses_a_zip(tmp_path, capsys):
+    z = _build_zip(tmp_path)
+    before = z.read_bytes()
+    assert main([str(z), "--reset-only"]) != 0
+    assert "RUNS" in capsys.readouterr().err
+    assert z.read_bytes() == before
+
+
+def test_the_finish_yml_hint_is_absolute_for_a_relative_input(
+    tmp_path, capsys, monkeypatch
+):
+    seq_dir = _build_runs_dir(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    assert main([str(seq_dir.relative_to(tmp_path))]) == 0
+    hint = next(
+        ln for ln in capsys.readouterr().out.splitlines() if "/finish_yml" in ln
+    )
+    target = hint.split("yml_path=", 1)[1].split(" ", 1)[0]
+    assert Path(target).is_absolute() and Path(target).is_file()
+
+
+@pytest.fixture(autouse=True)
+def _reset_logger():
+    """CLI mains install a root logger; keep it from leaking between tests."""
+    from helao.helpers import helao_logging
+
+    saved = helao_logging.LOGGER
+    yield
+    lg = helao_logging.LOGGER
+    if lg is not saved and lg is not None:
+        for h in list(lg.handlers):
+            lg.removeHandler(h)
+            h.close()
+    helao_logging.LOGGER = saved
+
+
+def _ledger_rows(root, tool):
+    import hashlib
+
+    from helao.helpers import helao_logging
+
+    for h in helao_logging.LOGGER.handlers:
+        h.flush()
+    p = root / "LOGS" / f"artifacts_{tool}.jsonl"
+    rows = [json.loads(x) for x in p.read_bytes().splitlines()]
+    for r in rows:
+        f = Path(r["path"])
+        f = f if f.is_absolute() else root / f
+        assert r["sha256"] == hashlib.sha256(f.read_bytes()).hexdigest()
+    return rows
+
+
+def test_main_ledgers_rewrites_beside_the_runs_tree(tmp_path):
+    seq_dir = _build_runs_dir(tmp_path)
+    assert main([str(seq_dir), "--run-use", "data"]) == 0
+    rows = _ledger_rows(tmp_path, "set_run_use")
+    assert {r["event"] for r in rows} == {"artifact_rewritten"}
+    assert {r["reason"] for r in rows} == {"set_run_use"}
+    assert {r["kind"] for r in rows} >= {"act", "exp", "prc"}
+
+
+def test_dry_run_logs_nothing(tmp_path):
+    seq_dir = _build_runs_dir(tmp_path)
+    assert main([str(seq_dir), "--dry-run"]) == 0
+    assert not (tmp_path / "LOGS").exists()

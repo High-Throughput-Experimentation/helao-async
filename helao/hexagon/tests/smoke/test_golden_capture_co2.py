@@ -4,30 +4,22 @@ Exercises only:
   - the PARITY_TOPS snapshot copy + provenance.yml round-trip (``snapshot``)
   - the masked-column set (co2_ppm / epoch_s are masked) and the masked
     meta-key set (action_params.mean_co2_ppm is masked)
-  - the shared (gamry-authored, imported here) ``settle`` helper, applied to a
-    co2-shaped RUNS_DIAG tree
 
 The real-hardware POST to ``/CO2SENSOR/acquire_co2`` is NOT exercised here --
 that only runs at-station with the SprintIR sensor attached on COM12 (see
 golden_capture_co2.py docstrings).
 
-Written as plain assert-based ``test_*`` functions with no ``import pytest``
-(mirrors test_golden_capture_spec.py -- this repo's conda ``helao`` env does
-not currently have the pytest package installed), so this module is runnable
-two ways:
+Run:
 
     conda run -n helao python -m pytest helao/hexagon/tests/smoke/test_golden_capture_co2.py -q
-    conda run -n helao python -m helao.hexagon.tests.smoke.test_golden_capture_co2
 """
 
 from __future__ import annotations
 
-import sys
 import tempfile
 from pathlib import Path
 
 from harness.manifest import ProvenanceManifest
-from helao.hexagon.tests.smoke.golden_capture import settle
 from helao.hexagon.tests.smoke.golden_capture_co2 import (
     CO2_ACT_YML_MASKED_META_KEYS,
     CO2_HLO_COLUMNS,
@@ -75,7 +67,7 @@ def test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance():
             "hlo_version: x\n%%\n", encoding="utf-8"
         )
         (root / "LOGS").mkdir(parents=True)
-        (root / "LOGS" / "CO2SENSOR.log").write_text("not captured", encoding="utf-8")
+        (root / "LOGS" / "CO2SENSOR.jsonl").write_text("not captured", encoding="utf-8")
 
         out = Path(td) / "golden" / "run1"
         snapshot(
@@ -161,70 +153,3 @@ def test_snapshot_refuses_empty_capture():
         else:
             raise AssertionError("snapshot() must refuse an empty (no-output) capture")
         assert not out.exists()  # nothing written on refusal
-
-
-def test_settle_returns_once_action_artifacts_are_complete_and_stable():
-    with tempfile.TemporaryDirectory() as td:
-        root = Path(td) / "captroot"
-        _write_action(root, status="finished", with_hlo=True)
-        settle(root, settle_polls=2, poll_s=0.01, timeout_s=5.0)
-
-
-def test_settle_times_out_when_no_artifacts_are_written():
-    """The action never wrote output (errored / no data): settle must raise,
-    not silently return -- this is what prevents the empty-capture false PASS."""
-    with tempfile.TemporaryDirectory() as td:
-        root = Path(td) / "captroot"
-        root.mkdir()  # empty root, nothing ever written
-        try:
-            settle(root, settle_polls=2, poll_s=0.01, timeout_s=0.05)
-        except TimeoutError:
-            pass
-        else:
-            raise AssertionError("settle() should time out when no artifacts appear")
-
-
-def test_settle_does_not_return_while_action_active():
-    """-act.yml exists at init with status 'active' (base.py:1029). settle must
-    NOT return on file existence -- else it snapshots + kills the server
-    mid-acquisition."""
-    with tempfile.TemporaryDirectory() as td:
-        root = Path(td) / "captroot"
-        _write_action(root, status="active", with_hlo=False)  # still running
-        try:
-            settle(root, settle_polls=2, poll_s=0.01, timeout_s=0.05)
-        except TimeoutError:
-            pass
-        else:
-            raise AssertionError("settle() must not return while status is 'active'")
-
-
-ALL_TESTS = [
-    test_masked_columns_cover_the_live_channels,
-    test_poll_paced_row_count_tolerance_is_nonzero,
-    test_data_derived_mean_is_masked_in_act_yml,
-    test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance,
-    test_snapshot_refuses_to_overwrite_existing_out_dir,
-    test_snapshot_refuses_empty_capture,
-    test_settle_returns_once_action_artifacts_are_complete_and_stable,
-    test_settle_times_out_when_no_artifacts_are_written,
-    test_settle_does_not_return_while_action_active,
-]
-
-
-def main() -> int:
-    failures = 0
-    for fn in ALL_TESTS:
-        try:
-            fn()
-        except Exception as exc:  # noqa: BLE001 -- report every failure, keep going
-            failures += 1
-            print(f"FAIL {fn.__name__}: {exc}")
-        else:
-            print(f"PASS {fn.__name__}")
-    print(f"{len(ALL_TESTS) - failures}/{len(ALL_TESTS)} passed")
-    return 1 if failures else 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

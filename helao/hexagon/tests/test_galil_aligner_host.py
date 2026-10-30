@@ -166,6 +166,25 @@ def _host():
     return h, d
 
 
+def test_start_binds_port_plus_1000_when_bokeh_port_is_null():
+    class _UiHost:
+        def start_document_host(self, apps, host, port, allow_websocket_origin):
+            self.port = port
+            return object()
+
+    ui = _UiHost()
+    h = GalilAlignerHost(
+        driver=_FakeDriver(),
+        base="BASE",
+        server_cfg={"host": "127.0.0.1", "port": 8003},
+        server_name="MOTOR",
+        config={"enable_aligner": True, "bokeh_port": None},
+        ui_host=ui,
+    )
+    h.start()
+    assert ui.port == 9003
+
+
 def test_precheck_not_available_before_bokeh_start():
     h, _ = _host()
     # bokehapp is None until start(); precheck must report not_available
@@ -250,51 +269,3 @@ def test_shutdown_cancels_aligner_iotask():
 def test_shutdown_noop_without_aligner():
     h, _ = _host()
     h.shutdown()  # must not raise when no aligner constructed
-
-
-# --------------------------------------------------------------------------
-# Driver: D6 surface genuinely removed
-# --------------------------------------------------------------------------
-def test_driver_shed_d6_surface():
-    from helao.deploy.hte.drivers.motion import galil_motion_driver as gm
-
-    d = gm.Galil(config={"axis_id": {"x": "A"}})
-    for gone in [
-        "start_aligner",
-        "makeBokehApp",
-        "start_aligner_run",
-        "run_aligner_precheck",
-        "stop_aligner",
-        "base",
-        "aligner_active",
-        "bokehapp",
-        "aligner_enabled",
-    ]:
-        assert not hasattr(d, gone), f"driver still exposes {gone}"
-    # module no longer imports the Bokeh/aligner symbols
-    for sym in ["Server", "HelaoVis", "Aligner", "partial"]:
-        assert not hasattr(gm, sym), f"driver module still exposes {sym}"
-    # position-notify sink is the only remaining aligner tie
-    assert d._position_sink is None
-    d.set_position_sink("Q")
-    assert d._position_sink == "Q"
-
-
-def test_update_aligner_pushes_to_sink_only_when_wired():
-    from helao.deploy.hte.drivers.motion import galil_motion_driver as gm
-
-    d = gm.Galil(config={"axis_id": {}})
-    # no sink -> no-op, must not raise
-    asyncio.run(d.update_aligner({"ax": ["x"]}))
-
-    class _Q:
-        def __init__(self):
-            self.items = []
-
-        async def put(self, msg):
-            self.items.append(msg)
-
-    q = _Q()
-    d.set_position_sink(q)
-    asyncio.run(d.update_aligner({"ax": ["x"], "position": [1.0]}))
-    assert q.items == [{"ax": ["x"], "position": [1.0]}]

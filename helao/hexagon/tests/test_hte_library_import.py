@@ -12,12 +12,12 @@ the action-server ports):
    module-top vendor import, the dependent libraries break here loudly.
 
 2. **Flat-namespace collision guard** (spec §4.3.12 Library port) — the known
-   ``CCSI_exp``/``CSIL_exp`` (shared ``CCSI_sub_*`` names) and
-   ``ECHEUVIS_seq``/``HISPEC_seq`` (``ECHEUVIS_postseq``) shadowing hazards are
-   asserted to still be detectable, so the eventual Library-port load-time
-   collision check has a frozen expected set. These collisions are currently
+   known ``ECHEUVIS_seq``/``HISPEC_seq`` (``ECHEUVIS_postseq``) shadowing
+   hazard is asserted to still be detectable, and the detector itself is
+   exercised on a synthetic pair, so the eventual Library-port load-time
+   collision check has a frozen expected set. The collision is currently
    **latent** — no hte config lists a colliding pair in one ``*_libraries:``
-   list — but the guard keeps them from silently going live.
+   list — but the guard keeps it from silently going live.
 """
 
 from __future__ import annotations
@@ -48,10 +48,10 @@ LIBRARY_MODULES = _library_modules(
 
 
 def test_library_module_set_nonempty():
-    # 13 experiment modules + 13 sequence modules on unstable (spec §8.1).
+    # 10 experiment modules + 9 sequence modules on unstable (spec §8.1).
     # Deliberately an exact count, not a floor: adding an hte library should
     # force a conscious look at this sweep. Update it when the set changes.
-    assert len(LIBRARY_MODULES) == 26, LIBRARY_MODULES
+    assert len(LIBRARY_MODULES) == 19, LIBRARY_MODULES
 
 
 @pytest.mark.parametrize("mod", LIBRARY_MODULES)
@@ -60,12 +60,18 @@ def test_hte_library_imports_on_linux(mod):
     importlib.import_module(mod)
 
 
-def test_known_exp_collision_still_detected():
-    cols = scan_collisions(EXP_DIR)
-    ccsi = {n: m for n, m in cols.items() if n.startswith("CCSI_sub_")}
-    assert ccsi, "expected CCSI_sub_* forks across CCSI_exp.py/CSIL_exp.py"
-    for mods in ccsi.values():
-        assert {"CCSI_exp.py", "CSIL_exp.py"} <= set(mods)
+def test_exp_collision_detected_in_synthetic_pair(tmp_path):
+    for mod in ("twin_a_exp", "twin_b_exp"):
+        (tmp_path / f"{mod}.py").write_text(
+            "def shared_sub_exp():\n    return []\n", encoding="utf-8"
+        )
+    assert scan_collisions(tmp_path) == {
+        "shared_sub_exp": ["twin_a_exp.py", "twin_b_exp.py"]
+    }
+
+
+def test_hte_exp_libraries_have_no_collisions():
+    assert scan_collisions(EXP_DIR) == {}
 
 
 def test_known_seq_collision_still_detected():

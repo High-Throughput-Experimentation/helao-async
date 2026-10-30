@@ -17,6 +17,7 @@ import json
 import os
 import re
 import time
+from base64 import b64decode
 from enum import Enum
 from functools import partial
 from socket import gethostname
@@ -41,7 +42,6 @@ from bokeh.models import (
 from bokeh.models.widgets import Div, FileInput
 from bokeh.models.widgets.inputs import TextAreaInput, TextInput
 from bokeh.plotting import figure
-from pybase64 import b64decode
 from pydantic import BaseModel
 
 from helao.core.models.orchstatus import LoopStatus
@@ -241,7 +241,7 @@ class BokehOperator:
 
         Args:
             vis_serv: ``Vis`` helper providing access to the Bokeh document and config.
-            backend: An ``OrchBackend`` (Local or Remote) the UI drives.
+            backend: An ``RemoteBackend`` the UI drives.
         """
         self.vis = vis_serv
         self.backend = backend
@@ -2986,10 +2986,6 @@ cb_obj.stylesheets = [
                 return False
 
         return False
-
-    async def add_experiment_to_sequence(self):
-        """Placeholder hook for future experiment-to-sequence integration."""
-        pass
 
     @staticmethod
     def _assign(model, attr, value):

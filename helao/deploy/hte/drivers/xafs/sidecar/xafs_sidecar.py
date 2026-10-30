@@ -1,4 +1,5 @@
 """XAFS sidecar HTTP app (Python 3.9, vendor easyxafs). Imports nothing from helao."""
+
 import argparse
 import logging
 import os
@@ -59,31 +60,42 @@ class XrayReq(_Req):
     off: bool = False
 
 
-def create_app(simulate: bool, lock_path: str, state_dir: str,
-               exit_fn: Optional[Callable[[], None]] = None) -> FastAPI:
+def create_app(
+    simulate: bool,
+    lock_path: str,
+    state_dir: str,
+    exit_fn: Optional[Callable[[], None]] = None,
+) -> FastAPI:
     """exit_fn runs shortly after /shutdown replies; None means do not exit (tests)."""
     hardware._inited.clear()
     app = FastAPI()
     app.state.sim = None
-    if simulate:  # must run before easyxafs is used; easyxafs import resets root logging
+    if (
+        simulate
+    ):  # must run before easyxafs is used; easyxafs import resets root logging
         try:
             from . import sim_hw
         except ImportError:
             import sim_hw  # type: ignore
         app.state.sim = sim_hw.install_sim(state_dir)
     import easyxafs  # noqa: F401  its logging_setup clears root handlers: import before ours
+
     root = logging.getLogger()
     root.setLevel(logging.INFO)
     if not any(getattr(h, "_xafs_sidecar", False) for h in root.handlers):
         h = logging.StreamHandler()
         h._xafs_sidecar = True  # type: ignore[attr-defined]
-        h.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
+        h.setFormatter(
+            logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s")
+        )
         root.addHandler(h)
     runner = ScanRunner()
     jobs = {}  # type: Dict[str, dict]
     st = {"hw_initialized": False, "scan_id": None}
 
-    start_guard = threading.Lock()  # held across check-and-start in /scans and /calibrate
+    start_guard = (
+        threading.Lock()
+    )  # held across check-and-start in /scans and /calibrate
 
     def scan_active() -> bool:
         return runner.busy()  # also true for a watchdog-hung alive vendor thread
@@ -93,7 +105,9 @@ def create_app(simulate: bool, lock_path: str, state_dir: str,
 
     def need_lock() -> None:
         if not hardware.owns_lock(lock_path):
-            raise HTTPException(423, "hardware lock not held by this process; POST /initialize first")
+            raise HTTPException(
+                423, "hardware lock not held by this process; POST /initialize first"
+            )
 
     @app.exception_handler(InterlockError)
     async def _interlock(request: Request, exc: InterlockError) -> JSONResponse:
@@ -115,12 +129,17 @@ def create_app(simulate: bool, lock_path: str, state_dir: str,
     def health() -> dict:
         try:
             from pkg_resources import get_distribution
+
             ver = get_distribution("easyxafs_python").version
         except Exception:
             ver = "unknown"
-        return {"easyxafs_version": ver, "python": sys.version.split()[0],
-                "pid": os.getpid(), "hw_initialized": st["hw_initialized"],
-                "simulate": simulate}
+        return {
+            "easyxafs_version": ver,
+            "python": sys.version.split()[0],
+            "pid": os.getpid(),
+            "hw_initialized": st["hw_initialized"],
+            "simulate": simulate,
+        }
 
     @app.post("/initialize")
     def initialize(flags: InitFlags) -> dict:
@@ -167,8 +186,16 @@ def create_app(simulate: bool, lock_path: str, state_dir: str,
         with start_guard:
             if calibrating():
                 raise HTTPException(409, "calibration in progress")
-            sid = runner.start(req.scan_def, req.x_mm, req.y_mm, req.xchanger_station,
-                               req.savename, req.save_dir, req.duration_scale, req.roi_element)
+            sid = runner.start(
+                req.scan_def,
+                req.x_mm,
+                req.y_mm,
+                req.xchanger_station,
+                req.savename,
+                req.save_dir,
+                req.duration_scale,
+                req.roi_element,
+            )
             st["scan_id"] = sid
         return {"scan_id": sid}
 
@@ -231,12 +258,18 @@ def main(argv: Optional[List[str]] = None) -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, required=True)
     ap.add_argument("--simulate", action="store_true")
-    ap.add_argument("--lock-file",
-                    default=os.path.join(os.environ.get("TEMP", tempfile.gettempdir()),
-                                         "easyxafs_sidecar.lock"))
-    ap.add_argument("--state-dir", default=os.path.join(tempfile.gettempdir(), "easyxafs_sidecar"))
+    ap.add_argument(
+        "--lock-file",
+        default=os.path.join(
+            os.environ.get("TEMP", tempfile.gettempdir()), "easyxafs_sidecar.lock"
+        ),
+    )
+    ap.add_argument(
+        "--state-dir", default=os.path.join(tempfile.gettempdir(), "easyxafs_sidecar")
+    )
     a = ap.parse_args(argv)
     import uvicorn
+
     app = create_app(a.simulate, a.lock_file, a.state_dir, exit_fn=lambda: os._exit(0))
     uvicorn.run(app, host="127.0.0.1", port=a.port)
 

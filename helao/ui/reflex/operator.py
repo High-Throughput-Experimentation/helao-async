@@ -1,7 +1,7 @@
 """Reflex rendering of the standalone operator.
 
 A second UI over the same orchestrator seam the Bokeh operator uses:
-``orch_backend.OrchBackend`` is an async ABC, and this page is a consumer of
+``orch_backend.RemoteBackend`` is an async client, and this page is a consumer of
 it, not a second implementation. That module is not changed to suit this one --
 the Bokeh operator (``helao/ui/bokeh/operator.py``) is still live beside it.
 
@@ -137,7 +137,7 @@ SEQ_COLS = [
 EXP_COLS = ["experiment_name", "experiment_uuid"]
 ACT_COLS = ["action_name", "action_server", "action_uuid"]
 
-#: Controls the page may invoke, by ``OrchBackend`` method name. Reflex event
+#: Controls the page may invoke, by ``RemoteBackend`` method name. Reflex event
 #: arguments arrive from the client, so this is an allow-list rather than a
 #: convenience: without it a crafted event would reach any coroutine on the
 #: backend, ``close`` included.
@@ -260,7 +260,7 @@ def page_size_from(value: str) -> int:
 
 
 class BackendRegistry:
-    """Per-session ``session_token -> OrchBackend`` map.
+    """Per-session ``session_token -> RemoteBackend`` map.
 
     The backend holds sockets and a poll task, so it cannot ride a Reflex var
     (which is serialised to JSON) and it must be closed when its page goes
@@ -487,7 +487,7 @@ async def refresh_tables(backend, offsets: dict, page_size: int) -> dict:
     last poll.
 
     Args:
-        backend: An ``OrchBackend``, or ``None`` when the page is not yet
+        backend: A ``RemoteBackend``, or ``None`` when the page is not yet
             connected.
         offsets: ``kind -> first-row index``, one per :data:`QUEUE_KINDS`.
         page_size: Rows to request per queue.
@@ -566,7 +566,7 @@ async def dispatch_control(backend, name: str) -> str:
     """Run one orchestrator control.
 
     Args:
-        backend: An ``OrchBackend``, or ``None``.
+        backend: A ``RemoteBackend``, or ``None``.
         name: A member of :data:`CONTROL_METHODS`.
 
     Returns:
@@ -1218,14 +1218,6 @@ class OperatorQueueState(rx.State):
         message = await dispatch_remove(session_backend(token), kind, absolute, length)
         async with self:
             self.error = message
-
-    def _rows_for(self, kind: str) -> list:
-        """Currently rendered rows for one queue kind."""
-        return {
-            "sequence": self.seq_rows,
-            "experiment": self.exp_rows,
-            "action": self.act_rows,
-        }.get(kind, [])
 
 
 # -- parameter forms ---------------------------------------------------------

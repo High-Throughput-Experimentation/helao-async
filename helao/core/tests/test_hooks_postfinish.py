@@ -4,7 +4,6 @@ from types import SimpleNamespace
 
 import pytest
 
-import helao.core.drivers.data.sync_driver as legacy_mod
 import helao.hexagon.adapters.native.sync_driver as native_mod
 from helao.core.hooks import FinishHook, HookSet
 from helao.core.hooks.postfinish import run_postfinish_chain
@@ -37,7 +36,7 @@ def _prog(tmp_path, mod):
     return mod.Progress(act)
 
 
-@pytest.mark.parametrize("mod", [legacy_mod, native_mod])
+@pytest.mark.parametrize("mod", [native_mod])
 @pytest.mark.asyncio
 async def test_all_done_marks_synced_and_records_states(tmp_path, mod):
     a, b = _Hook(), _Hook(blocking=False)
@@ -55,7 +54,7 @@ async def test_all_done_marks_synced_and_records_states(tmp_path, mod):
     assert on_disk["touched"] == [{"x": 1}, None]
 
 
-@pytest.mark.parametrize("mod", [legacy_mod, native_mod])
+@pytest.mark.parametrize("mod", [native_mod])
 @pytest.mark.asyncio
 async def test_blocking_failure_stops_chain_and_resumes_at_failed_hook(tmp_path, mod):
     a, b, c = _Hook(), _Hook(fail=True), _Hook()
@@ -80,7 +79,7 @@ async def test_blocking_failure_stops_chain_and_resumes_at_failed_hook(tmp_path,
     assert "error" not in d["hooks"]["b"]
 
 
-@pytest.mark.parametrize("mod", [legacy_mod, native_mod])
+@pytest.mark.parametrize("mod", [native_mod])
 @pytest.mark.asyncio
 async def test_non_blocking_failure_is_recorded_alerted_and_does_not_block_synced(
     tmp_path, mod, caplog
@@ -105,7 +104,7 @@ async def test_non_blocking_failure_is_recorded_alerted_and_does_not_block_synce
     assert b.calls == 2 and mod.Progress(prog.prg).dict["hooks"]["b"]["state"] == "done"
 
 
-@pytest.mark.parametrize("mod", [legacy_mod, native_mod])
+@pytest.mark.parametrize("mod", [native_mod])
 @pytest.mark.asyncio
 async def test_hooks_and_synced_false_are_written_before_the_first_hook_runs(
     tmp_path, mod
@@ -122,7 +121,7 @@ async def test_hooks_and_synced_false_are_written_before_the_first_hook_runs(
     assert peek.on_disk["hooks"] == {} and peek.on_disk["synced"] is False
 
 
-@pytest.mark.parametrize("mod", [legacy_mod, native_mod])
+@pytest.mark.parametrize("mod", [native_mod])
 @pytest.mark.asyncio
 async def test_empty_chain_is_synced(tmp_path, mod):
     syncer = _syncer({}, {})
@@ -131,7 +130,7 @@ async def test_empty_chain_is_synced(tmp_path, mod):
     assert mod.Progress(prog.prg).dict["synced"] is True
 
 
-@pytest.mark.parametrize("mod", [legacy_mod, native_mod])
+@pytest.mark.parametrize("mod", [native_mod])
 @pytest.mark.asyncio
 async def test_syncer_without_postfinish_raises_rather_than_reporting_synced(
     tmp_path, mod
@@ -149,7 +148,7 @@ async def test_syncer_without_postfinish_raises_rather_than_reporting_synced(
         await run_postfinish_chain(syncer, prog, opts={})
 
 
-@pytest.mark.parametrize("mod", [legacy_mod, native_mod])
+@pytest.mark.parametrize("mod", [native_mod])
 @pytest.mark.asyncio
 async def test_hooks_null_in_prg_runs_the_chain_normally(tmp_path, mod):
     """A ``.prg`` whose ``hooks:`` line loaded as ``None`` must not crash.
@@ -168,7 +167,7 @@ async def test_hooks_null_in_prg_runs_the_chain_normally(tmp_path, mod):
     assert mod.Progress(prog.prg).dict["hooks"]["a"]["state"] == "done"
 
 
-@pytest.mark.parametrize("mod", [legacy_mod, native_mod])
+@pytest.mark.parametrize("mod", [native_mod])
 @pytest.mark.asyncio
 async def test_context_carries_yml_prg_syncer_args_opts(tmp_path, mod):
     seen = {}

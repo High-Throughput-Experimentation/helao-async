@@ -78,14 +78,10 @@ async def galil_dyn_endpoints(app: ActionHost):
     server_key = app.server.server_name
     app.driver: Galil
 
-    # gclib connection is opened here (not in the driver's __init__, per the
-    # HelaoDriver ABC's no-device-I/O-at-construction rule) so that
-    # `galil_enabled` reflects a real connection attempt before endpoint
-    # registration below decides which routes to expose -- matching the
-    # pre-migration timing where __init__ itself opened the connection
-    # before this hook ran.
-    connect_resp = app.driver.connect()
-    LOGGER.info(f"Galil connect() returned status={connect_resp.status}")
+    # The host has already connected the driver (``connect_on_startup``), before
+    # this runs, so `galil_enabled` reflects a real connection attempt before the
+    # registration below decides which routes to expose. A failed or raising
+    # connect leaves it falsy and no routes register, as after a failed connect today.
 
     if app.driver.galil_enabled is True:
 

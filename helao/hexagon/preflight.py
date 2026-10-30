@@ -118,6 +118,14 @@ _REFLEX_BACKEND_LABEL = "reflex backend port, port + 1"
 _ALIGNER_BOKEH_LABEL = "aligner Bokeh port, params.bokeh_port or port + 1000"
 
 
+def aligner_bokeh_port(server_cfg: dict) -> int:
+    """Bokeh port of a server's plate aligner: ``params.bokeh_port`` when set
+    (not ``None``), else ``server_cfg['port'] + 1000``. A null value counts as
+    unset, which ``dict.get(key, default)`` would not."""
+    port = (server_cfg.get("params") or {}).get("bokeh_port")
+    return int(int(server_cfg["port"]) + 1000 if port is None else port)
+
+
 def _aligner_port(server: dict) -> Optional[int]:
     """The extra Bokeh-aligner port a server claims, or ``None``.
 
@@ -139,7 +147,7 @@ def _aligner_port(server: dict) -> Optional[int]:
     port = server.get("port")
     if port is None:
         return None
-    return int(params.get("bokeh_port", int(port) + 1000))
+    return aligner_bokeh_port(server)
 
 
 def _claimed_addresses(server: dict) -> list[tuple[str, str]]:

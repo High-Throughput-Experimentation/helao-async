@@ -6,12 +6,12 @@ from datetime import datetime
 
 import pytest
 
-import helao.core.drivers.data.sync_driver as legacy_mod
 import helao.hexagon.adapters.native.sync_driver as native_mod
 from helao.core.models.helaodirs import HelaoDirs
 from helao.core.models.process import ProcessModel
 from helao.core.models.run_dir import RunDir
 from helao.helpers.run_state import _prg_is_complete, _prg_is_quarantined
+from helao.helpers.meta_io import read_meta
 from helao.helpers.yml_tools import yml_load
 from helao.hexagon.tests.sync_fixtures import (
     drain,
@@ -24,7 +24,7 @@ from helao.hexagon.tests.sync_fixtures import (
     write_yml,
 )
 
-MODS = [legacy_mod, native_mod]
+MODS = [native_mod]
 GROUPS = {0: [0, 1], 1: [2, 3]}
 NOW = datetime(2026, 10, 15, 12, 0, 0)
 
@@ -148,8 +148,8 @@ async def test_write_off_block_stops_f3_and_marks_only_its_group(
         assert isinstance(result, dict)
 
         by_group = {}
-        for p in exp_yml.parent.glob("*-prc.yml"):
-            by_group[int(p.name.split("__")[0])] = mod.yml_load(p, fast=True)
+        for p in exp_yml.parent.glob("*-prc.json"):
+            by_group[int(p.name.split("__")[0])] = read_meta(p)
         assert by_group[1]["missing_action_orders"] == [2]
         assert "missing_action_orders" not in by_group[0]
         assert any(b.get("missing_action_orders") == [2] for b in bodies)
@@ -260,8 +260,8 @@ async def test_write_off_marks_the_pushed_process(tmp_path, mod, monkeypatch):
         await drain(drv, timeout=15)
         assert _prg_is_complete(exp_yml.with_suffix(".prg"))
         by_group = {}
-        for p in exp_yml.parent.glob("*-prc.yml"):
-            by_group[int(p.name.split("__")[0])] = yml_load(p, fast=True)
+        for p in exp_yml.parent.glob("*-prc.json"):
+            by_group[int(p.name.split("__")[0])] = read_meta(p)
         assert by_group[1]["missing_action_orders"] == [2]
         assert "missing_action_orders" not in by_group[0]
         # the ledger line is JSON, so its keys are strings; the .prg keys are not
@@ -311,6 +311,7 @@ async def test_write_off_repushes_a_backlog_group_with_the_marker(
         await drv.enqueue_yml(exp_yml, 1)
         await drain(drv, timeout=15)
         assert yml_load(old, fast=True)["missing_action_orders"] == [2]
+        assert [p.name for p in exp_yml.parent.glob("1__*-prc.*")] == [old.name]
         assert bodies and all(b["missing_action_orders"] == [2] for b in bodies)
     finally:
         await teardown_driver(drv)

@@ -18,6 +18,7 @@ from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 from helao.hexagon.app.action_context import ActionContext
 from helao.hexagon.app.action_host import ActionHost
+from helao.hexagon.app.motion_panel import running_actions
 from helao.ui.shared.motion_control import Units
 from helao.helpers.executor import Executor
 
@@ -27,20 +28,6 @@ from ...drivers.motion.kinesis_driver import (
     KinesisPoller,
     MoveModes,
 )
-
-
-def _running_actions(app: ActionHost) -> list:
-    """Names of this server's endpoints that currently have a running action.
-
-    Whether an action is running is knowable only server-side, from the
-    ``Base`` object no shared module holds, so this check cannot live beside
-    the rest of the panel logic in ``motion_control.py`` -- only the
-    *rendering* of a refusal does. Same sweep the queueing middleware performs
-    in ``base_api.py``, without its single-endpoint narrowing: a panel command
-    for the stage cares that the server is moving something, not which route
-    was asked to move it.
-    """
-    return [ep for ep, em in app.actionservermodel.endpoints.items() if em.active_dict]
 
 
 class KinesisMotorExec(Executor):
@@ -374,7 +361,7 @@ async def kinesis_dyn_endpoints(app: ActionHost):
             if app.actionservermodel.estop:
                 LOGGER.error("KMOTOR is in estop.")
                 return ErrorCodes.estop, {}
-            running = _running_actions(app)
+            running = running_actions(app)
             if running:
                 LOGGER.info(
                     f"refusing panel move on axis '{axis}': actions running "
@@ -431,7 +418,7 @@ async def kinesis_dyn_endpoints(app: ActionHost):
                 the stop was issued to.
             """
             axes = list(app.driver.motors)
-            running = _running_actions(app)
+            running = running_actions(app)
             if running:
                 LOGGER.warning(
                     f"panel stop_motion issued while actions are running on "

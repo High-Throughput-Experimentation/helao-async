@@ -137,9 +137,10 @@ class PlateGateFailed:
 
 @dataclass(frozen=True)
 class HeartbeatFailed:
-    """active_action_monitor probe failure (T12 + alert). P2a: carries the
-    dead server's active action uuids (stringified) so the reducer can order
-    a PruneDeadActions — the pure-hexagon dead-peer exit (decision Q3)."""
+    """HexHealthMonitor probe failure (formerly active_action_monitor; T12 +
+    alert). P2a: carries the dead server's active action uuids (stringified)
+    so the reducer can order a PruneDeadActions — the pure-hexagon dead-peer
+    exit (decision Q3)."""
 
     message: str
     dead_action_uuids: tuple[str, ...] = ()
@@ -222,7 +223,10 @@ Event = Union[
 
 @dataclass(frozen=True)
 class CreateDispatchLoopTask:
-    """start_loop(): create dispatch_loop_task (T1)."""
+    """start_loop(): wake the HexDispatchLoop (T1).
+
+    ``CreateDispatchLoopTask`` sets ``loop_wake``; the long-lived task is the loop.
+    """
 
 
 @dataclass(frozen=True)

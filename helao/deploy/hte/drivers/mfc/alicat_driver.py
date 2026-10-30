@@ -47,7 +47,7 @@ class AliCatMFC(HelaoDriver):
     """HELAO ``HelaoDriver`` wrapper around one or more Alicat `FlowController` instances.
 
     Reads a `devices` dict from `config["devices"]`; each `FlowController` is
-    opened by :meth:`connect`, not by construction. Always-on per-device status
+    opened by :meth:`connect`, which the host calls at startup (``connect_on_startup``). Always-on per-device status
     polling is handled by the paired :class:`AliCatMFCPoller`, wired in as the
     server's ``poller_class``. Exposes async helpers for setting flow/pressure,
     swapping gases, locking/unlocking the front panel, holding valves, and
@@ -56,6 +56,8 @@ class AliCatMFC(HelaoDriver):
     Server config parameters:
         ``devices``: dict of ``{device_name: {"port": ..., "unit_id": ...}}``.
     """
+
+    connect_on_startup = True  # the host connects after _base_hook, before the poller
 
     def __init__(self, config: dict = {}):
         """Store config; each `FlowController` is opened in :meth:`connect`.
@@ -78,17 +80,6 @@ class AliCatMFC(HelaoDriver):
 
         self.polling = True
         self.last_state = "unknown"
-        # Open the Alicat serial connections at construction. ActionHost builds
-        # the AliCatMFCPoller immediately after the driver and the poller
-        # AUTO-STARTS its poll loop in __init__ -- but ActionHost never calls
-        # connect(), so
-        # deferring the serial open left self.fcs empty: the poller produced no
-        # data, the live buffer key never appeared, and acquire_flowrate's
-        # MfcExec._poll (get_lbuf) never advanced -> the capture hung. Connect
-        # here (like the biologic/andor/SprintIR drivers) so the controllers are
-        # open before the first poll; a bad/absent port logs a clear
-        # "connect failed" instead. get_data() already no-ops on empty fcs.
-        self.connect()
 
     def connect(self) -> DriverResponse:
         """Open every configured Alicat and query its gas/identity registers.

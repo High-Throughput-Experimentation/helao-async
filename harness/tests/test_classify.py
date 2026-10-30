@@ -61,7 +61,7 @@ def test_classify_rows():
     assert classify_file("ANALYSES/25.28/0716/x/u.yml") is ArtifactRow.ANALYSIS
     assert classify_file("S3_SIM/helao-sim/action/u.json") is ArtifactRow.S3_RECORD
     assert classify_file("RUNS_FINISHED/a/extra_output.csv") is ArtifactRow.AUX_FILE
-    assert classify_file("LOGS/ORCH.log") is ArtifactRow.IGNORE
+    assert classify_file("LOGS/ORCH.jsonl") is ArtifactRow.IGNORE
     assert classify_file("STATES/pids_golden_.pck") is ArtifactRow.IGNORE
 
 
@@ -83,4 +83,26 @@ def test_normalize_cam_image_strips_only_the_wall_clock_suffix():
             "RUNS_DIAG/25.28/0716/0__0__CAM__acquire_image/cam_000000_260719.220107.jpg"
         )
         == "RUNS_DIAG/YY.WW/MMDD/0__0__CAM__acquire_image/cam_000000_TS.jpg"
+    )
+
+
+def test_new_suffixes_normalize_onto_legacy_names():
+    assert normalize_name("250716.131421123456-act.json") == "TS-act.yml"
+    assert normalize_name("250716.131415123456-seq.json") == "TS-seq.yml"
+    assert normalize_name("WsSim-0.0.0.0__0.jsonl") == "WsSim-0.0.0.0__0.hlo"
+    assert normalize_name("0__u__CV-prc.json") == "0__u__CV-prc.yml"
+    assert normalize_name("u-ana.json") == "u.yml"
+    assert normalize_name("u_output_xrfs.json") == "u_output_xrfs.json"
+
+
+def test_classify_new_suffixes():
+    assert classify_file("RUNS/a/b-seq.json") is ArtifactRow.SEQ_YML
+    assert classify_file("RUNS/a/b-exp.json") is ArtifactRow.EXP_YML
+    assert classify_file("RUNS/a/b-act.json") is ArtifactRow.ACT_YML
+    assert classify_file("RUNS/a/0__x__t-prc.json") is ArtifactRow.PRC_YML
+    assert classify_file("RUNS/a/x.jsonl") is ArtifactRow.HLO
+    assert classify_file("RUNS/a/x.meta.json") is ArtifactRow.IGNORE
+    assert classify_file("ANALYSES/25.28/0716/x/u-ana.json") is ArtifactRow.ANALYSIS
+    assert (
+        classify_file("S3_SIM/helao-sim/raw_data/u/x.hlo.json") is ArtifactRow.S3_RECORD
     )

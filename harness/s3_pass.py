@@ -32,6 +32,7 @@ from harness.hlo_pass import (
 from harness.manifest import ProvenanceManifest, content_mask_mode
 from harness.uuidmap import UuidMapper
 from harness.yaml_pass import diff_meta, load_yml_plain, normalize_meta
+from helao.helpers.meta_io import meta_glob
 
 
 def _load_bytes(path: Path) -> bytes:
@@ -161,7 +162,10 @@ def assert_s3_meta_rules(disk_act: dict, s3_act: dict) -> list[dict]:
                 orig = name
             if orig.endswith(".json"):
                 orig = orig[: -len(".json")]
-            if orig not in disk_files:
+            if (
+                orig not in disk_files
+                and orig[: -len(".hlo")] + ".jsonl" not in disk_files
+            ):
                 diffs.append(
                     {
                         "key": f"files[{name}].file_name",
@@ -258,9 +262,13 @@ def internal_s3_analysis_checks(root: Path) -> list[dict]:
 
     ana_root = Path(root) / "ANALYSES"
     on_disk: dict[str, Path] = {}
-    for yml in ana_root.rglob("*.yml"):
-        on_disk[yml.stem.lower()] = yml
-    local_outputs = {p.stem.lower(): p for p in ana_root.rglob("*.json")}
+    for yml in [*ana_root.rglob("*.yml"), *ana_root.rglob("*-ana.json")]:
+        on_disk[yml.name.removesuffix("-ana.json").removesuffix(".yml").lower()] = yml
+    local_outputs = {
+        p.stem.lower(): p
+        for p in ana_root.rglob("*.json")
+        if not p.name.endswith("-ana.json")
+    }
 
     for payload in sorted(s3_root.glob("*/analysis/*.json")):
         stem = payload.stem.lower()
@@ -359,7 +367,7 @@ def internal_s3_analysis_checks(root: Path) -> list[dict]:
 def internal_s3_checks(root: Path) -> list[dict]:
     """Pair S3 action metas with on-disk act ymls (raw uuid) in ONE capture."""
     act_index: dict = {}
-    for act_yml in Path(root).rglob("*-act.yml"):
+    for act_yml in meta_glob(Path(root), "act", "**/*"):
         d = load_yml_plain(act_yml)
         if isinstance(d, dict) and d.get("action_uuid"):
             act_index[str(d["action_uuid"]).lower()] = d

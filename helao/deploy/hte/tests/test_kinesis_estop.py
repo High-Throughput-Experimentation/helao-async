@@ -21,6 +21,7 @@ from starlette.testclient import TestClient
 from helao.deploy.hte.drivers.motion import kinesis_driver as kd
 from helao.deploy.hte.drivers.motion.kinesis_driver import KinesisMotor
 from helao.helpers.dispatcher import _query_safe
+from helao.helpers.meta_io import read_meta
 from helao.helpers.premodels import Action
 
 _AXIS = {"serial_no": "1", "pos_scale": 1228800.0, "vel_scale": 1.0, "acc_scale": 1.0}
@@ -50,7 +51,9 @@ class FakeMotor:
 @pytest.fixture
 def driver(monkeypatch):
     monkeypatch.setattr(kd.Thorlabs, "KinesisMotor", FakeMotor)
-    return KinesisMotor(config=_CFG)
+    drv = KinesisMotor(config=_CFG)
+    drv.connect()  # the host connects after construction
+    return drv
 
 
 _STOP = ("stop", (), {"immediate": True, "sync": False})
@@ -108,12 +111,9 @@ def _host(root="/tmp"):
             config=_Stub(),
             logging=_Stub(),
             clock=_Clock(),
-            transport=_Stub(),
             state_persistence=_Stub(),
-            status=_Stub(),
             health=_Stub(),
             artifact_store=NativeArtifactStoreAdapter(config=_Stub(), clock=_Clock()),
-            data_sink=_Stub(),
         ),
         helao_cfg={
             "root": root,
@@ -190,6 +190,15 @@ def test_latched_kmove_is_refused_with_no_session_and_no_move(gated, tmp_path):
     from helao.core.error import ErrorCodes
 
     host, client = gated
+
+    def _files():
+        return sorted(
+            os.path.relpath(os.path.join(d, f), tmp_path)
+            for d, _, fs in os.walk(tmp_path)
+            for f in fs
+        )
+
+    before = _files()  # whatever startup wrote (log layout varies with LOGGER)
     _latch(client, True)
     resp = _kmove(client)
     assert resp.status_code == 200, resp.text
@@ -198,9 +207,9 @@ def test_latched_kmove_is_refused_with_no_session_and_no_move(gated, tmp_path):
     assert _move_calls(host.driver) == []
     assert host.actives == {} and host.executors == {}
     # a rejected call creates no artifact: nothing was written under the root
-    written = [f for _, _, fs in os.walk(tmp_path) for f in fs]
-    # startup's fault log and its per-key lock file, nothing else
-    assert sorted(written) == ["KMOTOR_faults.txt", "action_host_KMOTOR.lock"]
+    assert _files() == before
+    # startup's own files (fault log or JSONL log, and the per-key lock) only
+    assert "action_host_KMOTOR.lock" in map(os.path.basename, before)
 
 
 def test_latched_move_axis_is_refused_and_sends_no_move(gated):
@@ -273,9 +282,9 @@ def test_latch_landing_after_the_gate_stops_the_executor_before_it_moves(
             os.path.join(d, f)
             for d, _, fs in os.walk(tmp_path)
             for f in fs
-            if f.endswith("-act.yml")
+            if f.endswith("-act.json")
         ]
     time.sleep(0.3)
     assert _move_calls(host.driver) == []
     assert acts, "the action never finished"
-    assert "error_code: estop" in open(acts[0], encoding="utf-8").read()
+    assert read_meta(acts[0])["error_code"] == "estop"

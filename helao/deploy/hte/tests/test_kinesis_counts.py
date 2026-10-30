@@ -98,6 +98,7 @@ def make_driver(monkeypatch):
 
     def _make(config=None, position=0, status=()):
         driver = KinesisMotor(config=config or _cfg())
+        driver.connect()  # the host connects after construction
         for motor in driver.motors.values():
             motor.position = position
             motor._status = list(status)

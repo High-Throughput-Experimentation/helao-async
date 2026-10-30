@@ -17,7 +17,7 @@ def resolve_sequence_path(params: dict) -> Optional[str]:
     A synced sequence is no longer zipped (spec D9), so ``sequence_zip_path``
     names something that is usually a directory. The honest name is
     ``sequence_path``; the old one stays accepted so live configs
-    (``auto_analyze_sequences``) and the ``*_postseq`` sequences keep working
+    (``dispatch_analysis`` blocks) and the ``*_postseq`` sequences keep working
     with no edit. ``LocalLoader`` already accepts a directory, a zip, or a yml,
     so callers need no other change.
 

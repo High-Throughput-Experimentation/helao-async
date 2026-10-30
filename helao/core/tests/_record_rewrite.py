@@ -24,6 +24,14 @@ Things worth knowing before editing this:
   rewritten) if it belongs to something else.
 - **Handing the record back does not make the syncer notice it.** See
   :func:`reset_to_finished`.
+- **A sequence directory in the single ``RUNS`` tree is the second source.**
+  Its records are edited in place in their own format (``.yml`` round-trip,
+  comments kept; ``.json`` through ``meta_io.write_meta``), only once
+  :func:`unsynced_records` finds every record shipped, and handed back by
+  :func:`reset_runs_dir` deleting its ``.prg`` files -- what
+  ``SyncDriver.reset_sync`` does to a legacy synced directory. A record whose
+  ``.prg`` is not ``synced: true`` may still be mid-upload, so editing it would
+  race the syncer. See :func:`runs_gate` for what else refuses.
 """
 
 __all__ = [
@@ -31,22 +39,33 @@ __all__ = [
     "PROCESS_DIR_NAME",
     "finish_yml_hint",
     "finished_dir_for",
+    "is_runs_dir",
     "kind_for",
     "process_dir_for",
+    "reset_runs_dir",
     "reset_to_finished",
+    "rewrite_dir",
+    "run_reset_only",
+    "runs_gate",
     "rewrite_processes",
     "rewrite_zip",
+    "unsynced_records",
 ]
 
 import os
+import sys
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from helao.core.models.run_dir import RunDir
+from helao.core.models.run_dir import RunDir, is_legacy_path
+from helao.helpers.artifact_hash import log_artifact_hashes_sync, record_uuid
 from helao.helpers.file_utils import staging_path
+from helao.helpers.meta_io import meta_glob, read_meta, write_meta
+from helao.helpers.run_state import _prg_is_complete
 from helao.helpers.yml_tools import yml_dumps, yml_load
+from helao.hexagon.domain.naming import meta_kind
 
 #: ``apply(doc, kind) -> (changed field descriptions, "left alone" note)``.
 Apply = Callable[[dict, str], "tuple[list[str], str]"]
@@ -56,12 +75,12 @@ Apply = Callable[[dict, str], "tuple[list[str], str]"]
 #: root (see ``helao.helpers.helao_dirs``).
 PROCESS_DIR_NAME = "PROCESSES"
 
-#: Record yml suffix -> the record kind it names.
+#: ``naming.meta_kind`` -> the record kind it names.
 _KINDS = {
-    "-seq.yml": "sequence",
-    "-exp.yml": "experiment",
-    "-act.yml": "action",
-    "-prc.yml": "process",
+    "seq": "sequence",
+    "exp": "experiment",
+    "act": "action",
+    "prc": "process",
 }
 
 
@@ -82,16 +101,181 @@ class Edit:
 
 
 def kind_for(name: "str | os.PathLike[str]") -> "str | None":
-    """The record kind a yml's name declares, or ``None`` if it names none."""
-    text = str(name)
-    for suffix, kind in _KINDS.items():
-        if text.endswith(suffix):
-            return kind
-    return None
+    """The record kind a ``.yml``/``.json`` name declares, or ``None``."""
+    return _KINDS.get(meta_kind(name) or "")
+
+
+def _load(path: Path):
+    """A record as a mapping: ``.yml`` round-trip (comments kept), else JSON.
+
+    Written back with ``meta_io.write_meta``, which keeps each file's format:
+    ``yml_dumps`` re-emits a round-trip document with its comments.
+    """
+    return yml_load(path) if path.suffix == ".yml" else read_meta(path)
+
+
+def is_runs_dir(path: "str | os.PathLike[str]") -> bool:
+    """Whether ``path`` is a sequence directory of the single ``RUNS`` tree."""
+    path = Path(path).resolve()
+    return path.is_dir() and not is_legacy_path(path) and bool(meta_glob(path, "seq"))
+
+
+#: Records that carry their own ``.prg``; a process has none.
+_SYNCED_KINDS = ("seq", "exp", "act")
+
+
+def unsynced_records(seq_dir: "str | os.PathLike[str]") -> "list[Path]":
+    """Records under ``seq_dir`` whose sibling ``.prg`` is not ``synced: true``."""
+    return [
+        p
+        for p in meta_glob(seq_dir, _SYNCED_KINDS, "**/*")
+        if not _prg_is_complete(p.with_suffix(".prg"))
+    ]
+
+
+def _prg_has_write_off(prg: Path) -> bool:
+    """Whether ``prg`` carries a top-level ``write_off`` block (flat-text read)."""
+    try:
+        lines = prg.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return False
+    for line in lines:
+        if line.startswith("write_off:"):
+            return line.split(":", 1)[1].strip() not in ("null", "~", "{}")
+    return False
+
+
+def runs_gate(seq_dir: "str | os.PathLike[str]", *, reset_only: bool = False):
+    """Why a ``RUNS`` sequence may not be rewritten or reset; empty when it may.
+
+    - A ``.prg`` with a ``write_off`` block always refuses: the operator wrote
+      the experiment off (``SyncDriver.write_off``), and deleting the ``.prg``
+      drops that, so a re-sync would park the experiment again forever.
+    - An edit run needs every seq/exp/act record's ``.prg`` present and
+      ``synced: true``; anything else may still be uploading.
+    - ``reset_only`` instead tolerates a *missing* ``.prg`` (an interrupted
+      reset already deleted it) and refuses only one that exists unsynced.
+    """
+    seq_dir = Path(seq_dir)
+    prgs = sorted(seq_dir.rglob("*.prg"))
+    problems = [
+        f"{p}: carries a write_off block" for p in prgs if _prg_has_write_off(p)
+    ]
+    if reset_only:
+        problems += [
+            f"{p}: not synced: true (a sync may be in flight)"
+            for p in prgs
+            if not _prg_is_complete(p)
+        ]
+    else:
+        problems += [
+            f"{p}: its .prg is missing or not synced: true"
+            for p in unsynced_records(seq_dir)
+        ]
+    return problems
+
+
+def gate_message(problems: "list[str]") -> str:
+    """The refusal text for :func:`runs_gate`'s ``problems``."""
+    return (
+        "this sequence cannot be rewritten or reset:\n"
+        + "\n".join(f"  {p}" for p in problems)
+        + "\na written-off sequence is never reset (it would be re-parked); a "
+        ".prg missing after an interrupted reset is finished with --reset-only "
+        "(only if an earlier run of this tool made the edits: a record SYNC has "
+        "not reached yet also has no .prg)"
+    )
+
+
+def run_reset_only(path: "str | os.PathLike[str]", *, dry_run: bool = False) -> int:
+    """``--reset-only``: hand a ``RUNS`` sequence back without editing anything.
+
+    For a sequence whose edits are already on disk -- a ``--no-reset`` run, or
+    a reset that stopped part way through deleting the ``.prg`` files.
+    """
+    path = Path(path)
+    if not is_runs_dir(path):
+        print(
+            f"--reset-only needs a sequence directory under RUNS, not {path}",
+            file=sys.stderr,
+        )
+        return 1
+    problems = runs_gate(path, reset_only=True)
+    if problems:
+        print(f"REFUSED: {gate_message(problems)}", file=sys.stderr)
+        print("nothing was written.", file=sys.stderr)
+        return 1
+    prgs = reset_runs_dir(path, dry_run=dry_run)
+    print(f"{'would delete' if dry_run else 'deleted'} {len(prgs)} .prg file(s)")
+    if dry_run:
+        print("--dry-run: nothing written.")
+    else:
+        print(finish_yml_hint(path))
+    return 0
+
+
+def rewrite_dir(
+    seq_dir: "str | os.PathLike[str]",
+    apply: Apply,
+    *,
+    dry_run: bool = False,
+    reason: str = "record_rewrite",
+) -> "tuple[list[Edit], str | None]":
+    """Run ``apply`` over the seq/exp/act records of a ``RUNS`` sequence directory.
+
+    The directory twin of :func:`rewrite_zip`, editing each record in place.
+    Processes are left to :func:`rewrite_processes`, which checks their
+    ``sequence_uuid``. The caller gates on :func:`unsynced_records` first.
+    """
+    seq_dir = Path(seq_dir)
+    edits: list[Edit] = []
+    sequence_uuid: "str | None" = None
+    for path in meta_glob(seq_dir, _SYNCED_KINDS, "**/*"):
+        kind = kind_for(path)
+        assert kind is not None  # meta_glob filtered on it
+        doc = _load(path)
+        if not isinstance(doc, dict):
+            edits.append(Edit(str(path), kind, note="not a mapping; left alone"))
+            continue
+        if kind == "sequence" and path.parent == seq_dir:
+            uuid = doc.get("sequence_uuid")
+            if uuid is not None:
+                sequence_uuid = str(uuid)
+        changed, note = apply(doc, kind)
+        if changed and not dry_run:
+            written = write_meta(path, doc)
+            log_artifact_hashes_sync(
+                [written],
+                kind=meta_kind(path) or "record",
+                owner_uuid=record_uuid(doc),
+                event="artifact_rewritten",
+                reason=reason,
+            )
+        if changed or note:
+            edits.append(Edit(str(path), kind, changed, note))
+    return edits, sequence_uuid
+
+
+def reset_runs_dir(
+    seq_dir: "str | os.PathLike[str]", *, dry_run: bool = False
+) -> "list[Path]":
+    """Delete every ``.prg`` under ``seq_dir`` so SYNC re-pushes the sequence.
+
+    Returns the ``.prg`` files deleted (or, with ``dry_run``, that would be).
+    """
+    prgs = sorted(Path(seq_dir).rglob("*.prg"))
+    if not dry_run:
+        for prg in prgs:
+            prg.unlink()
+    return prgs
 
 
 def rewrite_zip(
-    zip_path: "str | os.PathLike[str]", apply: Apply, *, dry_run: bool = False
+    zip_path: "str | os.PathLike[str]",
+    apply: Apply,
+    *,
+    dry_run: bool = False,
+    reason: str = "record_rewrite",
 ) -> "tuple[list[Edit], str | None]":
     """Run ``apply`` over every record yml inside one sequence zip.
 
@@ -115,7 +299,7 @@ def rewrite_zip(
         infos = zin.infolist()
         for info in infos:
             kind = kind_for(info.filename)
-            if kind is None:
+            if kind is None or not info.filename.endswith(".yml"):
                 continue
             doc = yml_load(zin.read(info).decode())
             if not isinstance(doc, dict):
@@ -165,6 +349,13 @@ def rewrite_zip(
     # Outside the read handle: on Windows the original cannot be replaced while
     # it is still open.
     os.replace(staged, zip_path)
+    log_artifact_hashes_sync(
+        [zip_path],
+        kind="zip",
+        owner_uuid=sequence_uuid,
+        event="artifact_rewritten",
+        reason=reason,
+    )
     return edits, sequence_uuid
 
 
@@ -261,14 +452,19 @@ def reset_to_finished(
 def finish_yml_hint(dest: Path) -> str:
     """The call that makes the syncer pick up a record handed back to ``dest``.
 
-    The tools print it and never make it: posting is a production write.
+    ``dest`` is a ``RUNS_FINISHED`` twin or a ``RUNS`` sequence directory; the
+    sequence record named is whichever format is on disk, as an absolute
+    path. The tools print it and never make it: posting is a production write.
     """
-    seqs = sorted(dest.rglob("*-seq.yml"), key=lambda p: (len(p.parts), str(p)))
+    dest = Path(dest).resolve()
+    seqs = sorted(meta_glob(dest, "seq", "**/*"), key=lambda p: (len(p.parts), str(p)))
     target = seqs[0] if seqs else dest / "<sequence>-seq.yml"
+    hint = f"next: POST /finish_yml?yml_path={target} on the station's SYNC server"
+    if not is_legacy_path(dest):
+        return hint
     return (
-        f"next: POST /finish_yml?yml_path={target} on the station's SYNC server "
-        "-- the syncer does not discover records in RUNS_FINISHED by itself; the "
-        "record then syncs in place and stays there"
+        f"{hint} -- the syncer does not discover records in RUNS_FINISHED by "
+        "itself; the record then syncs in place and stays there"
     )
 
 
@@ -290,20 +486,28 @@ def process_dir_for(zip_path: "str | os.PathLike[str]") -> "Path | None":
     """The ``PROCESSES`` directory mirroring ``zip_path``'s own run tree.
 
     ``<root>/RUNS_SYNCED/<week>/<day>/<seq>.zip`` ->
-    ``<root>/PROCESSES/<week>/<day>/<seq>/``. ``None`` when the path has no
-    ``RUNS_*`` segment to mirror, which is also the case for a zip copied out
-    of a station tree -- there the caller must name the directory explicitly.
+    ``<root>/PROCESSES/<week>/<day>/<seq>/``, and likewise for a
+    ``<root>/RUNS/<year>/<day>/<seq>`` directory. ``None`` when the path has no
+    ``RUNS``/``RUNS_*`` segment to mirror, which is also the case for a zip
+    copied out of a station tree -- there the caller must name the directory
+    explicitly.
     """
     parts = Path(zip_path).resolve().parts
     idx = next(
-        (i for i, part in enumerate(parts) if part.startswith("RUNS_")),
+        (
+            i
+            for i, part in enumerate(parts)
+            if part == "RUNS" or part.startswith("RUNS_")
+        ),
         None,
     )
     if idx is None:
         return None
     root = Path(*parts[:idx])
     rel = Path(*parts[idx + 1 :])
-    return root / PROCESS_DIR_NAME / rel.with_suffix("")
+    if rel.suffix == ".zip":
+        rel = rel.with_suffix("")
+    return root / PROCESS_DIR_NAME / rel
 
 
 def rewrite_processes(
@@ -312,8 +516,9 @@ def rewrite_processes(
     apply: Apply,
     *,
     dry_run: bool = False,
+    reason: str = "record_rewrite",
 ) -> list[Edit]:
-    """Run ``apply`` over the ``-prc.yml`` files under ``process_dir``.
+    """Run ``apply`` over the ``-prc`` records (``.yml``/``.json``) under ``process_dir``.
 
     Every candidate is checked against ``sequence_uuid`` first: the directory
     is derived from a path convention, and a mirrored directory that turns out
@@ -323,8 +528,8 @@ def rewrite_processes(
     """
     process_dir = Path(process_dir)
     edits: list[Edit] = []
-    for path in sorted(process_dir.rglob("*-prc.yml")):
-        doc = yml_load(path)
+    for path in meta_glob(process_dir, "prc", "**/*"):
+        doc = _load(path)
         if not isinstance(doc, dict):
             edits.append(Edit(str(path), "process", note="not a yml mapping"))
             continue
@@ -344,17 +549,15 @@ def rewrite_processes(
                 edits.append(Edit(str(path), "process", note=note))
             continue
         edits.append(Edit(str(path), "process", changed, note))
-        if dry_run:
-            continue
-        staged = staging_path(path)
-        try:
-            with open(staged, "w", encoding="utf-8") as fh:
-                fh.write(yml_dumps(doc))
-        except BaseException:
-            if os.path.exists(staged):
-                os.remove(staged)
-            raise
-        os.replace(staged, path)
+        if not dry_run:
+            written = write_meta(path, doc)
+            log_artifact_hashes_sync(
+                [written],
+                kind="prc",
+                owner_uuid=record_uuid(doc),
+                event="artifact_rewritten",
+                reason=reason,
+            )
     return edits
 
 

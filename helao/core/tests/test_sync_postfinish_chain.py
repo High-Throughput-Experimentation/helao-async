@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-import helao.core.drivers.data.sync_driver as legacy_mod
 import helao.hexagon.adapters.native.sync_driver as native_mod
 from helao.core.hooks import HookConfigError
 from helao.helpers import dispatcher as dispatcher_mod
@@ -21,7 +20,7 @@ from helao.hexagon.tests.sync_fixtures import (
     write_yml,
 )
 
-MODS = [legacy_mod, native_mod]
+MODS = [native_mod]
 
 FAILING_HOOK = """
 from helao.core.hooks import FinishHook

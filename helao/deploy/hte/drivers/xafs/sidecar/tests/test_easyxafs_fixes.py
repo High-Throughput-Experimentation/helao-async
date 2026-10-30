@@ -1,7 +1,10 @@
 """Python 3.9 sim env: vendor easyxafs fixes the sidecar depends on."""
+
 import os
 from pathlib import Path
 import pytest
+
+pytest.importorskip("easyxafs")  # vendor package; absent from the main helao env
 
 from helao.deploy.hte.drivers.xafs.sidecar import sim_hw
 
@@ -12,9 +15,15 @@ def test_saved_path_set(tmp_path, monkeypatch):
     import easyxafs.scan as scan
 
     s = scan.NormalScan(
-        crystal2d="Si(5,5,3)", beta_offset=0, theta_offset=0, analyzer_radius=500,
-        roi_bragg=80, roi_min=800, roi_max=1000,
-        measurement_mode="XAFS_Fluorescence", saveaftercomplete=True,
+        crystal2d="Si(5,5,3)",
+        beta_offset=0,
+        theta_offset=0,
+        analyzer_radius=500,
+        roi_bragg=80,
+        roi_min=800,
+        roi_max=1000,
+        measurement_mode="XAFS_Fluorescence",
+        saveaftercomplete=True,
         savename=str(tmp_path / "Zn_Scan0000_Sample1_X0.000_Y0.000"),
     )
     s.create_zone_constant_step(9600, 9620, 5, 0.01)
@@ -34,15 +43,23 @@ def test_saved_path_not_set_if_archive_write_fails(tmp_path, monkeypatch):
     import easyxafs.scan as scan
 
     s = scan.NormalScan(
-        crystal2d="Si(5,5,3)", beta_offset=0, theta_offset=0, analyzer_radius=500,
-        roi_bragg=80, roi_min=800, roi_max=1000,
-        measurement_mode="XAFS_Fluorescence", saveaftercomplete=False,
+        crystal2d="Si(5,5,3)",
+        beta_offset=0,
+        theta_offset=0,
+        analyzer_radius=500,
+        roi_bragg=80,
+        roi_min=800,
+        roi_max=1000,
+        measurement_mode="XAFS_Fluorescence",
+        saveaftercomplete=False,
     )
     s.create_zone_constant_step(9600, 9620, 5, 0.01)
     s.start()
     s._thread.join(timeout=30)
     assert s.saved_path is None
-    monkeypatch.setattr(ss.json, "dumps", lambda *a, **k: (_ for _ in ()).throw(OSError("disk")))
+    monkeypatch.setattr(
+        ss.json, "dumps", lambda *a, **k: (_ for _ in ()).throw(OSError("disk"))
+    )
     with pytest.raises(OSError):
         s._save_scan_data(str(tmp_path / "Zn_fail"))
     assert s.saved_path is None
@@ -60,14 +77,21 @@ def test_thetascan_exception_sets_finished(tmp_path, monkeypatch):
     import easyxafs.scan as scan
 
     s = scan.ThetaScan(
-        crystal2d="Si(5,5,3)", analyzer_radius=500, angle=80,
-        theta_min=79.9, theta_max=80.1, theta_step=0.05, duration=0.01,
-        roi_bragg=80, roi_min=800, roi_max=1000,
+        crystal2d="Si(5,5,3)",
+        analyzer_radius=500,
+        angle=80,
+        theta_min=79.9,
+        theta_max=80.1,
+        theta_step=0.05,
+        duration=0.01,
+        roi_bragg=80,
+        roi_min=800,
+        roi_max=1000,
         savename=str(tmp_path / "theta"),
-        measurement_mode="XAFS_Fluorescence", scan_mode="Standard",
+        measurement_mode="XAFS_Fluorescence",
+        scan_mode="Standard",
     )
     s.start()
     s._thread.join(10)  # wait_until_complete() has no timeout and would hang pre-fix
     assert not s._thread.is_alive()
     assert s._finished is True
-

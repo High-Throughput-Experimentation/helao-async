@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-import helao.core.drivers.data.sync_driver as legacy_mod
 import helao.hexagon.adapters.native.sync_driver as native_mod
 from helao.core.models.helaodirs import HelaoDirs
 from helao.core.models.run_dir import RunDir
@@ -26,7 +25,7 @@ from helao.hexagon.tests.sync_fixtures import (
     teardown_driver,
 )
 
-MODS = [legacy_mod, native_mod]
+MODS = [native_mod]
 T0 = datetime(2026, 10, 14, 9, 0, 0)
 
 

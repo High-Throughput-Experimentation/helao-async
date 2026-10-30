@@ -1,27 +1,21 @@
-"""Native sync pipeline (hexagon P2c).
+"""Native sync pipeline (hexagon P2c): the module helpers, ``AsyncRWLock``,
+``HelaoYml``, ``Progress`` and ``SyncDriver``, the only sync implementation.
 
-Verbatim re-body of the legacy sync driver
-(``helao/core/drivers/data/sync_driver.py``): the module helpers,
-``AsyncRWLock``, ``HelaoYml``, ``Progress``, and ``SyncDriver`` are
-byte-identical copies of legacy lines 62-2057, source-parity-pinned per
-member by ``test_native_sync_pins.py`` — including the 728a663c
-process-recovery surface (``update_process`` unified metas,
-``reconcile_processes`` cross-run replay, ``sync_process`` phantom-group
-drop, estopped-children-terminal gate in ``sync_yml``). Class names are NOT
-renamed: the copied bodies construct ``HelaoYml(...)`` / ``Progress(...)``
-by name, so renaming would break byte-identity (D1).
+This is the body the stations ran as the former core twin, carried over
+byte for byte, including the 728a663c process-recovery surface
+(``update_process`` unified metas, ``reconcile_processes`` cross-run replay,
+``sync_process`` phantom-group drop, estopped-children-terminal gate in
+``sync_yml``). Class names are NOT renamed: the bodies construct
+``HelaoYml(...)`` / ``Progress(...)`` by name.
 
-The ONLY legacy import dropped is ``helao.core.servers.base.Base`` (D2):
-the Base-coupled ``HelaoSyncer`` subclass is replaced by ``NativeSyncer``
-(in ``native_syncer.py``), which
-replicates its config resolution against the narrow ``SyncerHost``
-protocol — so this module imports only ``helao.helpers.*`` /
+The former Base-coupled syncer subclass is replaced by ``NativeSyncer``
+(in ``native_syncer.py``), which resolves its config against the narrow
+``SyncerHost`` protocol, so this module imports only ``helao.helpers.*`` /
 ``helao.core.models.*`` and passes the adapters/native boundary rule.
 
-Black-force-excluded (pyproject.toml): the legacy source is not black-clean
-at 88. Only this docstring, the pyright file-scope suppression, ``__all__``,
-two import-header lines (Base dropped, ``Protocol`` added to the typing
-import), and the native-only section differ from legacy.
+Black-force-excluded (pyproject.toml): these are the exact bytes the stations
+ran, and reformatting them would destroy the cheap diff that shows it. A
+formatting-only follow-up drops the exclusion.
 """
 
 # pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportCallIssue=false, reportOptionalMemberAccess=false, reportOptionalSubscript=false
@@ -29,7 +23,6 @@ import), and the native-only section differ from legacy.
 __all__ = ["AsyncRWLock", "HelaoYml", "Progress", "SyncDriver"]
 
 import asyncio
-import codecs
 import gzip
 import io
 import json
@@ -44,7 +37,7 @@ from copy import copy
 from datetime import datetime, timedelta
 from glob import glob
 from pathlib import Path, PurePosixPath
-from typing import Optional, Protocol, Union
+from typing import Optional, Union
 from zipfile import ZipFile
 
 import boto3
@@ -65,6 +58,7 @@ from helao.core.models.run_dir import (
 
 # from filelock import FileLock
 from helao.helpers import helao_logging as logging
+from helao.helpers.artifact_hash import log_artifact_hashes
 from helao.helpers.run_state import (
     DONE,
     QUARANTINED,
@@ -77,7 +71,21 @@ from helao.helpers.run_state import (
     root_relative,
 )
 from helao.helpers.time_utils import gen_uuid
+from helao.helpers.meta_io import (
+    dumps_meta,
+    meta_glob,
+    read_meta,
+    resolve_meta_path,
+    write_meta,
+)
 from helao.helpers.yml_tools import yml_dumps, yml_load
+from helao.hexagon.domain.naming import (
+    DATA_SUFFIX,
+    HEADER_SUFFIX,
+    RECORD_KINDS,
+    data_sibling,
+    meta_kind,
+)
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 ABR_MAP = {
@@ -86,29 +94,6 @@ ABR_MAP = {
     "seq": "sequence",
     "prc": "process",
 }
-PLURALS = {
-    "action": "actions",
-    "experiment": "experiments",
-    "sequence": "sequences",
-    "process": "processes",
-}
-
-
-def dict2json(input_dict: dict) -> io.BytesIO:
-    """Serialize a dict to a UTF-8 JSON byte stream rewound to position 0.
-
-    Args:
-        input_dict: Dictionary to serialize.
-
-    Returns:
-        A ``BytesIO`` containing the JSON bytes, ready for upload.
-    """
-    bio = io.BytesIO()
-    stream_writer = codecs.getwriter("utf-8")
-    wrapper_file = stream_writer(bio)
-    json.dump(input_dict, wrapper_file)
-    bio.seek(0)
-    return bio
 
 
 def _pending_only(paths: list) -> list:
@@ -214,7 +199,7 @@ class HelaoYml:
         # round-trip containers -- and those containers are what made syncing a
         # yml holding a long list quadratic (their __deepcopy__ is O(n^2), and
         # HelaoDict.as_dict used to copy them).
-        self.meta = yml_load(self.target, fast=True)
+        self.meta = read_meta(self.target)
 
     @property
     def parts(self) -> list:
@@ -225,8 +210,8 @@ class HelaoYml:
         """Resolve ``self.target`` to an existing yml file and set ``targetdir``.
 
         If ``target`` doesn't exist, the active/finished/synced variants are
-        probed in turn. If ``target`` is a directory, the single ``*-seq.yml``
-        / ``*-exp.yml`` / ``*-act.yml`` inside is selected. The resolved
+        probed in turn. If ``target`` is a directory, the single ``*-seq`` /
+        ``*-exp`` / ``*-act`` record (``.json`` or legacy ``.yml``) inside is selected. The resolved
         directory must live under a ``RUNS_*`` parent.
 
         Raises:
@@ -242,13 +227,7 @@ class HelaoYml:
                 LOGGER.info(f"{self.target} does not exist")
         if self.target.is_dir():
             self.targetdir = self.target
-            possible_ymls = [
-                x
-                for x in list(self.targetdir.glob("*.yml"))
-                if x.stem.endswith("-seq")
-                or x.stem.endswith("-exp")
-                or x.stem.endswith("-act")
-            ]
+            possible_ymls = meta_glob(self.targetdir, RECORD_KINDS)
             if len(possible_ymls) > 1:
                 raise ValueError(
                     f"{self.targetdir} contains multiple .yml files and is not a valid Helao directory"
@@ -471,11 +450,7 @@ class HelaoYml:
         # Record suffixes only. A colocated ``-prc.yml`` is a process artifact
         # sitting beside its experiment, not a child record, and wrapping one
         # in HelaoYml would put a process into the sync hierarchy.
-        paths = [
-            p
-            for p in yml_path.parent.glob("*/*.yml")
-            if p.stem.endswith(("-seq", "-exp", "-act"))
-        ]
+        paths = meta_glob(yml_path.parent, RECORD_KINDS, "*/*")
         hpaths = [HelaoYml(x) for x in paths]
         return sorted(hpaths, key=lambda x: x.timestamp)
 
@@ -501,11 +476,6 @@ class HelaoYml:
     def finished_children(self) -> list:
         """Children that are finished but not yet shipped."""
         return self._children_in(self.finished_path, "finished")
-
-    @property
-    def synced_children(self) -> list:
-        """Children that have shipped."""
-        return self._children_in(self.synced_path, "synced")
 
     @property
     def children(self) -> list:
@@ -640,7 +610,14 @@ class HelaoYml:
             # from the first run.
             if p.suffix in (".prg", ".lock"):
                 continue
-            if p.relative_to(self.targetdir).as_posix() in named:
+            # The record's own metadata, and a data header whose .jsonl partner
+            # is registered (the header travels by stem, spec §4).
+            if meta_kind(p) is not None:
+                continue
+            rel = p.relative_to(self.targetdir).as_posix()
+            if rel.endswith(HEADER_SUFFIX) and data_sibling(rel, DATA_SUFFIX) in named:
+                continue
+            if rel in named:
                 continue
             unregistered.append(p)
         for p in unregistered:
@@ -673,7 +650,7 @@ class HelaoYml:
 
     @property
     def process_ymls(self) -> list[Path]:
-        """``*-prc.yml`` files in the immediate target directory.
+        """``*-prc`` records (``.json`` or legacy ``.yml``) in the immediate target directory.
 
         A process artifact is colocated with the ``-exp.yml`` it belongs to, so
         it is in neither :attr:`misc_files` (which excludes ``.yml``) nor
@@ -681,11 +658,7 @@ class HelaoYml:
         that moves to ``RUNS_SYNCED``; left behind, it both orphans the process
         and keeps :meth:`cleanup` reporting the directory as not empty forever.
         """
-        return [
-            x
-            for x in self.targetdir.glob("*-prc.yml")
-            if x.is_file()
-        ]
+        return [x for x in meta_glob(self.targetdir, "prc") if x.is_file()]
 
     @property
     def parent_yml(self) -> Optional[Path]:
@@ -705,11 +678,7 @@ class HelaoYml:
         if self.type == "sequence":
             return self.target
         for x in (self.active_path, self.finished_path, self.synced_path):
-            found = [
-                p
-                for p in x.parent.parent.glob("*.yml")
-                if p.stem.endswith(("-seq", "-exp", "-act"))
-            ]
+            found = meta_glob(x.parent.parent, RECORD_KINDS)
             if found:
                 return found[0]
         return None
@@ -826,17 +795,17 @@ class Progress:
         """
 
         if isinstance(path, Path):
-            if path.suffix == ".yml":
+            if path.suffix in (".json", ".yml"):
                 self.ymlpath = path
             elif path.suffix == ".prg":
                 self.prg = path
         else:
-            if path.endswith(".yml"):
+            if path.endswith((".json", ".yml")):
                 self.ymlpath = Path(path)
             elif path.endswith(".prg"):
                 self.prg = Path(path)
             else:
-                raise ValueError(f"{path} is not a valid Helao .yml or .prg file")
+                raise ValueError(f"{path} is not a valid Helao record (.json/.yml) or .prg file")
 
         # if not hasattr(self, "yml"):
         #     self.read_dict()
@@ -871,7 +840,14 @@ class Progress:
                 }
                 self.dict.update(act_dict)
             if self.yml.type == "experiment":
-                process_groups = self.yml.meta.get("process_order_groups", {})
+                # JSON object keys are strings; the .prg bookkeeping, action
+                # orders and written-off groups are all compared as ints.
+                process_groups = {
+                    int(k): v
+                    for k, v in (
+                        self.yml.meta.get("process_order_groups") or {}
+                    ).items()
+                }
                 exp_dict = {
                     "process_actions_done": {},  # {action submit order: yml.target.name}
                     "process_groups": process_groups,  # {process_idx: contributor action indices}
@@ -1090,7 +1066,7 @@ class Progress:
             # case exits above without touching it.
             declared = {
                 str(f.get("file_name"))
-                for f in (yml_load(self.yml.target, fast=True).get("files") or [])
+                for f in (read_meta(self.yml.target).get("files") or [])
                 if f.get("file_name")
             }
             dropped = [
@@ -1258,7 +1234,7 @@ class SyncDriver:
 
         Args:
             config: Driver/server config dict; supplies AWS keys, bucket,
-                ``max_tasks``, and ``auto_analyze_sequences``.
+                and ``max_tasks``.
             helaodirs: Resolved HELAO directory paths for this server.
             postfinish_hooks: The SYNC entry's top-level hook config; ``None``
                 selects the default chain (finish-hooks spec §3.2).
@@ -1270,9 +1246,7 @@ class SyncDriver:
         self.postfinish = {
             level: load_hook_set(hook_map, phase="postfinish", level=level)
             for level, hook_map in postfinish_config(
-                postfinish_hooks,
-                self.config_dict.get("auto_analyze_sequences"),
-                "SYNC",
+                postfinish_hooks, "SYNC", params=config
             ).items()
         }
         # config_dict is the live world config that /get_config serves, so the
@@ -1551,7 +1525,7 @@ class SyncDriver:
         prg = yml_path.with_suffix(".prg")
         root = Path(str(self.helaodirs.root)).resolve()
         if (
-            not yml_path.name.endswith("-exp.yml")
+            meta_kind(yml_path) != "exp"
             or not yml_path.is_file()
             or not yml_path.resolve().is_relative_to(root)
             or not prg.exists()
@@ -1666,13 +1640,13 @@ class SyncDriver:
         """
         if self.run_journal is None:
             return []
-        suffix = {"action": "-act.yml", "experiment": "-exp.yml", "sequence": "-seq.yml"}
+        kind_abbr = {"action": "act", "experiment": "exp", "sequence": "seq"}
         out = []
         for rec in self.run_journal.working_set().values():
             if rec.get("state") != QUARANTINED:
                 continue
             rec_dir = Path(str(self.helaodirs.root)) / rec["path"]
-            ymls = sorted(rec_dir.glob(f"*{suffix.get(rec['kind'], '.yml')}"))
+            ymls = meta_glob(rec_dir, kind_abbr.get(rec["kind"], RECORD_KINDS))
             entry = {
                 "uuid": rec["uuid"],
                 "kind": rec["kind"],
@@ -1757,22 +1731,6 @@ class SyncDriver:
                     weekdir = os.path.dirname(datedir)
                     if len(glob(os.path.join(weekdir, "*"))) == 0:
                         self.try_remove_empty(weekdir)
-
-    def sync_exit_callback(self, task: asyncio.Task):
-        """Drop the finished task from ``running_tasks`` and ``task_set``.
-
-        Args:
-            task: The asyncio task that just completed.
-        """
-        task_name = task.get_name()
-        if task_name in self.running_tasks:
-            LOGGER.debug(f"Removing {task_name} from running_tasks.")
-            self.running_tasks.pop(task_name)
-        try:
-            LOGGER.debug(f"Removing {task_name} from task_set.")
-            self.task_set.discard(task_name)
-        except KeyError:
-            pass
 
     @staticmethod
     def _rel_under_runs(path: Path) -> Optional[str]:
@@ -1929,7 +1887,7 @@ class SyncDriver:
                 prevent runaway re-queuing.
         """
         yml_path = Path(upath) if isinstance(upath, str) else upath
-        if yml_path.name.endswith("-prc.yml"):
+        if meta_kind(yml_path) == "prc":
             # A process is an artifact of an experiment's sync, never a record
             # that syncs on its own. It reaches here only by mistake -- most
             # plausibly a hand-POSTed /finish_yml, which ranks an unrecognised
@@ -2007,7 +1965,7 @@ class SyncDriver:
             shipped state; ``True`` if there was nothing to sync; ``False``
             when the yml could not be synced this pass.
         """
-        if yml_path.name.endswith("-prc.yml"):
+        if meta_kind(yml_path) == "prc":
             # Authoritative backstop to enqueue_yml's guard: syncer() calls this
             # directly off the queue, so anything queued before the guard
             # existed would otherwise run. Returning True retires it without a
@@ -2031,12 +1989,12 @@ class SyncDriver:
         # Re-queue it one rank lower, as the full child check below would, but
         # without parsing it: a 296-experiment -seq.yml (9.7 MB, ~4 s a parse)
         # re-entered every ~15 s and starved the event loop for minutes.
-        if not yml_path.name.endswith("-act.yml"):
+        if meta_kind(yml_path) != "act":
             # A shipped child re-posted to the queue is not one to wait for:
             # it returns at once without re-queuing this parent, which would
             # then be dropped below rank_limit and lost until a restart.
             children = await asyncio.to_thread(
-                lambda: list(yml_path.parent.glob("*/*.yml"))
+                lambda: meta_glob(yml_path.parent, ("exp", "act"), "*/*")
             )
             busy = [
                 c.name
@@ -2523,7 +2481,7 @@ class SyncDriver:
 
         For each process group not yet flagged in ``process_s3`` /
         ``process_api`` and whose contributing actions are complete (or when
-        ``force`` is true), writes a local ``*-prc.yml``, uploads the JSON to
+        ``force`` is true), writes a local ``*-prc.json``, uploads the JSON to
         S3, and registers it with the API.
 
         Args:
@@ -2638,12 +2596,29 @@ class SyncDriver:
                 # every repair tool had to consult a parallel tree that might
                 # no longer be beside the zip it was repairing.
                 save_dir = str(exp_prog.yml.target.parent)
-                save_yml_path = os.path.join(
-                    save_dir, f"{pidx}__{uuid_key}__{meta['technique_name']}-prc.yml"
+                prc_path = os.path.join(
+                    save_dir,
+                    f"{pidx}__{uuid_key}__{meta['technique_name']}-prc.json",
                 )
-                os.makedirs(save_dir, exist_ok=True)
-                with open(save_yml_path, "w", encoding="utf-8") as f:
-                    f.write(yml_dumps(model))
+                # an existing legacy -prc.yml is rewritten in place, so hash
+                # whatever write_meta resolves to, not the .json name
+                prior = resolve_meta_path(prc_path)
+                old_bytes = prior.read_bytes() if prior.exists() else None
+                written = write_meta(prc_path, model)
+                # a re-push after a write-off rewrites the record (spec §5);
+                # an S3 retry that leaves the bytes alone logs nothing
+                if old_bytes is None or old_bytes != written.read_bytes():
+                    await log_artifact_hashes(
+                        [written],
+                        kind="prc",
+                        owner_uuid=uuid_key,
+                        event=(
+                            "artifact_final"
+                            if old_bytes is None
+                            else "artifact_rewritten"
+                        ),
+                        reason=None if old_bytes is None else "process_repush",
+                    )
                 # sync to s3
                 meta_s3_key = f"process/{uuid_key}.json"
                 s3_success = await self.to_s3(model, meta_s3_key)
@@ -2709,7 +2684,7 @@ class SyncDriver:
                     *close* it, where rewinding instead raises ``ValueError:
                     I/O operation on closed file``.
                     """
-                    body: Union[io.BytesIO, str] = dict2json(msg)
+                    body: Union[io.BytesIO, str] = io.BytesIO(json.dumps(msg).encode())
                     if compress:
                         gzipped = io.BytesIO()
                         with gzip.GzipFile(fileobj=gzipped, mode="wb") as f:
@@ -2748,7 +2723,7 @@ class SyncDriver:
             return False
 
     def list_pending(self, omit_manual_exps: bool = True) -> list:
-        """Return ``*-seq.yml`` paths that have not shipped yet.
+        """Return ``*-seq`` record (``.json`` or legacy ``.yml``) paths that have not shipped yet.
 
         Args:
             omit_manual_exps: Skip files containing ``manual_orch_seq``.
@@ -2759,7 +2734,7 @@ class SyncDriver:
         finished_dir = str(self.helaodirs.save_root).replace(
             RunDir.ACTIVE.value, RunDir.FINISHED.value
         )
-        pending = glob(os.path.join(finished_dir, "*", "*", "*", "*-seq.yml"))
+        pending = [str(p) for p in meta_glob(finished_dir, "seq", "*/*/*/*")]
         if omit_manual_exps:
             pending = [x for x in pending if "manual_orch_seq" not in x]
         pending = _pending_only(pending)
@@ -2767,7 +2742,7 @@ class SyncDriver:
         return pending
 
     def list_pending_acts(self, omit_manual_exps: bool = True) -> list:
-        """Return ``*-act.yml`` paths that have not shipped yet.
+        """Return ``*-act`` record (``.json`` or legacy ``.yml``) paths that have not shipped yet.
 
         Args:
             omit_manual_exps: Skip files containing ``manual_orch_seq``.
@@ -2778,7 +2753,7 @@ class SyncDriver:
         finished_dir = str(self.helaodirs.save_root).replace(
             RunDir.ACTIVE.value, RunDir.FINISHED.value
         )
-        pending = glob(os.path.join(finished_dir, "*", "*", "*", "*", "*", "*-act.yml"))
+        pending = [str(p) for p in meta_glob(finished_dir, "act", "*/*/*/*/*/*")]
         if omit_manual_exps:
             pending = [x for x in pending if "manual_orch_seq" not in x]
         pending = _pending_only(pending)
@@ -2786,7 +2761,7 @@ class SyncDriver:
         return pending
 
     def list_pending_exps(self, omit_manual_exps: bool = True) -> list:
-        """Return ``*-exp.yml`` paths that have not shipped yet.
+        """Return ``*-exp`` record (``.json`` or legacy ``.yml``) paths that have not shipped yet.
 
         Args:
             omit_manual_exps: Skip files containing ``manual_orch_seq``.
@@ -2797,7 +2772,7 @@ class SyncDriver:
         finished_dir = str(self.helaodirs.save_root).replace(
             RunDir.ACTIVE.value, RunDir.FINISHED.value
         )
-        pending = glob(os.path.join(finished_dir, "*", "*", "*", "*", "*-exp.yml"))
+        pending = [str(p) for p in meta_glob(finished_dir, "exp", "*/*/*/*/*")]
         if omit_manual_exps:
             pending = [x for x in pending if "manual_orch_seq" not in x]
         pending = _pending_only(pending)
@@ -2842,7 +2817,10 @@ class SyncDriver:
             Legacy artifacts only -- see the caller's docstring for why this does
             not (and must not) look for ``.prg``.
             """
-            if os.path.exists(
+            # ``.progress`` sidecars exist only beside legacy ``.yml`` records;
+            # on a ``.json`` record the replace below is a no-op and the probe
+            # would test the record itself.
+            if pp.endswith(".yml") and os.path.exists(
                 pp.replace(RunDir.FINISHED.value, RunDir.SYNCED.value).replace(
                     ".yml", ".progress"
                 )

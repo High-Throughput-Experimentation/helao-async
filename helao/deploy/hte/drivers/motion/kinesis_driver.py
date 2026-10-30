@@ -27,6 +27,7 @@ from helao.core.drivers.helao_driver import (
     HelaoDriver,
 )
 from helao.helpers.make_str_enum import make_str_enum
+from helao.hexagon.domain.motion_transform import wants_counts
 
 
 class MoveModes(str, Enum):
@@ -51,17 +52,6 @@ MOTION_STATES = [
 ]
 
 
-def _wants_counts(units) -> bool:
-    """True when ``units`` selects the counts domain rather than mm.
-
-    Accepts the shared ``Units`` str-enum or a bare string: a ``(str, Enum)``
-    member carries its own value, so one comparison covers both. Anything that
-    is not exactly ``"counts"`` is mm; the endpoint's typed enum is what
-    rejects a misspelling with a 422 before it can reach here.
-    """
-    return getattr(units, "value", units) == "counts"
-
-
 class KinesisMotor(HelaoDriver):
     """`HelaoDriver` managing one Thorlabs Kinesis motor per configured axis.
 
@@ -71,8 +61,10 @@ class KinesisMotor(HelaoDriver):
     endpoints.
     """
 
+    connect_on_startup = True  # the host connects after _base_hook, before the poller
+
     def __init__(self, config: dict = {}):
-        """Initialize the driver state and immediately attempt to connect.
+        """Initialize the driver state; the host calls :meth:`connect` at startup.
 
         Args:
             config: Driver configuration containing an `axes` dict.
@@ -84,7 +76,6 @@ class KinesisMotor(HelaoDriver):
         self.dev_kinesis = make_str_enum(
             "dev_kinesis", {key: key for key in self.config.get("axes", {})}
         )
-        self.connect()
 
     def connect(self) -> DriverResponse:
         """Open a `KinesisMotor` instance for every configured axis."""
@@ -237,7 +228,7 @@ class KinesisMotor(HelaoDriver):
             elif move_mode == MoveModes.absolute:
                 move_func = self.motors[axis].move_to
                 LOGGER.info("kinesis motor starting motion")
-            if _wants_counts(units):
+            if wants_counts(units):
                 move_func(value, scale=False)
             else:
                 move_func(value)

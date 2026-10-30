@@ -12,9 +12,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, ClassVar, Optional
 
 from helao.helpers import helao_logging as logging
+
+if TYPE_CHECKING:
+    from helao.hexagon.ports.hardware import DriverHostPort
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -77,11 +80,6 @@ class DriverResponse:
         """Stamp the response with the current wall-clock time."""
         self.timestamp = datetime.now()
 
-    @property
-    def timestamp_str(self) -> str:
-        """Timestamp formatted as ``YYYY-MM-DD HH:MM:SS,mmm``."""
-        return self.timestamp.strftime("%F %T,%f")[:-3]
-
 
 class HelaoDriver(ABC):
     """Abstract base class every HELAO device driver implements.
@@ -98,6 +96,12 @@ class HelaoDriver(ABC):
 
     timestamp: datetime
     config: dict
+    # ``True`` means the host calls ``connect()`` once at startup, after setting
+    # ``_base_hook`` and before building the poller. A driver must not do
+    # device I/O in ``__init__``.
+    connect_on_startup: ClassVar[bool] = False
+    # set by the host right after construction
+    _base_hook: "Optional[DriverHostPort]"
 
     def __init__(self, config: dict = {}):
         """Record the creation timestamp and store the driver config.
@@ -107,16 +111,6 @@ class HelaoDriver(ABC):
         """
         self.timestamp = datetime.now()
         self.config = config
-
-    @property
-    def _created_at(self) -> str:
-        """Instantiation timestamp formatted as ``YYYY-MM-DD HH:MM:SS,mmm``."""
-        return self.timestamp.strftime("%F %T,%f")[:-3]
-
-    @property
-    def _uptime(self) -> str:
-        """Time since instantiation as a duration string (``H:MM:SS.ffffff``)."""
-        return str(datetime.now() - self.timestamp)
 
     @abstractmethod
     def connect(self) -> DriverResponse:
@@ -163,9 +157,9 @@ class DriverPoller:
     polling: bool
     poll_signal_task: "asyncio.Task[None]"
     polling_task: "asyncio.Task[None]"
-    # the owning host (ActionHost sets it after construction); Any avoids a
-    # core->hexagon import cycle and keeps `await _base_hook.put_lbuf(...)` typed
-    _base_hook: Any
+    # the owning host (ActionHost sets it after construction); the port is
+    # imported under TYPE_CHECKING only, so there is no core->hexagon import cycle
+    _base_hook: "Optional[DriverHostPort]"
 
     def __init__(self, driver: HelaoDriver, wait_time: float = 0.05) -> None:
         """Bind to ``driver`` and start the signal and polling background tasks.
@@ -284,3 +278,33 @@ class DriverPoller:
         """
         LOGGER.info("DriverPoller.get_data() has not been implemented")
         return DriverResponse()
+
+
+class NoDeviceDriver(HelaoDriver):
+    """Base for drivers with no physical device: every lifecycle call succeeds."""
+
+    def connect(self) -> DriverResponse:
+        """Nothing to connect to; always succeeds."""
+        return DriverResponse(
+            response=DriverResponseType.success,
+            message="no device",
+            status=DriverStatus.ok,
+        )
+
+    def get_status(self) -> DriverResponse:
+        """Nothing to poll; always reports ok."""
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
+
+    def stop(self) -> DriverResponse:
+        """Nothing to abort; always succeeds."""
+        return self.get_status()
+
+    def reset(self) -> DriverResponse:
+        """Nothing to reinitialize; always succeeds."""
+        return self.get_status()
+
+    def disconnect(self) -> DriverResponse:
+        """Nothing to release; always succeeds."""
+        return self.get_status()

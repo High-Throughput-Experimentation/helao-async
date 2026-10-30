@@ -21,7 +21,12 @@ import pytest
 
 import launch
 
-launch.LAUNCH_LOGGER = _logging.getLogger("test_launch_stale_group")
+
+@pytest.fixture(autouse=True)
+def _launch_logger(monkeypatch):
+    monkeypatch.setattr(
+        launch, "LAUNCH_LOGGER", _logging.getLogger("test_launch_stale_group")
+    )
 
 
 CONF = {
@@ -35,14 +40,17 @@ CONF = {
 class _FakeProc:
     """psutil.Process stand-in for one scenario."""
 
-    def __init__(self, cmdline, status="running"):
+    def __init__(self, cmdline, status="running", cmdline_exc=None):
         self._cmdline = cmdline
         self._status = status
+        self._cmdline_exc = cmdline_exc
 
     def status(self):
         return self._status
 
     def cmdline(self):
+        if self._cmdline_exc is not None:
+            raise self._cmdline_exc
         return self._cmdline
 
 
@@ -119,6 +127,48 @@ def test_a_live_reflex_server_is_recognised(monkeypatch, pidd):
         {78: _FakeProc(["python", "-u", "reflex_launcher.py", "golden", "UI"])},
     )
     assert pidd._pid_is_server(78, "UI") is True
+
+
+def test_a_live_bokeh_server_is_recognised(monkeypatch, pidd):
+    _fake_world(
+        monkeypatch,
+        {77: _FakeProc(["python", "-u", "bokeh_launcher.py", "golden", "SIM"])},
+    )
+    assert pidd._pid_is_server(77, "SIM") is True
+
+
+def test_a_dead_pid_is_not_a_server(monkeypatch, pidd):
+    """A stale pickle whose process is gone: pid_exists False."""
+    _fake_world(monkeypatch, {})
+    assert pidd._pid_is_server(77, "SIM") is False
+
+
+def test_another_servers_launcher_is_not_this_server_key(monkeypatch, pidd):
+    """Right launcher and config, different key: a substring match would claim it."""
+    _fake_world(
+        monkeypatch,
+        {77: _FakeProc(["python", "-u", "fast_launcher.py", "golden", "ORCH"])},
+    )
+    assert pidd._pid_is_server(77, "SIM") is False
+
+
+def test_a_zombie_with_the_right_cmdline_is_not_a_server(monkeypatch, pidd):
+    _fake_world(
+        monkeypatch,
+        {
+            77: _FakeProc(
+                ["python", "-u", "fast_launcher.py", "golden", "SIM"],
+                status=psutil.STATUS_ZOMBIE,
+            )
+        },
+    )
+    assert pidd._pid_is_server(77, "SIM") is False
+
+
+def test_an_unreadable_cmdline_is_not_a_server(monkeypatch, pidd):
+    """AccessDenied: another user's process on a recycled PID."""
+    _fake_world(monkeypatch, {77: _FakeProc([], cmdline_exc=psutil.AccessDenied(77))})
+    assert pidd._pid_is_server(77, "SIM") is False
 
 
 def test_a_prefixless_pidd_keeps_the_looser_check(monkeypatch, tmp_path):

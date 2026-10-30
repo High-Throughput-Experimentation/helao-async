@@ -28,7 +28,7 @@ import importlib
 
 import pytest
 
-from helao.helpers.config_loader import load_global_config
+from helao.helpers.config_loader import install_global_config, read_validated_config
 
 #: (module, config prefix, server key) -- one representative station per module.
 #: Measured by loading each station config and calling makeApp; every one of
@@ -67,12 +67,6 @@ BUILDS: list[tuple[str, str, str]] = [
 WINDOWS_ONLY: dict[str, str] = {}
 
 
-def _not_yet_ported() -> frozenset[str]:
-    from helao.hexagon.tests.test_hte_is_native import NOT_YET_PORTED
-
-    return NOT_YET_PORTED
-
-
 @pytest.mark.parametrize("module,config,server_key", BUILDS, ids=[b[0] for b in BUILDS])
 def test_module_builds_under_its_station_config(
     module: str, config: str, server_key: str
@@ -80,7 +74,7 @@ def test_module_builds_under_its_station_config(
     from helao.helpers.server_api import HelaoFastAPI
     from helao.hexagon.app.action_host import ActionHost
 
-    load_global_config(config, set_global=True)
+    install_global_config(read_validated_config(config)[0])
     mod = importlib.import_module(f"helao.deploy.hte.servers.action.{module}")
     app = mod.makeApp(server_key)
 
@@ -91,12 +85,10 @@ def test_module_builds_under_its_station_config(
     assert isinstance(app, HelaoFastAPI), f"{module} built a {type(app).__name__}"
     assert app.title == server_key
 
-    # Before this module's port the app is a legacy BaseAPI, and the ratchet is
-    # what says which of the two to expect. After it, the host type IS the
-    # assertion -- a port that left a BaseAPI behind would still pass the
-    # checklist gate, which reads decorators rather than the constructor.
-    if module not in _not_yet_ported():
-        assert isinstance(app, ActionHost), f"{module} did not build an ActionHost"
+    # The host type IS the assertion -- a port that left a BaseAPI behind would
+    # still pass the checklist gate, which reads decorators rather than the
+    # constructor.
+    assert isinstance(app, ActionHost), f"{module} did not build an ActionHost"
 
 
 @pytest.mark.parametrize("module,expected", sorted(WINDOWS_ONLY.items()))
@@ -128,7 +120,7 @@ def test_the_orchestrator_builds_a_native_OrchHost() -> None:
     """
     from helao.hexagon.app.orch_host import OrchHost
 
-    load_global_config("adss3", set_global=True)
+    install_global_config(read_validated_config("adss3")[0])
     mod = importlib.import_module("helao.deploy.hte.servers.orchestrator.async_orch2")
     app = mod.makeApp("ORCH")
     assert isinstance(app, OrchHost), f"orchestrator built a {type(app).__name__}"

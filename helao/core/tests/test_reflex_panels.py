@@ -55,7 +55,7 @@ def test_generated_state_owns_its_vars_rather_than_inheriting_them():
     cls = make_panel_state("wssim_panel", "SIM_OWN", LiveVisState, "ws_live")
     for name in ("server_key", "ws_path", "connection", "window_points"):
         assert name in cls.vars
-        assert name not in cls.inherited_vars, f"'{name}' is shared across panels"
+        assert name in cls.base_vars, f"'{name}' is shared across panels"
 
 
 def test_two_generated_states_do_not_share_var_storage():
