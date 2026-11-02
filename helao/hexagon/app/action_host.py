@@ -565,6 +565,7 @@ class ActionHost(HelaoFastAPI):
             private_action="update_status",
             params_dict={"regular_task": "true" if action_name is None else "false"},
             json_dict=json_dict,
+            retries=1,  # every caller retries; nested, 5 x 5 stalled ~25 min
         )
         return response, error_code
 
@@ -595,6 +596,7 @@ class ActionHost(HelaoFastAPI):
             private_action="update_nonblocking",
             params_dict=params_dict,
             json_dict=json_dict,
+            retries=1,  # send_nonblocking_status retries
         )
         LOGGER.info(f"update_nonblocking request got response: {response}")
         return response, error_code

@@ -554,7 +554,11 @@ class ActionSession:
                     client_port=client_port,
                     actionmodel=self.action.get_act(),
                 )
-                if response.get("success", False) and error_code == ErrorCodes.none:
+                if (
+                    response
+                    and response.get("success", False)
+                    and error_code == ErrorCodes.none
+                ):
                     success = True
                     break
             if success:

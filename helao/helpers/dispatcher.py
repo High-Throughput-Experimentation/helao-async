@@ -340,6 +340,10 @@ async def async_private_dispatcher(
             args=rpc_args,
         )
         return result, ErrorCodes.none
+    except RPCHandlerError as e:
+        # The handler ran and raised. Re-sending would run it twice.
+        LOGGER.error(f"RPC {server_key}/{private_action} handler failed: {e}")
+        return None, ErrorCodes.http
     except (RPCError, asyncio.TimeoutError, zmq.ZMQError, OSError) as e:
         LOGGER.debug(
             f"RPC {server_key}/{private_action} fast-path failed "

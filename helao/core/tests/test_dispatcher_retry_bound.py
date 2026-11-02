@@ -138,3 +138,73 @@ def test_the_call_terminates_at_all():
     attempts, _ = asyncio.run(_bounded())
     assert attempts == 2
     print("test_the_call_terminates_at_all PASS")
+
+
+def test_an_rpc_handler_error_is_not_resent_over_http():
+    """The handler ran and raised; an HTTP re-send runs it again and, on a
+    deterministic error, walks the whole HTTP backoff (30+60+90+120 s) for
+    nothing. That is how one bad status push stalled note1 ANA's status queue
+    for 25 minutes (2026-11-02)."""
+    counter = [0]
+
+    class _RaisingClient:
+        async def call(self, *args, **kwargs):
+            raise dispatcher.RPCHandlerError("TypeError: boom")
+
+    async def _client(*args, **kwargs):
+        return _RaisingClient()
+
+    def _session(*args, **kwargs):
+        return _FakeSession(200, counter, **kwargs)
+
+    with (
+        patch.object(dispatcher.aiohttp, "ClientSession", _session),
+        patch.object(dispatcher.aiohttp, "TCPConnector", _FakeConnector),
+        patch.object(dispatcher, "_get_rpc_client", new=_client),
+        patch.object(dispatcher.asyncio, "sleep", new=_no_sleep),
+    ):
+        response, error_code = asyncio.run(
+            dispatcher.async_private_dispatcher(
+                server_key="ORCH",
+                host="127.0.0.1",
+                port=8002,
+                private_action="update_status",
+            )
+        )
+    assert counter[0] == 0, f"handler error fell back to {counter[0]} HTTP POSTs"
+    assert response is None and error_code == ErrorCodes.http
+
+
+@pytest.mark.parametrize("method", ["send_statuspackage", "send_nbstatuspackage"])
+def test_status_packages_post_once_per_call(method):
+    """Every caller of these wraps them in its own retry loop
+    (log_status_task, regular_status_task, send_nonblocking_status), so the
+    dispatcher must not retry underneath: 5 x 5 nested attempts with backoff
+    held a status queue for ~25 minutes per undeliverable message."""
+    from types import SimpleNamespace
+
+    from helao.hexagon.app.action_host import ActionHost
+
+    counter = [0]
+
+    def _session(*args, **kwargs):
+        return _FakeSession(500, counter, **kwargs)
+
+    host = SimpleNamespace(
+        actionservermodel=SimpleNamespace(get_fastapi_json=lambda **kw: {}),
+        server_cfg={"host": "127.0.0.1", "port": 8003},
+    )
+    kwargs: dict = dict(
+        client_servkey="ORCH", client_host="127.0.0.1", client_port=8002
+    )
+    if method == "send_nbstatuspackage":
+        kwargs["actionmodel"] = SimpleNamespace(as_dict=lambda: {})
+    with (
+        patch.object(dispatcher.aiohttp, "ClientSession", _session),
+        patch.object(dispatcher.aiohttp, "TCPConnector", _FakeConnector),
+        patch.object(dispatcher, "_get_rpc_client", new=_no_rpc),
+        patch.object(dispatcher.asyncio, "sleep", new=_no_sleep),
+    ):
+        _response, error_code = asyncio.run(getattr(ActionHost, method)(host, **kwargs))
+    assert counter[0] == 1, f"{method} made {counter[0]} POSTs"
+    assert error_code == ErrorCodes.http
