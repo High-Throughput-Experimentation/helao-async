@@ -1,7 +1,7 @@
 """HexStatusIngestion (P2a T3): verbatim fold parity against the legacy
 StatusIngester bodies, the elif-chain event selection evaluated on LIVE
 loop_state, lock-held emission, and the two update_nonblocking wire quirks
-(None-timestamp TypeError; unknown-exec_id ValueError)."""
+(unknown-exec_id ValueError)."""
 
 import asyncio
 from datetime import datetime
@@ -235,14 +235,27 @@ async def test_update_nonblocking_unknown_exec_id_raises_valueerror():
 
 
 @pytest.mark.asyncio
-async def test_update_nonblocking_none_timestamp_raises_typeerror():
-    """status.py third-drift quirk: the %-format f-string rejects None."""
+async def test_update_nonblocking_none_timestamp_registers_none():
     orch, _spy, ing = _make()
     act = _act(uuid4(), [HloStatus.active])
     act.exec_id = "acquire exec1"
     act.action_timestamp = None
-    with pytest.raises(TypeError):
-        await ing.update_nonblocking(act, "127.0.0.1", 8002)
+    await ing.update_nonblocking(act, "127.0.0.1", 8002)
+    assert orch.registered[act.action_uuid]["action_timestamp"] is None
+
+
+@pytest.mark.asyncio
+async def test_parked_status_without_timestamp_registers():
+    """ActionAdmission._park pushes a parked action's status before init_act:
+    action_status [] and action_timestamp None. update_status raised
+    TypeError on it, so the orchestrator answered 500 and the action server
+    retried each push 5 times, stalling its status queue (note1 ANA,
+    2026-11-02)."""
+    orch, _spy, ing = _make()
+    act = _act(uuid4(), [])
+    act.action_timestamp = None
+    assert await ing.update_status(actionservermodel=_asm(act, last=act.action_uuid))
+    assert orch.registered[act.action_uuid]["action_timestamp"] is None
 
 
 def test_action_history_meta_matches_legacy_shape():

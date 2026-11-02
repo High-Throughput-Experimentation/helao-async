@@ -24,10 +24,8 @@ unconditional trailing ``globalstatusmodel`` put) and by the health monitor.
 ``clear_nonblocking`` stays on ``StatusIngester`` (orch_status_sync.py); its wire behavior is
 untouched.
 
-Wire quirks reproduced, not fixed (spec §7.4): ``update_nonblocking``'s
-%-format f-string raises ``TypeError`` on a ``None`` ``action_timestamp``
-(the status-adapter "third drift"), and ``list.remove`` raises ``ValueError``
-on an unknown exec_id. Like the legacy ``StatusIngester``, this class caches
+Wire quirk reproduced, not fixed (spec §7.4): ``list.remove`` raises
+``ValueError`` on an unknown exec_id. Like the legacy ``StatusIngester``, this class caches
 no shared mutable state — it holds only the ``orch``/``runtime`` refs and
 resolves every attribute at call time (``import_queues`` reassignment of
 ``globalstatusmodel`` is always observed)."""
@@ -52,8 +50,9 @@ def action_history_meta(orch, act_model) -> dict:
     """The legacy register_action_uuid meta dict, byte-identical output
     (orch_status_sync.py duplicated this block in update_nonblocking and
     update_status; factored once here, also reused by the PruneDeadActions
-    executor). Deliberately keeps the legacy %-format f-string: a ``None``
-    ``action_timestamp`` raises TypeError, same as the legacy endpoint."""
+    executor). A ``None`` ``action_timestamp`` maps to ``None``: a parked
+    action's status is pushed before ``init_act`` sets it, and raising there
+    answered every such push with HTTP 500."""
     matching_experiment = (
         orch.active_experiment is not None
         and orch.active_experiment.experiment_uuid == act_model.experiment_uuid
@@ -63,7 +62,11 @@ def action_history_meta(orch, act_model) -> dict:
         "action_params": act_model.action_params,
         "action_status": act_model.action_status,
         "action_server": act_model.action_server.server_name,
-        "action_timestamp": f"{act_model.action_timestamp: %m-%d %H:%M:%S}",
+        "action_timestamp": (
+            f"{act_model.action_timestamp: %m-%d %H:%M:%S}"
+            if act_model.action_timestamp is not None
+            else None
+        ),
         "action_finished_timestamp": (
             f"{act_model.action_finished_timestamp: %m-%d %H:%M:%S}"
             if act_model.action_finished_timestamp is not None
