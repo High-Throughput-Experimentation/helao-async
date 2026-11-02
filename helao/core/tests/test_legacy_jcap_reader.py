@@ -1,12 +1,13 @@
 """Reader tests for the legacy JCAP archive format (synthetic zips only)."""
 
 import zipfile
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
 from helao.helpers.legacy_api import (
+    HTELegacyAPI,
     FileAttrs,
     labview_epoch_to_utc,
     parse_file_attrs,
@@ -109,6 +110,8 @@ def test_read_run_rcp_cp1252(tmp_path):
         ("x.txt", "t;a,b;15;150;212", FileAttrs("t", ("a", "b"), 15, 150, 212)),
         ("Sample9_CA1.txt", "t;a,b;15;150;", FileAttrs("t", ("a", "b"), 15, 150, 9)),
         ("x.png", "img;;5", FileAttrs("img", (), None, None, 5)),
+        ("t.txt", "t;;15;150;212", FileAttrs("t", (), 15, 150, 212)),
+        ("t.txt", "t;t(s),I(A)", FileAttrs("t", ("t(s)", "I(A)"), None, None, 0)),
     ],
 )
 def test_parse_file_attrs_variants(fn, value, expected):
@@ -149,12 +152,9 @@ ECHE_TXT = (
 
 
 def test_labview_epoch_known_value():
-    # independent expected value: 1904-01-01 UTC + 3551899182.9 s
-    expected = datetime(1904, 1, 1, tzinfo=timezone.utc) + timedelta(
-        seconds=3551899182.9
+    assert labview_epoch_to_utc(3551899182.9) == datetime(
+        2016, 7, 20, 22, 39, 42, 900000, tzinfo=timezone.utc
     )
-    assert labview_epoch_to_utc(3551899182.9) == expected
-    assert expected.year == 2016 and expected.month == 7 and expected.day == 20
 
 
 def test_rename_column():
@@ -189,6 +189,46 @@ def test_read_eche_file_cp1252_crlf(tmp_path):
     assert len(cols["t_s"]) == 2
 
 
-def test_rcp_text_level_is_four_spaces():
-    # a 2-space indent is not a level: the line stays a sibling (depth = spaces // 4)
-    assert rcp_text_to_dict("a:\n  b: 1\n") == {"a": "", "b": "1"}
+def test_rcp_text_malformed_indent_nests():
+    # depth is the raw leading-space count: any deeper indent nests
+    assert rcp_text_to_dict("a:\n  b: 1\n") == {"a": {"b": "1"}}
+
+
+def test_rcp_to_dict_text_cp1252(tmp_path):
+    p = tmp_path / "1.info"
+    p.write_bytes(b"unit: \xb5A\n")
+    assert HTELegacyAPI().rcp_to_dict(str(p)) == {"unit": "\u00b5A"}
+
+
+def test_eche_row_cell_count_mismatch_raises(tmp_path):
+    body = "%column_headings=a\tb\n1\t2\n3\t\t4\n"
+    p = tmp_path / "r.zip"
+    with zipfile.ZipFile(p, "w") as z:
+        z.writestr("f.txt", body)
+    with zipfile.ZipFile(p) as z:
+        with pytest.raises(ValueError, match=r"f\.txt:3"):
+            read_eche_file(z, "f.txt")
+
+
+def test_eche_missing_headings_raises(tmp_path):
+    p = tmp_path / "r.zip"
+    with zipfile.ZipFile(p, "w") as z:
+        z.writestr("f.txt", "%Plate=\n1\t2\n")
+    with zipfile.ZipFile(p) as z:
+        with pytest.raises(ValueError):
+            read_eche_file(z, "f.txt")
+
+
+def test_resolve_run_zip_non_stamp_dir_is_none(tmp_path):
+    d = tmp_path / "day"
+    d.mkdir()
+    (d / "unrelated.zip").write_bytes(b"")
+    assert resolve_run_zip(str(tmp_path), "/day/") is None
+
+
+def test_resolve_run_zip_picks_lexically_last(tmp_path):
+    d = tmp_path / "day"
+    d.mkdir()
+    for n in ("20160720.153523.copied-1PDT.zip", "20160720.153523.copied-2PST.zip"):
+        (d / n).write_bytes(b"")
+    assert resolve_run_zip(str(tmp_path), "/day/20160720.153523.x").endswith("2PST.zip")
