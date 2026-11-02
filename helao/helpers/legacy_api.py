@@ -7,10 +7,27 @@ helpers for retrieving the platemap, the element list, and the
 multi-element ink concentration matrix for a given ``plateid``.
 """
 
-__all__ = ["HTELegacyAPI"]
+__all__ = [
+    "HTELegacyAPI",
+    "FileAttrs",
+    "labview_epoch_to_utc",
+    "parse_file_attrs",
+    "rcp_text_to_dict",
+    "read_eche_file",
+    "read_exp",
+    "read_run_rcp",
+    "read_zip_member_text",
+    "rename_column",
+    "resolve_run_zip",
+    "split_technique",
+]
 
+import glob
 import os
+import re
 import zipfile
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from re import compile as regexcompile
 from typing import Optional
 
@@ -19,6 +36,179 @@ import numpy
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+
+def rcp_text_to_dict(text: str) -> dict:
+    """Parse legacy JCAP rcp-format text (.rcp/.exp/.ana/.info) to a nested dict.
+
+    Four spaces per level; a key whose next line is deeper becomes a dict, a
+    repeated key at one level becomes a list, blank lines are skipped, and the
+    value is everything after the first ':' (so Windows paths survive).
+    """
+    rows = []
+    for line in text.splitlines():
+        if not line.strip() or ":" not in line:
+            continue
+        key, val = line.split(":", 1)
+        depth = (len(key) - len(key.lstrip(" "))) // 4
+        rows.append((depth, key.strip(), val.strip()))
+
+    def build(i: int, depth: int) -> tuple[dict, int]:
+        out: dict = {}
+        while i < len(rows) and rows[i][0] >= depth:
+            d, k, v = rows[i]
+            if d > depth:  # malformed over-indent: attach to previous level
+                i += 1
+                continue
+            if i + 1 < len(rows) and rows[i + 1][0] > depth:
+                v, i = build(i + 1, rows[i + 1][0])
+            else:
+                i += 1
+            if k in out:
+                if not isinstance(out[k], list):
+                    out[k] = [out[k]]
+                out[k].append(v)
+            else:
+                out[k] = v
+        return out, i
+
+    return build(0, 0)[0]
+
+
+def read_zip_member_text(zf: zipfile.ZipFile, member: str) -> str:
+    """Decode one archive member as utf-8, falling back to cp1252."""
+    raw = zf.read(member)
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return raw.decode("cp1252")
+
+
+def _single_member(zip_path: str, ext: str) -> dict:
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        names = [n for n in zf.namelist() if n.lower().endswith(ext)]
+        if len(names) != 1:
+            raise ValueError(f"{zip_path}: expected one {ext} member, found {names}")
+        return rcp_text_to_dict(read_zip_member_text(zf, names[0]))
+
+
+def read_exp(zip_path: str) -> dict:
+    """Parse the single .exp member of a legacy experiment zip (read-only)."""
+    return _single_member(zip_path, ".exp")
+
+
+def read_run_rcp(zip_path: str) -> dict:
+    """Parse the single .rcp member of a legacy run zip (read-only)."""
+    return _single_member(zip_path, ".rcp")
+
+
+@dataclass(frozen=True)
+class FileAttrs:
+    """A legacy file-attribute string, normalised across its field-count variants."""
+
+    file_type: str
+    keys: tuple[str, ...]
+    nhead: int | None
+    nrows: int | None
+    sample_no: int
+
+
+_SAMPLE_FN = re.compile(r"^Sample(\d+)_")
+
+
+def _sample_from_name(filename: str) -> int:
+    m = _SAMPLE_FN.match(filename)
+    return int(m.group(1)) if m else 0
+
+
+def parse_file_attrs(filename: str, value: str) -> FileAttrs:
+    """Parse ``type;keys;nhead;nrows;sample`` and its 1-4 field variants."""
+    while ";;" in value:
+        value = value.replace(";;", ";")
+    parts = value.split(";")
+    if parts and parts[-1] == "":
+        parts = parts[:-1] if len(parts) != 5 else parts
+    ftype = parts[0]
+    keys: tuple[str, ...] = ()
+    nhead = nrows = None
+    smp = ""
+    if len(parts) == 2:
+        smp = parts[1]
+    elif len(parts) == 3:
+        keys, smp = tuple(parts[1].split(",")), parts[2]
+    elif len(parts) == 4:
+        keys, nhead, nrows = tuple(parts[1].split(",")), int(parts[2]), int(parts[3])
+    elif len(parts) >= 5:
+        keys, nhead, nrows = tuple(parts[1].split(",")), int(parts[2]), int(parts[3])
+        smp = parts[4]
+    keys = tuple(k for k in keys if k)
+    sample_no = int(smp) if smp.strip().isdigit() else _sample_from_name(filename)
+    return FileAttrs(ftype, keys, nhead, nrows, sample_no)
+
+
+_TECH = re.compile(r"^([A-Za-z_]+?)(\d*)$")
+
+
+def split_technique(tech_key: str) -> tuple[str, int]:
+    """Split ``CA12`` into ``("CA", 12)``; a key with no digits gets index 0."""
+    m = _TECH.match(tech_key)
+    if not m:
+        return tech_key, 0
+    return m.group(1), int(m.group(2) or 0)
+
+
+def resolve_run_zip(run_root: str, run_path: str) -> str | None:
+    """Locate a legacy run zip from an .exp ``run_path`` (read-only lookups).
+
+    Tries the path as given, then with ``.zip`` appended, then any zip in the
+    same directory whose name starts with the 15-character run timestamp.
+    """
+    rel = run_path.lstrip("/").replace("\\", "/")
+    full = os.path.join(run_root, rel)
+    for cand in (full, full + ".zip"):
+        if cand.endswith(".zip") and os.path.isfile(cand):
+            return cand
+    stamp = os.path.basename(rel)[:15]
+    hits = sorted(
+        glob.glob(os.path.join(os.path.dirname(full), glob.escape(stamp) + "*.zip"))
+    )
+    return hits[0] if hits else None
+
+
+_LABVIEW_EPOCH = datetime(1904, 1, 1, tzinfo=timezone.utc)
+_UNIT = re.compile(r"^(.*?)\((.*)\)$")
+
+
+def labview_epoch_to_utc(epoch_s: float) -> datetime:
+    """Convert LabVIEW seconds-since-1904 (UTC) to an aware UTC datetime."""
+    return _LABVIEW_EPOCH + timedelta(seconds=float(epoch_s))
+
+
+def rename_column(col: str) -> str:
+    """``X(u)`` -> ``X_u``; names without a unit are unchanged."""
+    m = _UNIT.match(col.strip())
+    return f"{m.group(1)}_{m.group(2)}" if m else col.strip()
+
+
+def read_eche_file(
+    zf: zipfile.ZipFile, member: str
+) -> tuple[dict[str, str], dict[str, list[float]]]:
+    """Read one legacy eche .txt: ``%key=value`` header, then tab-separated floats."""
+    header: dict[str, str] = {}
+    names: list[str] = []
+    data: list[list[float]] = []
+    for line in read_zip_member_text(zf, member).splitlines():
+        if not line.strip():
+            continue
+        if line.startswith("%"):
+            k, _, v = line[1:].partition("=")
+            header[k.strip()] = v.strip()
+            if k.strip() == "column_headings":
+                names = [rename_column(c) for c in v.split("\t") if c.strip()]
+            continue
+        data.append([float(x) for x in line.split("\t") if x.strip()])
+    cols = {n: [row[i] for row in data] for i, n in enumerate(names)}
+    return header, cols
 
 
 class HTELegacyAPI:
@@ -229,12 +419,6 @@ class HTELegacyAPI:
         Returns:
             Nested dictionary representation of the file.
         """
-        dlist = []
-
-        def _tab_level(astr):
-            """Count number of leading tabs in a string"""
-            return (len(astr) - len(astr.lstrip("    "))) / 4
-
         if rcppath.endswith(".zip"):
             if "analysis" in os.path.dirname(rcppath):
                 ext = ".ana"
@@ -242,57 +426,9 @@ class HTELegacyAPI:
                 ext = ".exp"
             else:
                 ext = ".rcp"
-            rcpfn = os.path.basename(rcppath).split(".copied")[0] + ext
-            archive = zipfile.ZipFile(rcppath, "r")
-            with archive.open(rcpfn, "r") as f:
-                for l in f:
-                    k, v = l.decode("ascii").split(":", 1)
-                    lvl = _tab_level(l.decode("ascii"))
-                    dlist.append({"name": k.strip(), "value": v.strip(), "level": lvl})
-        else:
-            with open(rcppath, "r", encoding="utf-8") as f:
-                for l in f:
-                    k, v = l.split(":", 1)
-                    lvl = _tab_level(l)
-                    dlist.append({"name": k.strip(), "value": v.strip(), "level": lvl})
-
-        def ttree_to_json(ttree, level=0):
-            result = {}
-            for i in range(0, len(ttree)):
-                cn = ttree[i]
-                try:
-                    nn = ttree[i + 1]
-                except:
-                    nn = {"level": -1}
-
-                # Edge cases
-                if cn["level"] > level:
-                    continue
-                if cn["level"] < level:
-                    return result
-                # Recursion
-                if nn["level"] == level:
-                    dict_insert_or_append(result, cn["name"], cn["value"])
-                elif nn["level"] > level:
-                    rr = ttree_to_json(ttree[i + 1 :], level=nn["level"])
-                    dict_insert_or_append(result, cn["name"], rr)
-                else:
-                    dict_insert_or_append(result, cn["name"], cn["value"])
-                    return result
-            return result
-
-        def dict_insert_or_append(adict, key, val):
-            """Insert a value in dict at key if one does not exist
-            Otherwise, convert value to list and append
-            """
-            if key in adict:
-                if type(adict[key]) != list:
-                    adict[key] = [adict[key]]
-                adict[key].append(val)
-            else:
-                adict[key] = val
-
-        return ttree_to_json(dlist)
+            return _single_member(rcppath, ext)
+        with open(rcppath, "r", encoding="utf-8", errors="replace") as f:
+            return rcp_text_to_dict(f.read())
 
     def getplatemappath_plateid(
         self,
