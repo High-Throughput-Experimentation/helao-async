@@ -60,8 +60,17 @@ def test_torn_final_line_is_discarded_and_warned(tmp_path: Path, caplog):
     with j.path.open("a", encoding="utf-8") as f:
         f.write('{"uuid": "333')  # truncated, no newline
 
-    with caplog.at_level("WARNING"):
-        ws = j.working_set()
+    # helao loggers set propagate = False, so caplog's root handler sees
+    # nothing unless it is attached to the logger run_state writes to.
+    from helao.helpers import run_state
+
+    lg = run_state._log()
+    lg.addHandler(caplog.handler)
+    try:
+        with caplog.at_level("WARNING", logger=lg.name):
+            ws = j.working_set()
+    finally:
+        lg.removeHandler(caplog.handler)
     assert set(ws) == {UUID_A, UUID_B}
     assert "discarding" in caplog.text.lower()
 
