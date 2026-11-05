@@ -327,7 +327,7 @@ candidate that still writes a legacy `RUNS_*` tree or a `%y.%U` directory or
 Expect **0 diffs** beyond the normalizations the differ already applies (uuids,
 timestamps, host names).
 
-**Scripted (Windows stations).** `helao\hexagon\tests\smoke\eche10_golden_diff.bat`
+**Scripted (Windows stations).** `helao\deploy\hte\tests\smoke\eche10_golden_diff.bat`
 wraps steps 1 and 6 for eche10 (`capture pre <seq>`, `capture post <seq>`,
 `diff`); the header documents the order. Its capture helper,
 `station_golden_capture.py`, is stdlib-only and run by path, so copy both files

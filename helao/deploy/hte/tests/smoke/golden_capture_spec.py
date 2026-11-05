@@ -80,7 +80,8 @@ SPEC_HOST, SPEC_PORT = "127.0.0.1", 8011
 SCENARIO = "GM-SPEC"
 
 # hte canary configs live alongside this module, in
-# its own configs/ sibling directory (helao/deploy/hte/tests/smoke/configs), not helao/deploy/*/configs/.
+# its own configs/ sibling directory (helao/deploy/hte/tests/smoke/configs), not
+# helao/deploy/*/configs/.
 CONFIG_DIR = Path(__file__).resolve().parent / "configs"
 
 # n_pixels from the SPEC config block (eche10.yml / spec*.yml). SM303.

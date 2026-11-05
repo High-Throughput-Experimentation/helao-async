@@ -2,7 +2,7 @@
 items (P1b2b: items 1, 3, 5).
 
 Boots the REAL compositions under uvicorn inside the test's event loop: the
-OrchHost the hte orchestrator module builds, the SIM through its own makeApp, and the
+OrchHost the deployment's orchestrator module builds, the SIM through its own makeApp, and the
 test deployment's sim_db_server — real HTTP routes registered through the
 real registration code, and the co-located ZMQ RPC mirrors HelaoFastAPI
 auto-registers on http_port+10000 (§10.1 fixture-fidelity). Race injection happens via the host's
@@ -194,9 +194,7 @@ async def live_group(tmp_root: str, ntp_offset_s: float = 0.0):
     if helao_logging.LOGGER is None:
         helao_logging.LOGGER = make_logger("hexlive", log_dir=log_dir)
 
-    from helao.deploy.hte.servers.orchestrator.async_orch2 import (
-        makeApp as orch_makeApp,
-    )
+    from helao.hexagon.app.orch_host import OrchHost
     from helao.deploy.test.servers.action.sim_db_server import makeApp as db_makeApp
     from helao.deploy.test.servers.action.ws_simulator import makeApp as sim_makeApp
 
@@ -209,7 +207,7 @@ async def live_group(tmp_root: str, ntp_offset_s: float = 0.0):
     # whatever actually drains -- and after the cut-over that is the host's
     # own reducer. Pointing it at the graft would leave the shipped loop
     # untested while reporting green.
-    orch_app = orch_makeApp("ORCH")
+    orch_app = OrchHost("ORCH", "ORCH", "Orchestrator", version=3.0)
     orch_server, orch_task = await _serve(orch_app, ORCH_HOST, ORCH_PORT)
     try:
         runtime = None

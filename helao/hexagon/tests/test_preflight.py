@@ -285,6 +285,7 @@ def test_a_missing_checklist_is_reported_not_failed():
 
 def test_a_checklist_that_existed_at_b7c_and_is_gone_fails(tmp_path, monkeypatch):
     monkeypatch.setattr(preflight, "_checklist_dir", lambda dep: tmp_path)
+    (tmp_path / "_at_b7c.json").write_text('["gamry_server2"]', encoding="utf-8")
     servers = {"GAMRY": {"group": "action", "fast": "gamry_server2"}}
     issues, notes = preflight._checklist_presence(servers, {"GAMRY": "hte"})
     assert len(issues) == 1 and "gamry_server2" in issues[0] and notes == []
@@ -391,6 +392,7 @@ def test_a_scratch_copy_of_a_config_still_exercises_the_checklist_gate(
 
     empty = tmp_path / "checklists"
     empty.mkdir()
+    (empty / "_at_b7c.json").write_text('["gamry_server2"]', encoding="utf-8")
     monkeypatch.setattr(preflight, "_checklist_dir", lambda deployment: empty)
     for config in (src, scratch):
         found = preflight.preflight_config(str(config))

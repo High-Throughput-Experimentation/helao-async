@@ -53,6 +53,7 @@ OUT = Path(__file__).resolve().parent / "checklists"
 SERVERS: list[tuple[str, Optional[str]]] = [
     (e["module"], e["representative_key"]) for e in load_manifest(OUT)
 ]
+assert len(SERVERS) == 23
 
 
 def hte_module(filename: str) -> Path:

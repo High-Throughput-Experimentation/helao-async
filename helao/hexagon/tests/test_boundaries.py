@@ -282,8 +282,8 @@ def test_app_layer_clean():
 # bokeh.server rule (P7d, D6 generalized): VENDOR_BANNED above is consulted
 # only for domain/ports (the LOCKED branch); adapters/ and app/ both return
 # before that check, so "bokeh" imports are otherwise legal everywhere in
-# the tree. That is exactly the D6 hole: galil_aligner_host.py constructed
-# bokeh.server.server.Server from helao/deploy/hte/servers/galil_motion/. The rule below is
+# the tree. That is exactly the D6 hole: the aligner host (then in hexagon
+# adapters/vis/) constructed bokeh.server.server.Server. The rule below is
 # independent of _allowed()/VENDOR_BANNED and is stricter than the general
 # per-layer allow-list -- it reaches tests/ too, since nothing genuinely
 # needs bokeh.server outside app/ui_host.py.

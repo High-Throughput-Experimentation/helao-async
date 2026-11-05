@@ -90,7 +90,8 @@ SCENARIO = "GM-DIN"
 DI_ITEM = "gamry_ttl0"
 
 # hte canary configs live alongside this module, in
-# its own configs/ sibling directory (helao/deploy/hte/tests/smoke/configs), not helao/deploy/*/configs/.
+# its own configs/ sibling directory (helao/deploy/hte/tests/smoke/configs), not
+# helao/deploy/*/configs/.
 CONFIG_DIR = Path(__file__).resolve().parent / "configs"
 
 # galil_io.py's get_digital_in endpoint calls `Galil.get_digital_in(di_name=

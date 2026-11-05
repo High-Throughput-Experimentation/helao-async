@@ -12,7 +12,7 @@ The boundary is SAMPLE-server-behind-RPC -- exactly what PAL already consumes
 via sample_shim.SampleArchiveShim (fail-loud RPC client, call-time address
 resolution, typed rehydration). Signatures mirror the shim's public methods
 verbatim (cross-checked against
-helao/deploy/hte/servers/pal/sample_shim.py, dropping only the shim's
+the deployment's pal server folder (sample_shim.py), dropping only the shim's
 `*args, **kwargs` catch-alls) so the P1b adapter is the shim itself. Archive
 is NEVER ported as a driver. The shim's public surface has no methods beyond
 those in the protocol (no custom_unloadall/custom_load exist on it).

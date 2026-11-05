@@ -89,7 +89,8 @@ PSTAT_HOST, PSTAT_PORT = "127.0.0.1", 8001
 SCENARIO = "GM-OCV"
 
 # hte canary configs live alongside this module, in
-# its own configs/ sibling directory (helao/deploy/hte/tests/smoke/configs), not helao/deploy/*/configs/.
+# its own configs/ sibling directory (helao/deploy/hte/tests/smoke/configs), not
+# helao/deploy/*/configs/.
 CONFIG_DIR = Path(__file__).resolve().parent / "configs"
 
 # helao/deploy/hte/servers/gamry/dtaq.py: DTAQ_OCV.output_keys. These

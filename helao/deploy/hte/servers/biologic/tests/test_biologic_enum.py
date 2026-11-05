@@ -2,7 +2,7 @@
 
 `EC_IRange`/`EC_ERange`/`EC_Bandwidth` are FastAPI annotations on the
 `run_*` endpoints, so a renamed member changes the recorded action params and
-the OpenAPI surface that `test_hte_route_checklist.py` freezes.
+the OpenAPI surface that `test_route_checklist.py` freezes.
 """
 
 import sys

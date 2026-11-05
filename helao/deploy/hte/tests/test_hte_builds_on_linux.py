@@ -1,6 +1,6 @@
 """hte action modules still CONSTRUCT under a real config (B5).
 
-The checklist gate (``test_hte_route_checklist.py``) reads source and never
+The checklist gate (``test_route_checklist.py``) reads source and never
 imports, which is its strength -- it covers Windows-only modules and
 ``dyn_endpoints`` routes alike. Its blind spot is the constructor: a port that
 renames a driver keyword, drops a poller class or breaks an import passes the

@@ -16,7 +16,7 @@ server launch and no hardware:
    skipped.
 3. **endpoint-checklist presence** -- an action server's frozen endpoint
    checklist is looked up in its OWNING deployment (the one gate 2 resolved).
-   Fails only when a checklist frozen at B7c's base (`CHECKLISTS_AT_B7C`) is gone;
+   Fails only when a checklist frozen at B7c's base (`_at_b7c.json`) is gone;
    any other absence is reported as a note.
 4. **library collision** -- the config's `experiment_libraries` +
    `sequence_libraries` lists carry no flat-namespace function-name collision
@@ -33,6 +33,7 @@ with "PREFLIGHT OK" or 1 listing the issues.
 from __future__ import annotations
 
 import ast
+import json
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -199,37 +200,15 @@ _RULE = (
 #: The retired routing deployment; matched only to reject it.
 _RETIRED_DEPLOYMENT = "hexagon"
 
-#: E4: the per-server hte checklists tracked at 7592729b. Gate 3 fails only when one
-#: of these goes missing; any other absent checklist is reported.
-CHECKLISTS_AT_B7C: dict[str, frozenset[str]] = {
-    "hte": frozenset(
-        {
-            "HTEdata_server",
-            "analysis_server",
-            "andor_server",
-            "biologic_server",
-            "calc_server",
-            "cam_server",
-            "co2sensor_server",
-            "diapump_server",
-            "galil_io",
-            "galil_motion",
-            "gamry_server2",
-            "kinesis_server",
-            "mfc_server",
-            "nidaqmx_server",
-            "o2sensor_server",
-            "pal_server",
-            "pdu_server",
-            "power_supply_server",
-            "sample_server",
-            "spec_server",
-            "sync_server",
-            "syringe_server",
-            "tec_server",
-        }
-    ),
-}
+
+# E4: per-server checklists tracked at 7592729b, listed in the owning deployment's
+# ``_at_b7c.json`` beside its checklists. Gate 3 fails only when one of these goes
+# missing; any other absent checklist is reported.
+def _frozen_checklists(cdir: Path) -> frozenset[str]:
+    f = cdir / "_at_b7c.json"
+    if not f.exists():
+        return frozenset()
+    return frozenset(json.loads(f.read_text(encoding="utf-8")))
 
 
 def _launcher_deployment(config_path: str, group: str, module: str):
@@ -318,7 +297,7 @@ def _checklist_presence(servers: dict, resolved: dict) -> tuple[list[str], list[
         cdir = _checklist_dir(owner)
         if cdir is not None and (cdir / f"{module}.json").exists():
             continue
-        if cdir is not None and module in CHECKLISTS_AT_B7C.get(owner, frozenset()):
+        if cdir is not None and module in _frozen_checklists(cdir):
             issues.append(
                 f"{key}: frozen endpoint checklist {module}.json is gone from {cdir}"
             )
