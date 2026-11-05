@@ -288,7 +288,7 @@ a config with an externally managed server cannot pass preflight.
 Without a `deployment:` key, the launcher globs every deployment for
 `servers/*/<module>.py` (`servers/reflex/` excluded), and:
 
-- one match — uses it, logging `Auto-detected deployment`;
+- one match — uses it; logs `Auto-detected deployment` only when that match is not the config's own deployment;
 - several matches — prefers the config's own deployment, else takes the
   first in sorted order and logs a WARNING that an explicit `deployment:` key would disambiguate;
 - no match — fails with `FileNotFoundError: Could not find deployment for
