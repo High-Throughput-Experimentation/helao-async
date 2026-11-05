@@ -15,6 +15,9 @@ if /I not "%CONDA_DEFAULT_ENV%"=="helao" (
 )
 uv pip install --python "%CONDA_PREFIX%\python.exe" -r "%~dp0requirements.txt"
 if ERRORLEVEL 1 exit /b 1
+set PYTHONPATH=%HA_DIR%
+python "%HA_DIR%\helao_env.py" update %*
+if ERRORLEVEL 1 exit /b 1
 echo setting PYTHONPATH in 'helao' conda environment vars
 call conda env config vars set PYTHONPATH=%HA_DIR%
 call conda env config vars set HELAOLAUNCH=%HA_DIR%\helao.bat

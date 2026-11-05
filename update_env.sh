@@ -18,6 +18,7 @@ then
     exit 1
 fi
 uv pip install --python "$CONDA_PREFIX/bin/python" -r "$HA_DIR/requirements.txt" || exit 1
+PYTHONPATH="$HA_DIR" python "$HA_DIR/helao_env.py" update "$@" || exit 1
 conda env config vars set PYTHONPATH=$HA_DIR > /dev/null
 conda env config vars set HELAOLAUNCH="$HA_DIR/helao.sh" > /dev/null
 chmod +x $HA_DIR/helao.sh
