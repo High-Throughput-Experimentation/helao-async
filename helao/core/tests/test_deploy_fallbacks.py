@@ -24,6 +24,8 @@ def tree(tmp_path, monkeypatch):
     _touch(tmp_path, "b/processors/shared.py")
     _touch(tmp_path, "c/processors/shared.py")
     _touch(tmp_path, "b/processors/only_b.py")
+    _touch(tmp_path, "a/processors/both.py")
+    _touch(tmp_path, "b/processors/both.py")
     monkeypatch.setattr(server_modules, "DEPLOY_ROOT", tmp_path)
     monkeypatch.setattr(config_loader, "CONFIG", {"deployment": "a"})
     monkeypatch.chdir(tmp_path.parent)  # cwd must not matter
@@ -32,6 +34,10 @@ def tree(tmp_path, monkeypatch):
 
 def test_own_processor(tree):
     assert loader._resolve_path("mine") == str(tree / "a/processors/mine.py")
+
+
+def test_own_processor_wins_over_another_deployments(tree):
+    assert loader._resolve_path("both") == str(tree / "a/processors/both.py")
 
 
 def test_unique_foreign_processor(tree):

@@ -172,6 +172,17 @@ def test_library_collision_overridable(tmp_path):
     assert preflight._library_collisions(cfg) == []
 
 
+def test_bare_library_in_several_other_deployments_is_an_issue(tmp_path, monkeypatch):
+    for dep in ("b", "c"):
+        d = tmp_path / "helao" / "deploy" / dep / "experiments"
+        d.mkdir(parents=True)
+        (d / "lib.py").write_text("def f():\n    return []\n", encoding="utf-8")
+    (tmp_path / "helao" / "deploy" / "a" / "experiments").mkdir(parents=True)
+    monkeypatch.setattr(preflight, "REPO_ROOT", tmp_path)
+    issues = preflight._library_collisions({"experiment_libraries": ["lib"]}, "a")
+    assert any("lib" in i and "several deployments" in i for i in issues)
+
+
 def _synthetic_tree(tmp_path, own_has_module=False):
     """helao/deploy/{alpha,beta}/servers/action/twin_server.py, and a config under own/."""
     deploy = tmp_path / "helao" / "deploy"

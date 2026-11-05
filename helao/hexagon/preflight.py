@@ -363,6 +363,14 @@ def _lib_module_path(
     return found[0] if len(found) == 1 else None
 
 
+def _holding_deployments(entry: str, kind: str) -> list[str]:
+    """Deployments with a bare ``entry`` library; [] for an explicit path."""
+    if entry.endswith(".py") or "/" in entry:
+        return []
+    found = (REPO_ROOT / "helao" / "deploy").glob(f"*/{kind}/{entry}.py")
+    return sorted(p.parent.parent.name for p in found)
+
+
 def _top_level_funcs(path: Path) -> list[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"))
     return [
@@ -384,6 +392,12 @@ def _library_collisions(cfg: dict, deployment: Optional[str] = None) -> list[str
         for entry in cfg.get(cfg_key, []) or []:
             path = _lib_module_path(str(entry), kind, deployment)
             if path is None:
+                deps = _holding_deployments(str(entry), kind)
+                if len(deps) > 1:
+                    issues.append(
+                        f"{cfg_key}: '{entry}' exists in several deployments "
+                        f"{deps}; give an explicit .py path"
+                    )
                 continue
             for fn in _top_level_funcs(path):
                 name_to_mods[fn].append(path.name)
