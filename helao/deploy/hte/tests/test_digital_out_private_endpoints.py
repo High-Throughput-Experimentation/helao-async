@@ -7,8 +7,8 @@ what it returns, so these tests assert the registration too — a route that
 slipped back under ``tags=["action"]``, or under the ``/{server_key}/`` prefix,
 would still work and would still be wrong.
 
-Neither server's hardware is present here (gclib and NI-DAQmx are both
-Windows-only vendor SDKs), so the drivers are stubbed at the two methods the
+Neither server's hardware is present here (the vendor gclib and NI-DAQmx
+SDKs are not installed here), so the drivers are stubbed at the two methods the
 endpoints call. What is under test is the server layer: name resolution, the
 bool coercion, and the shape of the ``(error_code, {name: state})`` pair.
 

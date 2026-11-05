@@ -283,15 +283,6 @@ a config with an externally managed server cannot pass preflight.
 > about 20 servers across the tracked configs, but no code reads it. Use
 > `log_level` (per server) to change the file-log level.
 
-### Galil `params.gclib_api`
-
-Both Galil servers (`galil_io`, `galil_motion`) read `params.gclib_api`: `"1"`
-(default; gclib Python wrapper 1.0.1, `gclib.py()`) or `"2"` (wrapper 2.x,
-`gclib.Controller`, Python >= 3.12). YAML ints `1`/`2` are accepted; any other
-value raises `ValueError` at driver construction. It must match the wrapper
-installed in the env, else connect fails with a message naming `gclib_api`.
-Install steps: each server's `README.md`.
-
 ### Deployment resolution
 
 Without a `deployment:` key, the launcher globs every deployment for
@@ -607,6 +598,12 @@ Shared by every action server (`ActionHost`):
 | `allow_concurrent_actions` | `True` | `False`: an action whose endpoint is busy is parked in one server-wide queue, released when no endpoint is running an action; an action for an idle endpoint starts at once. `True`: parked per endpoint. `start_condition: no_wait` bypasses either. Some `hte` servers force `False` in code. |
 | `enable_aligner` / `bokeh_port` | — / `port + 1000` | Motion servers: host the Bokeh plate aligner on a second port; a null `bokeh_port` means the default. Preflight reserves it; `validateConfig` does not. |
 | `positions` | — | Sample-archive positions. At most one server per config may declare it (see [Validation rules](#validation-rules)). |
+
+Galil (`galil_io`, `galil_motion`):
+
+| Param | Default | Effect |
+|---|---|---|
+| `gclib_api` | `"1"` | gclib Python wrapper API: `"1"` (wrapper 1.0.1, `gclib.py()`) or `"2"` (wrapper 2.x, `gclib.Controller`, Python >= 3.12). YAML ints `1`/`2` are accepted; any other value raises `ValueError` at driver construction. Must match the wrapper installed in the env, else connect fails with a message naming `gclib_api`. Install steps: each server's `README.md`. |
 
 `SYNC` (`sync_server`, `NativeSyncer`). An orchestrator or other host that
 builds a syncer without its own `aws_config_path` reads these from the `SYNC`

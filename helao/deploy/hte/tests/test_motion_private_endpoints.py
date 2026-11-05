@@ -36,8 +36,8 @@ dispatch must reach the log, since the return value can no longer carry it.
 Tests that assert what reached the controller therefore await the dispatched
 task (``_galil_move``) instead of the endpoint alone.
 
-Neither server's hardware is present (the vendor ``gclib`` is not installed here and no
-Thorlabs stage is attached), but neither is needed: the galil vendor seam is
+Neither server's hardware is present (the vendor ``gclib`` is not installed here and
+no Thorlabs stage is attached), but neither is needed: the galil vendor seam is
 ``GalilCommandChannel`` and the Kinesis one is ``Thorlabs.KinesisMotor``, and
 both are replaced with recorders.
 
