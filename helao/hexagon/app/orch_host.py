@@ -69,8 +69,8 @@ def orch_ws_publishers(
 ) -> tuple[WsPublisher, WsPublisher, WsPublisher]:
     """The ORCH family's three WS publishers, in ``(status, data, live)`` order.
 
-    Status and data pickle ``msg.as_dict()``; the live buffer is dict-native
-    and is pickled as-is. ``OrchHost._register_orch_ws_routes`` serves its
+    Status and data encode ``msg.as_dict()``; the live buffer is dict-native
+    and is encoded as-is (both via ``ws_utils.wire_dumps``). ``OrchHost._register_orch_ws_routes`` serves its
     routes from these, and ``harness.ws_frames.encode_orch_api`` encodes the
     ``orch_api`` fixture family through the same function, so the harness
     cannot drift from the host.
@@ -1329,9 +1329,9 @@ class OrchHost(ActionHost):
 
         The two families genuinely differ on the wire. ``base_api`` streams
         through ``WsPublisher``, whose default ``xform_func`` is the
-        IDENTITY -- it pickles the model object. ``orch_api`` streams
-        through the publishers :func:`orch_ws_publishers` builds, which
-        pickle ``msg.as_dict()`` for status and data, and the raw message for
+        IDENTITY -- it encodes the model object (tagged, rebuilt on decode).
+        ``orch_api`` streams through the publishers :func:`orch_ws_publishers`
+        builds, which encode ``msg.as_dict()`` for status and data, and the raw message for
         the live buffer -- the bytes the legacy ``Base._ws_relay`` sent,
         compared byte for byte by B7b. So on ``/ws_status`` the action family
         delivers an ``ActionModel`` and the orchestrator a plain dict.

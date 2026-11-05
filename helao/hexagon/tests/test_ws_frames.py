@@ -61,8 +61,8 @@ async def test_frames_roundtrip_via_wssubscriber(channel, family):
             assert row[wf.STRING_COLUMN] == wf.STRING_VALUES
     else:  # ws_live: dict-native in both families
         assert isinstance(decoded, dict), type(decoded)
-        assert decoded[wf.LIVE_FLOAT_LABEL] == (wf.LIVE_FLOAT_VALUE, wf.LIVE_EPOCH)
-        assert decoded[wf.LIVE_STRING_LABEL] == (wf.LIVE_STRING_VALUE, wf.LIVE_EPOCH)
+        assert decoded[wf.LIVE_FLOAT_LABEL] == [wf.LIVE_FLOAT_VALUE, wf.LIVE_EPOCH]
+        assert decoded[wf.LIVE_STRING_LABEL] == [wf.LIVE_STRING_VALUE, wf.LIVE_EPOCH]
 
 
 @pytest.mark.asyncio
@@ -77,7 +77,7 @@ async def test_frames_roundtrip_via_wssyncclient(channel, family):
     assert decoded != {}, "WsSyncClient returned its empty-retry sentinel"
     # A light-touch check (full type assertions are covered by the
     # WsSubscriber variant above): the same sentinel value must be present
-    # regardless of which decoder unpickled it.
+    # regardless of which decoder decoded it.
     if channel == "ws_live":
         assert decoded[wf.LIVE_FLOAT_LABEL][0] == wf.LIVE_FLOAT_VALUE
     elif channel == "ws_status":

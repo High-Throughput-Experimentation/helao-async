@@ -1042,7 +1042,7 @@ class ActionHost(HelaoFastAPI):
         """Register the three broadcast channels.
 
         Encodings are the ``BaseAPI`` family's and are frozen (Amendment 2 §3):
-        a pickled ``ActionModel`` on ws_status, a pickled ``DataPackageModel`` on
+        an ``ActionModel`` on ws_status, a ``DataPackageModel`` on
         ws_data, a ``{datalab: (value, epoch)}`` dict on ws_live. ``OrchHost``
         puts dicts under the same three names; converging the families would
         blank every subscriber of whichever one moved, with no error on either

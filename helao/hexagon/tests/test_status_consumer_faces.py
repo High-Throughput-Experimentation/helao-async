@@ -3,7 +3,7 @@ edge, and the measured absence of a ``ws_status`` consumer.
 
 The normalizers in ``helao.ui.reflex.ingest.NORMALIZERS`` are keyed by
 ``ws_path``, not uniform across channels: ``ws_live`` relays a
-``{datalab: (value, epoch)}`` dict while ``ws_data`` carries a pickled
+``{datalab: (value, epoch)}`` dict while ``ws_data`` carries a tagged
 ``DataPackageModel``. A single normalizer silently drops the other endpoint's
 messages with no error on either side.
 

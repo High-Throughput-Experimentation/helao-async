@@ -6,13 +6,13 @@ route names (measured, see docs/superpowers/plans/2026-08-05-P7-UI-both-stacks.m
 
 - ``base_api`` family: every action server (``ActionHost._register_websockets``)
   serves ``/ws_status`` / ``/ws_data`` / ``/ws_live`` over
-  ``WsPublisher.broadcast`` with the identity ``xform_func``, which pickles
+  ``WsPublisher.broadcast`` with the identity ``xform_func``, which msgpack-encodes
   the message object as-is -- status carries an ``ActionModel``, data a
   ``DataPackageModel``, live a plain dict.
 - ``orch_api`` family: the orchestrator (``OrchHost._register_orch_ws_routes``)
   replaces those three routes with the publishers
   :func:`~helao.hexagon.app.orch_host.orch_ws_publishers` builds, which call
-  ``msg.as_dict()`` before pickling for status/data (live stays a dict
+  ``msg.as_dict()`` before encoding for status/data (live stays a dict
   either way).
 
 The family names are the legacy hosts' (``BaseAPI`` and its sibling
@@ -23,7 +23,7 @@ The family names are the legacy hosts' (``BaseAPI`` and its sibling
 Frames here are produced by driving the REAL production coroutine --
 ``WsPublisher.broadcast``, with the ``xform_func`` each host installs --
 against a :class:`FakeWebSocket` that only fakes the transport
-(``accept``/``send_bytes``); the ``pyzstd.compress(pickle.dumps(...))`` (or
+(``accept``/``send_bytes``); the ``wire_dumps`` (or
 ``msg.as_dict()`` then the same) encode step is the actual production code
 path, not a hand-rolled copy (the dd31c36f trap this repo has hit before).
 Decoding is likewise
@@ -31,7 +31,7 @@ driven through the real :class:`~helao.helpers.ws_utils.WsSubscriber` /
 :class:`~helao.helpers.ws_utils.WsSyncClient`, via a tiny replay server
 (:func:`replay_server`) that serves pre-computed frame bytes over an actual
 WebSocket connection -- the only way to exercise those classes' real
-``pickle.loads(pyzstd.decompress(...))`` decode step without copying it.
+``wire_loads`` decode step without copying it.
 """
 
 from __future__ import annotations
@@ -164,7 +164,7 @@ class FakeWebSocket:
 
     Not a network socket -- it exists so :class:`WsPublisher.broadcast` can
     run to completion and perform its real
-    ``pyzstd.compress(pickle.dumps(...))`` encode step
+    ``wire_dumps`` encode step
     against something matching the tiny subset of the FastAPI ``WebSocket``
     surface they actually call, without opening a socket per frame.
     """
@@ -288,7 +288,7 @@ async def replay_server(frames_by_path: dict[str, Any]):
     every frame in order (a single ``bytes`` is wrapped as a one-element
     list) and then idles until the server is torn down. This is what lets
     :func:`decode_via_wssubscriber` / :func:`decode_via_wssyncclient` drive
-    the *real* decode path (``pickle.loads(pyzstd.decompress(...))`` inside
+    the *real* decode path (``wire_loads`` inside
     ``WsSubscriber``/``WsSyncClient``) without copying that line.
 
     Args:
