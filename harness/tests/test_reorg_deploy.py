@@ -51,6 +51,18 @@ def _repo(tmp_path: Path) -> Path:
         "from helao.deploy.d.drivers import pump\n",
     )
     _w(r, "helao/other/__init__.py", "")
+    _w(r, "helao/deploy/d/common.py", "X = 1\n")
+    _w(
+        r,
+        "helao/deploy/d/rel_user.py",
+        "from .drivers.pump import enum\nfrom .drivers.pump.enum import SPEED\n",
+    )
+    _w(r, "helao/deploy/d/drivers/pump/sib.py", "from . import enum\n")
+    _w(
+        r,
+        "helao/deploy/d/drivers/pump/rel.py",
+        "from ... import common\nfrom ...common import X\n",
+    )
     subprocess.run(["git", "init", "-q", str(r)], check=True)
     subprocess.run(["git", "-C", str(r), "add", "-A"], check=True)
     subprocess.run(
@@ -156,3 +168,90 @@ def test_nested_git_repo_is_not_scanned(tmp_path):
     rd.apply(r / "map.json", r, dry_run=False)
     text = (r / "helao/deploy/nested/x.py").read_text(encoding="utf-8")
     assert "drivers.pump.enum" in text
+
+
+def _map(r: Path, moves) -> Path:
+    _w(r, "map2.json", json.dumps({"scan": ["helao"], "moves": moves}))
+    return r / "map2.json"
+
+
+def test_file_by_file_sibling_relative_import_kept(tmp_path):
+    r = _repo(tmp_path)
+    pump = "helao/deploy/d/drivers/pump/"
+    new = "helao/deploy/d/servers/pump/"
+    m = _map(
+        r, [[pump + "sib.py", new + "sib.py"], [pump + "enum.py", new + "enum.py"]]
+    )
+    report = rd.apply(m, r, dry_run=False)
+    assert (r / new / "sib.py").read_text(encoding="utf-8") == "from . import enum\n"
+    assert not any("sib.py" in line for line in report.leftovers)
+
+
+def test_relative_import_in_moved_package_to_unmoved_target(tmp_path):
+    r = _repo(tmp_path)
+    m = _map(
+        r,
+        [["helao/deploy/d/drivers/pump", "helao/deploy/d/servers/deep/pump"]],
+    )
+    rd.apply(m, r, dry_run=False)
+    text = (r / "helao/deploy/d/servers/deep/pump/rel.py").read_text(encoding="utf-8")
+    assert (
+        text
+        == "from helao.deploy.d import common\nfrom helao.deploy.d.common import X\n"
+    )
+
+
+def test_unmoved_file_relative_import_of_moved_module(tmp_path):
+    r = _repo(tmp_path)
+    rd.apply(r / "map.json", r, dry_run=False)
+    text = (r / "helao/deploy/d/rel_user.py").read_text(encoding="utf-8")
+    assert text == (
+        "from helao.deploy.d.servers.pump import enum\n"
+        "from helao.deploy.d.servers.pump.enum import SPEED\n"
+    )
+
+
+def _dup_dst_map(r: Path) -> Path:
+    return _map(
+        r,
+        [
+            ["helao/deploy/d/drivers/pump/enum.py", "helao/other/x.py"],
+            ["helao/deploy/d/drivers/pump/driver.py", "helao/other/x.py"],
+        ],
+    )
+
+
+def test_duplicate_destination_aborts_before_any_move(tmp_path):
+    import pytest
+
+    r = _repo(tmp_path)
+    with pytest.raises(ValueError, match="destination listed twice"):
+        rd.apply(_dup_dst_map(r), r, dry_run=False)
+    assert (r / "helao/deploy/d/drivers/pump/enum.py").exists()
+    assert not (r / "helao/other/x.py").exists()
+
+
+def test_dry_run_reports_preflight_error(tmp_path):
+    import pytest
+
+    r = _repo(tmp_path)
+    with pytest.raises(ValueError, match="destination listed twice"):
+        rd.apply(_dup_dst_map(r), r, dry_run=True)
+
+
+def test_existing_destination_and_untracked_source_rejected(tmp_path):
+    import pytest
+
+    r = _repo(tmp_path)
+    _w(r, "helao/other/new.py", "")  # untracked
+    m = _map(
+        r,
+        [
+            ["helao/other/new.py", "helao/other/z.py"],
+            ["helao/deploy/d/common.py", "helao/other/user.py"],
+        ],
+    )
+    with pytest.raises(ValueError) as e:
+        rd.apply(m, r, dry_run=False)
+    assert "source not tracked" in str(e.value) and "destination exists" in str(e.value)
+    assert (r / "helao/deploy/d/common.py").exists()

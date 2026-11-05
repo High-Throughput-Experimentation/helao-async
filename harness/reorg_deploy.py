@@ -43,19 +43,49 @@ def load_mapping(path: Path) -> tuple[list[str], list[tuple[Path, Path]]]:
     ]
 
 
-def expand(moves, repo_root: Path) -> dict[Path, Path]:
-    out: dict[Path, Path] = {}
+def _pairs(moves, repo_root: Path) -> list[tuple[Path, Path]]:
+    out: list[tuple[Path, Path]] = []
     for src, dst in moves:
         full = repo_root / src
         if full.is_dir():
             for f in sorted(full.rglob("*")):
                 if f.is_file() and not SKIP & set(f.relative_to(full).parts):
-                    out[src / f.relative_to(full)] = dst / f.relative_to(full)
+                    out.append((src / f.relative_to(full), dst / f.relative_to(full)))
         elif full.is_file():
-            out[src] = dst
+            out.append((src, dst))
         else:
             raise FileNotFoundError(f"mapping source missing: {src}")
     return out
+
+
+def expand(moves, repo_root: Path) -> dict[Path, Path]:
+    return dict(_pairs(moves, repo_root))
+
+
+def preflight(moves, repo_root: Path) -> None:
+    """Raise ValueError listing every problem; touches nothing."""
+    pairs = _pairs(moves, repo_root)
+    tracked = set(
+        subprocess.run(
+            ["git", "-C", str(repo_root), "ls-files", "-z"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.split("\0")
+    )
+    problems = []
+    for seen, label, idx in ((set(), "source", 0), (set(), "destination", 1)):
+        for pair in pairs:
+            if pair[idx] in seen:
+                problems.append(f"{label} listed twice: {pair[idx]}")
+            seen.add(pair[idx])
+    for src, dst in pairs:
+        if (repo_root / dst).exists():
+            problems.append(f"destination exists: {dst}")
+        if src.as_posix() not in tracked:
+            problems.append(f"source not tracked by git: {src}")
+    if problems:
+        raise ValueError("reorg preflight failed:\n" + "\n".join(problems))
 
 
 def module_name(path: Path) -> str:
@@ -114,13 +144,20 @@ def rewrite_source(
                 else node.module or ""
             )
             new_abs = _new(old_abs, modmap)
+            if node.level:
+                rel_new = _absolute(node.level, node.module, own_new, is_package)
+                if all(
+                    _new(f"{old_abs}.{a.name}", modmap) == f"{rel_new}.{a.name}"
+                    for a in node.names
+                ):
+                    continue  # every imported name still resolves from here
             if manual is not None and any(
                 _new(f"{old_abs}.{a.name}", modmap) != f"{new_abs}.{a.name}"
                 for a in node.names
             ):
                 manual.append(node.lineno)
             if node.level:
-                if new_abs == _absolute(node.level, node.module, own_new, is_package):
+                if new_abs == rel_new:
                     continue  # the relative import still resolves to the target
             elif new_abs == old_abs:
                 continue
@@ -184,6 +221,7 @@ def _is_empty_pkg(d: Path) -> bool:
 def apply(mapping_path: Path, repo_root: Path, dry_run: bool) -> Report:
     repo_root = Path(repo_root).resolve()
     roots, moves = load_mapping(mapping_path)
+    preflight(moves, repo_root)
     files = expand(moves, repo_root)
     modmap = _modmap(files)
     new_to_old = {d: s for s, d in files.items()}
@@ -236,7 +274,7 @@ def apply(mapping_path: Path, repo_root: Path, dry_run: bool) -> Report:
             continue
         for n in manual:
             report.leftovers.append(
-                f"MANUAL {rel}:{n}: {text.splitlines()[n - 1].strip()}"
+                f"MANUAL {rel}:{n}: {new.splitlines()[n - 1].strip()}"
             )
         if new != text:
             f.write_text(new, encoding="utf-8")
