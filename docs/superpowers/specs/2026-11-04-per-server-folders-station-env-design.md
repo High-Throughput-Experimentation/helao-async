@@ -126,7 +126,16 @@ update_env.sh eche10             -> python helao_env.py update eche10
    conda env var `HELAO_STATION_PREFIXES` (`os.pathsep`-separated) and take the
    union. With no arguments and no variable, install nothing beyond the base env and
    print a hint to pass config prefixes.
-2. **Folders.** For each prefix, `read_config`, then resolve every server's
+   **Duplicate prefixes.** A prefix is matched against
+   `helao/deploy/*/configs/<prefix>.*` in every nested deployment, private ones
+   included (`read_config`, `helpers/config_loader.py`). When 2+ deployments match,
+   `helao_env.py` lists the matches numbered by deployment and asks which one with
+   `input()`. Without a tty it exits with the list instead of guessing. A prefix may
+   also be given as `<deployment>/<prefix>` or as a full config path, which skips the
+   prompt. The resolved full config path, not the bare prefix, is what gets recorded
+   in step 5, so a no-argument `update` never prompts again. `launch.py` is
+   unchanged and still raises on a duplicate prefix.
+2. **Folders.** For each config, `read_config`, then resolve every server's
    `fast` / `bokeh` / `reflex` module with the launcher resolver (imported, not
    copied). Collect the containing server folders. An unresolvable module is a hard
    error.
@@ -136,7 +145,7 @@ update_env.sh eche10             -> python helao_env.py update eche10
    the solve; report it and stop.
 4. **pip second.** `uv pip install -r <folder>/requirements.txt` per folder. uv skips
    requirements conda already satisfied.
-5. **Record.** For each config `root:`, merge the prefixes into
+5. **Record.** For each config `root:`, merge the resolved config paths into
    `<root>/STATES/setup_env_prefixes.json` (create `STATES` if missing). Set
    `HELAO_STATION_PREFIXES` to the list of those file paths with
    `conda env config vars set`. Explicit prefixes passed to `update` are appended
@@ -183,7 +192,9 @@ the pre-P2 tree; sweep parity; sim launches.
 **P3. `helao_env.py` and the four wrappers.**
 Gates: fresh Linux env from prefixes, second run is a no-op; Windows dry-run solve of
 the merged yml; no-argument `update` reproduces the same folder set from
-`HELAO_STATION_PREFIXES`; a bad prefix or unresolvable module is a hard error. All
+`HELAO_STATION_PREFIXES`; a bad prefix or unresolvable module is a hard error; a
+duplicate prefix prompts on a tty, exits without one, and `<deployment>/<prefix>`
+skips the prompt. All
 runs use a root under the job temp dir; nothing touches station roots or network
 mounts.
 
