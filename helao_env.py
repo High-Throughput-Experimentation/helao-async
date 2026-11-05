@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -114,22 +115,34 @@ def _yaml():
     return YAML(typ="safe")
 
 
+def platform_tag() -> str:
+    """Conda subdir of the running interpreter (the per-platform file suffix)."""
+    machine = platform.machine().lower()
+    if sys.platform == "win32":
+        return "win-64"
+    if sys.platform == "darwin":
+        return "osx-arm64" if machine in ("arm64", "aarch64") else "osx-64"
+    return "linux-aarch64" if machine in ("aarch64", "arm64") else "linux-64"
+
+
 def merge_environment(folders) -> dict | None:
-    """One conda env spec from every folder's environment.yml (union, order kept)."""
+    """One conda env spec from every folder's environment.yml, then
+    environment_<platform>.yml (union, order kept)."""
     channels: list[str] = []
     deps: list[str] = []
     pip: list[str] = []
     for folder in sorted(folders):
-        f = Path(folder) / "environment.yml"
-        if not f.is_file():
-            continue
-        data = _yaml().load(f.read_text(encoding="utf-8")) or {}
-        channels += [c for c in data.get("channels", []) if c not in channels]
-        for d in data.get("dependencies", []):
-            if isinstance(d, dict):
-                pip += [p for p in d.get("pip", []) if p not in pip]
-            elif d not in deps:
-                deps.append(d)
+        for name in ("environment.yml", f"environment_{platform_tag()}.yml"):
+            f = Path(folder) / name
+            if not f.is_file():
+                continue
+            data = _yaml().load(f.read_text(encoding="utf-8")) or {}
+            channels += [c for c in data.get("channels", []) if c not in channels]
+            for d in data.get("dependencies", []):
+                if isinstance(d, dict):
+                    pip += [p for p in d.get("pip", []) if p not in pip]
+                elif d not in deps:
+                    deps.append(d)
     if not deps and not pip:
         return None
     return {
@@ -142,14 +155,60 @@ def _conda() -> str:
     return os.environ.get("CONDA_EXE", "conda")
 
 
-def _run(cmd: list[str]) -> None:
+def _run(cmd: list[str], env: dict | None = None) -> None:
     print("+ " + " ".join(cmd), flush=True)
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True, env=env)
+
+
+def pip_env_overrides(folder) -> dict[str, str]:
+    """VAR: value templates from <folder>/pip_env_<platform>.yml (unexpanded).
+
+    Empty if the file is absent, or has no requirements.txt beside it (warned).
+    """
+    f = Path(folder) / f"pip_env_{platform_tag()}.yml"
+    if not f.is_file():
+        return {}
+    if not (Path(folder) / "requirements.txt").is_file():
+        _warn(f"{f} has no requirements.txt beside it; ignored")
+        return {}
+    data = _yaml().load(f.read_text(encoding="utf-8"))
+    if data is None:
+        return {}
+    if not isinstance(data, dict) or any(
+        isinstance(v, (dict, list)) for v in data.values()
+    ):
+        raise EnvSetupError(f"{f}: expected a flat VAR: value mapping")
+    win = platform_tag().startswith("win")
+    return {
+        (str(k).upper() if win else str(k)): "" if v is None else str(v)
+        for k, v in data.items()
+    }
+
+
+def _child_env(over: dict[str, str]) -> dict[str, str] | None:
+    """os.environ plus expanded overrides; an empty value unsets the variable."""
+    if not over:
+        return None
+    subs = {"{prefix}": sys.prefix, "{PATH}": os.environ.get("PATH", "")}
+    env = dict(os.environ)
+    for k, v in over.items():
+        for a, b in subs.items():
+            v = v.replace(a, b)
+        env[k] = v
+    for k, v in over.items():
+        if v == "":
+            env.pop(k, None)
+    return env
 
 
 def install(folders, runner=_run, dry_run: bool = False) -> list[list[str]]:
-    """Conda first (one merged update), then uv per folder requirements.txt."""
+    """Conda first (one merged update), then uv per folder requirements.txt.
+
+    A folder's pip_env_<platform>.yml overrides reach only that folder's uv
+    command; the runner is called ``runner(cmd, env)`` (env None = inherit).
+    """
     cmds: list[list[str]] = []
+    overs: list[dict] = []
     env = merge_environment(folders)
     tmpdir = Path(tempfile.mkdtemp())
     try:
@@ -169,17 +228,23 @@ def install(folders, runner=_run, dry_run: bool = False) -> list[list[str]]:
                     str(tmp),
                 ]
             )
+            overs.append({})
         for folder in sorted(folders):
             req = Path(folder) / "requirements.txt"
+            over = pip_env_overrides(folder)  # also warns on a stray pip_env file
             if req.is_file():
                 cmds.append(
                     ["uv", "pip", "install", "--python", sys.executable, "-r", str(req)]
                 )
-        for cmd in cmds:
+                overs.append(over)
+        for cmd, over in zip(cmds, overs):
             if dry_run:
-                print("+ " + " ".join(cmd), flush=True)
+                note = "".join(f"  [env {k}={v}]" for k, v in over.items())
+                print("+ " + " ".join(cmd) + note, flush=True)
+                if cmd is cmds[0] and env is not None:
+                    print(f"  conda dependencies: {env['dependencies']}", flush=True)
             else:
-                runner(cmd)
+                runner(cmd, _child_env(over))
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
     return cmds

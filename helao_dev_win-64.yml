@@ -20,7 +20,6 @@ dependencies:
   - filelock
   - fsspec
   - git
-  - gpytorch
   - h5py
   - httpx
   - ipykernel
@@ -59,7 +58,6 @@ dependencies:
   - pytest-xdist
   - python-dotenv
   - python=3.14
-  - pytorch-cpu
   - pyusb
   - pyvisa
   - pyvisa-py

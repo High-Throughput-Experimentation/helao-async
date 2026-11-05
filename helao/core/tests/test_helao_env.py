@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -121,7 +122,7 @@ def test_install_runs_conda_once_then_uv_per_folder(tmp_path):
     b.mkdir()
     (b / "requirements.txt").write_text("nidaqmx\n", encoding="utf-8")
     cmds = []
-    he.install({a, b}, runner=cmds.append)
+    he.install({a, b}, runner=lambda c, e=None: cmds.append(c))
     assert [c[1:3] for c in cmds] == [["env", "update"], ["pip", "install"]]
     assert cmds[1][-1] == str(b / "requirements.txt")
 
@@ -230,7 +231,7 @@ def test_install_removes_tmp_dir_and_dry_run_prints_plus_form(
     a = tmp_path / "a"
     _env(a, "dependencies: [pyserial]\n")
     seen = []
-    he.install({a}, runner=lambda cmd: seen.append(Path(cmd[-1]).parent))
+    he.install({a}, runner=lambda cmd, env=None: seen.append(Path(cmd[-1]).parent))
     assert not seen[0].exists()
     he.install({a}, dry_run=True)
     assert capsys.readouterr().out.startswith("+ ")
@@ -254,3 +255,96 @@ def test_yml_beats_py_within_one_deployment(tmp_path):
     _touch(tmp_path, "a/configs/both.yml")
     _touch(tmp_path, "a/configs/both.py")
     assert he.resolve_config("both", tmp_path).name == "both.yml"
+
+
+def test_platform_file_merged_only_for_matching_platform(tmp_path, monkeypatch):
+    a = tmp_path / "a"
+    _env(a, "dependencies: [base]\n")
+    (a / "environment_win-64.yml").write_text("dependencies: [winonly]\n", "utf-8")
+    (a / "environment_linux-64.yml").write_text("dependencies: [linonly]\n", "utf-8")
+    monkeypatch.setattr(he, "platform_tag", lambda: "win-64")
+    assert he.merge_environment({a})["dependencies"] == ["base", "winonly"]
+    monkeypatch.setattr(he, "platform_tag", lambda: "linux-64")
+    assert he.merge_environment({a})["dependencies"] == ["base", "linonly"]
+    monkeypatch.setattr(he, "platform_tag", lambda: "osx-64")
+    assert he.merge_environment({a})["dependencies"] == ["base"]
+
+
+def _pip_folder(root: Path, name: str, over: str | None) -> Path:
+    f = root / name
+    f.mkdir()
+    (f / "requirements.txt").write_text("x\n", encoding="utf-8")
+    if over is not None:
+        (f / "pip_env_linux-64.yml").write_text(over, encoding="utf-8")
+    return f
+
+
+def test_pip_env_reaches_only_its_folder_and_expands(tmp_path, monkeypatch):
+    monkeypatch.setattr(he, "platform_tag", lambda: "linux-64")
+    monkeypatch.setenv("PATH", "/orig")
+    monkeypatch.setenv("FC_LD", "keepme")
+    monkeypatch.delenv("CC", raising=False)
+    a = _pip_folder(tmp_path, "a", 'CC: gcc\nFC_LD: ""\nPATH: "{prefix}/bin;{PATH}"\n')
+    b = _pip_folder(tmp_path, "b", None)
+    _env(tmp_path / "c", "dependencies: [pyserial]\n")
+    calls = []
+    he.install({a, b, tmp_path / "c"}, runner=lambda c, e=None: calls.append((c, e)))
+    by_dir = {
+        Path(c[-1]).parent.name if c[1] == "pip" else "conda": e for c, e in calls
+    }
+    assert by_dir["conda"] is None and by_dir["b"] is None
+    env = by_dir["a"]
+    assert env["CC"] == "gcc"
+    assert "FC_LD" not in env  # empty string unsets, even if set in os.environ
+    assert env["PATH"] == f"{sys.prefix}/bin;/orig"
+    assert "CC" not in os.environ and os.environ["FC_LD"] == "keepme"
+    assert os.environ["PATH"] == "/orig"
+
+
+def test_pip_env_without_requirements_warns_and_is_ignored(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.setattr(he, "platform_tag", lambda: "linux-64")
+    (tmp_path / "pip_env_linux-64.yml").write_text("CC: gcc\n", encoding="utf-8")
+    (tmp_path / "environment.yml").write_text("dependencies: [x]\n", "utf-8")
+    he.install({tmp_path}, dry_run=True)
+    cap = capsys.readouterr()
+    assert "requirements.txt" in cap.err
+    assert "CC" not in cap.out.replace("conda dependencies", "")
+
+
+@pytest.mark.parametrize("body", ["- a\n- b\n", "CC: [gcc]\n", "CC: {a: b}\n"])
+def test_pip_env_not_flat_mapping_is_a_clean_error(tmp_path, monkeypatch, body, capsys):
+    monkeypatch.setattr(he, "platform_tag", lambda: "linux-64")
+    f = _pip_folder(tmp_path, "a", body)
+    with pytest.raises(he.EnvSetupError, match="flat VAR: value mapping"):
+        he.pip_env_overrides(f)
+    cfg = tmp_path / "c.yml"
+    cfg.write_text("servers: {}\n", encoding="utf-8")
+    monkeypatch.setattr(he, "server_folders", lambda c: {f})
+    assert he.main(["setup", str(cfg), "--dry-run"]) == 2
+    assert "flat VAR: value mapping" in capsys.readouterr().err
+
+
+def test_pip_env_keys_uppercased_on_windows(tmp_path, monkeypatch):
+    monkeypatch.setattr(he, "platform_tag", lambda: "win-64")
+    f = _pip_folder(tmp_path, "a", None)
+    (f / "pip_env_win-64.yml").write_text("Path: x\n", encoding="utf-8")
+    assert he.pip_env_overrides(f) == {"PATH": "x"}
+
+
+def test_dry_run_shows_templates_and_conda_deps(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(he, "platform_tag", lambda: "linux-64")
+    a = _pip_folder(tmp_path, "a", "CC: gcc\nPATH: '{prefix}\\Library;{PATH}'\n")
+    _env(a, "dependencies: [pyserial]\n")
+    he.install({a}, dry_run=True)
+    out = capsys.readouterr().out
+    assert "CC=gcc" in out and "PATH={prefix}\\Library;{PATH}" in out
+    assert "['pyserial']" in out
+
+
+def test_gpsim_folder_brings_pytorch_and_gpytorch():
+    cfg = he.resolve_config("test/demo1")
+    env = he.merge_environment(he.server_folders(cfg))
+    assert env is not None
+    assert {"pytorch-cpu", "gpytorch"} <= set(env["dependencies"])

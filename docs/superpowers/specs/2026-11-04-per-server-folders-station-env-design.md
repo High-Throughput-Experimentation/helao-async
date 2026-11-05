@@ -173,8 +173,16 @@ update_env.sh eche10             -> python helao_env.py update eche10
    dependencies) into one temporary file and run
    `conda env update -n helao --solver=rattler -f <tmp>` once. A conflicting pin fails
    the solve; report it and stop.
+   Each folder may also hold `environment_<platform>.yml` (conda subdir name such as
+   `win-64` or `linux-64`), merged after its `environment.yml` with the same rules, for
+   packages only one platform needs.
 4. **pip second.** `uv pip install -r <folder>/requirements.txt` per folder. uv skips
    requirements conda already satisfied.
+   A folder holding `pip_env_<platform>.yml` (flat `VAR: value` map) runs that folder's
+   install with those variables added to the environment: `{prefix}` expands to the env
+   prefix, `{PATH}` to the current PATH, an empty string unsets the variable. It
+   affects no other folder and not the conda step; without a `requirements.txt` beside
+   it, the file is ignored with a warning (for compiler/build variables of source builds).
 5. **Record.** For each config `root:`, merge the resolved config paths into
    `<root>/STATES/setup_env_prefixes.json` (create `STATES` if missing). Set
    `HELAO_STATION_PREFIXES` to the list of those file paths with
