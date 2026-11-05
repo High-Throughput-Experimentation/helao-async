@@ -7,10 +7,9 @@ for reading/setting digital and analog channels plus a `set_digital_cycle`
 routine that uploads a DMC toggling program. A paired `GalilPoller` publishes
 scaled analog-input readings to the action-server live buffer.
 
-Requires gclib (Windows). After installing the Galil toolkit, install the
-Python module from the helao environment:
-
-`python "c:\\Program Files (x86)\\Galil\\gclib\\source\\wrappers\\python\\setup.py" install`
+Requires the gclib C library and one of its Python wrappers (Windows or Linux);
+the server's `gclib_api` param ("1" default, or "2") must match the installed
+wrapper -- see this folder's README.md.
 """
 
 __all__ = [
@@ -28,6 +27,7 @@ import time
 import traceback
 from typing import Optional, Union
 
+from helao.deploy.hte.servers.galil_motion.galil_channels import make_channel
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -47,9 +47,6 @@ from helao.deploy.hte.servers.galil_io.enum import TriggerType
 
 driver_path = os.path.dirname(os.path.realpath(__file__))
 
-# install galil driver first
-# (helao) c:\Program Files (x86)\Galil\gclib\source\wrappers\python>python setup.py install
-
 # pathlib.Path(os.path.join(helao_repo_root, 'visualizer\styles.css')).read_text()
 
 
@@ -66,7 +63,7 @@ class Galil(HelaoDriver):
 
     Reads its `config` dict from the action server's ``params`` block:
     `galil_ip_str`, `dev_ai`/`dev_ao`/`dev_di`/`dev_do` port maps, and the
-    `monitor_ai` scaling dict. The `gclib.py()` connection is opened by
+    `monitor_ai` scaling dict. The controller connection is opened by
     :meth:`connect`, which the host calls at startup (``connect_on_startup``); always-on analog-input polling is
     handled by the paired :class:`GalilPoller`, wired in as the server's
     ``poller_class``. Public coroutines mirror digital and analog IO
@@ -78,6 +75,8 @@ class Galil(HelaoDriver):
             this).
         ``dev_ai``/``dev_ao``/``dev_di``/``dev_do``: port-name maps.
         ``monitor_ai``: dict of ``{ai_name: scaling}`` for the poller.
+        ``gclib_api``: ``"1"`` (default) or ``"2"``; must match the installed
+            gclib Python wrapper.
     """
 
     connect_on_startup = (
@@ -117,7 +116,7 @@ class Galil(HelaoDriver):
         self.digital_cycle_subthread = None
         self.digital_cycle_subthread2 = None
 
-        self.g = None
+        self._channel = make_channel(self.config_dict)
         self.galilcmd = None
         self.galilprgdownload = None
         self.galil_enabled = None
@@ -125,24 +124,20 @@ class Galil(HelaoDriver):
         self.cycle_lights = False
 
     def connect(self) -> DriverResponse:
-        """Open the `gclib.py()` handle and connect to the configured Galil IP.
+        """Open the controller channel at the configured Galil IP.
 
         Returns:
             ``DriverResponse`` reporting connection success or failure.
         """
-        import gclib
-
         try:
-            self.g = gclib.py()
-            LOGGER.info(f"gclib version: {self.g.GVersion()}")
-            # TODO: error checking here: Galil can crash and crash program
             galil_ip = self.config_dict.get("galil_ip_str", None)
             if galil_ip:
-                self.g.GOpen("%s --direct -s ALL" % (galil_ip))
-                LOGGER.info(self.g.GInfo())
-                self.galilcmd = self.g.GCommand  # alias the command callable
+                self._channel.open(f"{galil_ip} --direct -s ALL")
+                LOGGER.info(f"gclib version: {self._channel.version()}")
+                LOGGER.info(self._channel.info())
+                self.galilcmd = self._channel.command
                 # downloads a DMC program to galil
-                self.galilprgdownload = self.g.GProgramDownload
+                self.galilprgdownload = self._channel.download_program
                 self.galil_enabled = True
                 response = DriverResponse(
                     response=DriverResponseType.success, status=DriverStatus.ok
@@ -198,7 +193,7 @@ class Galil(HelaoDriver):
         LOGGER.info("shutting down galil io")
         self.galil_enabled = False
         try:
-            self.g.GClose()
+            self._channel.close()
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
