@@ -599,6 +599,22 @@ Shared by every action server (`ActionHost`):
 | `enable_aligner` / `bokeh_port` | — / `port + 1000` | Motion servers: host the Bokeh plate aligner on a second port; a null `bokeh_port` means the default. Preflight reserves it; `validateConfig` does not. |
 | `positions` | — | Sample-archive positions. At most one server per config may declare it (see [Validation rules](#validation-rules)). |
 
+Control-panel keys. A server that declares `control_vis` gets a motion or
+digital-output panel (Bokeh and Reflex) built from its own `params`; the shared
+readers are `helao/ui/shared/motion_control.py` and
+`helao/ui/shared/io_control.py`. A panel module picks the schema by its
+`AXIS_SOURCE` (`letter_scale`, `name_scale` or `inverse_scale`) and its
+`DO_GROUPS`; a server whose params do not match the panel's schema gets an
+empty panel, and an unknown `AXIS_SOURCE` is logged and yields no controls.
+
+| Param | Schema | Default | Effect |
+|---|---|---|---|
+| `axis_id` | `letter_scale`, `name_scale` | — | Mapping `axis name: letter`. Its keys are the panel's axes (`motion_control.py:236`); for `letter_scale` the value is the letter that indexes `count_to_mm` (`:293`). |
+| `count_to_mm` | `letter_scale` (keyed by letter), `name_scale` (keyed by axis name) | — | Millimetres per encoder count. A missing, non-numeric, non-finite or non-positive value gives no scale, so the panel shows no mm conversion for that axis (`:296`, `:298`). |
+| `axes` | `inverse_scale` | — | Mapping `axis name: {pos_scale, move_limit_mm, ...}`. Its keys are the panel's axes (`:238`). `pos_scale` is counts per mm; the panel uses `1 / pos_scale`, and a missing or zero value gives no scale (`:300`). `move_limit_mm` feeds the warn threshold below (`:357`). |
+| `warn_above_mm` | all | — | Mapping `axis name: mm`. A move longer than this asks for confirmation. Resolution order: this value, then `axes[axis].move_limit_mm`, then `10.0` (`DEFAULT_WARN_ABOVE_MM`, `:98`). A non-positive or non-finite value is skipped (`:358-364`). |
+| `dev_do` (and the other `dev_*` groups a panel lists in `DO_GROUPS`) | digital-out panels | — | Mapping `output name: line`. Each name becomes a toggle in group order, then config order. A name in two groups gets a control only in the first and an error is logged (`io_control.py:98`, `:103-110`). |
+
 Galil (`galil_io`, `galil_motion`):
 
 | Param | Default | Effect |
