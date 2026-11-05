@@ -77,8 +77,8 @@ MOTOR_HOST, MOTOR_PORT = "127.0.0.1", 8003
 
 SCENARIO = "GM-QPOS"
 
-# hte canary configs (P3a/P3e relocation) live alongside this module, in
-# its own configs/ sibling directory -- no longer under helao/deploy/hte/.
+# hte canary configs live alongside this module, in
+# its own configs/ sibling directory (helao/deploy/hte/tests/smoke/configs), not helao/deploy/*/configs/.
 CONFIG_DIR = Path(__file__).resolve().parent / "configs"
 
 # galil_motion.py's query_positions endpoint calls

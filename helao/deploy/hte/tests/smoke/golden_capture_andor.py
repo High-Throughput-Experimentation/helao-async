@@ -102,8 +102,8 @@ ANDOR_HOST, ANDOR_PORT = "127.0.0.1", 8011
 
 SCENARIO = "GM-ANDOR"
 
-# hte canary configs (P3a/P3e relocation) live alongside this module, in
-# its own configs/ sibling directory -- no longer under helao/deploy/hte/.
+# hte canary configs live alongside this module, in
+# its own configs/ sibling directory (helao/deploy/hte/tests/smoke/configs), not helao/deploy/*/configs/.
 CONFIG_DIR = Path(__file__).resolve().parent / "configs"
 
 # N_PIXELS: AndorDriver.setup_spectroscope reads the calibrated wavelength array

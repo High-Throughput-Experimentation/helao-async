@@ -200,7 +200,7 @@ def test_adjust_nd_is_still_frozen_and_calibrate_wl_is_listed():
     import json
 
     frozen = json.loads(
-        Path("helao/hexagon/tests/checklists/hte/andor_server.json").read_text(
+        Path("helao/deploy/hte/tests/checklists/andor_server.json").read_text(
             encoding="utf-8"
         )
     )
@@ -209,7 +209,7 @@ def test_adjust_nd_is_still_frozen_and_calibrate_wl_is_listed():
     assert "/ANDOR/calibrate_wl" not in paths, "additions go in _additions.json"
 
     additions = json.loads(
-        Path("helao/hexagon/tests/checklists/hte/_additions.json").read_text(
+        Path("helao/deploy/hte/tests/checklists/_additions.json").read_text(
             encoding="utf-8"
         )
     )

@@ -182,7 +182,7 @@ def test_run_protocol_is_recorded_in_the_additions_allowlist():
     from pathlib import Path
 
     additions = json.loads(
-        Path("helao/hexagon/tests/checklists/hte/_additions.json").read_text(
+        Path("helao/deploy/hte/tests/checklists/_additions.json").read_text(
             encoding="utf-8"
         )
     )

@@ -1,6 +1,6 @@
 """Every hte action module still declares its frozen route set (B5).
 
-``helao/hexagon/tests/checklists/hte/*.json`` is a verbatim AST extraction of
+``helao/deploy/hte/tests/checklists/*.json`` is a verbatim AST extraction of
 the PRE-migration legacy source: 175 action routes and 81 private routes,
 each with every parameter's name, annotation and default. B5 rewrites the
 decorator form of all 175 action routes, so this is the gate that says the
@@ -11,7 +11,7 @@ Windows-only is checked here exactly like any other -- and so are routes
 registered inside ``dyn_endpoints``, which are decorated in source but do not
 exist on the app until startup.
 
-**Never regenerate the checklists.** ``harness/hte_freeze.py`` writes that
+**Never regenerate the checklists.** ``python -m harness.freeze`` writes that
 directory from whatever the source currently says; running it after a port
 replaces the record with the port's own output, and this test then passes by
 construction, proving nothing. The frozen files are the pre-port record and
@@ -44,7 +44,24 @@ from harness.endpoints import (
     filter_allowed_additions,
     filter_allowed_param_additions,
 )
-from harness.hte_freeze import OUT, SERVERS, hte_module
+from harness.freeze import load_manifest
+from helao.helpers.server_modules import module_file
+
+OUT = Path(__file__).resolve().parent / "checklists"
+
+#: (module filename, representative server_key), read from the frozen manifest.
+SERVERS: list[tuple[str, Optional[str]]] = [
+    (e["module"], e["representative_key"]) for e in load_manifest(OUT)
+]
+
+
+def hte_module(filename: str) -> Path:
+    """The hte action module file for ``filename`` (``andor_server.py``)."""
+    path = module_file("hte", Path(filename).stem, "app")
+    if path is None:
+        raise FileNotFoundError(f"hte has no action module {filename!r}")
+    return path
+
 
 ADDITIONS_PATH = OUT / "_additions.json"
 #: Optional parameters deliberately added to frozen routes; see

@@ -105,8 +105,8 @@ MFC_HOST, MFC_PORT = "127.0.0.1", 8009
 
 SCENARIO = "GM-MFCFLOW"
 
-# hte canary configs (P3a/P3e relocation) live alongside this module, in
-# its own configs/ sibling directory -- no longer under helao/deploy/hte/.
+# hte canary configs live alongside this module, in
+# its own configs/ sibling directory (helao/deploy/hte/tests/smoke/configs), not helao/deploy/*/configs/.
 CONFIG_DIR = Path(__file__).resolve().parent / "configs"
 
 # The single MFC device declared in the mfc*.yml MFC block (ccsi1.yml verbatim:

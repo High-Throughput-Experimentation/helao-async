@@ -1,5 +1,5 @@
 {
-  "_description": "Manifest of the 23 hte action-server modules (helao/deploy/hte/servers/action/*.py) to their tracked server_key(s), per spec P3 decomposition doc §1 (source: .omc/research/framework-rewrite/deploy-hte-servers.md). Multi-key servers list all keys; representative_key (first listed) is the key substituted for {server_key} when freezing the endpoint checklist in harness/hte_freeze.py.",
+  "_description": "Manifest of the 23 hte action-server modules (helao/deploy/hte/servers/action/*.py) to their tracked server_key(s), per spec P3 decomposition doc §1 (source: .omc/research/framework-rewrite/deploy-hte-servers.md). Multi-key servers list all keys; representative_key (first listed) is the key substituted for {server_key} when freezing the endpoint checklist in harness/freeze.py.",
   "servers": [
     {
       "module": "HTEdata_server.py",

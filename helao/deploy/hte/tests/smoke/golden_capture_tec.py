@@ -72,8 +72,8 @@ TEC_HOST, TEC_PORT = "127.0.0.1", 8008
 
 SCENARIO = "GM-TEC"
 
-# hte canary configs (P3a/P3e relocation) live alongside this module, in
-# its own configs/ sibling directory -- no longer under helao/deploy/hte/.
+# hte canary configs live alongside this module, in
+# its own configs/ sibling directory (helao/deploy/hte/tests/smoke/configs), not helao/deploy/*/configs/.
 CONFIG_DIR = Path(__file__).resolve().parent / "configs"
 
 # TECMonExec._poll (mecom_driver.py) reads the poller's live buffer

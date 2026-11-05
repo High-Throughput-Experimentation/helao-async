@@ -312,7 +312,7 @@ def test_the_sweep_is_armed_from_a_startup_handler_registered_after_baseapis(
 
 
 def test_no_route_is_added_by_the_recovery_wiring(installed_config):
-    """The frozen checklist (``checklists/hte/sync_server.json``) pins this
+    """The frozen checklist (``checklists/sync_server.json``) pins this
     module's route set, so a new route would break that gate. The sweep is
     therefore observable through the existing ``/tasks`` body instead."""
     app = _make_app(installed_config)

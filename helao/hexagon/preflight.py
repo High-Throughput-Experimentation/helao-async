@@ -80,13 +80,10 @@ def _server_module(server: dict) -> Optional[str]:
 def _checklist_dir(deployment: Optional[str]) -> Optional[Path]:
     """Where a deployment's frozen endpoint checklists live.
 
-    A PRIVATE nested deployment keeps its checklists INSIDE its own repo
-    (helao/deploy/<dep>/tests/checklists/) — the public parent cannot host a
-    directory named after a private deployment. The public deployments (hte,
-    test) keep theirs centrally under helao/hexagon/tests/checklists/<dep>/.
-    Prefer the in-repo location when it exists, else the central one; the path
-    is BUILT from the resolved deployment at runtime, so this parent source
-    names nothing private.
+    Every deployment keeps its checklists INSIDE its own tree
+    (helao/deploy/<dep>/tests/checklists/); the path is BUILT from the resolved
+    deployment at runtime, so this source names no deployment. The central
+    CHECKLIST_ROOT/<dep> is only a fallback for a deployment without one.
     """
     if not deployment:
         return None

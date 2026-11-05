@@ -352,12 +352,11 @@ def _a_nested_deployment_with_checklists() -> str | None:
 
 
 def test_checklist_dir_prefers_private_in_repo_then_central():
-    """A nested deployment's checklists live in its own repo
-    (helao/deploy/<dep>/tests/checklists); hte/test use the central
-    helao/hexagon/tests/checklists/<dep>. Unknown/None -> None."""
+    """A deployment's checklists live in its own tree
+    (helao/deploy/<dep>/tests/checklists). Unknown/None -> None."""
     hte = preflight._checklist_dir("hte")
-    assert hte is not None and hte.parts[-3:] == ("tests", "checklists", "hte")
-    assert "hexagon" in hte.parts  # central location
+    assert hte is not None and hte.parts[-3:] == ("hte", "tests", "checklists")
+    assert "deploy" in hte.parts and "hexagon" not in hte.parts
 
     nested = _a_nested_deployment_with_checklists()
     if nested is not None:  # only when such a nested repo is checked out
@@ -391,8 +390,8 @@ def test_a_scratch_copy_of_a_config_still_exercises_the_checklist_gate(
     assert preflight.preflight_config(str(scratch)) == []
 
     empty = tmp_path / "checklists"
-    (empty / "hte").mkdir(parents=True)
-    monkeypatch.setattr(preflight, "CHECKLIST_ROOT", empty)
+    empty.mkdir()
+    monkeypatch.setattr(preflight, "_checklist_dir", lambda deployment: empty)
     for config in (src, scratch):
         found = preflight.preflight_config(str(config))
         assert len(found) == 1 and "frozen endpoint checklist" in found[0], found

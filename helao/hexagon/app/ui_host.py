@@ -2,7 +2,7 @@
 ``helao/hexagon`` that constructs ``bokeh.server.server.Server`` (enforced
 by test_boundaries.py's bokeh.server-outside-app/ rule). Every adapter that
 needs to host a Bokeh document -- today the Galil plate-aligner
-(``adapters/vis/galil_aligner_host.py``) -- receives an instance of this
+(in the deployment's galil_motion server folder) -- receives an instance of this
 behind ``ports.ui_host.UiHostPort`` instead of importing ``bokeh.server``
 itself.
 

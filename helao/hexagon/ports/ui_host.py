@@ -1,7 +1,7 @@
 """UI-host port (spec §4.5; Amendment §6, D6 generalized): nothing outside
 the app layer may construct a UI-hosting server. ``start_document_host``/``stop``
 are a Bokeh-shaped document-server host (today's only consumer: the Galil
-plate-aligner, ``adapters/vis/galil_aligner_host.py``, folding in the standing
+plate-aligner, in the deployment's galil_motion server folder, folding in the standing
 D6 exception noted in master spec §4.4).
 
 Ports may import only ``helao.hexagon.domain.*``/``helao.hexagon.ports.*``/

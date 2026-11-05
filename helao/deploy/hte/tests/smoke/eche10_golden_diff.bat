@@ -116,8 +116,8 @@ if not exist "%GOLDENS%\post\provenance.yml" (
   exit /b 2
 )
 
-REM repo root = four levels up from this script (helao\hexagon\tests\smoke\)
-pushd "%~dp0..\..\..\.." || exit /b 2
+REM repo root = five levels up from this script (helao\deploy\hte\tests\smoke\)
+pushd "%~dp0..\..\..\..\.." || exit /b 2
 
 set "HELPLOG=%GOLDENS%\parity_help.txt"
 call conda run -n helao python -m harness.parity --help > "%HELPLOG%" 2>&1

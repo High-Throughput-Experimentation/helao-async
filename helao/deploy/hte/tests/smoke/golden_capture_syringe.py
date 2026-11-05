@@ -94,8 +94,8 @@ SYRINGE_HOST, SYRINGE_PORT = "127.0.0.1", 8013
 
 SCENARIO = "GM-SYRVOL"
 
-# hte canary configs (P3a/P3e relocation) live alongside this module, in
-# its own configs/ sibling directory -- no longer under helao/deploy/hte/.
+# hte canary configs live alongside this module, in
+# its own configs/ sibling directory (helao/deploy/hte/tests/smoke/configs), not helao/deploy/*/configs/.
 CONFIG_DIR = Path(__file__).resolve().parent / "configs"
 
 # MASKING = NONE (deliberate -- see module docstring). get_present_volume
