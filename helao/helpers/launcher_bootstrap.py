@@ -14,12 +14,13 @@ __all__ = [
 
 import os
 import sys
-from glob import glob
+from pathlib import Path
 
 import colorama
 
 from helao.helpers import config_loader
 from helao.helpers import helao_logging as logging
+from helao.helpers import server_modules
 from helao.helpers.yml_tools import yml_load
 
 
@@ -63,61 +64,37 @@ def launcher_bootstrap(conf_arg: str, server_key: str):
 
 
 def resolve_app_deployment(server_config, module, config_path, logger) -> str:
-    """Deployment holding ``servers/<group>/<module>.py`` for this server.
+    """Deployment holding the ``fast:``/``bokeh:`` module for this server.
 
-    An explicit ``deployment:`` key wins; otherwise glob the deployments, prefer
-    the one matching the config's own path, and fall back (with a warning) to
-    the first match.
+    An explicit ``deployment:`` key wins unchecked. Otherwise the search root is
+    the config's great-grandparent (``helao/deploy`` for an in-tree config) and
+    the config's own deployment is preferred; a module in several other
+    deployments warns and takes the first in sorted order. Unchanged semantics
+    from the ``servers/<group>/`` glob, now over every ``servers/*`` folder.
     """
-    detected_deployment = os.path.basename(
-        os.path.dirname(os.path.dirname(config_path))
-    )
-    deployment = server_config.get("deployment", detected_deployment)
-    if "deployment" not in server_config:
-        possible_deployments = sorted(
-            glob(
-                os.path.join(
-                    os.path.dirname(os.path.dirname(os.path.dirname(config_path))),
-                    "*",
-                    "servers",
-                    server_config["group"],
-                    f"{module}.py",
-                )
-            )
-        )
-        if len(possible_deployments) == 1:
-            deployment = os.path.basename(
-                os.path.dirname(
-                    os.path.dirname(os.path.dirname(possible_deployments[0]))
-                )
-            )
+    if "deployment" in server_config:
+        return server_config["deployment"]
+    cfg = Path(config_path).resolve()
+    own, root = cfg.parents[1].name, cfg.parents[2]
+    deployment, found = server_modules.locate(module, "app", own=own, deploy_root=root)
+    if deployment is not None:
+        if deployment != own:
             logger.info(f"Auto-detected deployment: {deployment}")
-        elif len(possible_deployments) > 1:
-            # Prefer the deployment matching the config's own path. If none
-            # match (e.g. a derived/private config that reuses another
-            # deployment's generic app), fall back to the first match and warn
-            # rather than crashing on an empty filter.
-            config_dep_dir = os.path.dirname(os.path.dirname(config_path))
-            filter_possible = [
-                x for x in possible_deployments if x.startswith(config_dep_dir)
-            ]
-            chosen = filter_possible[0] if filter_possible else possible_deployments[0]
-            deployment = os.path.basename(
-                os.path.dirname(os.path.dirname(os.path.dirname(chosen)))
-            )
-            if filter_possible:
-                logger.info(
-                    f"Auto-detected deployment from multiple options: {deployment}"
-                )
-            else:
-                logger.warning(
-                    f"No deployment under the config path matched "
-                    f"{module} in {server_config['group']}; "
-                    f"falling back to '{deployment}'. Set an explicit "
-                    f"'deployment:' key on this server to disambiguate."
-                )
-        else:
-            raise FileNotFoundError(
-                f"Could not find deployment for {module} in {server_config['group']}"
-            )
-    return deployment
+        return deployment
+    if not found:
+        raise FileNotFoundError(f"Could not find deployment for {module}")
+    logger.warning(
+        f"{module} exists in {found}, none of them this config's own; falling "
+        f"back to '{found[0]}'. Set an explicit 'deployment:' key on the server."
+    )
+    return found[0]
+
+
+def app_module_path(deployment: str, module: str) -> str:
+    """Dotted import path of ``module`` (app stack) inside ``deployment``."""
+    path = server_modules.module_file(deployment, module, "app")
+    if path is None:
+        raise FileNotFoundError(
+            f"deployment {deployment!r} has no module {module!r} under servers/"
+        )
+    return server_modules.import_path(path)

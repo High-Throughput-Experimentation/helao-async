@@ -57,6 +57,7 @@ if __name__ == "__main__" and len(sys.argv) > 2:
 
 from helao.core.version import get_hlo_version, hlo_version
 from helao.helpers.launcher_bootstrap import (
+    app_module_path,
     init_colorama,
     launcher_bootstrap,
     resolve_app_deployment,
@@ -100,9 +101,7 @@ if __name__ == "__main__":
         server_config["restore_queues_on_startup"] = True
         LOGGER.info("--restore flag set; orchestrator will import saved queues.")
 
-    makeApp = import_module(
-        f"helao.deploy.{deployment}.servers.{server_config['group']}.{server_config['fast']}"
-    ).makeApp
+    makeApp = import_module(app_module_path(deployment, server_config["fast"])).makeApp
     app = makeApp(server_key)
     root = CONFIG.get("root", None)
     if root is not None:

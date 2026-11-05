@@ -33,13 +33,12 @@ with "PREFLIGHT OK" or 1 listing the issues.
 from __future__ import annotations
 
 import ast
-import os
 import sys
 from collections import defaultdict
-from glob import glob
 from pathlib import Path
 from typing import Optional
 
+from helao.helpers import server_modules
 from helao.helpers.config_loader import read_config
 
 #: The launcher's server code keys, pinned to ``launch.py``'s ``codeKeys``. A
@@ -250,25 +249,16 @@ CHECKLISTS_AT_B7C: dict[str, frozenset[str]] = {
 
 
 def _launcher_deployment(config_path: str, group: str, module: str):
-    """fast_launcher.py:102-152's auto-detection, with its own string operations.
+    """The launcher's auto-detection (``resolve_app_deployment``), shared code.
 
-    Returns ``(deployment or None, candidate deployments)``. ``None`` with candidates
-    means ambiguous: more than one deployment has the module, none is the config's own,
-    and the launcher would take the first in sorted order (and only warn).
-    The glob root is the config's great-grandparent, as in the launcher: for a smoke
-    config that root holds no deployments, so every smoke entry needs deployment:.
+    Returns ``(deployment or None, candidate deployments)``. ``None`` with
+    candidates means ambiguous. The search root is the config's great-grandparent,
+    as in the launcher, so a smoke config outside helao/deploy needs deployment:.
     """
-    search = os.path.dirname(os.path.dirname(os.path.dirname(config_path)))
-    found = sorted(glob(os.path.join(search, "*", "servers", group, f"{module}.py")))
-    deps = [
-        os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(p))))
-        for p in found
-    ]
-    if len(found) == 1:
-        return deps[0], deps
-    own_dir = os.path.dirname(os.path.dirname(config_path))
-    own = [d for p, d in zip(found, deps) if p.startswith(own_dir)]
-    return (own[0] if own else None), deps
+    cfg = Path(config_path).resolve()
+    return server_modules.locate(
+        module, "app", own=cfg.parents[1].name, deploy_root=cfg.parents[2]
+    )
 
 
 def _module_resolution(cfg: dict, deploy_root: Path = DEPLOY_ROOT):
@@ -308,11 +298,11 @@ def _module_resolution(cfg: dict, deploy_root: Path = DEPLOY_ROOT):
                     f"and would import a deployment named {explicit!r}"
                 )
                 continue
-            if (deploy_root / explicit / "servers" / group / f"{module}.py").is_file():
+            if server_modules.module_file(explicit, module, "app", deploy_root):
                 resolved[key] = explicit
             else:
                 issues.append(
-                    f"{key}: deployment: {explicit} has no servers/{group}/{module}.py"
+                    f"{key}: deployment: {explicit} has no {module}.py under servers/"
                 )
             continue
         dep, found = _launcher_deployment(config_path, group, module)
@@ -320,11 +310,11 @@ def _module_resolution(cfg: dict, deploy_root: Path = DEPLOY_ROOT):
             resolved[key] = dep
         elif not found:
             issues.append(
-                f"{key}: {group}/{module}.py exists in no deployment the launcher searches"
+                f"{key}: {module}.py exists in no deployment the launcher searches"
             )
         else:
             issues.append(
-                f"{key}: {group}/{module}.py exists in {found}, none of them this config's "
+                f"{key}: {module}.py exists in {found}, none of them this config's "
                 f"own, so the launcher would pick '{found[0]}' by sorted order; add "
                 f"deployment: <owner>"
             )

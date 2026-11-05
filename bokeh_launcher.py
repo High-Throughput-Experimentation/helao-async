@@ -66,6 +66,7 @@ if __name__ == "__main__" and len(sys.argv) > 2:
 
 from helao.core.version import get_hlo_version, hlo_version
 from helao.helpers.launcher_bootstrap import (
+    app_module_path,
     init_colorama,
     launcher_bootstrap,
     resolve_app_deployment,
@@ -112,7 +113,7 @@ if __name__ == "__main__":
         CONFIG["deployment_version"] = hlo_version
 
     makeApp = import_module(
-        f"helao.deploy.{app_deployment}.servers.{server_config['group']}.{server_config['bokeh']}"
+        app_module_path(app_deployment, server_config["bokeh"])
     ).makeBokehApp
     root = CONFIG.get("root", None)
     if root is not None:
