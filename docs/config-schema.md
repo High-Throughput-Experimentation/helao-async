@@ -250,8 +250,8 @@ two is a launch-time error.
 
 | Code key | Launcher | What the value names |
 |---|---|---|
-| `fast` | `fast_launcher.py` (uvicorn) | a module under `servers/<group>/` exposing `makeApp(server_key) -> HelaoFastAPI` |
-| `bokeh` | `bokeh_launcher.py` (Bokeh `Server`) | a module under `servers/<group>/` exposing `makeBokehApp(doc, confPrefix, server_key, helao_repo_root)`, served at `/<module>` |
+| `fast` | `fast_launcher.py` (uvicorn) | a module at `servers/*/<module>.py` exposing `makeApp(server_key) -> HelaoFastAPI` |
+| `bokeh` | `bokeh_launcher.py` (Bokeh `Server`) | a module at `servers/*/<module>.py` (same lookup as `fast`) exposing `makeBokehApp(doc, confPrefix, server_key, helao_repo_root)`, served at `/<module>` |
 | `reflex` | `reflex_launcher.py` | the app bundle (`helao_ui`); only its presence matters, and the app imported is always `helao.ui.reflex.app` |
 
 **Omitting the code key is legal for `launch.py`**: the server appears in the
@@ -286,13 +286,13 @@ a config with an externally managed server cannot pass preflight.
 ### Deployment resolution
 
 Without a `deployment:` key, the launcher globs every deployment for
-`servers/<group>/<module>.py`, and:
+`servers/*/<module>.py` (`servers/reflex/` excluded), and:
 
 - one match — uses it, logging `Auto-detected deployment`;
-- several matches — prefers the one under the config's own path, else takes
-  the first and warns that an explicit `deployment:` key would disambiguate;
+- several matches — prefers the config's own deployment, else takes the
+  first in sorted order and logs a WARNING that an explicit `deployment:` key would disambiguate;
 - no match — fails with `FileNotFoundError: Could not find deployment for
-  <module> in <group>`.
+  <module>`.
 
 Set `deployment:` on the server to pin it. For a config inside
 `helao/deploy/*/configs/`, it is needed only when the module exists in two or
@@ -323,7 +323,7 @@ An action server declares which visualizer renders it:
 The value is a bare module name, or a list of names, resolved across
 deployments: the configured deployment first, then the one other deployment
 that holds the module; if several others do, resolution is ambiguous and
-errors (or warns). The same name serves both UI stacks:
+errors (`ModuleNotFoundError` naming them). The same name serves both UI stacks:
 `servers/visualizer/<name>.py` or `servers/*/bokeh/<name>.py` for Bokeh,
 `servers/reflex/<name>.py` or `servers/*/reflex/<name>.py` for Reflex. A station therefore gains Reflex panels
 by adding a `reflex:` server and changing nothing else, provided a Reflex
