@@ -57,7 +57,8 @@ def test_duplicate_reprompts_on_bad_answer(root):
 
 def test_duplicate_without_tty_exits_with_list(root):
     with pytest.raises(
-        he.EnvSetupError, match=r"a/configs/dup\.yml[\s\S]*b/configs/dup\.yml"
+        he.EnvSetupError,
+        match=r"a[/\\]configs[/\\]dup\.yml[\s\S]*b[/\\]configs[/\\]dup\.yml",
     ):
         he.resolve_config("dup", root, interactive=False)
 
@@ -131,14 +132,19 @@ def test_record_creates_states_and_merges(tmp_path, monkeypatch):
     cfg1.write_text(f"root: {root}\nservers: {{}}\n", encoding="utf-8")
     cfg2 = tmp_path / "c2.yml"
     cfg2.write_text(f"root: {root}\nservers: {{}}\n", encoding="utf-8")
-    monkeypatch.delenv(he.ENV_VAR, raising=False)
+    other = tmp_path / "other_states.json"
+    other.write_text("[]", encoding="utf-8")
+    monkeypatch.setenv(he.ENV_VAR, str(other))
     calls = []
     he.record([cfg1], runner=calls.append)
     files = he.record([cfg2], runner=calls.append)
     data = json.loads((root / "STATES" / he.STATES_FILE).read_text(encoding="utf-8"))
     assert data == sorted([str(cfg1.resolve()), str(cfg2.resolve())])
     assert files == [root / "STATES" / he.STATES_FILE]
-    assert calls[-1][-1].startswith(f"{he.ENV_VAR}=")
+    mine = root / "STATES" / he.STATES_FILE
+    assert calls[-1][-1] == f"{he.ENV_VAR}=" + os.pathsep.join(
+        sorted([str(other), str(mine)])
+    )
 
 
 def test_relative_root_resolves_against_repo_root(tmp_path, monkeypatch):
@@ -171,3 +177,67 @@ def test_main_update_without_anything_is_a_hint(monkeypatch, capsys):
 
 def test_main_bad_prefix_exits_2(capsys):
     assert he.main(["setup", "definitely_not_a_config"]) == 2
+    assert "error:" in capsys.readouterr().err
+
+
+def test_backslash_qualified_prefix(root):
+    assert (
+        he.resolve_config("b\\dup", root, interactive=False)
+        == (root / "b/configs/dup.yml").resolve()
+    )
+
+
+def test_eof_at_duplicate_prompt_is_a_clean_error(root):
+    def eof(_):
+        raise EOFError
+
+    with pytest.raises(he.EnvSetupError, match="dup"):
+        he.resolve_config("dup", root, ask=eof, interactive=True)
+
+
+def test_malformed_states_json_names_the_file(tmp_path, monkeypatch, capsys):
+    states = tmp_path / "s.json"
+    states.write_text("[not json", encoding="utf-8")
+    monkeypatch.setenv(he.ENV_VAR, str(states))
+    assert he.main(["update"]) == 2
+    assert "s.json" in capsys.readouterr().err
+
+
+def test_record_malformed_states_json_raises_env_error(tmp_path, monkeypatch):
+    root = tmp_path / "r"
+    (root / "STATES").mkdir(parents=True)
+    (root / "STATES" / he.STATES_FILE).write_text("{oops", encoding="utf-8")
+    cfg = tmp_path / "c.yml"
+    cfg.write_text(f"root: {root}\nservers: {{}}\n", encoding="utf-8")
+    monkeypatch.delenv(he.ENV_VAR, raising=False)
+    with pytest.raises(he.EnvSetupError, match=he.STATES_FILE):
+        he.record([cfg], runner=lambda cmd: None)
+
+
+def test_main_missing_tool_exits_2(monkeypatch, capsys):
+    def boom(cmd):
+        raise FileNotFoundError("conda")
+
+    monkeypatch.setattr(he, "_run", boom)
+    monkeypatch.setattr(he, "install", lambda folders, **kw: boom(["x"]))
+    assert he.main(["setup", "hte/anec"]) == 2
+    assert "error:" in capsys.readouterr().err
+
+
+def test_install_removes_tmp_dir_and_dry_run_prints_plus_form(
+    tmp_path, monkeypatch, capsys
+):
+    a = tmp_path / "a"
+    _env(a, "dependencies: [pyserial]\n")
+    seen = []
+    he.install({a}, runner=lambda cmd: seen.append(Path(cmd[-1]).parent))
+    assert not seen[0].exists()
+    he.install({a}, dry_run=True)
+    assert capsys.readouterr().out.startswith("+ ")
+
+
+def test_main_malformed_yaml_config_exits_2(tmp_path, capsys):
+    cfg = tmp_path / "bad.yml"
+    cfg.write_text("servers: [unclosed\n  x: : :\n", encoding="utf-8")
+    assert he.main(["setup", str(cfg)]) == 2
+    assert "error:" in capsys.readouterr().err

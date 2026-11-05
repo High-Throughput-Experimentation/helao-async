@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -43,7 +44,7 @@ def resolve_config(
         if path.is_file():
             return path.resolve()
         raise EnvSetupError(f"config file not found: {arg}")
-    dep, _, prefix = arg.rpartition("/")
+    dep, _, prefix = arg.replace("\\", "/").rpartition("/")
     pattern = f"{dep or '*'}/configs/{prefix}"
     matches = sorted(deploy_root.glob(f"{pattern}.yml")) or sorted(
         deploy_root.glob(f"{pattern}.py")
@@ -63,7 +64,15 @@ def resolve_config(
             f"pass <deployment>/{prefix} or a full path"
         )
     while True:
-        answer = ask(f"{arg!r} exists in several deployments:\n{listing}\nwhich one? ")
+        try:
+            answer = ask(
+                f"{arg!r} exists in several deployments:\n{listing}\nwhich one? "
+            )
+        except EOFError:
+            raise EnvSetupError(
+                f"config prefix {arg!r} exists in several deployments and no "
+                "answer was given; pass <deployment>/<prefix>"
+            ) from None
         if answer.strip().isdigit() and 1 <= int(answer) <= len(matches):
             return matches[int(answer) - 1].resolve()
 
@@ -92,10 +101,7 @@ def server_folders(config_path: Path) -> set[Path]:
             raise EnvSetupError(
                 f"{config_path.name}: server {key}: deployment {dep!r} has no {module!r}"
             )
-        folder = path.parent
-        if folder.name in ("bokeh", "reflex"):
-            folder = folder.parent
-        folders.add(folder)
+        folders.add(path.parent)
     return folders
 
 
@@ -142,30 +148,37 @@ def install(folders, runner=_run, dry_run: bool = False) -> list[list[str]]:
     """Conda first (one merged update), then uv per folder requirements.txt."""
     cmds: list[list[str]] = []
     env = merge_environment(folders)
-    if env is not None:
-        tmp = Path(tempfile.mkdtemp()) / "station_env.yml"
-        with open(tmp, "w", encoding="utf-8") as fh:
-            _yaml().dump(env, fh)
-        cmds.append(
-            [
-                _conda(),
-                "env",
-                "update",
-                "--solver=rattler",
-                "--prefix",
-                sys.prefix,
-                "-f",
-                str(tmp),
-            ]
-        )
-    for folder in sorted(folders):
-        req = Path(folder) / "requirements.txt"
-        if req.is_file():
+    tmpdir = Path(tempfile.mkdtemp())
+    try:
+        if env is not None:
+            tmp = tmpdir / "station_env.yml"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                _yaml().dump(env, fh)
             cmds.append(
-                ["uv", "pip", "install", "--python", sys.executable, "-r", str(req)]
+                [
+                    _conda(),
+                    "env",
+                    "update",
+                    "--solver=rattler",
+                    "--prefix",
+                    sys.prefix,
+                    "-f",
+                    str(tmp),
+                ]
             )
-    for cmd in cmds:
-        (print if dry_run else runner)(cmd)
+        for folder in sorted(folders):
+            req = Path(folder) / "requirements.txt"
+            if req.is_file():
+                cmds.append(
+                    ["uv", "pip", "install", "--python", sys.executable, "-r", str(req)]
+                )
+        for cmd in cmds:
+            if dry_run:
+                print("+ " + " ".join(cmd), flush=True)
+            else:
+                runner(cmd)
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
     return cmds
 
 
@@ -177,6 +190,13 @@ def _states_files(env) -> list[Path]:
     return [Path(p) for p in env.get(ENV_VAR, "").split(os.pathsep) if p]
 
 
+def _load_states(states: Path) -> list[str]:
+    try:
+        return json.loads(states.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise EnvSetupError(f"{states} is not valid JSON: {exc}") from exc
+
+
 def stored_configs(env=os.environ) -> list[Path]:
     """Config paths recorded by earlier setup runs; missing ones are skipped."""
     out: list[Path] = []
@@ -184,7 +204,7 @@ def stored_configs(env=os.environ) -> list[Path]:
         if not states.is_file():
             _warn(f"{ENV_VAR} lists {states}, which does not exist; skipped")
             continue
-        for p in json.loads(states.read_text(encoding="utf-8")):
+        for p in _load_states(states):
             if Path(p).is_file():
                 out.append(Path(p))
             else:
@@ -205,11 +225,7 @@ def record(configs, runner=_run) -> list[Path]:
             continue
         states = (REPO_ROOT / root).resolve() / "STATES" / STATES_FILE
         states.parent.mkdir(parents=True, exist_ok=True)
-        known = (
-            set(json.loads(states.read_text(encoding="utf-8")))
-            if states.is_file()
-            else set()
-        )
+        known = set(_load_states(states)) if states.is_file() else set()
         known.add(str(Path(cfg).resolve()))
         states.write_text(json.dumps(sorted(known), indent=2), encoding="utf-8")
         files.add(states)
@@ -232,6 +248,8 @@ def record(configs, runner=_run) -> list[Path]:
 
 
 def main(argv=None) -> int:
+    from ruamel.yaml.error import YAMLError
+
     p = argparse.ArgumentParser(prog="helao_env.py")
     p.add_argument("mode", choices=["setup", "update"])
     p.add_argument("prefixes", nargs="*")
@@ -260,7 +278,13 @@ def main(argv=None) -> int:
             if (folder / "README.md").is_file():
                 print(f"vendor notes: {folder / 'README.md'}")
         return 0
-    except (EnvSetupError, subprocess.CalledProcessError) as exc:
+    except (
+        EnvSetupError,
+        subprocess.CalledProcessError,
+        OSError,
+        ValueError,
+        YAMLError,
+    ) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
