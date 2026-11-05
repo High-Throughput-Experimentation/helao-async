@@ -7,6 +7,9 @@ import pytest
 
 from helao.deploy.hte.servers.galil_io.enum import TriggerType
 from helao.deploy.hte.servers.galil_io.galil_io_driver import Galil
+from helao.deploy.hte.servers.galil_motion.galil_command_channel_port import (
+    GalilChannelError,
+)
 from helao.deploy.hte.servers.galil_motion.galil_motion_native import NativeGalilMotion
 from helao.deploy.hte.servers.galil_motion.tests.fake_gclib import Wire, install
 
@@ -26,6 +29,7 @@ MOTION_CFG = {
     "def_speed_count_sec": 10000,
     "max_speed_count_sec": 25000,
     "axis_zero": {"A": 5.0, "B": 3.0},
+    "timeout": 1,  # bounds settle loops so a fault fails fast instead of hanging
 }
 # stop code 1 so the settle-poll breaks at once; non-zero TP/PA for positions
 MOTION_REPLIES = {
@@ -113,6 +117,7 @@ async def _motion_session(monkeypatch, api):
     out.append(await drv.reset_controller())
     out.append(await drv.estop(True))
     out.append(await drv.motor_disconnect())
+    out.append(drv.reset().response)
     out.append(drv.disconnect().response)
     return wire, [_stable(o) for o in out]
 
@@ -126,3 +131,38 @@ async def test_motion_parity(monkeypatch):
     assert ("command", "BGA") in w2.calls and ("command", "HMA") in w2.calls
     assert w2.gcaps is False
     assert w1.raw_open == "10.0.0.7 --direct -s ALL"
+
+
+@pytest.mark.asyncio
+async def test_io_error_parity(monkeypatch):
+    runs = []
+    for api in ("1", "2"):
+        wire = Wire(dict(IO_REPLIES), fail_on={"MG @AN[1]"})
+        install(monkeypatch, api, wire)
+        drv = Galil(config={**IO_CFG, "gclib_api": api})
+        drv.connect()
+        try:
+            res = _stable(await drv.get_analog_in("ai1"))
+        except GalilChannelError as exc:  # the driver lets channel errors escape
+            res = ("raised", type(exc).__name__, str(exc))
+        runs.append((wire, res))
+    assert runs[0][0].calls == runs[1][0].calls
+    assert runs[0][1] == runs[1][1]
+    assert runs[0][1][0] == "raised"
+
+
+@pytest.mark.asyncio
+async def test_motion_error_parity(monkeypatch):
+    runs = []
+    for api in ("1", "2"):
+        wire = Wire(dict(MOTION_REPLIES), fail_on={"BGA"})
+        install(monkeypatch, api, wire)
+        drv = NativeGalilMotion({**MOTION_CFG, "gclib_api": api})
+        drv.connect()
+        res = await drv.motor_move(
+            _active({"d_mm": [1.0], "axis": ["x"], "mode": "absolute"})
+        )
+        runs.append((wire, _stable(res)))
+    assert runs[0][0].calls == runs[1][0].calls
+    assert runs[0][1] == runs[1][1]
+    assert ("command", "TC1") in runs[1][0].calls  # the error-code read happened
