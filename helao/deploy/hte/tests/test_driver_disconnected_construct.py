@@ -1,16 +1,15 @@
 """Disconnected construction is a ratchet, and the host connects drivers at startup.
 
-A ``HelaoDriver`` must not do device I/O in ``__init__``. Only one class, which no
-hte station uses, still does (``CONSTRUCTOR_CONNECT_PENDING``); every other driver
-moved out of that set and into ``CONNECT_ON_STARTUP`` (the host connects it), so
-forgetting either half goes red. The pending set is checked by AST (a ``connect`` call on ``self``
+A ``HelaoDriver`` must not do device I/O in ``__init__``. No hte driver still does:
+``CONSTRUCTOR_CONNECT_PENDING`` is empty, and every driver the host must connect is
+in ``CONNECT_ON_STARTUP``, so forgetting either half goes red. The pending set is checked by AST (a ``connect`` call on ``self``
 inside ``__init__``), which also covers a class whose module cannot be imported
 here. A runtime tripwire judges the other direction: every importable class not in
 the pending set constructs with zero recorded vendor/I/O hits.
 
 The tripwire records instead of only raising, because most ``connect()`` bodies
 swallow exceptions. Keys are ``<module>.<qualname>`` relative to
-``helao.deploy.hte.servers`` (or ``.drivers``) or ``helao.hexagon.adapters.native`` (two classes are
+``helao.deploy.hte.servers`` or ``helao.hexagon.adapters.native`` (two classes are
 named ``Galil``). Nothing here writes outside ``tmp_path``.
 """
 
@@ -35,7 +34,6 @@ from helao.core.drivers.helao_driver import HelaoDriver
 REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[4]
 DRIVER_ROOTS: Final[tuple[str, ...]] = (
     "helao/deploy/hte/servers",
-    "helao/deploy/hte/drivers",
     "helao/hexagon/adapters/native",
 )
 # Not drivers: UI stacks and the generic server dirs, plus any module that builds
@@ -43,20 +41,11 @@ DRIVER_ROOTS: Final[tuple[str, ...]] = (
 SERVER_ONLY_DIRS: Final[frozenset[str]] = frozenset(
     {"bokeh", "reflex", "action", "orchestrator", "operator", "visualizer"}
 )
-# Skipped from import (reason below); leancat's driver stays in the AST scan.
-# `logger/__init__.py` imports a `main_log` that `logger.py` does not define, an
-# in-tree ImportError that cascades to script/commands/database/station; the
-# subtree also needs `tenacity` and `opcua`, which are not installed. Fixing the
-# package is out of scope (follow-up F2).
-IMPORT_ALLOWLIST: Final[tuple[str, ...]] = ("test_station/leancat/",)
+# Module paths skipped from the import sweep (the AST scan still reads them).
+IMPORT_ALLOWLIST: Final[tuple[str, ...]] = ()
 
 # Drivers whose __init__ still connects, keyed by module.qualname.
-CONSTRUCTOR_CONNECT_PENDING: Final[frozenset[str]] = frozenset(
-    {
-        # no hte station; not flipped by this plan, see amendment 3
-        "test_station.leancat.driver.LeancatDriver",
-    }
-)
+CONSTRUCTOR_CONNECT_PENDING: Final[frozenset[str]] = frozenset()
 # Drivers whose connect_on_startup is True (the host connects them).
 CONNECT_ON_STARTUP: Final[frozenset[str]] = frozenset(
     {
@@ -105,7 +94,6 @@ VENDOR_PACKAGES: Final[tuple[str, ...]] = (
     "comtypes.client",
     "minimalmodbus",
     "nidaqmx",
-    "leancat_helao",
     "pylablib",
 )
 
@@ -141,7 +129,6 @@ def _modname(p: Path) -> str:
 def _key(module: str, qualname: str) -> str:
     for prefix in (
         "helao.deploy.hte.servers.",
-        "helao.deploy.hte.drivers.",
         "helao.hexagon.adapters.native.",
     ):
         if module.startswith(prefix):
@@ -399,9 +386,9 @@ def test_construct_is_disconnected(world) -> None:
 def test_pending_importable_drivers_do_hit(world) -> None:
     """Whatever is still pending and importable must record a hit.
 
-    The ratchet ends with one pending class that cannot be imported here, so this
-    can be vacuous; ``test_tripwire_sees_module_level_vendor_names`` is what keeps
-    the tripwire honest.
+    The pending set is empty, so this is vacuous until a class is added to it;
+    ``test_tripwire_sees_module_level_vendor_names`` is what keeps the tripwire
+    honest.
     """
     importable = {k for k in CONSTRUCTOR_CONNECT_PENDING if k in world.results}
     silent = sorted(k for k in importable if not world.results[k][0])
@@ -438,9 +425,9 @@ def test_tripwire_sees_module_level_vendor_names(world) -> None:
     assert any("MeCom" in h for h in hits), hits
 
 
-def test_only_leancat_is_not_importable(world) -> None:
+def test_every_pending_driver_is_importable(world) -> None:
     missing = CONSTRUCTOR_CONNECT_PENDING - set(world.results)
-    assert missing == {"test_station.leancat.driver.LeancatDriver"}
+    assert missing == set()
 
 
 def test_connect_on_startup_set_is_exact(world) -> None:
