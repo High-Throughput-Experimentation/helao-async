@@ -90,13 +90,13 @@ class NativeGalilMotion(HelaoDriver):
         super().__init__(config=config or {})
         self.config_dict = self.config
         if channel is None:
-            # production default: the at-station gclib channel (lazy import so
-            # this module still imports/constructs on Linux without gclib).
-            from helao.deploy.hte.servers.galil_motion.galil_command_channel import (
-                GclibCommandChannel,
+            # production default: the gclib channel named by `gclib_api`
+            # (lazy gclib import, so this still constructs without gclib).
+            from helao.deploy.hte.servers.galil_motion.galil_channels import (
+                make_channel,
             )
 
-            channel = GclibCommandChannel()
+            channel = make_channel(self.config_dict)
         self._channel: GalilCommandChannel = channel
         self._base_hook: "Optional[DriverHostPort]" = base_hook
         # Optional aligner position-notify queue (object with async `put`);
