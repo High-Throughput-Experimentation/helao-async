@@ -15,10 +15,10 @@ __all__ = [
 import os
 from functools import lru_cache
 from importlib import import_module
-from importlib import util as importlib_util
+from pathlib import Path
 
 import helao
-from helao.helpers import config_loader
+from helao.helpers import config_loader, server_modules
 
 #: Subpackage under ``helao/deploy/<deployment>/servers/`` holding Reflex panels.
 PANEL_SUBPACKAGE = "reflex"
@@ -38,70 +38,35 @@ def _deploy_root() -> str:
 
 
 def deployment_search_order() -> list:
-    """Return the deployment names to search when resolving a UI module.
+    """Configured deployment first, then every other deployment, sorted."""
+    current = (config_loader.CONFIG or {}).get("deployment")
+    others = [
+        d for d in server_modules.deployments(Path(_deploy_root())) if d != current
+    ]
+    return ([current] if current else []) + others
 
-    The configured deployment (``CONFIG["deployment"]``) is tried first so a
-    deployment can override a shared module, then ``hte`` as the canonical home
-    of the generic visualizers, then any remaining deployment that ships a
-    ``servers/visualizer`` package (sorted for determinism).
 
-    Returns:
-        list: Ordered, de-duplicated deployment directory names.
-    """
-    order = []
-    cfg = config_loader.CONFIG or {}
-    current = cfg.get("deployment")
-    if current:
-        order.append(current)
-    if "hte" not in order:
-        order.append("hte")
-    deploy_root = _deploy_root()
-    if os.path.isdir(deploy_root):
-        for name in sorted(os.listdir(deploy_root)):
-            if name in order:
-                continue
-            if os.path.isdir(os.path.join(deploy_root, name, "servers", "visualizer")):
-                order.append(name)
-    return order
+def _resolve(module_name: str, stack: str):
+    root = Path(_deploy_root())
+    own = (config_loader.CONFIG or {}).get("deployment")
+    deployment, found = server_modules.locate(
+        module_name, stack, own=own, deploy_root=root
+    )
+    if deployment is None:
+        where = f"several deployments {found}" if found else "no deployment"
+        raise ModuleNotFoundError(
+            f"could not locate {stack} module '{module_name}': found in {where}; "
+            f"the config's own deployment is {own!r}"
+        )
+    path = server_modules.module_file(deployment, module_name, stack, root)
+    assert path is not None  # locate() only returns deployments that have it
+    return import_module(server_modules.import_path(path, root))
 
 
 @lru_cache(maxsize=None)
 def resolve_panel_module(module_name: str):
-    """Import a Reflex panel module by short name, searching deployments.
-
-    Args:
-        module_name: Short module name from a server's ``live_vis`` /
-            ``action_vis`` config key (e.g. ``"wssim_panel"``).
-
-    Returns:
-        The imported module.
-
-    Raises:
-        ModuleNotFoundError: If no deployment provides ``module_name``.
-    """
-    tried = {}
-    for deployment in deployment_search_order():
-        modpath = f"helao.deploy.{deployment}.servers.{PANEL_SUBPACKAGE}.{module_name}"
-        try:
-            spec = importlib_util.find_spec(modpath)
-        except ModuleNotFoundError as exc:
-            # An absent module and one whose *parent package* fails to import
-            # both land here, and the two mean opposite things: pull the
-            # deployment, versus fix an import inside it. Reporting only the
-            # paths tried sent a station chasing a missing module that was
-            # sitting on disk. Anything other than ModuleNotFoundError is left
-            # to propagate -- that is a bug in the deployment, not a miss.
-            tried[modpath] = f"{type(exc).__name__}: {exc}"
-            continue
-        if spec is None:
-            tried[modpath] = "no module of that name"
-            continue
-        return import_module(modpath)
-    detail = "\n".join(f"  {path}: {why}" for path, why in tried.items())
-    raise ModuleNotFoundError(
-        f"could not locate Reflex panel module '{module_name}' in any "
-        f"deployment:\n{detail}"
-    )
+    """Import the Reflex panel module ``module_name`` (see ``server_modules``)."""
+    return _resolve(module_name, "reflex")
 
 
 def reserved_addresses(server_cfg: dict) -> list:
