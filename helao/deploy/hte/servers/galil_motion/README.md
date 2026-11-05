@@ -11,9 +11,14 @@ Install by hand (not pip/conda), on Windows or Linux:
      helao env on Windows:
      `python "C:\Program Files (x86)\Galil\gclib\source\wrappers\python\setup.py" install`.
      On Linux, run the same `setup.py install` from the `wrappers/python` folder
-     of the gclib installation.
+     of the gclib installation. Alternative (`setup.py install` is deprecated
+     in current setuptools): `python -m pip install "<gclib install>/source/wrappers/python"`.
    - `gclib_api: "2"`: wrapper 2.x, the `gclib.Controller` API (Python >= 3.12):
      `pip install --upgrade --index-url https://www.galil.com/sw/pub/python gclib`
      (docs: https://www.galil.com/sw/pub/python/doc/index.html).
+     Not yet verified at a station (reply trimming, gcaps bypass, unsolicited
+     output without `-s ALL`): before using `"2"` in production, run
+     `helao/deploy/hte/tests/smoke/golden_capture_galil.py` and
+     `golden_capture_galil_io.py` with `"1"` and with `"2"` and diff the captures.
 
 A mismatch fails at connect with a message naming `gclib_api`.

@@ -603,7 +603,7 @@ Galil (`galil_io`, `galil_motion`):
 
 | Param | Default | Effect |
 |---|---|---|
-| `gclib_api` | `"1"` | gclib Python wrapper API: `"1"` (wrapper 1.0.1, `gclib.py()`) or `"2"` (wrapper 2.x, `gclib.Controller`, Python >= 3.12). YAML ints `1`/`2` are accepted; any other value raises `ValueError` at driver construction. Must match the wrapper installed in the env, else connect fails with a message naming `gclib_api`. Install steps: each server's `README.md`. |
+| `gclib_api` | `"1"` | gclib Python wrapper API: `"1"` (wrapper 1.0.1, `gclib.py()`) or `"2"` (wrapper 2.x, `gclib.Controller`, Python >= 3.12). YAML ints `1`/`2` are accepted; any other value raises `ValueError` at driver construction. Must match the wrapper installed in the env, else connect fails with a message naming `gclib_api`. `"2"` is not yet verified at a station (reply trimming, gcaps bypass, unsolicited output without `-s ALL`); before using it in production run `helao/deploy/hte/tests/smoke/golden_capture_galil.py` and `golden_capture_galil_io.py` with `"1"` and with `"2"` and diff the captures. Install steps: each server's `README.md`. |
 
 `SYNC` (`sync_server`, `NativeSyncer`). An orchestrator or other host that
 builds a syncer without its own `aws_config_path` reads these from the `SYNC`

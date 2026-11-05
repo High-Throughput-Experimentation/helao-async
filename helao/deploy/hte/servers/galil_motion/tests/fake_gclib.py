@@ -18,6 +18,7 @@ class Wire:
         self.gcaps = None  # last force_gcaps() argument (2.0 only)
         self.raw_open = None  # last 1.0 GOpen() string, verbatim
         self.open_error = False  # make open/Controller() fail
+        self.info_error = False  # 2.0 only: revision_information()/version() raise
 
     def reply(self, cmd):
         r = self.responses.get(cmd, "0")
@@ -77,6 +78,8 @@ def gclib_v2(wire):
             return self._address
 
         def revision_information(self):
+            if wire.info_error:
+                raise Error("info failed")
             return "DMC4183 Rev 1.3a"
 
         def serial_number(self):
@@ -95,13 +98,18 @@ def gclib_v2(wire):
         def close(self):
             wire.calls.append(("close",))
 
+    def version():
+        if wire.info_error:
+            raise Error("version failed")
+        return "2.5.0"
+
     def force_gcaps(on):
         wire.gcaps = on
 
     m.__dict__.update(
         Error=Error,
         Controller=Controller,
-        version=lambda: "2.5.0",
+        version=version,
         force_gcaps=force_gcaps,
     )
     return m

@@ -89,6 +89,18 @@ def test_info_and_version_shape(monkeypatch, api):
     assert ch.version() == ("1.0.1" if api == "1" else "2.5.0")
 
 
+def test_v2_info_and_version_errors_map(monkeypatch):
+    wire = Wire()
+    install(monkeypatch, "2", wire)
+    ch = CHANNELS["2"]()
+    ch.open(CONN)
+    wire.info_error = True
+    with pytest.raises(GalilChannelError, match="info failed"):
+        ch.info()
+    with pytest.raises(GalilChannelError, match="version failed"):
+        ch.version()
+
+
 @pytest.mark.parametrize("api", ["1", "2"])
 def test_command_error_maps(monkeypatch, api):
     install(monkeypatch, api, Wire(fail_on={"BAD"}))

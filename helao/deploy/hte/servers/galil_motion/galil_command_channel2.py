@@ -66,11 +66,17 @@ class Gclib2CommandChannel:
     def info(self) -> str:
         c = self._open_controller()
         # the 1.0 GInfo() shape: "<address>, <revision>, <serial>"
-        return f"{c.address()}, {c.revision_information()}, {c.serial_number()}"
+        try:
+            return f"{c.address()}, {c.revision_information()}, {c.serial_number()}"
+        except self._gclib.Error as exc:
+            raise GalilChannelError(f"info failed: {exc}") from exc
 
     def version(self) -> str:
         self._open_controller()
-        return self._gclib.version()
+        try:
+            return self._gclib.version()
+        except self._gclib.Error as exc:
+            raise GalilChannelError(f"version failed: {exc}") from exc
 
     def close(self) -> None:
         if self._c is None:

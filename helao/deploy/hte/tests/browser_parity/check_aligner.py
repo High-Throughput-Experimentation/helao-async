@@ -7,16 +7,15 @@ that construction behind ``ports.ui_host.UiHostPort`` so
 makes this check possible, because the host can now be handed a ``ui_host`` and
 a driver by a test instead of by a motion server holding a Galil card.
 
-**What this does and does not prove, stated plainly.** ``gclib`` needs
-the vendor library (Windows or Linux) and there is no Galil simulator, so
-nothing here drives real motion. What it does cover is everything between the port and the pixels: the
-P7d composition starts a document host, ``HelaoVis`` applies the theme to a
-document that never passes through ``bokeh_launcher.py`` (the reason
-``apply_theme`` lives in ``HelaoVis.__init__`` at all), ``Aligner`` builds its
-1685-line layout, and a browser renders it. The plate-alignment *procedure* --
-picking markers on a real plate and computing a transfer matrix against a
-moving stage -- remains an at-station dry run and this check does not claim
-otherwise.
+**What this does and does not prove, stated plainly.** ``gclib`` needs the vendor
+library (Windows or Linux) and there is no Galil simulator, so nothing here drives real
+motion. What it does cover is everything between the port and the pixels: the P7d
+composition starts a document host, ``HelaoVis`` applies the theme to a document that
+never passes through ``bokeh_launcher.py`` (the reason ``apply_theme`` lives in
+``HelaoVis.__init__`` at all), ``Aligner`` builds its 1685-line layout, and a browser
+renders it. The plate-alignment *procedure* -- picking markers on a real plate and
+computing a transfer matrix against a moving stage -- remains an at-station dry run and
+this check does not claim otherwise.
 
 The driver below is a stand-in, not a simulator: it answers the handful of
 attributes ``AlignerMotorContext`` delegates and records what was asked of it.
