@@ -283,6 +283,15 @@ a config with an externally managed server cannot pass preflight.
 > about 20 servers across the tracked configs, but no code reads it. Use
 > `log_level` (per server) to change the file-log level.
 
+### Galil `params.gclib_api`
+
+Both Galil servers (`galil_io`, `galil_motion`) read `params.gclib_api`: `"1"`
+(default; gclib Python wrapper 1.0.1, `gclib.py()`) or `"2"` (wrapper 2.x,
+`gclib.Controller`, Python >= 3.12). YAML ints `1`/`2` are accepted; any other
+value raises `ValueError` at driver construction. It must match the wrapper
+installed in the env, else connect fails with a message naming `gclib_api`.
+Install steps: each server's `README.md`.
+
 ### Deployment resolution
 
 Without a `deployment:` key, the launcher globs every deployment for

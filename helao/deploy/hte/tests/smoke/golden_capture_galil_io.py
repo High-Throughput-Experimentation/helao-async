@@ -45,7 +45,7 @@ not reference gamry's OCV scenario name or masking). Only the
 scenario-specific pieces (endpoint, masking, manifest notes) are new in this
 module. ``golden_capture.py`` itself is NOT modified.
 
-Usage (AT-STATION, Windows, conda env ``helao``) -- the galil controller must
+Usage (AT-STATION, conda env ``helao``) -- the galil controller must
 be powered on and reachable at ``galil_ip_str`` (192.168.200.234 by default).
 NO pump/valve/LED is actuated for this scenario (only a digital INPUT is
 read):

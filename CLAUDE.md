@@ -109,7 +109,7 @@ The orchestrator is the long-lived queue-and-dispatch service used in production
 - Configs may be `.yml` (loaded via `yml_load`) or `.py` (which must define a top-level `config` dict). `read_config` accepts either a full path or a bare prefix and globs `helao/deploy/*/configs/<prefix>.*`.
 - The `dummy: true` / `simulation: true` keys at the top of a config govern banner color and whether simulated drivers are used.
 - Logging: do not instantiate loggers directly; use `helao.helpers.helao_logging.make_logger(__file__)` (or the already-initialized `logging.LOGGER`) so per-server log routing and email alerts work.
-- Windows-only drivers: Galil (`gclib`) and Gamry (`comtypes`) here, plus Ocean Insight (`oceandirect`) in a private deployment. Most other code, and the `test` deployment's simulators, run on Linux. All three import their vendor package *inside* `connect()`, not at module scope, so the driver module and its tests still import on Linux; `run_tests.py` then reports the missing package as `ENV` rather than `FAIL`.
+- Windows-only drivers: Gamry (`comtypes`) here, plus Ocean Insight (`oceandirect`) in a private deployment. Galil (`gclib`) runs on Windows and Linux; its servers take `gclib_api` (`"1"` default: wrapper 1.0 `gclib.py()`; `"2"`: wrapper 2.x `gclib.Controller`), which must match the wrapper installed in the env. Most other code, and the `test` deployment's simulators, run on Linux. All three vendor drivers (Galil, Gamry, Ocean Insight) import their vendor package *inside* `connect()`, not at module scope, so the driver module and its tests still import on Linux; `run_tests.py` then reports the missing package as `ENV` rather than `FAIL`.
 
 ### BioLogic potentiostats: three backends
 

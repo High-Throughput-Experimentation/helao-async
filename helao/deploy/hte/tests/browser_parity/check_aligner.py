@@ -7,8 +7,8 @@ that construction behind ``ports.ui_host.UiHostPort`` so
 makes this check possible, because the host can now be handed a ``ui_host`` and
 a driver by a test instead of by a motion server holding a Galil card.
 
-**What this does and does not prove, stated plainly.** ``gclib`` is
-Windows-only and there is no Galil simulator, so nothing here drives real
+**What this does and does not prove, stated plainly.** ``gclib`` needs
+the vendor library (Windows or Linux) and there is no Galil simulator, so nothing here drives real
 motion. What it does cover is everything between the port and the pixels: the
 P7d composition starts a document host, ``HelaoVis`` applies the theme to a
 document that never passes through ``bokeh_launcher.py`` (the reason

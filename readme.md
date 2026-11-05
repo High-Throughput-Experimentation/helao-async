@@ -4,7 +4,7 @@ HELAO-async is Caltech HTE group's instrument control software following [HELAO]
 
 ## Requirements
 
-- Windows is required for Galil (gclib) and Gamry (comtypes) drivers. (Tested with Windows 10 x64)
+- Windows is required for Gamry (comtypes) drivers. Galil (gclib) drivers run on Windows and Linux. (Tested with Windows 10 x64)
 - [miniconda](https://docs.conda.io/en/latest/miniconda.html); the `helao` env pins Python 3.14 (see `helao_dev_*.yml`); its pip packages are in `requirements.txt` and `setup_env.*` installs them with `uv` after conda.
 
 ## Installation

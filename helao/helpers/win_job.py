@@ -3,7 +3,7 @@
 The Windows counterpart to :mod:`helao.helpers.parent_death`, and a different
 mechanism for the same failure: kill or crash ``launch.py`` and every server it
 spawned keeps running, holding its port. On Windows the cost is higher than a
-held port -- the Windows-only drivers are Galil (``gclib``) and Gamry
+held port -- the Windows-only drivers include Gamry
 (``comtypes``), and an orphaned Gamry server still owns ``GamryCOM`` and the
 potentiostat, so the next launch cannot acquire the instrument at all.
 

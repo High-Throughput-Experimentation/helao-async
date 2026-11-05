@@ -1,7 +1,7 @@
 """Galil command-channel port (P3a galil-3 native deepening).
 
-The single seam between the native Galil motion logic and the Windows-only
-``gclib`` runtime. Every gclib interaction in the legacy driver reduces to a
+The single seam between the native Galil motion logic and the vendor
+``gclib`` runtime (Windows or Linux). Every gclib interaction in the legacy driver reduces to a
 connection lifecycle plus a string command channel (``g.GCommand``); promoting
 that to a port lets the motion logic (command generation, coordinate transform,
 TP/PA/SC parsing) run and be unit-tested on Linux against a fake channel, with
