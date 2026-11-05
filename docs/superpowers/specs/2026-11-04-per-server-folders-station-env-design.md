@@ -50,8 +50,8 @@ helao/deploy/<dep>/servers/
     __init__.py
     gamry_server2.py          # makeApp; filename unchanged (config: fast: gamry_server2)
     driver.py, technique.py, signal.py, readz.py   # was drivers/pstat/gamry/*
-    gamry_vis.py              # makeBokehApp; filename unchanged
-    gamry_panel.py            # Reflex panel; filename unchanged
+    bokeh/gamry_vis.py        # Bokeh visualizer; filename unchanged
+    reflex/gamry_vis.py       # Reflex panel; same name on purpose (see Rules)
     environment.yml           # optional: conda deps
     requirements.txt          # optional: pip deps
     README.md                 # optional: vendor SDK install notes
@@ -63,35 +63,65 @@ Rules:
 
 - Module filenames do not change, so config values do not change.
 - Folder names are valid Python identifiers.
-- Multi-device or generic UIs (`live_visualizer`, operator, orchestrator) stay in
-  their group folders.
+- A config key such as `action_vis: gamry_vis` loads the Bokeh module in a Bokeh
+  group and the Reflex module of the same name in a Reflex group (15 such twins in
+  `hte`). Twins therefore live in the instrument's `bokeh/` and `reflex/` subfolders.
+  A Bokeh visualizer is found only at `servers/visualizer/<m>.py` or
+  `servers/*/bokeh/<m>.py`; a Reflex panel only at `servers/reflex/<m>.py` or
+  `servers/*/reflex/<m>.py`; a `fast:`/`bokeh:` app module only at
+  `servers/*/<m>.py` outside `servers/reflex/`.
+- Multi-device or generic UIs stay in their group folders: `live_visualizer`,
+  `action_visualizer`, `control_visualizer`, `data_browser`, operator, orchestrator,
+  the shape-generic panels used by several instruments or deployments
+  (`motion_control_*_scale`, `digital_out_control`, `temp_vis`, `pressure_vis`) and
+  the `_`-prefixed helpers (`_live_panel`, `_vis_host`, `_pstat`, `_spectra`, ...).
+- Code shared by several instruments or imported by experiments goes to its main
+  owner's folder; the other users import across folders.
 
 Moves in `hte`:
 
 | From | To |
 |---|---|
-| `drivers/<category>/<x>` | the server folder that uses it; relative imports become local |
+| `drivers/<category>/<x>` | the server folder that uses it; a single-directory driver moves flat, a multi-package driver (BioLogic) keeps its subpackages |
 | `drivers/pstat/biologic*`, `biologic_backend.py` | `servers/biologic/` |
-| `drivers/io/enum.py`, `drivers/motion/enum.py` | their server folders; experiment imports rewritten |
+| `drivers/io/enum.py` | `servers/galil_io/` (also used by spec and 7 experiments) |
+| `drivers/motion/enum.py` | `servers/galil_motion/` (also used by the aligner layout and 6 experiments) |
+| `drivers/spec/enum.py` | `servers/spec/` |
+| `drivers/robot/pal_driver.py` | `servers/pal/` (also used by 2 experiments) |
 | `drivers/serial_lifecycle.py` | `helao/helpers/serial_lifecycle.py` (generic) |
 | `drivers/data/*` (calc, archive, HTEdata_legacy) | their server folders, no env files |
-| hexagon Galil motion/aligner adapters | `servers/galil_motion/` |
+| `drivers/data/analyses/` | `servers/analysis/analyses/`; `analysis_driver` tries `servers.analysis.analyses` then the old `drivers.data.analyses`, so private deployments keep working until they move |
+| `drivers/test_station/leancat/` | stays where it is (nothing imports it) |
+| hexagon Galil motion adapter, Galil command channel (adapter + port), aligner host | `servers/galil_motion/` |
 | hexagon `gamry_com` | `servers/gamry/` |
-| hexagon PAL and NI adapters | their server folders |
-| 53 hte-importing core/hexagon tests | matching server folder `tests/` or `hte/tests/` |
-| `harness/hte_freeze.py`, `hexagon/tests/checklists/hte/` | `hte/tests/`, driven by the generic `harness/freeze.py` |
+| hexagon PAL transport and trigger (adapters + ports), `domain/pal_reconciliation.py`, the PAL models in `domain/models.py` | `servers/pal/` |
+| hexagon `calibration_store`, `domain/motion_transform.py` | stay (pure, used by private deployments) |
+| hte-importing core/hexagon/harness tests and helpers | matching server folder `tests/` or `hte/tests/` |
+| `harness/hte_freeze.py`, `hexagon/tests/checklists/hte/` | checklists to `hte/tests/checklists/` (already preferred by `preflight._checklist_dir`), frozen by the generic `harness/freeze.py`; `hte_freeze.py` deleted |
+
+The aligner host has one private consumer, so that deployment's import fix merges
+together with P2. There is no compatibility shim.
 
 `hexagon/adapters/native/native_syncer.py` and `sync_adapter.py` are not hardware and
 stay in hexagon.
 
 ### 2. Module resolution
 
-One resolver function in `helao/helpers/launcher_bootstrap.py` finds a module by
-globbing `helao/deploy/<dep>/servers/*/<module>.py`.
+One resolver module, `helao/helpers/server_modules.py`, finds a module by the
+per-stack globs in section 1 (app, Bokeh, Reflex) under `helao/deploy/<dep>/servers/`.
 
 - Deployment order is unchanged: explicit `deployment:` key, then the config's own
-  deployment, then the remaining deployments. The hardcoded `hte` fallback is
-  removed.
+  deployment, then the one other deployment that has the module. The hardcoded
+  `hte` fallback is removed everywhere (launchers, panel discovery, processors,
+  experiment/sequence libraries, preflight).
+- A module found in several other deployments, none of them the config's own, is
+  reported with every candidate. The launcher keeps today's behaviour there (warn,
+  take the first in sorted order); panel, processor and library lookups, which used
+  to prefer `hte`, raise instead. Before this lands, a check lists every name found
+  in more than one deployment on the machine; any collision a config relies on is
+  resolved first.
+- A config outside `helao/deploy/*/configs/` still needs an explicit `deployment:`
+  key, as today.
 - Two files with the same module name inside one deployment is a hard error that
   names both paths.
 - The old layout (`servers/action/x.py`) already matches `servers/*/x.py`, so the
@@ -157,8 +187,12 @@ Rules:
 
 - Platform-only dependencies go in `requirements.txt` with environment markers
   (`comtypes; sys_platform == "win32"`), because conda env files have no selectors.
-- Hardware dependencies leave `helao_dev_<os>.yml` and `requirements.txt`. The
-  `*_pinned_*` files cover the base env only.
+- Hardware dependencies leave `helao_dev_<os>.yml` and `requirements.txt`, but only
+  as the last step: after every private deployment ships its folder env files and
+  every station has run `setup_env <its prefixes>` once (otherwise a no-argument
+  `update_env` would drop drivers' packages). `pyftdi`, `pyft232` and `pyusb` have no
+  importer anywhere and are removed outright. The `*_pinned_*` files cover the base
+  env only and are regenerated with `repin_envs.py`.
 - No uninstall and no `forget` command. To drop a prefix, edit the json.
 - `update.sh` / `update.bat` are unchanged and do not call `update_env`.
 
