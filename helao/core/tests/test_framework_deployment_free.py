@@ -40,11 +40,12 @@ def _hits(path: Path) -> list[str]:
     out = []
     for node in ast.walk(tree):
         if isinstance(node, (ast.Import, ast.ImportFrom)):
-            names = (
-                [a.name for a in node.names]
-                if isinstance(node, ast.Import)
-                else [node.module or ""]
-            )
+            if isinstance(node, ast.Import):
+                names = [a.name for a in node.names]
+            else:  # also ``from helao.deploy import hte``
+                names = [node.module or ""] + [
+                    f"{node.module}.{a.name}" for a in node.names
+                ]
             out += [f"import {n}" for n in names if IMPORT.match(n)]
         elif isinstance(node, ast.Constant) and isinstance(node.value, str):
             if in_tests or id(node) in allowed:

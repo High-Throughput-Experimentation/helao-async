@@ -1,8 +1,9 @@
 """In-process REAL-transport hexagon group for §10.3 precise-interleaving
 items (P1b2b: items 1, 3, 5).
 
-Boots the REAL compositions under uvicorn inside the test's event loop: the
-OrchHost the deployment's orchestrator module builds, the SIM through its own makeApp, and the
+Boots the REAL compositions under uvicorn inside the test's event loop: an
+OrchHost built directly (the same construction the deployment's orchestrator
+module uses), the SIM through its own makeApp, and the
 test deployment's sim_db_server — real HTTP routes registered through the
 real registration code, and the co-located ZMQ RPC mirrors HelaoFastAPI
 auto-registers on http_port+10000 (§10.1 fixture-fidelity). Race injection happens via the host's

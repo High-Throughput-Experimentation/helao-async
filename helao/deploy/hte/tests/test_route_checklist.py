@@ -301,3 +301,14 @@ def test_no_param_addition_entry_is_stale() -> None:
             f"{entry['path']}: {sorted(folded)} are already in the frozen record; "
             "remove them from _param_additions.json"
         )
+
+
+def test_frozen_at_b7c_list_is_present_and_complete():
+    """Gate 3 reads ``_at_b7c.json``; a missing file would silently demote to notes."""
+    from helao.hexagon import preflight
+
+    cdir = preflight._checklist_dir("hte")
+    assert cdir is not None
+    names = preflight._frozen_checklists(cdir)
+    assert len(names) == 23, sorted(names)
+    assert [n for n in names if not (cdir / f"{n}.json").exists()] == []
