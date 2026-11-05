@@ -7,8 +7,8 @@ import types
 import numpy as np
 import pytest
 
-from helao.hexagon.adapters.native import galil_motion_native as gmn
-from helao.hexagon.adapters.native.galil_motion_native import NativeGalilMotion
+from helao.deploy.hte.servers.galil_motion import galil_motion_native as gmn
+from helao.deploy.hte.servers.galil_motion.galil_motion_native import NativeGalilMotion
 
 
 class _Channel:

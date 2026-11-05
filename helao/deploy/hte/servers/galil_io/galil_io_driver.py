@@ -1,0 +1,733 @@
+"""Galil IO driver used by a HELAO FastAPI action server.
+
+Wraps the digital/analog IO portion of the `gclib` library: reads `dev_ai`,
+`dev_ao`, `dev_di`, `dev_do` port maps from the server config, opens a TCP
+connection to the Galil controller at `galil_ip_str`, and exposes async helpers
+for reading/setting digital and analog channels plus a `set_digital_cycle`
+routine that uploads a DMC toggling program. A paired `GalilPoller` publishes
+scaled analog-input readings to the action-server live buffer.
+
+Requires gclib (Windows). After installing the Galil toolkit, install the
+Python module from the helao environment:
+
+`python "c:\\Program Files (x86)\\Galil\\gclib\\source\\wrappers\\python\\setup.py" install`
+"""
+
+__all__ = [
+    "Galil",
+    "GalilPoller",
+    "TriggerType",
+    "AiMonExec",
+]
+
+
+import asyncio
+import os
+import pathlib
+import time
+import traceback
+from typing import Optional, Union
+
+from helao.helpers import helao_logging as logging
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+from helao.core.drivers.helao_driver import (
+    DriverPoller,
+    DriverResponse,
+    DriverResponseType,
+    DriverStatus,
+    HelaoDriver,
+)
+from helao.core.error import ErrorCodes
+from helao.core.models.hlostatus import HloStatus
+from helao.helpers.executor import Executor
+from helao.helpers.make_str_enum import make_str_enum
+
+from helao.deploy.hte.servers.galil_io.enum import TriggerType
+
+driver_path = os.path.dirname(os.path.realpath(__file__))
+
+# install galil driver first
+# (helao) c:\Program Files (x86)\Galil\gclib\source\wrappers\python>python setup.py install
+
+# pathlib.Path(os.path.join(helao_repo_root, 'visualizer\styles.css')).read_text()
+
+
+class cmd_exception(ValueError):
+    """Raised for invalid Galil command sequences."""
+
+    def __init__(self, arg):
+        """Store the offending argument(s) on the exception."""
+        self.args = arg
+
+
+class Galil(HelaoDriver):
+    """IO portion of a Galil controller exposed to the HELAO action server.
+
+    Reads its `config` dict from the action server's ``params`` block:
+    `galil_ip_str`, `dev_ai`/`dev_ao`/`dev_di`/`dev_do` port maps, and the
+    `monitor_ai` scaling dict. The `gclib.py()` connection is opened by
+    :meth:`connect`, which the host calls at startup (``connect_on_startup``); always-on analog-input polling is
+    handled by the paired :class:`GalilPoller`, wired in as the server's
+    ``poller_class``. Public coroutines mirror digital and analog IO
+    operations and (`set_digital_cycle`) upload a DMC program to the
+    controller.
+
+    Server config parameters:
+        ``galil_ip_str``: Controller IP (direct connect string is built from
+            this).
+        ``dev_ai``/``dev_ao``/``dev_di``/``dev_do``: port-name maps.
+        ``monitor_ai``: dict of ``{ai_name: scaling}`` for the poller.
+    """
+
+    connect_on_startup = (
+        True  # the host connects after _base_hook, before dyn_endpoints
+    )
+
+    def __init__(self, config: dict = {}):
+        """Store config and build the dynamic IO enums; no device I/O here.
+
+        Args:
+            config: Driver configuration (the server's ``params`` dict).
+        """
+        super().__init__(config=config)
+        self.config_dict = self.config
+
+        self.dev_ai = self.config_dict.get("dev_ai", {})
+        self.dev_aiitems = make_str_enum("dev_ai", {key: key for key in self.dev_ai})
+
+        self.monitor_ai = {
+            ai_name: scaling
+            for ai_name, scaling in self.config_dict.get("monitor_ai", {}).items()
+            if ai_name in self.dev_ai.keys()
+        }
+
+        self.dev_ao = self.config_dict.get("dev_ao", {})
+        self.dev_aoitems = make_str_enum("dev_ao", {key: key for key in self.dev_ao})
+
+        self.dev_di = self.config_dict.get("dev_di", {})
+        self.dev_diitems = make_str_enum("dev_di", {key: key for key in self.dev_di})
+
+        self.dev_do = self.config_dict.get("dev_do", {})
+        self.dev_doitems = make_str_enum("dev_do", {key: key for key in self.dev_do})
+
+        self.digital_cycle_out = None
+        self.digital_cycle_out_gamry = None
+        self.digital_cycle_mainthread = None
+        self.digital_cycle_subthread = None
+        self.digital_cycle_subthread2 = None
+
+        self.g = None
+        self.galilcmd = None
+        self.galilprgdownload = None
+        self.galil_enabled = None
+
+        self.cycle_lights = False
+
+    def connect(self) -> DriverResponse:
+        """Open the `gclib.py()` handle and connect to the configured Galil IP.
+
+        Returns:
+            ``DriverResponse`` reporting connection success or failure.
+        """
+        import gclib
+
+        try:
+            self.g = gclib.py()
+            LOGGER.info(f"gclib version: {self.g.GVersion()}")
+            # TODO: error checking here: Galil can crash and crash program
+            galil_ip = self.config_dict.get("galil_ip_str", None)
+            if galil_ip:
+                self.g.GOpen("%s --direct -s ALL" % (galil_ip))
+                LOGGER.info(self.g.GInfo())
+                self.galilcmd = self.g.GCommand  # alias the command callable
+                # downloads a DMC program to galil
+                self.galilprgdownload = self.g.GProgramDownload
+                self.galil_enabled = True
+                response = DriverResponse(
+                    response=DriverResponseType.success, status=DriverStatus.ok
+                )
+            else:
+                LOGGER.error("no Galil IP configured")
+                self.galil_enabled = False
+                response = DriverResponse(
+                    response=DriverResponseType.failed,
+                    status=DriverStatus.uninitialized,
+                )
+        except Exception:
+            LOGGER.error("could not connect to Galil controller", exc_info=True)
+            self.galil_enabled = False
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        return response
+
+    def get_status(self) -> DriverResponse:
+        """Return whether the Galil connection has been established.
+
+        Returns:
+            ``DriverResponse`` with ``status=ok`` if connected, else
+            ``status=uninitialized``.
+        """
+        if self.galil_enabled:
+            return DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.uninitialized
+        )
+
+    def stop(self) -> DriverResponse:
+        """No active operation to abort; reports current status."""
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
+
+    def reset(self) -> DriverResponse:
+        """Placeholder reset; no controller-level reset is currently performed."""
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
+
+    def disconnect(self) -> DriverResponse:
+        """Close the Galil connection.
+
+        Returns:
+            ``DriverResponse`` reporting close success or failure.
+        """
+        LOGGER.info("shutting down galil io")
+        self.galil_enabled = False
+        try:
+            self.g.GClose()
+            response = DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception as e:
+            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            LOGGER.error(f"could not close galil connection: {repr(e), tb,}")
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        return response
+
+    def _read_analog_in(self, ai_name: str = "analog_in") -> dict:
+        """Synchronous single-shot read of a configured analog input.
+
+        Shared by :meth:`get_analog_in` (awaited by the action server) and
+        :class:`GalilPoller` (called synchronously from the poll loop).
+
+        Args:
+            ai_name: Key in `dev_ai` identifying the channel.
+
+        Returns:
+            Dict with `error_code`, `port`, `name`, `type` ("analog_in"), and
+            the raw `value` returned by the controller.
+        """
+        err_code = ErrorCodes.none
+        ret = None
+        ai_port = -1
+        if ai_name in self.dev_ai:
+            ai_port = self.dev_ai[ai_name]
+            cmd = f"MG @AN[{int(ai_port)}]"
+            # LOGGER.info(f"cmd: '{cmd}'")
+            ret = self.galilcmd(cmd)
+        else:
+            err_code = ErrorCodes.not_available
+
+        return {
+            "error_code": err_code,
+            "port": ai_port,
+            "name": ai_name,
+            "type": "analog_in",
+            "value": ret,
+        }
+
+    async def estop(self, switch: bool, *args, **kwargs) -> bool:
+        """Engage the IO emergency stop by driving every configured AO/DO low.
+
+        Args:
+            switch: True to assert estop (drives every configured AO/DO low),
+                False is a no-op (server-side estop-flag bookkeeping is owned
+                by the action-server framework, not the driver).
+
+        Returns:
+            The `switch` value passed in.
+        """
+        LOGGER.info("IO Estop")
+        if switch:
+            for ao_name in self.dev_ao.keys():
+                await self.set_analog_out(value=0.0, ao_name=ao_name)
+            for do_name in self.dev_do.keys():
+                await self.set_digital_out(
+                    on=False,
+                    do_name=do_name,
+                )
+        return switch
+
+    async def get_analog_in(self, ai_name: str = "analog_in", *args, **kwargs) -> dict:
+        """Read a configured analog input by name.
+
+        Args:
+            ai_name: Key in `dev_ai` identifying the channel.
+
+        Returns:
+            Dict with `error_code`, `port`, `name`, `type` ("analog_in"), and
+            the raw `value` returned by the controller.
+        """
+        return self._read_analog_in(ai_name)
+
+    async def get_digital_in(
+        self, di_name: str = "digital_in", *args, **kwargs
+    ) -> dict:
+        """Read a configured digital input by name.
+
+        Args:
+            di_name: Key in `dev_di` identifying the channel.
+
+        Returns:
+            Dict with `error_code`, `port`, `name`, `type` ("digital_in"),
+            and `value`.
+        """
+        err_code = ErrorCodes.none
+        ret = None
+        di_port = -1
+        if di_name in self.dev_di:
+            di_port = self.dev_di[di_name]
+            cmd = f"MG @IN[{int(di_port)}]"
+            # LOGGER.info(f"cmd: '{cmd}'")
+            ret = self.galilcmd(cmd)
+        else:
+            err_code = ErrorCodes.not_available
+
+        return {
+            "error_code": err_code,
+            "port": di_port,
+            "name": di_name,
+            "type": "digital_in",
+            "value": ret,
+        }
+
+    async def get_digital_out(
+        self, do_name: str = "digital_out", *args, **kwargs
+    ) -> dict:
+        """Read the current state of a configured digital output by name.
+
+        Args:
+            do_name: Key in `dev_do` identifying the channel.
+
+        Returns:
+            Dict with `error_code`, `port`, `name`, `type` ("digital_out"),
+            and `value`.
+        """
+        err_code = ErrorCodes.none
+        ret = None
+        do_port = -1
+        if do_name in self.dev_do:
+            do_port = self.dev_do[do_name]
+            cmd = f"MG @OUT[{int(do_port)}]"
+            # LOGGER.info(f"cmd: '{cmd}'")
+            ret = self.galilcmd(cmd)
+        else:
+            err_code = ErrorCodes.not_available
+
+        return {
+            "error_code": err_code,
+            "port": do_port,
+            "name": do_name,
+            "type": "digital_out",
+            "value": ret,
+        }
+
+    # def set_analog_out(self, ports, handle: int, module: int, bitnum: int, multi_value):
+    async def set_analog_out(
+        self, value: float, ao_name: str = "analog_out", *args, **kwargs
+    ) -> dict:
+        """Placeholder for analog-out writes; the DMC-4143 does not support AO.
+
+        Args:
+            value: Requested analog-out value (unused).
+            ao_name: Channel name (unused).
+
+        Returns:
+            Dict with `error_code` set to `not_available` and a null `value`.
+        """
+        err_code = ErrorCodes.not_available
+        ao_port = -1
+        # this is essentially a placeholder for now since the DMC-4143 does not support
+        # analog out but I believe it is worthwhile to have this in here for the RIO
+        # Handle num is A-H and must be on port 502 for the modbus commons
+        # module is the position of the module from 1 to 16
+        # bitnum is the IO point in the module from 1-4
+        # the fist value n_0
+        # n_0 = handle * 1000 + (module - 1) * 4 + bitnum
+        # _ = self.galilcmd("AO {},{}".format(port, value))
+        return {
+            "error_code": err_code,
+            "port": ao_port,
+            "name": ao_name,
+            "type": "analog_out",
+            "value": None,
+        }
+
+    async def set_digital_out(
+        self, on: bool, do_name: str = "", *args, **kwargs
+    ) -> dict:
+        """Set a configured digital output high or low.
+
+        Args:
+            on: True to set the bit (`SB`), False to clear it (`CB`).
+            do_name: Key in `dev_do` identifying the channel.
+
+        Returns:
+            Dict with `error_code`, `port`, `name`, `type` ("digital_out"), and
+            the post-set readback `value`.
+        """
+        err_code = ErrorCodes.none
+        on = bool(on)
+        ret = None
+        do_port = -1
+        if do_name in self.dev_do:
+            do_port = self.dev_do[do_name]
+            if on:
+                cmd = f"SB {int(do_port)}"
+            else:
+                cmd = f"CB {int(do_port)}"
+            # LOGGER.info(f"cmd: '{cmd}'")
+            _ = self.galilcmd(cmd)
+            cmd = f"MG @OUT[{int(do_port)}]"
+            # LOGGER.info(f"cmd: '{cmd}'")
+            ret = self.galilcmd(cmd)
+        else:
+            err_code = ErrorCodes.not_available
+
+        return {
+            "error_code": err_code,
+            "port": do_port,
+            "name": do_name,
+            "type": "digital_out",
+            "value": ret,
+        }
+
+    async def upload_DMC(self, DMC_prog):
+        """Download a DMC program string to the Galil controller.
+
+        Args:
+            DMC_prog: DMC program text. A null terminator is appended.
+        """
+        # self.galilcmd("UL;")  # begin upload
+        # upload line by line from DMC_prog
+        self.galilprgdownload("DL;")
+        LOGGER.info(f"DMC prg:\n{DMC_prog}")
+        self.galilprgdownload(DMC_prog + "\x00")
+
+    async def set_digital_cycle(
+        self,
+        trigger_name: str,
+        triggertype: TriggerType,
+        out_name: Union[str, list[str]],
+        toggle_init_delay: Union[float, list[float]],  # seconds
+        toggle_duty: Union[float, list[float]],  # fraction
+        toggle_period: Union[float, list[float]],  # seconds
+        toggle_duration: Union[float, list[float]],  # seconds
+        out_name_gamry: Optional[str] = None,
+        req_out_name: Optional[str] = None,
+        stop_via_ttl: Optional[bool] = True,
+        *args,
+        **kwargs,
+    ) -> dict:
+        """Build and upload a DMC program that toggles one or more outputs on a trigger.
+
+        Generates a main thread that waits on `trigger_name` (with edge type
+        `triggertype`) and one sub-thread per output that toggles the output
+        according to `toggle_init_delay`, `toggle_duty`, `toggle_period`, and
+        `toggle_duration` (all in seconds). Either a single `out_name`/Gamry
+        pair or a list of outputs (with parallel parameter lists) is supported.
+
+        Args:
+            trigger_name: Key in `dev_di` used as the start trigger.
+            triggertype: Edge type to wait for.
+            out_name: Output name (or list of names) in `dev_do` to toggle.
+            toggle_init_delay: Pre-toggle delay (seconds).
+            toggle_duty: On-fraction of `toggle_period`.
+            toggle_period: Cycle period (seconds).
+            toggle_duration: Total run time (seconds).
+            out_name_gamry: Optional companion DO for Gamry trigger output.
+            req_out_name: Optional DO that indicates a request line.
+            stop_via_ttl: If True, use the variant of the main DMC that halts
+                on TTL; otherwise use the no-stop variant.
+
+        Returns:
+            Dict with `error_code` reflecting whether the program was
+            successfully built and started.
+        """
+        # rewrite params for consistency w/jcap eche runs
+        t_duration = (
+            [int(round(x * 1e3)) for x in toggle_duration]
+            if isinstance(toggle_duration, list)
+            else int(round(toggle_duration * 1e3))
+        )
+        t_on = (
+            [int(round(x * y * 1e3)) for x, y in zip(toggle_period, toggle_duty)]
+            if isinstance(toggle_period, list)
+            else int(round(toggle_period * toggle_duty * 1e3))
+        )
+        t_off = (
+            [int(round(x * (1 - y) * 1e3)) for x, y in zip(toggle_period, toggle_duty)]
+            if isinstance(toggle_period, list)
+            else int(round(toggle_period * (1 - toggle_duty) * 1e3))
+        )
+        t_offset = (
+            [int(round(x * 1e3)) for x in toggle_init_delay]
+            if isinstance(toggle_init_delay, list)
+            else int(round(toggle_init_delay * 1e3))
+        )
+
+        # A single output with no Gamry companion is just the list case with
+        # one entry. Without this, out_name_gamry=None with a bare string
+        # out_name fell through both branches to "parameters are not valid",
+        # so a station with no gamry_aux line could only cycle outputs by
+        # passing a list.
+        if (
+            out_name_gamry is None
+            and isinstance(out_name, str)
+            and isinstance(t_on, int)
+            and isinstance(t_off, int)
+            and isinstance(t_offset, int)
+            and isinstance(t_duration, int)
+        ):
+            out_name = [out_name]
+            t_on = [t_on]
+            t_off = [t_off]
+            t_offset = [t_offset]
+            t_duration = [t_duration]
+
+        err_code = ErrorCodes.none
+        valid_trig = False
+        if trigger_name in self.dev_di:
+            valid_trig = True
+            trigger_port = self.dev_di[trigger_name]
+            if triggertype == TriggerType.risingedge:
+                trigger_port_on = trigger_port
+                trigger_port_off = -trigger_port
+            elif triggertype == TriggerType.fallingedge:
+                trigger_port_on = -trigger_port
+                trigger_port_off = trigger_port
+            elif triggertype == TriggerType.blip:
+                trigger_port_on = trigger_port
+                trigger_port_off = trigger_port
+
+        if (
+            valid_trig
+            and out_name_gamry is not None
+            and isinstance(out_name, str)
+            and isinstance(t_on, int)
+            and isinstance(t_off, int)
+            and isinstance(t_offset, int)
+            and isinstance(t_duration, int)
+            and out_name in self.dev_do
+            and out_name_gamry in self.dev_do
+            # The port, not just the key. A config line like `gamry_aux: None`
+            # is the *string* "None" in YAML (null is `null`/`~`/empty), which
+            # is truthy and reaches the DMC program as `CB None`.
+            and isinstance(self.dev_do[out_name_gamry], int)
+        ):
+            out_port = self.dev_do[out_name]
+            out_port_gamry = self.dev_do[out_name_gamry]
+            out_ports = [out_port, out_port_gamry]
+            t_on = [t_on] * 2
+            t_off = [t_off] * 2
+            t_offset = [t_offset] * 2
+            t_duration = [t_duration] * 2
+            self.digital_cycle_out = out_port
+            self.digital_cycle_out_gamry = out_port_gamry
+            self.digital_cycle_mainthread = 0
+            self.digital_cycle_subthread = 1
+
+            # di (AI n):
+            # if n is positive, galil waits for input to go high (rising edge)
+            # if n is negative, galil waits for input to go low (falling edge)
+
+        elif (
+            valid_trig
+            and isinstance(out_name, list)
+            and isinstance(t_on, list)
+            and isinstance(t_off, list)
+            and isinstance(t_offset, list)
+            and isinstance(t_duration, list)
+            and trigger_name in self.dev_di
+            and all([x in self.dev_do for x in out_name])
+            and len(out_name)
+            == len(t_on)
+            == len(t_off)
+            == len(t_offset)
+            == len(t_duration)
+        ):
+            out_ports = [self.dev_do[x] for x in out_name]
+            self.digital_cycle_out = out_ports
+            self.digital_cycle_out_gamry = None
+            self.digital_cycle_mainthread = 0
+            self.digital_cycle_subthread = [i + 1 for i in range(len(out_ports))]
+
+        else:
+            LOGGER.error("set_digital_cycle parameters are not valid")
+            return {"error_code": ErrorCodes.not_available}
+
+        if stop_via_ttl:
+            main_dmc = "galil_toggle_main.dmc"
+        else:
+            main_dmc = "galil_toggle_main_nostop.dmc"
+        mainprog = pathlib.Path(os.path.join(driver_path, main_dmc)).read_text(
+            encoding="utf-8"
+        )
+        if req_out_name is not None:
+            req_port = self.dev_do[req_out_name]
+            subprog_dmc = "galil_toggle_sub_req.dmc"
+        else:
+            req_port = ""
+            subprog_dmc = "galil_toggle_sub.dmc"
+        subprog = pathlib.Path(os.path.join(driver_path, subprog_dmc)).read_text(
+            encoding="utf-8"
+        )
+        mainlines = mainprog.split("\n")
+        subindex = [i for i, x in enumerate(mainlines) if x.strip().startswith("XQ")][0]
+        subline = mainlines.pop(subindex)
+        for i in range(len(out_ports)):
+            mainlines.insert(subindex + i, subline.format(subthread=i + 1))
+        clearbits = [i for i, x in enumerate(mainlines) if x.strip().startswith("CB")]
+        for i in clearbits:
+            mainlines[i] = "    " + "".join([f"CB {oc};" for oc in out_ports])
+        haltindex = [i for i, x in enumerate(mainlines) if x.strip().startswith("HX")][
+            0
+        ]
+        mainlines.pop(haltindex)
+        haltline = "    " + "".join([f"HX{i+1};" for i in range(len(out_ports))])
+        mainlines.insert(haltindex, haltline)
+        prog_parts = [
+            "\n".join(mainlines).format(
+                p_trigger_on=trigger_port_on, p_trigger_off=trigger_port_off
+            )
+        ] + [
+            subprog.format(
+                subthread=i + 1,
+                p_output=out_ports[i],
+                t_duration=t_duration[i],
+                t_offset=t_offset[i],
+                t_time_on=t_on[i],
+                t_time_off=t_off[i],
+                r_output=req_port,
+            )
+            for i in range(len(out_ports))
+        ]
+        dmc_prog = "\n".join(prog_parts)
+        await self.upload_DMC(dmc_prog)
+        self.galilcmd("XQ #main,0")  # excecute main routine
+
+        return {"error_code": err_code}
+
+    async def stop_digital_cycle(self) -> dict:
+        """Halt any running digital-cycle DMC threads and clear their outputs.
+
+        Returns:
+            Dict with `error_code` set to `none`.
+        """
+        if self.digital_cycle_out is not None:
+            self.galilcmd(f"HX{self.digital_cycle_mainthread}")  # stops main routine
+            self.digital_cycle_mainthread = None
+            if isinstance(self.digital_cycle_out, int):
+                self.digital_cycle_out = [self.digital_cycle_out]
+            for i, dout in enumerate(self.digital_cycle_out):
+                self.galilcmd(f"HX{i+1}")  # stops main routine
+                cmd = f"CB {int(dout)}"
+                _ = self.galilcmd(cmd)
+            self.digital_cycle_out = None
+            self.digital_cycle_subthread = None
+        if self.digital_cycle_out_gamry is not None:
+            self.galilcmd("HX2")  # Gamry companion thread (second subthread)
+            cmd = f"CB {int(self.digital_cycle_out_gamry)}"
+            _ = self.galilcmd(cmd)
+            self.digital_cycle_out_gamry = None
+
+        return {"error_code": ErrorCodes.none}
+
+    def shutdown(self):
+        """Close the Galil connection. Invoked when the action server shuts down."""
+        self.disconnect()
+
+
+class GalilPoller(DriverPoller):
+    """Background poller that reads the monitored analog inputs from the Galil driver."""
+
+    driver: Galil
+
+    def get_data(self) -> DriverResponse:
+        """Read every `monitor_ai` channel and scale it.
+
+        Mirrors the pre-migration `poll_sensor_loop`: for each configured
+        `monitor_ai` channel, reads the raw analog value and multiplies it by
+        the configured scaling factor, forwarding the merged dict for the
+        `DriverPoller` base class to push into the live buffer.
+
+        Returns:
+            `DriverResponse` with `data={ai_name: scaled_value, ...}` merged
+            across every channel that returned a valid reading this cycle
+            (the pre-migration loop forwarded one `{ai_name: value}` to
+            `put_lbuf` per channel per cycle; folding them into a single call
+            here is behaviorally equivalent since `DriverPoller` merges
+            `resp.data` into `live_dict` as a whole), or an empty
+            `DriverResponse` if no channel returned a valid reading.
+        """
+        status_dict = {}
+        for ai_name, scaling in self.driver.monitor_ai.items():
+            ai_resp = self.driver._read_analog_in(ai_name)
+            if ai_resp.get("error_code", ErrorCodes.not_available) == ErrorCodes.none:
+                status_dict[ai_name] = float(ai_resp["value"]) * scaling
+        if not status_dict:
+            return DriverResponse()
+        return DriverResponse(
+            response=DriverResponseType.success,
+            status=DriverStatus.ok,
+            data=status_dict,
+        )
+
+
+class AiMonExec(Executor):
+    """Executor that streams the monitored analog inputs from the live buffer.
+
+    Reads `duration` (seconds; -1 for no limit) from the action params and
+    finishes when the elapsed time exceeds it.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the executor and capture the start time and duration."""
+        super().__init__(*args, **kwargs)
+        LOGGER.info("AiMonExec initialized.")
+        self.start_time = time.time()
+        self.duration = self.active.action.action_params.get("duration", -1)
+        LOGGER.info("AiMonExec init complete.")
+
+    async def _poll(self) -> dict:
+        """Read each monitored analog input from the live buffer.
+
+        Returns:
+            Dict with `error`, `status` (active/finished based on duration),
+            and `data` containing per-channel values plus `epoch_s`.
+        """
+        data_dict = {}
+        times = []
+        for ai_name in self.active.driver.monitor_ai.keys():
+            val, epoch_s = self.active.base.get_lbuf(ai_name)
+            data_dict[ai_name] = val
+            times.append(epoch_s)
+        data_dict["epoch_s"] = max(times)
+        iter_time = time.time()
+        elapsed_time = iter_time - self.start_time
+        if (self.duration < 0) or (elapsed_time < self.duration):
+            status = HloStatus.active
+        else:
+            status = HloStatus.finished
+        await asyncio.sleep(0.01)
+        return {
+            "error": ErrorCodes.none,
+            "status": status,
+            "data": data_dict,
+        }

@@ -21,8 +21,8 @@ import pathlib
 import pytest
 
 from helao.core.error import ErrorCodes
-from helao.deploy.hte.drivers.io.enum import TriggerType
-from helao.deploy.hte.drivers.io.galil_io_driver import Galil
+from helao.deploy.hte.servers.galil_io.enum import TriggerType
+from helao.deploy.hte.servers.galil_io.galil_io_driver import Galil
 from helao.helpers.yml_tools import yml_load
 
 CONFIG_DIR = pathlib.Path(__file__).resolve().parents[1] / "configs"

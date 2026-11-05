@@ -13,12 +13,12 @@ import pytest
 
 from helao.core.drivers.helao_driver import DriverResponseType
 from helao.core.error import ErrorCodes
-from helao.deploy.hte.drivers.io.nidaqmx_driver import cNIMAX
-from helao.deploy.hte.drivers.mfc.alicat_driver import MfcConstConcExec
-from helao.deploy.hte.drivers.pump.legato_driver import KDS100
-from helao.deploy.hte.drivers.sensor import axiscam_driver
-from helao.deploy.hte.drivers.sensor.axiscam_driver import AxisCam, AxisCamExec
-from helao.deploy.hte.drivers.temperature_control.mecom_driver import MeerstetterTEC
+from helao.deploy.hte.servers.nidaqmx.nidaqmx_driver import cNIMAX
+from helao.deploy.hte.servers.mfc.alicat_driver import MfcConstConcExec
+from helao.deploy.hte.servers.syringe.legato_driver import KDS100
+from helao.deploy.hte.servers.cam import axiscam_driver
+from helao.deploy.hte.servers.cam.axiscam_driver import AxisCam, AxisCamExec
+from helao.deploy.hte.servers.tec.mecom_driver import MeerstetterTEC
 
 
 @pytest.mark.asyncio
@@ -44,7 +44,7 @@ async def test_heatloop_turns_every_heater_off_on_exit():
 
 @pytest.mark.asyncio
 async def test_power_supply_estop_writes_out0():
-    from helao.deploy.hte.drivers.power_supply.power_supply_driver import (
+    from helao.deploy.hte.servers.power_supply.power_supply_driver import (
         PowerSupplyDriver as PowerSupply,
     )
 
@@ -61,10 +61,10 @@ async def test_power_supply_estop_writes_out0():
 
 @pytest.mark.asyncio
 async def test_estop_during_apply_voltage_leaves_output_off():
-    from helao.deploy.hte.drivers.power_supply.power_supply_driver import (
+    from helao.deploy.hte.servers.power_supply.power_supply_driver import (
         PowerSupplyDriver as PowerSupply,
     )
-    from helao.deploy.hte.servers.action.power_supply_server import (
+    from helao.deploy.hte.servers.power_supply.power_supply_server import (
         ApplyVoltageExecutor,
     )
 

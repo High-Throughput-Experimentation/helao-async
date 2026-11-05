@@ -14,14 +14,14 @@ Every COM call is recorded by the stubs of ``test_gamry_sampling_mode``.
 
 import pytest
 
-from helao.deploy.hte.drivers.pstat.gamry.device import (
+from helao.deploy.hte.servers.gamry.device import (
     GAMRY_DEVICES,
     IFC1010,
     REF30K,
 )
-from helao.deploy.hte.drivers.pstat.gamry.driver import DUMMY_SINK, GamryDriver
-from helao.deploy.hte.drivers.pstat.gamry.range import RANGES
-from helao.deploy.hte.drivers.pstat.gamry.technique import TECH_CV
+from helao.deploy.hte.servers.gamry.driver import DUMMY_SINK, GamryDriver
+from helao.deploy.hte.servers.gamry.range import RANGES
+from helao.deploy.hte.servers.gamry.technique import TECH_CV
 from helao.deploy.hte.tests.test_gamry_sampling_mode import (  # noqa: F401
     FakeGamryCOM,
     Recorder,
@@ -147,7 +147,7 @@ def test_a_failing_readback_does_not_fail_setup(log):
 
 def test_ifc1010_auto_run_after_a_cp_run_turns_auto_ranging_back_on(log):
     """CP/LSA leave SetIERangeMode(False) on the open pstat; auto must undo it."""
-    from helao.deploy.hte.drivers.pstat.gamry.technique import TECH_CP
+    from helao.deploy.hte.servers.gamry.technique import TECH_CP
 
     d = _driver(IFC1010, log)
     d.dtaqsink = DUMMY_SINK  # type: ignore  # driver annotates GamryDtaqSink only
@@ -165,7 +165,7 @@ def test_ifc1010_auto_run_after_a_cp_run_turns_auto_ranging_back_on(log):
 
 
 def test_ref30k_offers_only_the_booster_ranges():
-    from helao.deploy.hte.drivers.pstat.gamry.range import (
+    from helao.deploy.hte.servers.gamry.range import (
         Gamry_IErange_REF30K as enum,
         get_range,
     )

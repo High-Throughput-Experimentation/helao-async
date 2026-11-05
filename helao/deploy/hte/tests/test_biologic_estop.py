@@ -23,17 +23,17 @@ import pytest
 from starlette.testclient import TestClient
 
 from helao.core.drivers.helao_driver import DriverResponseType
-from helao.deploy.hte.drivers.pstat.biologic import driver as eclib1_driver
-from helao.deploy.hte.drivers.pstat.biologic import sim as eclib1_sim
-from helao.deploy.hte.drivers.pstat.biologic import technique as bt
-from helao.deploy.hte.drivers.pstat.biologic_eclib2 import sim as ec2sim
-from helao.deploy.hte.drivers.pstat.biologic_eclib2 import technique as ec2tech
-from helao.deploy.hte.drivers.pstat.biologic_eclib2.driver import (
+from helao.deploy.hte.servers.biologic.biologic import driver as eclib1_driver
+from helao.deploy.hte.servers.biologic.biologic import sim as eclib1_sim
+from helao.deploy.hte.servers.biologic.biologic import technique as bt
+from helao.deploy.hte.servers.biologic.biologic_eclib2 import sim as ec2sim
+from helao.deploy.hte.servers.biologic.biologic_eclib2 import technique as ec2tech
+from helao.deploy.hte.servers.biologic.biologic_eclib2.driver import (
     BiologicEclib2Driver,
 )
-from helao.deploy.hte.drivers.pstat.biologic_ole import technique as ot
-from helao.deploy.hte.drivers.pstat.biologic_ole.driver import BiologicOleDriver
-from helao.deploy.hte.drivers.pstat.biologic_ole.sim import SimConfig, set_sim_config
+from helao.deploy.hte.servers.biologic.biologic_ole import technique as ot
+from helao.deploy.hte.servers.biologic.biologic_ole.driver import BiologicOleDriver
+from helao.deploy.hte.servers.biologic.biologic_ole.sim import SimConfig, set_sim_config
 from helao.helpers.dispatcher import _query_safe
 from helao.helpers.premodels import Action
 from helao.hexagon.tests.biologic_eclib2_sample_params import params as ec2_params

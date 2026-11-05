@@ -18,8 +18,8 @@ from types import SimpleNamespace
 import pytest
 from starlette.testclient import TestClient
 
-from helao.deploy.hte.drivers.motion import kinesis_driver as kd
-from helao.deploy.hte.drivers.motion.kinesis_driver import KinesisMotor
+from helao.deploy.hte.servers.kinesis import kinesis_driver as kd
+from helao.deploy.hte.servers.kinesis.kinesis_driver import KinesisMotor
 from helao.helpers.dispatcher import _query_safe
 from helao.helpers.meta_io import read_meta
 from helao.helpers.premodels import Action
@@ -150,7 +150,7 @@ def _move_calls(driver):
 @pytest.fixture
 def gated(driver, tmp_path):
     """A real ActionHost keyed KMOTOR with the real Kinesis routes registered."""
-    from helao.deploy.hte.servers.action.kinesis_server import kinesis_dyn_endpoints
+    from helao.deploy.hte.servers.kinesis.kinesis_server import kinesis_dyn_endpoints
 
     host = _host(root=str(tmp_path))
     host.server_params.update(_CFG)
@@ -262,7 +262,7 @@ def test_latch_landing_after_the_gate_stops_the_executor_before_it_moves(
     """The race the entry gate cannot see: ``kmove`` passes the gate, then the
     latch lands during ``_pre_exec`` -- before the executor registers, so the
     route's executor sweep does not find it. ``_exec`` must re-check."""
-    from helao.deploy.hte.servers.action.kinesis_server import KinesisMotorExec
+    from helao.deploy.hte.servers.kinesis.kinesis_server import KinesisMotorExec
 
     host, client = gated
     real_pre_exec = KinesisMotorExec._pre_exec

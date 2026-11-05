@@ -29,7 +29,7 @@ servers:
       grounded: true
       # Empty until the templates are authored at a station; the simulated
       # backend never opens them, so the group still comes up.
-      # templates_dir: helao/deploy/hte/drivers/pstat/biologic_ole/templates
+      # templates_dir: helao/deploy/hte/servers/biologic/biologic_ole/templates
   ACTVIS:
     host: 127.0.0.1
     port: 5001

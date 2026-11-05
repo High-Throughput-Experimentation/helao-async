@@ -46,7 +46,7 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 CHANNEL_COLUMN = "channel"
 
 #: The private endpoint that aborts a running measurement, exactly as the Bokeh
-#: panels call it (``servers/visualizer/gamry_vis.py`` and ``biologic_vis.py``).
+#: panels call it (``servers/gamry/bokeh/gamry_vis.py`` and ``biologic_vis.py``).
 #: Bare-path and ``tags=["private"]``, so it never enters the action namespace
 #: and never queues behind whatever the orchestrator is running -- which is the
 #: whole point of an abort.

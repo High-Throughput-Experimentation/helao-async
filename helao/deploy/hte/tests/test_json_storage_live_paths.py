@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pandas as pd
 
 from helao.core.models.file import FileInfo
-from helao.deploy.hte.drivers.data.calc_driver import Calc
+from helao.deploy.hte.servers.calc.calc_driver import Calc
 from helao.deploy.hte.processors import hlo_to_csv, spec_melt_wls
 from helao.helpers.meta_io import dumps_meta, write_meta
 from helao.helpers.to_json import hlo_json_dumps

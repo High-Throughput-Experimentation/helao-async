@@ -50,12 +50,12 @@ from helao.core.models.echem_params import ref_offset, resolve_we_versus
 from helao.core.models.machine import MachineModel
 from helao.core.models.process_contrib import ProcessContrib
 from helao.core.models.sample import LiquidSample, SolidSample
-from helao.deploy.hte.drivers.io.enum import TriggerType
-from helao.deploy.hte.drivers.motion.enum import (
+from helao.deploy.hte.servers.galil_io.enum import TriggerType
+from helao.deploy.hte.servers.galil_motion.enum import (
     MoveModes,
     TransformationModes,
 )
-from helao.deploy.hte.drivers.robot.pal_driver import PALtools
+from helao.deploy.hte.servers.pal.pal_driver import PALtools
 from helao.helpers.lib_decorators import experiment
 from helao.helpers.premodels import ActionPlanMaker
 

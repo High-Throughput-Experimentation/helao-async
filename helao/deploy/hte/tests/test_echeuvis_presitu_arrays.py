@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from helao.deploy.hte.drivers.data.analyses.echeuvis_stability import (
+from helao.deploy.hte.servers.analysis.analyses.echeuvis_stability import (
     ANALYSIS_DEFAULTS,
     EcheUvisAnalysis,
 )

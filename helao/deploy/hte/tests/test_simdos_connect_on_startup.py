@@ -8,7 +8,7 @@ nothing.
 
 import pytest
 
-import helao.deploy.hte.drivers.pump.simdos_driver as simdos
+import helao.deploy.hte.servers.diapump.simdos_driver as simdos
 
 
 def test_port_is_open_after_connect(monkeypatch):

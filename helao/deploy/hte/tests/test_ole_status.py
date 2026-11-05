@@ -9,7 +9,7 @@ finished.
 
 import pytest
 
-from helao.deploy.hte.drivers.pstat.biologic_ole.status import (
+from helao.deploy.hte.servers.biologic.biologic_ole.status import (
     ChannelState,
     SafetyLimit,
     decode_status,

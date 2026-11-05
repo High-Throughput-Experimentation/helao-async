@@ -1,7 +1,7 @@
 """The Reflex potentiostat panels must be able to abort a measurement.
 
 The Bokeh panels have always carried a stop button — one on
-``servers/visualizer/gamry_vis.py``, one per channel on ``biologic_vis.py`` —
+``servers/gamry/bokeh/gamry_vis.py``, one per channel on ``biologic_vis.py`` —
 that POSTs the bare private ``stop_private`` route on the panel's own action
 server. Their Reflex ports carried none, so a station running only the Reflex
 stack could watch a measurement run and had no way to stop it from the UI.
@@ -17,6 +17,8 @@ Run directly (``python -m pytest`` on this file) — the hte suite is not part o
 
 import asyncio
 import importlib
+
+from helao.helpers.server_modules import import_path, module_file
 import json
 import pathlib
 
@@ -78,7 +80,7 @@ def _build_bokeh(modname):
     server that is not there. Same shape as
     ``test_pstat_vis_axis_selectors.py``'s harness.
     """
-    module = importlib.import_module(f"helao.deploy.hte.servers.visualizer.{modname}")
+    module = importlib.import_module(import_path(module_file("hte", modname, "bokeh")))
 
     async def _make():
         vis = module.C_vis(_FakeVis(Document(), {"num_channels": 2}), SERV_KEY)
@@ -151,7 +153,7 @@ def spy(monkeypatch):
 
 def panel_state_class(modname):
     """Mint the concrete state Reflex would bind this panel to."""
-    module = importlib.import_module(f"helao.deploy.hte.servers.reflex.{modname}")
+    module = importlib.import_module(import_path(module_file("hte", modname, "reflex")))
     return module, make_panel_state(
         f"{modname}_stop_test", SERV_KEY, module.STATE_BASE, module.WS_PATH
     )
@@ -352,7 +354,7 @@ def test_the_button_passes_the_channel_not_the_label(modname):
 
 
 def _targets(modname, state, snapshot):
-    module = importlib.import_module(f"helao.deploy.hte.servers.reflex.{modname}")
+    module = importlib.import_module(import_path(module_file("hte", modname, "reflex")))
     module.STATE_BASE._update_stop_targets(state, snapshot)
     return state.stop_targets
 

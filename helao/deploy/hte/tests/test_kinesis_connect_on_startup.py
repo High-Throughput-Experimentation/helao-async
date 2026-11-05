@@ -6,7 +6,7 @@ running poller, and ``KinesisPoller.get_data()`` (which publishes
 error, so a missing controller does not log an ERROR traceback every cycle.
 """
 
-import helao.deploy.hte.drivers.motion.kinesis_driver as kd
+import helao.deploy.hte.servers.kinesis.kinesis_driver as kd
 from helao.core.drivers.helao_driver import DriverResponse, DriverResponseType
 
 AXIS = {"serial_no": "1", "pos_scale": 1.0, "vel_scale": 1.0, "acc_scale": 1.0}

@@ -11,7 +11,7 @@ import threading
 import pytest
 
 from helao.core.drivers.helao_driver import DriverResponseType, DriverStatus
-from helao.deploy.hte.drivers.xafs.driver import XafsSidecarDriver
+from helao.deploy.hte.servers.xafs.driver import XafsSidecarDriver
 
 HEALTH = {"pid": 1, "hw_initialized": False, "simulate": False}
 FIXTURES = pathlib.Path(__file__).parent / "fixtures"
@@ -34,7 +34,11 @@ class Stub:
                 status, payload = stub.routes.get(
                     f"{self.command} {path}", (404, {"detail": "nope"})
                 )
-                raw = payload if isinstance(payload, bytes) else json.dumps(payload).encode()
+                raw = (
+                    payload
+                    if isinstance(payload, bytes)
+                    else json.dumps(payload).encode()
+                )
                 self.send_response(status)
                 self.send_header("Content-Length", str(len(raw)))
                 self.end_headers()

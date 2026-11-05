@@ -1,0 +1,107 @@
+"""Gate-config checks for the bokeh-hosting config, `goldenhexvis.yml`. It names
+the hte bokeh modules directly (no routing key); it resolves, validates, and
+import-resolves, and every hte visualizer module imports without hardware/vendor
+runtime."""
+
+import glob
+import os
+import types
+from importlib import import_module
+
+import pytest
+
+_REPO_ROOT = os.path.dirname(
+    os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    )
+)
+_CFG = os.path.join(
+    _REPO_ROOT, "helao", "deploy", "test", "configs", "goldenhexvis.yml"
+)
+
+
+def _load(path=_CFG):
+    from helao.helpers.config_loader import read_config
+
+    return read_config(path)
+
+
+def _bokeh_entries(conf):
+    return {
+        k: v for k, v in conf["servers"].items() if isinstance(v, dict) and "bokeh" in v
+    }
+
+
+def test_gate_configs_validate():
+    from launch import validateConfig
+
+    conf = _load()
+    pidd = types.SimpleNamespace(
+        reqKeys=("host", "port", "group"), codeKeys=("fast", "bokeh")
+    )
+    assert validateConfig(pidd, conf, _REPO_ROOT) is True
+
+
+def test_gate_bokeh_entries_name_hte_modules_with_no_routing_key():
+    """Every bokeh server names its hte module directly: no `deployment` key, no
+    `bokeh_port`, and the module resolves under helao.deploy.hte and exposes
+    makeBokehApp. (The retired routing keys are the ratchet's business.)"""
+    bokeh_entries = _bokeh_entries(_load())
+    assert set(bokeh_entries) == {"OPERATOR", "LIVE", "ACTVIS"}
+    for scfg in bokeh_entries.values():
+        assert "deployment" not in scfg
+        assert "bokeh_port" not in scfg  # bokeh servers use host/port
+        mod = import_module(f"helao.deploy.hte.servers.{scfg['group']}.{scfg['bokeh']}")
+        assert callable(mod.makeBokehApp)
+
+
+def test_gate_configs_preflight_clean():
+    from helao.hexagon import preflight
+
+    assert preflight.preflight_config(_CFG) == []
+
+
+def test_gate_config_ws_sources_present():
+    """The operator needs ORCH ws_status, live vis needs SIM ws_live — the
+    action/orch group must be in the gate config (reviewer point 3)."""
+    conf = _load()
+    servers = conf["servers"]
+    # no server carries a routing key: every host is natively an ActionHost
+    assert all("deployment" not in v for v in servers.values())
+    assert servers["SIM"]["live_vis"] == "wssim_live_vis"
+    assert servers["OPERATOR"]["params"]["orch_key"] == "ORCH"
+    hostports = [
+        (v["host"], v["port"]) for v in servers.values() if isinstance(v, dict)
+    ]
+    assert len(hostports) == len(set(hostports))
+
+
+_SERVERS = os.path.join(_REPO_ROOT, "helao", "deploy", "hte", "servers")
+_VIS_MODULES = [
+    ".".join(
+        (
+            "helao",
+            "deploy",
+            "hte",
+            "servers",
+            *os.path.relpath(p, _SERVERS)[:-3].split(os.sep),
+        )
+    )
+    for p in sorted(
+        glob.glob(os.path.join(_SERVERS, "visualizer", "*.py"))
+        + glob.glob(os.path.join(_SERVERS, "*", "bokeh", "*.py"))
+    )
+    if not p.endswith("__init__.py")
+]
+
+
+def test_vis_module_set_nonempty():
+    stems = {m.rsplit(".", 1)[1] for m in _VIS_MODULES}
+    expected = {"action_visualizer", "live_visualizer", "control_visualizer"}
+    assert expected <= stems, sorted(expected - stems)
+
+
+@pytest.mark.parametrize("mod", _VIS_MODULES)
+def test_hte_vis_imports_on_linux(mod):
+    """Every hte visualizer module imports without hardware/vendor runtime."""
+    import_module(mod)

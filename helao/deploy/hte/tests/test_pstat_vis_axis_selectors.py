@@ -1,3 +1,5 @@
+from helao.helpers.server_modules import import_path, module_file
+
 """The Gamry/Biologic visualizers' axis selectors are dropdowns keyed by name.
 
 Both visualizers used to hold the axis choice as an *index* into
@@ -72,7 +74,7 @@ def _plotted_axes(plot):
 def test_axis_selectors_are_dropdowns(modname):
     import importlib
 
-    module = importlib.import_module(f"helao.deploy.hte.servers.visualizer.{modname}")
+    module = importlib.import_module(import_path(module_file("hte", modname, "bokeh")))
     vis = _build(module, params={"num_channels": 1})
 
     for selector, title in (
@@ -95,7 +97,7 @@ def test_axis_selectors_are_dropdowns(modname):
 def test_changing_an_axis_replots_that_column(modname):
     import importlib
 
-    module = importlib.import_module(f"helao.deploy.hte.servers.visualizer.{modname}")
+    module = importlib.import_module(import_path(module_file("hte", modname, "bokeh")))
     vis = _build(module, params={"num_channels": 1})
     plot = vis.plot if modname == "gamry_vis" else vis.channel_plots[0]
 
@@ -131,7 +133,7 @@ if __name__ == "__main__":
 
 
 def test_biologic_vis_plots_every_single_technique_endpoint():
-    from helao.deploy.hte.servers.visualizer import biologic_vis
+    from helao.deploy.hte.servers.biologic.bokeh import biologic_vis
 
     for name in (
         "run_CALIMIT",

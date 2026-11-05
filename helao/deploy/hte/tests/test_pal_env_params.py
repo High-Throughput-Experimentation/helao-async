@@ -2,8 +2,8 @@
 
 import logging
 
-from helao.deploy.hte.drivers.robot import pal_driver
-from helao.deploy.hte.drivers.robot.pal_driver import _env_param
+from helao.deploy.hte.servers.pal import pal_driver
+from helao.deploy.hte.servers.pal.pal_driver import _env_param
 
 
 def test_env_resolution(monkeypatch):

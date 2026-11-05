@@ -5,8 +5,8 @@ raises (no DLL, no device), startup still completes, the failure is logged at ER
 and the routes register against the disconnected driver.
 """
 
-from helao.deploy.hte.drivers.spec.spectral_products_driver import SM303
-from helao.hexagon.tests.hosted_server import start_with_raising_connect
+from helao.deploy.hte.servers.spec.spectral_products_driver import SM303
+from helao.deploy.hte.tests.hosted_server import start_with_raising_connect
 
 
 def test_a_raising_connect_keeps_the_server_up(monkeypatch, tmp_path, caplog):
@@ -14,6 +14,7 @@ def test_a_raising_connect_keeps_the_server_up(monkeypatch, tmp_path, caplog):
         monkeypatch,
         tmp_path,
         caplog,
+        deployment="hte",
         module="spec_server",
         prefix="eche10",
         server_key="SPEC_T",

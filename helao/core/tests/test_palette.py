@@ -1119,6 +1119,7 @@ def test_gridjs_hover_does_not_reintroduce_a_grey_header() -> None:
 REFLEX_STACK_GLOBS: Final[tuple[str, ...]] = (
     "helao/ui/reflex/**/*.py",
     "helao/deploy/*/servers/reflex/**/*.py",
+    "helao/deploy/*/servers/*/reflex/**/*.py",
 )
 
 
@@ -1574,8 +1575,8 @@ SWEEP_EXEMPT_PATHS: Final[tuple[str, ...]] = (
 # references. These two are color="color" — a column name, not a colour.
 SWEEP_EXEMPT_SITES: Final[frozenset[tuple[str, int]]] = frozenset(
     {
-        ("helao/deploy/hte/servers/visualizer/spec_vis.py", 311),
-        ("helao/deploy/hte/servers/visualizer/spec_vis.py", 319),
+        ("helao/deploy/hte/servers/spec/bokeh/spec_vis.py", 311),
+        ("helao/deploy/hte/servers/spec/bokeh/spec_vis.py", 319),
     }
 )
 
@@ -1843,8 +1844,8 @@ def test_sweep_reaches_hexagon_tree() -> None:
     """
     targets = {_relative(p) for p in REPO_ROOT.glob("helao/hexagon/**/*.py")}
     assert (
-        "helao/hexagon/adapters/vis/galil_aligner_host.py" in targets
-    ), "helao/hexagon/**/*.py matched nothing under adapters/vis — glob is inert"
+        "helao/hexagon/app/ui_host.py" in targets
+    ), "helao/hexagon/**/*.py matched nothing under app/ — glob is inert"
 
 
 def test_sweep_reaches_the_ui_tree() -> None:

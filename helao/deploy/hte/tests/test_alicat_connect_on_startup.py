@@ -5,7 +5,7 @@ running poller, and the poller's ``get_data()`` must keep returning a
 ``DriverResponse`` without raising.
 """
 
-import helao.deploy.hte.drivers.mfc.alicat_driver as alicat
+import helao.deploy.hte.servers.mfc.alicat_driver as alicat
 from helao.core.drivers.helao_driver import DriverResponse
 
 CONFIG = {"devices": {"mfc1": {"port": "COM1", "unit_id": "A"}}}

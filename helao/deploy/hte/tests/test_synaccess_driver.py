@@ -11,7 +11,7 @@ import threading
 import pytest
 
 from helao.core.drivers.helao_driver import DriverResponseType
-from helao.deploy.hte.drivers.io.synaccess.driver import NetbooterDriver
+from helao.deploy.hte.servers.pdu.driver import NetbooterDriver
 
 AUTH = "Basic " + base64.b64encode(b"admin:secret").decode()
 
@@ -120,7 +120,7 @@ def _env_driver(stub, **extra):
 @pytest.fixture
 def captured_logs(caplog):
     """Route the driver's (possibly non-propagating) logger into caplog."""
-    from helao.deploy.hte.drivers.io.synaccess import driver as mod
+    from helao.deploy.hte.servers.pdu import driver as mod
 
     caplog.set_level(0)
     mod.LOGGER.addHandler(caplog.handler)
@@ -159,7 +159,7 @@ def test_explicit_password_beats_env(make_stub, monkeypatch):
 
 @pytest.mark.parametrize("value", [None, ""])
 def test_named_but_unset_env_is_unconfigured_and_logged(make_stub, monkeypatch, value):
-    from helao.deploy.hte.drivers.io.synaccess import driver as mod
+    from helao.deploy.hte.servers.pdu import driver as mod
 
     if value is None:
         monkeypatch.delenv("TEST_PDU_PW", raising=False)

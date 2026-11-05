@@ -10,8 +10,17 @@ import json
 from pathlib import Path
 
 from harness.endpoints import extract_routes
+from helao.helpers.server_modules import module_file
 
-HTE_ACTION = Path("helao/deploy/hte/servers/action")
+
+def hte_module(filename: str) -> Path:
+    """The hte action module file for ``filename`` (``andor_server.py``)."""
+    path = module_file("hte", Path(filename).stem, "app")
+    if path is None:
+        raise FileNotFoundError(f"hte has no action module {filename!r}")
+    return path
+
+
 OUT = Path("helao/hexagon/tests/checklists/hte")
 
 # (module filename, representative server_key for {server_key} substitution)
@@ -46,7 +55,7 @@ def freeze_all(out_dir: Path = OUT) -> list[Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
     for module, key in SERVERS:
-        routes = extract_routes(HTE_ACTION / module, server_key=key)
+        routes = extract_routes(hte_module(module), server_key=key)
         dst = out_dir / (Path(module).stem + ".json")
         dst.write_text(json.dumps(routes, indent=2) + "\n", encoding="utf-8")
         written.append(dst)

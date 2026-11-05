@@ -51,10 +51,6 @@ CODE_KEYS = ("fast", "bokeh", "reflex")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CHECKLIST_ROOT = REPO_ROOT / "helao" / "hexagon" / "tests" / "checklists"
-# hte's canary configs (P3a/P3e) were relocated here, OUTSIDE helao/deploy/hte/
-# entirely, so they no longer carry "deploy"/"hte" in their path -- see the
-# fallback in _config_deployment below.
-HTE_SMOKE_CONFIGS = REPO_ROOT / "helao" / "hexagon" / "tests" / "smoke" / "configs"
 
 
 def _config_deployment(config: str) -> Optional[str]:
@@ -73,13 +69,6 @@ def _config_deployment(config: str) -> Optional[str]:
             i = parts.index("deploy")
             if i + 1 < len(parts):
                 return parts[i + 1]
-        # Relocated hte canary config: lives under HTE_SMOKE_CONFIGS instead
-        # of helao/deploy/hte/configs/, so "deploy" never appears in its path.
-        # Every config under this centralized, hte-only directory belongs to
-        # "hte" by construction (P3a/P3e relocation) -- infer it directly so
-        # gate 4's deployment-first library lookup isn't skipped post-move.
-        if m.parent == HTE_SMOKE_CONFIGS:
-            return "hte"
     return None
 
 

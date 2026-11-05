@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from helao.deploy.hte.drivers.pstat.biologic_ole import mps_template as mt
+from helao.deploy.hte.servers.biologic.biologic_ole import mps_template as mt
 
 FIXTURES = Path("helao/deploy/hte/tests/fixtures/ole")
 CV = FIXTURES / "CV.mps"  # real: one Cyclic Voltammetry technique

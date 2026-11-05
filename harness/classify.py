@@ -49,7 +49,7 @@ RE_SEQ_ZIPDIR = re.compile(r"^\d{6}(__.+)\.zipdir$")  # explode_zips target
 # treatment as the ``.zip``/``.zipdir`` pair above.
 RE_SEQ_ORIG = re.compile(r"^\d{6}(__.+)\.orig$")
 RE_SEQ_ORIGDIR = re.compile(r"^\d{6}(__.+)\.origdir$")  # explode_zips target
-# AxisCamExec.write_image (helao/deploy/hte/drivers/sensor/axiscam_driver.py)
+# AxisCamExec.write_image (helao/deploy/hte/servers/cam/axiscam_driver.py)
 # names each frame ``cam_{counter:06}_{%y%m%d.%H%M%S}.jpg`` — the counter is
 # deterministic (0 for a one-shot) but the wall-clock ymdhms suffix is volatile
 # (§5.5), so two independent captures of the same acquire_image scenario would

@@ -8,8 +8,8 @@ SIMDOS fault sweep reads ``self._base_hook.executors`` (a ``DriverHostPort`` mem
 import types
 from typing import Any
 
-import helao.deploy.hte.drivers.pump.legato_driver as legato
-import helao.deploy.hte.drivers.pump.simdos_driver as simdos
+import helao.deploy.hte.servers.syringe.legato_driver as legato
+import helao.deploy.hte.servers.diapump.simdos_driver as simdos
 from helao.core.drivers.helao_driver import DriverResponse
 
 

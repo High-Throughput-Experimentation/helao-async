@@ -51,8 +51,8 @@ from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.machine import MachineModel as MM
 from helao.core.models.process_contrib import ProcessContrib
 from helao.core.models.sample import LiquidSample, SolidSample
-from helao.deploy.hte.drivers.io.enum import TriggerType
-from helao.deploy.hte.drivers.motion.enum import MoveModes, TransformationModes
+from helao.deploy.hte.servers.galil_io.enum import TriggerType
+from helao.deploy.hte.servers.galil_motion.enum import MoveModes, TransformationModes
 from helao.helpers.lib_decorators import experiment
 from helao.helpers.premodels import ActionPlanMaker
 

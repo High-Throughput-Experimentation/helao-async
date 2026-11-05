@@ -41,7 +41,7 @@ from helao.core.models.sample import (
     SolidSample,
     object_to_sample,
 )
-from helao.deploy.hte.drivers.robot.sample_shim import SampleArchiveShim
+from helao.deploy.hte.servers.pal.sample_shim import SampleArchiveShim
 
 _SampleParam = Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
 

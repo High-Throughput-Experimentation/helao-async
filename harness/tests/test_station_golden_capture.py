@@ -15,7 +15,7 @@ from harness.tests.test_parity_legacy_remap import SEQ_NAME, _u, _write_run
 
 HELPER = (
     Path(__file__).resolve().parents[2]
-    / "helao/hexagon/tests/smoke/station_golden_capture.py"
+    / "helao/deploy/hte/tests/smoke/station_golden_capture.py"
 )
 PRC = "0__0__t-prc.yml"
 

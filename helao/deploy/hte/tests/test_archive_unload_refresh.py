@@ -13,7 +13,7 @@ from types import SimpleNamespace
 import pytest
 
 from helao.core.models.sample import LiquidSample, SampleStatus
-from helao.deploy.hte.drivers.data.archive_driver import Archive
+from helao.deploy.hte.servers.sample.archive_driver import Archive
 from helao.helpers.sample_positions import VT15, Custom, CustomTypes
 
 

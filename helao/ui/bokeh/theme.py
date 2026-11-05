@@ -300,7 +300,7 @@ def apply_theme(doc) -> None:
 
     Called once from ``HelaoVis.__init__``, which is the single seam that
     reaches every HELAO Bokeh document — including the aligner served by
-    ``helao/hexagon/adapters/vis/galil_aligner_host.py``, whose ``Server`` is
+    ``helao/deploy/hte/servers/galil_motion/galil_aligner_host.py``, whose ``Server`` is
     built inside an action-server process and never passes through
     ``bokeh_launcher.py``.
 

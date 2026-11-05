@@ -20,8 +20,8 @@ value is the shipped MLJ150/M scale, 1/1228800.
 
 import pytest
 
-from helao.deploy.hte.drivers.motion import kinesis_driver as kd
-from helao.deploy.hte.drivers.motion.kinesis_driver import KinesisMotor, MoveModes
+from helao.deploy.hte.servers.kinesis import kinesis_driver as kd
+from helao.deploy.hte.servers.kinesis.kinesis_driver import KinesisMotor, MoveModes
 
 # MLJ150/M as shipped: 61 440 000 counts over 50 mm.
 POS_SCALE = 1228800.0

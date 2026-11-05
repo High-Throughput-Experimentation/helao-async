@@ -16,9 +16,9 @@ import types
 import pytest
 
 from helao.core.drivers.helao_driver import DriverResponse
-import helao.deploy.hte.drivers.sensor.cm0134_driver as cm0134
-import helao.deploy.hte.drivers.sensor.sprintir_driver as sprintir
-import helao.deploy.hte.drivers.temperature_control.mecom_driver as mecom_driver
+import helao.deploy.hte.servers.o2sensor.cm0134_driver as cm0134
+import helao.deploy.hte.servers.co2sensor.sprintir_driver as sprintir
+import helao.deploy.hte.servers.tec.mecom_driver as mecom_driver
 
 
 class _Inst:
@@ -163,7 +163,7 @@ def test_tec_host_starts_and_shuts_down_after_a_raising_connect(
 
     from fastapi.testclient import TestClient
 
-    from helao.deploy.hte.servers.action import tec_server
+    from helao.deploy.hte.servers.tec import tec_server
     from helao.helpers import config_loader
     from helao.hexagon.app import action_host
 

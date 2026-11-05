@@ -65,14 +65,14 @@ from helao.core.models.sample import (
     SampleStatus,
     SampleType,
 )
-from helao.deploy.hte.drivers.robot.enum import CAMS, Spacingmethod
-from helao.deploy.hte.drivers.robot.pal_driver import PAL
+from helao.deploy.hte.servers.pal.enum import CAMS, Spacingmethod
+from helao.deploy.hte.servers.pal.pal_driver import PAL
 from helao.helpers.active_params import ActiveParams
 from helao.helpers.premodels import Action
-from helao.hexagon.adapters.shared.pal_transport import LegacyPalTransport
-from helao.hexagon.adapters.shared.pal_trigger import NullPalTrigger
+from helao.deploy.hte.servers.pal.pal_transport import LegacyPalTransport
+from helao.deploy.hte.servers.pal.pal_trigger import NullPalTrigger
 from helao.hexagon.adapters.shared.sample_state import SampleShimAdapter
-from helao.hexagon.domain.pal_reconciliation import PalReconciliation
+from helao.deploy.hte.servers.pal.pal_reconciliation import PalReconciliation
 
 _FIXED_CLOCK = 1_700_000_000.0
 _DET_NS = uuid.UUID("00000000-0000-0000-0000-0000000000ab")

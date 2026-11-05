@@ -1,0 +1,155 @@
+"""Linux unit tests for golden_capture_co2.py's PURE logic (no server, no HTTP).
+
+Exercises only:
+  - the PARITY_TOPS snapshot copy + provenance.yml round-trip (``snapshot``)
+  - the masked-column set (co2_ppm / epoch_s are masked) and the masked
+    meta-key set (action_params.mean_co2_ppm is masked)
+
+The real-hardware POST to ``/CO2SENSOR/acquire_co2`` is NOT exercised here --
+that only runs at-station with the SprintIR sensor attached on COM12 (see
+golden_capture_co2.py docstrings).
+
+Run:
+
+    conda run -n helao python -m pytest helao/deploy/hte/tests/smoke/test_golden_capture_co2.py -q
+"""
+
+from __future__ import annotations
+
+import tempfile
+from pathlib import Path
+
+from harness.manifest import ProvenanceManifest
+from helao.deploy.hte.tests.smoke.golden_capture_co2 import (
+    CO2_ACT_YML_MASKED_META_KEYS,
+    CO2_HLO_COLUMNS,
+    CO2_HLO_ROW_COUNT_TOLERANCE,
+    CO2_MASKED_HLO_COLUMNS,
+    SCENARIO,
+    snapshot,
+)
+
+
+def test_masked_columns_cover_the_live_channels():
+    cols = set(CO2_MASKED_HLO_COLUMNS["*.hlo"])
+    # both live/hardware-derived columns are masked...
+    assert "co2_ppm" in cols
+    assert "epoch_s" in cols
+    # ...and nothing else (exactly the two data columns the executor emits)
+    assert cols == {"co2_ppm", "epoch_s"}
+    assert len(CO2_HLO_COLUMNS) == 2
+
+
+def test_poll_paced_row_count_tolerance_is_nonzero():
+    # The executor is poll-paced over a wall-clock duration, so the row count
+    # jitters run-to-run -- a nonzero tolerance is required (unlike spec's exact
+    # single-shot count). Anything <=0 would false-fail a legitimate capture.
+    assert CO2_HLO_ROW_COUNT_TOLERANCE["*.hlo"] >= 1
+    assert CO2_HLO_ROW_COUNT_TOLERANCE["*.hlo.json*"] >= 1
+
+
+def test_data_derived_mean_is_masked_in_act_yml():
+    # CO2MonExec._post_exec writes mean_co2_ppm (data-derived) back into
+    # action_params -- it MUST be masked or parity false-fails between captures.
+    keys = CO2_ACT_YML_MASKED_META_KEYS["*-act.yml"]
+    assert "action_params.mean_co2_ppm" in keys
+
+
+def test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td) / "captroot"
+        (root / "RUNS_FINISHED" / "x").mkdir(parents=True)
+        (root / "RUNS_FINISHED" / "x" / "a-act.yml").write_text(
+            "file_type: action\n", encoding="utf-8"
+        )
+        # include a .hlo too (the full happy path: metadata + stream file)
+        (root / "RUNS_FINISHED" / "x" / "acquire_co2-0.hlo").write_text(
+            "hlo_version: x\n%%\n", encoding="utf-8"
+        )
+        (root / "LOGS").mkdir(parents=True)
+        (root / "LOGS" / "CO2SENSOR.jsonl").write_text("not captured", encoding="utf-8")
+
+        out = Path(td) / "golden" / "run1"
+        snapshot(
+            root=root,
+            out_dir=out,
+            config_prefix="co2gold",
+            duration=3.0,
+            acquisition_rate=0.2,
+        )
+
+        assert (out / "root" / "RUNS_FINISHED" / "x" / "a-act.yml").exists()
+        assert not (out / "root" / "LOGS").exists()  # non-parity top excluded
+        assert (out / "provenance.yml").exists()
+
+        manifest = ProvenanceManifest.load(out)
+        assert manifest.scenario == SCENARIO
+        assert manifest.config_prefix == "co2gold"
+        assert manifest.config_path.replace("\\", "/").endswith(
+            "helao/deploy/hte/tests/smoke/configs/co2gold.yml"
+        )
+        assert manifest.masked_hlo_columns == CO2_MASKED_HLO_COLUMNS
+        assert manifest.hlo_row_count_tolerance == CO2_HLO_ROW_COUNT_TOLERANCE
+        assert manifest.masked_meta_keys == CO2_ACT_YML_MASKED_META_KEYS
+
+
+def _write_action(root: Path, status: str = "finished", with_hlo: bool = True) -> Path:
+    """A RUNS_DIAG tree with one manual action -act.yml at ``status`` (+ .hlo)."""
+    d = root / "RUNS_DIAG" / "25.28" / "0716" / "0__0__CO2SENSOR__acquire_co2"
+    d.mkdir(parents=True)
+    (d / "250716.131421-act.yml").write_text(
+        f"file_type: action\naction_status:\n  - {status}\n", encoding="utf-8"
+    )
+    if with_hlo:
+        (d / "acquire_co2-0.hlo").write_text("hlo_version: x\n%%\n", encoding="utf-8")
+    return d
+
+
+def test_snapshot_refuses_to_overwrite_existing_out_dir():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td) / "captroot"
+        _write_action(root, status="finished", with_hlo=True)
+        out = Path(td) / "golden" / "run1"
+        snapshot(
+            root=root,
+            out_dir=out,
+            config_prefix="co2gold",
+            duration=3.0,
+            acquisition_rate=0.2,
+        )
+        try:
+            snapshot(
+                root=root,
+                out_dir=out,
+                config_prefix="co2gold",
+                duration=3.0,
+                acquisition_rate=0.2,
+            )
+        except FileExistsError:
+            pass
+        else:
+            raise AssertionError(
+                "snapshot() should refuse to overwrite an existing out_dir"
+            )
+
+
+def test_snapshot_refuses_empty_capture():
+    """The false-PASS guard: a root with no -act.yml/.hlo must NOT be captured
+    (an empty golden set compares to nothing and passes parity vacuously)."""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td) / "captroot"
+        (root / "RUNS_DIAG").mkdir(parents=True)  # present but empty (no data)
+        out = Path(td) / "golden" / "run1"
+        try:
+            snapshot(
+                root=root,
+                out_dir=out,
+                config_prefix="co2gold",
+                duration=3.0,
+                acquisition_rate=0.2,
+            )
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("snapshot() must refuse an empty (no-output) capture")
+        assert not out.exists()  # nothing written on refusal

@@ -174,8 +174,14 @@ REGISTRAR_CONTRACT: Final[dict[str, set[str]]] = {
 }
 
 
+def _hte_module(stem: str) -> Path:
+    return next(
+        (REPO_ROOT / "helao/deploy/hte/servers").glob(f"*/{stem}.py"), Path(stem)
+    )
+
+
 def _registrar_reads(module_stem: str) -> set[str]:
-    path = REPO_ROOT / f"helao/deploy/hte/servers/action/{module_stem}.py"
+    path = _hte_module(module_stem)
     tree = ast.parse(path.read_text(encoding="utf-8"))
     fn = next(
         (
@@ -211,7 +217,5 @@ def test_registrar_reads_exactly_the_pinned_attributes(module_stem: str) -> None
 def test_the_contract_probe_is_not_vacuous() -> None:
     """A typo'd module stem would make the pin above assert over nothing."""
     for stem in REGISTRAR_CONTRACT:
-        assert (
-            REPO_ROOT / f"helao/deploy/hte/servers/action/{stem}.py"
-        ).exists(), f"{stem} is pinned but has no module"
+        assert (_hte_module(stem)).exists(), f"{stem} is pinned but has no module"
         assert _registrar_reads(stem), f"{stem}'s registrar reads no app attributes"

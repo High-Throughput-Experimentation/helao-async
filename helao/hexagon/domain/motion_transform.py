@@ -1,5 +1,5 @@
 """Pure motion-frame coordinate transform domain service, lifted verbatim
-from ``helao/deploy/hte/drivers/motion/galil_motion_driver.py``'s
+from the former hte ``galil_motion_driver.py``'s
 ``TransformXY`` (P3a D6 split): converts points between the motor, plate, and
 instrument frames using only numpy matrix algebra, with no Base/Active/
 gclib/Bokeh/file-IO coupling, so it is Linux-testable and reusable by P4's

@@ -49,6 +49,8 @@ of `run_unit_tests.py`.
 import asyncio
 import importlib
 
+from helao.helpers.server_modules import import_path, module_file
+
 import pytest
 from bokeh.document import Document
 
@@ -111,7 +113,7 @@ async def _decoded_data(numeric: dict, strings: dict, action_name: str) -> objec
 
 
 def _import(modname):
-    return importlib.import_module(f"helao.deploy.hte.servers.visualizer.{modname}")
+    return importlib.import_module(import_path(module_file("hte", modname, "bokeh")))
 
 
 # --- anti-vacuity guard -----------------------------------------------------
@@ -121,15 +123,11 @@ def test_targeted_module_set_matches_disk_and_is_documented():
     """11 hte modules define add_points; 9 are conformance-tested; the 2
     exclusions are named and justified in the module docstring above, not
     silently dropped."""
-    import subprocess
+    from pathlib import Path
 
-    out = subprocess.run(
-        ["grep", "-rl", "def add_points", "helao/deploy/hte/servers/visualizer"],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout
-    found = {line.split("/")[-1][: -len(".py")] for line in out.strip().splitlines()}
+    servers = Path("helao/deploy/hte/servers")
+    files = [*servers.glob("visualizer/*.py"), *servers.glob("*/bokeh/*.py")]
+    found = {p.stem for p in files if "def add_points" in p.read_text(encoding="utf-8")}
     assert len(found) == 11, found
     excluded = {"sample_vis", "spec_vis"}
     tested = found - excluded

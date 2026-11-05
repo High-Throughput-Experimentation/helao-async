@@ -9,12 +9,12 @@ untested.
 
 import pytest
 
-from helao.deploy.hte.drivers.pstat.biologic_ole.olecom_client import (
+from helao.deploy.hte.servers.biologic.biologic_ole.olecom_client import (
     OleComClient,
     OleComError,
 )
-from helao.deploy.hte.drivers.pstat.biologic_ole.sim import SimConfig, make_factory
-from helao.deploy.hte.drivers.pstat.biologic_ole.status import (
+from helao.deploy.hte.servers.biologic.biologic_ole.sim import SimConfig, make_factory
+from helao.deploy.hte.servers.biologic.biologic_ole.status import (
     ChannelState,
     decode_status,
 )

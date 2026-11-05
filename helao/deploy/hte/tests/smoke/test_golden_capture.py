@@ -1,0 +1,222 @@
+"""Linux unit tests for golden_capture.py's PURE logic (no server, no HTTP).
+
+Exercises only:
+  - the PARITY_TOPS snapshot copy + provenance.yml round-trip (``snapshot``)
+  - the RUNS_ACTIVE-based settle helper (``settle``), with no orch/DB
+
+The real-hardware POST to ``/PSTAT/run_OCV`` is NOT exercised here -- that
+only runs at-station (see golden_capture.py docstrings).
+
+Run:
+
+    conda run -n helao python -m pytest helao/deploy/hte/tests/smoke/test_golden_capture.py -q
+"""
+
+from __future__ import annotations
+
+import tempfile
+from pathlib import Path
+
+from harness.manifest import ProvenanceManifest
+from helao.deploy.hte.tests.smoke.golden_capture import (
+    OCV_ACT_YML_MASKED_META_KEYS,
+    OCV_HLO_COLUMNS,
+    OCV_HLO_ROW_COUNT_TOLERANCE,
+    OCV_MASKED_HLO_COLUMNS,
+    SCENARIO,
+    _actions_complete,
+    _run_artifacts,
+    settle,
+    snapshot,
+)
+
+
+def test_json_era_tree_is_seen_by_artifact_helpers_and_settle():
+    """-act.json + X.jsonl (JSON storage format) must be found and settled on."""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td) / "captroot"
+        d = root / "RUNS_DIAG" / "25.28" / "0716" / "0__0__PSTAT__run_OCV"
+        d.mkdir(parents=True)
+        (d / "250716.131421123456-act.json").write_text(
+            '{"file_type": "action", "action_status": ["finished"]}\n',
+            encoding="utf-8",
+        )
+        (d / "PSTAT-OCV-0.jsonl").write_text("[0, 1]\n", encoding="utf-8")
+        (d / "PSTAT-OCV-0.meta.json").write_text("{}\n", encoding="utf-8")
+        acts, hlos = _run_artifacts(root)
+        assert [Path(a).name for a in acts] == ["250716.131421123456-act.json"]
+        assert [Path(h).name for h in hlos] == ["PSTAT-OCV-0.jsonl"]
+        assert _actions_complete(root)
+        settle(root, settle_polls=2, poll_s=0.01, timeout_s=5.0)
+
+
+def test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td) / "captroot"
+        (root / "RUNS_FINISHED" / "x").mkdir(parents=True)
+        (root / "RUNS_FINISHED" / "x" / "a-act.yml").write_text(
+            "file_type: action\n", encoding="utf-8"
+        )
+        # include a .hlo too (the full happy path: metadata + data file)
+        (root / "RUNS_FINISHED" / "x" / "OCV-0.hlo").write_text(
+            "hlo_version: x\n%%\n", encoding="utf-8"
+        )
+        (root / "LOGS").mkdir(parents=True)
+        (root / "LOGS" / "PSTAT.jsonl").write_text("not captured", encoding="utf-8")
+
+        out = Path(td) / "golden" / "run1"
+        snapshot(
+            root=root,
+            out_dir=out,
+            config_prefix="gamrygold",
+            tval_s=3.0,
+            acq_s=0.1,
+        )
+
+        assert (out / "root" / "RUNS_FINISHED" / "x" / "a-act.yml").exists()
+        assert not (out / "root" / "LOGS").exists()  # non-parity top excluded
+        assert (out / "provenance.yml").exists()
+
+        manifest = ProvenanceManifest.load(out)
+        assert manifest.scenario == SCENARIO
+        assert manifest.config_prefix == "gamrygold"
+        assert manifest.config_path.replace("\\", "/").endswith(
+            "helao/deploy/hte/tests/smoke/configs/gamrygold.yml"
+        )
+        assert manifest.masked_hlo_columns == OCV_MASKED_HLO_COLUMNS
+        assert manifest.hlo_row_count_tolerance == OCV_HLO_ROW_COUNT_TOLERANCE
+        assert set(OCV_HLO_COLUMNS) == set(manifest.masked_hlo_columns["*OCV*.hlo"])
+        # The data-derived -act.yml action_params are masked via masked_meta_keys
+        # (manifest-driven meta-value mask) so parity is a clean PASS when only
+        # those values differ; assert the manifest carries the mask + round-trips.
+        assert manifest.masked_meta_keys == OCV_ACT_YML_MASKED_META_KEYS
+        assert manifest.masked_meta_keys_for("run_OCV__0-act.yml") == [
+            "action_params.t_s__mean_final",
+            "action_params.Ewe_V__mean_final",
+            "action_params.has_bubble",
+        ]
+
+
+def _write_action(root: Path, status: str = "finished", with_hlo: bool = True) -> Path:
+    """A RUNS_DIAG tree with one manual action -act.yml at ``status`` (+ .hlo)."""
+    d = root / "RUNS_DIAG" / "25.28" / "0716" / "0__0__PSTAT__run_OCV"
+    d.mkdir(parents=True)
+    (d / "250716.131421-act.yml").write_text(
+        f"file_type: action\naction_status:\n  - {status}\n", encoding="utf-8"
+    )
+    if with_hlo:
+        (d / "PSTAT-OCV-0.hlo").write_text("hlo_version: x\n%%\n", encoding="utf-8")
+    return d
+
+
+def _write_completed_run(root: Path) -> None:
+    """A RUNS_DIAG tree with one completed (finished) manual action: -act.yml + .hlo."""
+    _write_action(root, status="finished", with_hlo=True)
+
+
+def test_snapshot_refuses_to_overwrite_existing_out_dir():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td) / "captroot"
+        _write_completed_run(root)
+        out = Path(td) / "golden" / "run1"
+        snapshot(
+            root=root, out_dir=out, config_prefix="gamrygold", tval_s=3.0, acq_s=0.1
+        )
+        try:
+            snapshot(
+                root=root,
+                out_dir=out,
+                config_prefix="gamrygold",
+                tval_s=3.0,
+                acq_s=0.1,
+            )
+        except FileExistsError:
+            pass
+        else:
+            raise AssertionError(
+                "snapshot() should refuse to overwrite an existing out_dir"
+            )
+
+
+def test_snapshot_refuses_empty_capture():
+    """The false-PASS guard: a root with no -act.yml/.hlo must NOT be captured
+    (an empty golden set compares to nothing and passes parity vacuously)."""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td) / "captroot"
+        (root / "RUNS_DIAG").mkdir(parents=True)  # present but empty (no data)
+        out = Path(td) / "golden" / "run1"
+        try:
+            snapshot(
+                root=root, out_dir=out, config_prefix="gamrygold", tval_s=3.0, acq_s=0.1
+            )
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("snapshot() must refuse an empty (no-output) capture")
+        assert not out.exists()  # nothing written on refusal
+
+
+def test_settle_returns_once_action_artifacts_are_complete_and_stable():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td) / "captroot"
+        _write_completed_run(root)  # -act.yml + .hlo present, RUNS_ACTIVE absent
+        settle(root, settle_polls=2, poll_s=0.01, timeout_s=5.0)
+
+
+def test_settle_times_out_when_no_artifacts_are_written():
+    """The action never wrote output (errored / no data): settle must raise,
+    not silently return -- this is what prevents the empty-capture false PASS."""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td) / "captroot"
+        root.mkdir()  # empty root, nothing ever written
+        try:
+            settle(root, settle_polls=2, poll_s=0.01, timeout_s=0.05)
+        except TimeoutError:
+            pass
+        else:
+            raise AssertionError("settle() should time out when no artifacts appear")
+
+
+def test_settle_returns_with_terminal_status_no_hlo():
+    """A finished action with no .hlo (run_OCV emitted none) still settles --
+    settle gates on terminal action_status, not on a .hlo."""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td) / "captroot"
+        _write_action(root, status="finished", with_hlo=False)
+        settle(root, settle_polls=2, poll_s=0.01, timeout_s=5.0)
+
+
+def test_settle_does_not_return_while_action_active():
+    """THE core fix: -act.yml exists at init with status 'active' (base.py:1029).
+    settle must NOT return on file existence -- else it snapshots + kills the
+    server mid-measurement (observed: a captured -act.yml frozen at 'active')."""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td) / "captroot"
+        _write_action(root, status="active", with_hlo=False)  # still running
+        try:
+            settle(root, settle_polls=2, poll_s=0.01, timeout_s=0.05)
+        except TimeoutError:
+            pass
+        else:
+            raise AssertionError("settle() must not return while status is 'active'")
+
+
+def test_settle_returns_on_errored_status():
+    """An errored action IS terminal -- settle returns (snapshot then WARNS)."""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td) / "captroot"
+        _write_action(root, status="errored", with_hlo=False)
+        settle(root, settle_polls=2, poll_s=0.01, timeout_s=5.0)
+
+
+def test_snapshot_succeeds_with_terminal_act_yml_only():
+    """snapshot captures a finished -act.yml-only tree (warns about the missing
+    .hlo but does not refuse -- the -act.yml is still a real parity comparison)."""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td) / "captroot"
+        _write_action(root, status="finished", with_hlo=False)
+        out = Path(td) / "golden" / "run1"
+        snapshot(
+            root=root, out_dir=out, config_prefix="gamrygold", tval_s=3.0, acq_s=0.1
+        )
+        assert (out / "provenance.yml").exists()

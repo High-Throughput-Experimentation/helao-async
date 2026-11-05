@@ -14,7 +14,7 @@ from helao.helpers.config_loader import read_config
 # into this centralized, hte-only directory; bare-prefix resolution (which
 # globs helao/deploy/*/configs/) no longer finds them, so they must be passed
 # by full path.
-SMOKE_CONFIGS = preflight.HTE_SMOKE_CONFIGS
+SMOKE_CONFIGS = preflight.REPO_ROOT / "helao/deploy/hte/tests/smoke/configs"
 
 
 def test_config_sanity_duplicate_hostport():

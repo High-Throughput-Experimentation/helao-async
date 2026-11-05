@@ -12,9 +12,9 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from helao.deploy.hte.drivers.pstat.gamry.driver import GamryDriver
-from helao.hexagon.adapters.native.gamry_com import GamryComAdapter
-from helao.hexagon.tests.hosted_server import start_with_raising_connect
+from helao.deploy.hte.servers.gamry.driver import GamryDriver
+from helao.deploy.hte.servers.gamry.gamry_com import GamryComAdapter
+from helao.deploy.hte.tests.hosted_server import start_with_raising_connect
 
 
 def test_gamry_server2_stays_up_after_a_raising_connect(monkeypatch, tmp_path, caplog):
@@ -22,6 +22,7 @@ def test_gamry_server2_stays_up_after_a_raising_connect(monkeypatch, tmp_path, c
         monkeypatch,
         tmp_path,
         caplog,
+        deployment="hte",
         module="gamry_server2",
         prefix="eche10",
         server_key="PSTAT",
@@ -43,7 +44,7 @@ def test_gamry_driver_host_starts_without_comtypes(caplog):
     Before this increment the constructor imported ``comtypes`` and the host failed
     at construction. Now only ``connect()`` does, which the host catches.
     """
-    from helao.deploy.hte.servers.action.gamry_server2 import gamry_dyn_endpoints
+    from helao.deploy.hte.servers.gamry.gamry_server2 import gamry_dyn_endpoints
     from helao.hexagon.app import action_host
     from helao.hexagon.app.action_host import ActionHost
     from helao.hexagon.app.wiring import PortWiring

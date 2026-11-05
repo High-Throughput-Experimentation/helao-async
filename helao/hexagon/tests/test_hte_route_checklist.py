@@ -44,7 +44,7 @@ from harness.endpoints import (
     filter_allowed_additions,
     filter_allowed_param_additions,
 )
-from harness.hte_freeze import HTE_ACTION, OUT, SERVERS
+from harness.hte_freeze import OUT, SERVERS, hte_module
 
 ADDITIONS_PATH = OUT / "_additions.json"
 #: Optional parameters deliberately added to frozen routes; see
@@ -127,7 +127,7 @@ def test_module_matches_its_frozen_checklist(
 ) -> None:
     checklist = OUT / (Path(module).stem + ".json")
     frozen = json.loads(checklist.read_text(encoding="utf-8"))
-    current = extract_routes(HTE_ACTION / module, server_key=server_key)
+    current = extract_routes(hte_module(module), server_key=server_key)
     diffs, _allowed = filter_allowed_additions(
         diff_route_sets(frozen, current), _additions_for(module)
     )
@@ -187,7 +187,7 @@ def test_the_gate_covers_the_whole_measured_surface() -> None:
     resolved = 0
     for entry in _load_additions():
         current = extract_routes(
-            HTE_ACTION / entry["module"], server_key=by_module[entry["module"]]
+            hte_module(entry["module"]), server_key=by_module[entry["module"]]
         )
         for route in current:
             if (route["path"], route["method"]) == (entry["path"], entry["method"]):
@@ -208,7 +208,7 @@ def test_no_addition_entry_is_stale() -> None:
     by_module = dict(SERVERS)
     for entry in _load_additions():
         current = extract_routes(
-            HTE_ACTION / entry["module"], server_key=by_module[entry["module"]]
+            hte_module(entry["module"]), server_key=by_module[entry["module"]]
         )
         present = {(r["path"], r["method"]) for r in current}
         assert (entry["path"], entry["method"]) in present, (
@@ -252,7 +252,7 @@ def test_no_param_addition_entry_is_stale() -> None:
     by_module = dict(SERVERS)
     for entry in _load_param_additions():
         current = extract_routes(
-            HTE_ACTION / entry["module"], server_key=by_module[entry["module"]]
+            hte_module(entry["module"]), server_key=by_module[entry["module"]]
         )
         route = next(
             (

@@ -111,10 +111,10 @@ The orchestrator is the long-lived queue-and-dispatch service used in production
 
 ### BioLogic potentiostats: three backends
 
-`helao/deploy/hte/servers/action/biologic_server.py` serves the same technique endpoints from any of three drivers (`run_plan` excludes `olecom`) (the `BACKENDS` dict), chosen by the server's `pstat_backend` param — `eclib` (default), `olecom` (piloting EC-Lab over OLE COM) or `eclib2`. An absent key yields `eclib`; an *unrecognized* value raises. All three satisfy the `BiologicBackend` Protocol.
+`helao/deploy/hte/servers/biologic/biologic_server.py` serves the same technique endpoints from any of three drivers (`run_plan` excludes `olecom`) (the `BACKENDS` dict), chosen by the server's `pstat_backend` param — `eclib` (default), `olecom` (piloting EC-Lab over OLE COM) or `eclib2`. An absent key yields `eclib`; an *unrecognized* value raises. All three satisfy the `BiologicBackend` Protocol.
 
-The OLE path is not a variation on the EClib one. What to know before editing it: `helao/deploy/hte/drivers/pstat/CLAUDE.md`.
+The OLE path is not a variation on the EClib one. What to know before editing it: `helao/deploy/hte/servers/biologic/CLAUDE.md`.
 
 ### Andor Zyla + spectrograph (two driver variants)
 
-`helao/deploy/hte/drivers/spec/andor/` holds one camera base and two variants, selected by the action server's `wl_source` param (`spectrograph` | `calibration`). An absent value yields the spectrograph driver; an unrecognized one raises. Vendor-import isolation, the calibration lifecycle, and one known-inert endpoint: `helao/deploy/hte/drivers/spec/andor/CLAUDE.md`.
+`helao/deploy/hte/servers/andor/` holds one camera base and two variants, selected by the action server's `wl_source` param (`spectrograph` | `calibration`). An absent value yields the spectrograph driver; an unrecognized one raises. Vendor-import isolation, the calibration lifecycle, and one known-inert endpoint: `helao/deploy/hte/servers/andor/CLAUDE.md`.

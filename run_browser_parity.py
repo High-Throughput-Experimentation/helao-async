@@ -93,7 +93,7 @@ LANES = {
         # action-server process, so P7d's ui_host port is what the check
         # composes directly. Nothing to launch, nothing to tear down.
         "config": None,
-        "check": "helao/core/tests/browser_parity/check_aligner.py",
+        "check": "helao/deploy/hte/tests/browser_parity/check_aligner.py",
         "args": [],
         "ports": [],
     },

@@ -4,7 +4,7 @@ import re
 
 import pytest
 
-from helao.deploy.hte.drivers.xafs.naming import (
+from helao.deploy.hte.servers.xafs.naming import (
     apply_affine,
     reference_savename,
     sample_savename,
@@ -25,7 +25,8 @@ def test_sample_savename():
 def test_reference_savenames():
     assert reference_savename("Zn", "izero", "Cu2O_pellet") == "Zn_IzeroRef_Cu2O_pellet"
     assert (
-        reference_savename("Zn", "energy_calib", "ZnO_film") == "Zn_EnergyCalib_ZnO_film"
+        reference_savename("Zn", "energy_calib", "ZnO_film")
+        == "Zn_EnergyCalib_ZnO_film"
     )
 
 
@@ -47,4 +48,3 @@ def test_names_match_converter_regex():
 def test_apply_affine():
     assert apply_affine([[1, 0, 2], [0, 1, -3]], 1, 1) == (3, -2)
     assert apply_affine([[0, 1, 0], [-1, 0, 0]], 2, 5) == (5, -2)
-

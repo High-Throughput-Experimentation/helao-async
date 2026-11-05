@@ -11,11 +11,11 @@ import pytest
 
 from pathlib import Path
 
-from helao.deploy.hte.drivers.pstat.biologic.technique import BIOTECHS
-from helao.deploy.hte.drivers.pstat.biologic_ole import technique as ot
+from helao.deploy.hte.servers.biologic.biologic.technique import BIOTECHS
+from helao.deploy.hte.servers.biologic.biologic_ole import technique as ot
 
 TECHNIQUE_NAMES = ["OCV", "CA", "CP", "CV", "PEIS", "GEIS", "CAOCV"]
-TEMPLATES = Path("helao/deploy/hte/drivers/pstat/biologic_ole/templates")
+TEMPLATES = Path("helao/deploy/hte/servers/biologic/biologic_ole/templates")
 FIXTURES = Path("helao/deploy/hte/tests/fixtures/ole")
 
 
@@ -195,7 +195,7 @@ def _consumed_action_keys(technique) -> set:
 #: `Vval__V`/`Tval__s` to `..._list` before the `CA_`/`OCV_` prefix, so
 #: reconstructing the real flat key from what CA's/OCV's own build reads
 #: needs the rename applied backwards.
-from helao.deploy.hte.drivers.pstat.biologic.technique import (  # noqa: E402
+from helao.deploy.hte.servers.biologic.biologic.technique import (  # noqa: E402
     _CAOCV_RENAME,
 )
 
@@ -304,7 +304,7 @@ def test_every_caption_exists_in_the_real_template(name):
     station, where the symptom is an experiment that ran on the template's
     defaults with nothing to show it.
     """
-    from helao.deploy.hte.drivers.pstat.biologic_ole import mps_template as mt
+    from helao.deploy.hte.servers.biologic.biologic_ole import mps_template as mt
 
     tech = ot.resolve(name)
     doc = mt.load(TEMPLATES / tech.template)
@@ -317,7 +317,7 @@ def test_every_caption_exists_in_the_real_template(name):
 @pytest.mark.parametrize("name", TEMPLATED)
 def test_the_erange_pair_exists_in_every_real_template(name):
     """erange_rows writes both, and OCV has them despite having no I Range."""
-    from helao.deploy.hte.drivers.pstat.biologic_ole import mps_template as mt
+    from helao.deploy.hte.servers.biologic.biologic_ole import mps_template as mt
 
     doc = mt.load(TEMPLATES / ot.resolve(name).template)
     for caption in ("E range min (V)", "E range max (V)"):
@@ -325,7 +325,7 @@ def test_the_erange_pair_exists_in_every_real_template(name):
 
 
 def test_caocv_is_the_only_two_technique_template():
-    from helao.deploy.hte.drivers.pstat.biologic_ole import mps_template as mt
+    from helao.deploy.hte.servers.biologic.biologic_ole import mps_template as mt
 
     counts = {
         name: mt.n_techniques(mt.load(TEMPLATES / ot.resolve(name).template))
@@ -341,7 +341,7 @@ def test_caocv_scoping_is_not_optional():
     Unscoped, every one of those patches lands in the CA block and the OCV
     step silently keeps the template's values.
     """
-    from helao.deploy.hte.drivers.pstat.biologic_ole import mps_template as mt
+    from helao.deploy.hte.servers.biologic.biologic_ole import mps_template as mt
 
     doc = mt.load(TEMPLATES / "CAOCV.mps")
     for caption in ("E range min (V)", "E range max (V)", "record"):
@@ -357,7 +357,7 @@ def test_every_caocv_parameter_declares_its_block():
 
 def test_the_templates_agree_on_one_eclab_version():
     """A template from another build may have renamed a row silently."""
-    from helao.deploy.hte.drivers.pstat.biologic_ole import mps_template as mt
+    from helao.deploy.hte.servers.biologic.biologic_ole import mps_template as mt
 
     versions = set()
     for path in sorted(TEMPLATES.glob("*.mps")):
@@ -374,7 +374,7 @@ def test_captions_are_case_sensitive_and_inconsistent_across_techniques():
     Both are real, in files from the same EC-Lab build. This is why every
     caption is read from a template rather than derived from a convention.
     """
-    from helao.deploy.hte.drivers.pstat.biologic_ole import mps_template as mt
+    from helao.deploy.hte.servers.biologic.biologic_ole import mps_template as mt
 
     cv = mt.load(FIXTURES / "CV.mps")
     lsv = mt.load(FIXTURES / "LSV.mps")
@@ -498,8 +498,8 @@ def test_the_sweep_mode_row_is_spacing_and_its_values_are_words():
     assert ot.format_value("lin", "spacing") == "Linear"
 
 
-from helao.deploy.hte.drivers.pstat.biologic_ole import mps_assemble as ma
-from helao.deploy.hte.drivers.pstat.biologic_ole import mps_template as mt
+from helao.deploy.hte.servers.biologic.biologic_ole import mps_assemble as ma
+from helao.deploy.hte.servers.biologic.biologic_ole import mps_template as mt
 
 # The real GUI-authored templates, and the real three-technique file the
 # assembler is trying to reproduce.

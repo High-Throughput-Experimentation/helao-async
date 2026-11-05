@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from helao.deploy.hte.drivers.spec.andor import spectrograph as sg
+from helao.deploy.hte.servers.andor import spectrograph as sg
 
 
 class _FakeSpc:
