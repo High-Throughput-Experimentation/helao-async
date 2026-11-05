@@ -1686,7 +1686,7 @@ def ECMS_series_CA_change_gasflow(
 
 
 @sequence(version=1)
-def ECMS_final_clean(
+def ECMS_transition_clean(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     liquid_fill_time_init: float = 40,
@@ -1785,8 +1785,8 @@ def ECMS_final_clean(
     return epm.planned_experiments
 
 
-    @sequence(version=2)
-def ECMS_transition_clean(
+@sequence(version=2)
+def ECMS_final_clean(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     liquid_fill_time_init: float = 12,
