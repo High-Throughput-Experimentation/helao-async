@@ -16,6 +16,7 @@ class Wire:
         self.fail_on = set(fail_on)
         self.raw_programs = []  # exactly what the wrapper received
         self.gcaps = None  # last force_gcaps() argument (2.0 only)
+        self.raw_open = None  # last 1.0 GOpen() string, verbatim
         self.open_error = False  # make open/Controller() fail
 
     def reply(self, cmd):
@@ -36,6 +37,7 @@ def gclib_v1(wire):
         def GOpen(self, s):
             if wire.open_error:
                 raise GclibError("open failed")
+            wire.raw_open = s
             wire.calls.append(("open", s.split()[0]))
 
         def GInfo(self):
@@ -54,8 +56,7 @@ def gclib_v1(wire):
         def GClose(self):
             wire.calls.append(("close",))
 
-    m.GclibError = GclibError
-    m.py = py
+    m.__dict__.update(GclibError=GclibError, py=py)
     return m
 
 
@@ -97,10 +98,12 @@ def gclib_v2(wire):
     def force_gcaps(on):
         wire.gcaps = on
 
-    m.Error = Error
-    m.Controller = Controller
-    m.version = lambda: "2.5.0"
-    m.force_gcaps = force_gcaps
+    m.__dict__.update(
+        Error=Error,
+        Controller=Controller,
+        version=lambda: "2.5.0",
+        force_gcaps=force_gcaps,
+    )
     return m
 
 

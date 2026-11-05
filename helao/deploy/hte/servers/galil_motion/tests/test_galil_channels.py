@@ -48,6 +48,13 @@ def test_v1_download_is_passed_through_unchanged(monkeypatch):
     assert wire.raw_programs == ["#A\nEN\x00"]
 
 
+def test_v1_open_string_is_verbatim(monkeypatch):
+    wire = Wire()
+    install(monkeypatch, "1", wire)
+    GclibCommandChannel().open(CONN)
+    assert wire.raw_open == CONN
+
+
 def test_v2_download_strips_only_trailing_nul(monkeypatch):
     wire = Wire()
     install(monkeypatch, "2", wire)
@@ -55,7 +62,8 @@ def test_v2_download_strips_only_trailing_nul(monkeypatch):
     ch.open(CONN)
     ch.download_program("DL;")
     ch.download_program("#A\nEN\x00")
-    assert wire.raw_programs == ["DL;", "#A\nEN"]
+    ch.download_program("#A\nEN\x00\x00")
+    assert wire.raw_programs == ["DL;", "#A\nEN", "#A\nEN\x00"]
 
 
 def test_v2_direct_disables_gcaps(monkeypatch):
@@ -143,7 +151,7 @@ def test_int_api_is_normalised(value):
     assert isinstance(make_channel({"gclib_api": value}), Gclib2CommandChannel)
 
 
-@pytest.mark.parametrize("value", ["3", "", True, None, 2.0])
+@pytest.mark.parametrize("value", ["3", "", True, None, 2.0, [2]])
 def test_unknown_api_raises(value):
     with pytest.raises(ValueError, match="gclib_api"):
         make_channel({"gclib_api": value})

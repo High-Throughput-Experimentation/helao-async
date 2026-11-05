@@ -1,6 +1,7 @@
 """gclib-backed GalilCommandChannel (P3a galil-3 native deepening).
 
-The at-station adapter: wraps the ``gclib`` runtime (wrapper 1.0, ``gclib.py()``; Windows or Linux) behind the
+The at-station adapter: wraps the ``gclib`` runtime (wrapper 1.0, ``gclib.py()``;
+Windows or Linux) behind the
 :class:`~helao.deploy.hte.servers.galil_motion.galil_command_channel_port.GalilCommandChannel` port.
 ``import gclib`` is lazy (inside ``open``), so this module and the native motion
 driver import and construct on Linux without gclib; only ``open()`` (and the

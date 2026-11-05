@@ -194,6 +194,7 @@ class FakeChannel:
     """Records commands; returns programmed responses (default ``'0'``)."""
 
     def __init__(self, responses: Optional[dict] = None):
+        self.programs: list = []
         self.commands: list = []
         self.opened: Optional[str] = None
         self.closed = False
@@ -208,6 +209,9 @@ class FakeChannel:
         if isinstance(r, list):
             return r.pop(0)
         return r
+
+    def download_program(self, program: str) -> None:
+        self.programs.append(program)
 
     def info(self) -> str:
         return "fake-info"

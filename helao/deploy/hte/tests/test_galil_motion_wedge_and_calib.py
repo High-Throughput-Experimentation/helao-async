@@ -14,6 +14,7 @@ from helao.deploy.hte.servers.galil_motion.galil_motion_native import NativeGali
 class _Channel:
     def __init__(self):
         self.commands = []
+        self.programs = []
 
     def open(self, s):
         pass
@@ -21,6 +22,9 @@ class _Channel:
     def command(self, cmd):
         self.commands.append(cmd)
         return "0"
+
+    def download_program(self, program):
+        self.programs.append(program)
 
     def close(self):
         pass

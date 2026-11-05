@@ -20,7 +20,7 @@ class Gclib2CommandChannel:
 
     def __init__(self) -> None:
         self._c: Optional[Any] = None
-        self._gclib: Optional[Any] = None
+        self._gclib: Any = None
 
     def open(self, connection_string: str) -> None:
         import gclib  # lazy: vendor package, at-station only
