@@ -1,6 +1,6 @@
 """Reflex panel for the websocket simulator's live datastream.
 
-Reflex port of ``servers/visualizer/wssim_live_vis.py``: the ``series_<i>``
+Reflex port of ``servers/wssim/bokeh/wssim_live_vis.py``: the ``series_<i>``
 columns plotted against time, plus a latest-value table. The two coexist; a
 station picks one through its config.
 """

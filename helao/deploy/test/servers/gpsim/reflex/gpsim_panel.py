@@ -1,6 +1,6 @@
 """Reflex panel for the GP simulator's live acquisition stream.
 
-Reflex port of ``servers/visualizer/gpsim_live_vis.py``. This payload does not
+Reflex port of ``servers/gpsim/bokeh/gpsim_live_vis.py``. This payload does not
 fit the flat numeric-column model — it carries per-plate sample arrays
 (``pred_avail``, ``gt_acquired``) and string columns (``orchestrator``,
 ``last_acquisition``) — so this panel reads the ingest layer's raw message

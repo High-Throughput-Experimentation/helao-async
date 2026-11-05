@@ -241,3 +241,16 @@ def test_main_malformed_yaml_config_exits_2(tmp_path, capsys):
     cfg.write_text("servers: [unclosed\n  x: : :\n", encoding="utf-8")
     assert he.main(["setup", str(cfg)]) == 2
     assert "error:" in capsys.readouterr().err
+
+
+def test_yml_and_py_in_different_deployments_are_both_matches(tmp_path):
+    _touch(tmp_path, "a/configs/mix.yml")
+    _touch(tmp_path, "b/configs/mix.py")
+    with pytest.raises(he.EnvSetupError, match="several deployments"):
+        he.resolve_config("mix", tmp_path, interactive=False)
+
+
+def test_yml_beats_py_within_one_deployment(tmp_path):
+    _touch(tmp_path, "a/configs/both.yml")
+    _touch(tmp_path, "a/configs/both.py")
+    assert he.resolve_config("both", tmp_path).name == "both.yml"

@@ -1,6 +1,6 @@
 """Reflex panel for the OER simulator's per-action data stream.
 
-Reflex port of ``servers/visualizer/oersim_vis.py``. Subscribes to ``ws_data``
+Reflex port of ``servers/cpsim/bokeh/oersim_vis.py``. Subscribes to ``ws_data``
 and renders the action-scoped measurement traces.
 """
 

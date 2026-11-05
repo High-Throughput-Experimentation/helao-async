@@ -46,9 +46,12 @@ def resolve_config(
         raise EnvSetupError(f"config file not found: {arg}")
     dep, _, prefix = arg.replace("\\", "/").rpartition("/")
     pattern = f"{dep or '*'}/configs/{prefix}"
-    matches = sorted(deploy_root.glob(f"{pattern}.yml")) or sorted(
-        deploy_root.glob(f"{pattern}.py")
+    matches = sorted(deploy_root.glob(f"{pattern}.yml"))
+    have = {m.parent for m in matches}  # .yml wins over .py within a deployment
+    matches += sorted(
+        m for m in deploy_root.glob(f"{pattern}.py") if m.parent not in have
     )
+    matches.sort()
     if not matches:
         raise EnvSetupError(f"no config named {arg!r} in any deployment")
     if len(matches) == 1:

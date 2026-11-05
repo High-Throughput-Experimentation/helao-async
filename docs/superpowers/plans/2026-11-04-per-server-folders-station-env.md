@@ -2328,7 +2328,7 @@ After P2 and P3 are merged and pushed (and the private import fixes that P2 need
 ## Follow-up plans (separate repos, not in this document)
 
 Each private deployment gets its own short plan in its own repo, using the same tool:
-1. Write `<its repo>/reorg.json` with that deployment's moves, and run `python -m harness.reorg_deploy <its repo>/reorg.json` from the parent repo with `scan` limited to its own directory.
-2. Rewrite its imports of moved `hte` modules (e.g. `helao.deploy.hte.drivers.motion.enum` → `helao.deploy.hte.servers.galil_motion.enum`, and the `galil_aligner_host` import). Its `deployment: hte` config keys stay as they are.
+1. Write `<its repo>/reorg.json` with that deployment's moves. Its own file moves need `--root` support in `harness.reorg_deploy` (not built); until then, move them by hand or build that first.
+2. Rewrite its imports of moved `hte` modules (e.g. `helao.deploy.hte.drivers.motion.enum` → `helao.deploy.hte.servers.galil_motion.enum`, and the `galil_aligner_host` import) with `python -m harness.reorg_deploy --rewrite-only --scan helao/deploy/<private> harness/reorg/hte.json harness/reorg/hte_tests.json harness/reorg/hte_tests2.json harness/reorg/test.json`; it rewrites inside the nested repo and prints `LEFTOVER` lines for string references. Its `deployment: hte` config keys stay as they are.
 3. Add folder `environment.yml`/`requirements.txt`/`README.md` files.
 4. Merge together with P2 when it depends on a moved module.

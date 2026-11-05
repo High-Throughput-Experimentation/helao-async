@@ -255,3 +255,37 @@ def test_existing_destination_and_untracked_source_rejected(tmp_path):
         rd.apply(m, r, dry_run=False)
     assert "source not tracked" in str(e.value) and "destination exists" in str(e.value)
     assert (r / "helao/deploy/d/common.py").exists()
+
+
+def test_rewrite_only_rewrites_inside_nested_repo_and_moves_nothing(tmp_path):
+    r = tmp_path / "repo"
+    _w(
+        r,
+        "helao/deploy/nested/x.py",
+        "from helao.deploy.d.drivers.pump.enum import SPEED\n"
+        "from helao.deploy.d.drivers import pump\n"
+        "OTHER = 'helao.deploy.d.drivers.pump.enum'\n",
+    )
+    (r / "helao/deploy/nested/.git").mkdir()
+    _w(
+        r,
+        "m.json",
+        json.dumps(
+            {
+                "moves": [
+                    [
+                        "helao/deploy/d/drivers/pump/enum.py",
+                        "helao/deploy/d/servers/pump/enum.py",
+                    ],
+                    ["helao/deploy/d/drivers/pump", "helao/deploy/d/servers/pump"],
+                ]
+            }
+        ),
+    )
+    rep = rd.rewrite_only([r / "m.json"], "helao/deploy/nested", r)
+    text = (r / "helao/deploy/nested/x.py").read_text(encoding="utf-8")
+    assert "from helao.deploy.d.servers.pump.enum import SPEED" in text
+    assert "from helao.deploy.d.servers.pump import" not in text  # pkg-level: MANUAL
+    assert any(line.startswith("MANUAL") for line in rep.leftovers)
+    assert any("drivers.pump.enum'" in line for line in rep.leftovers)
+    assert rep.moved == []

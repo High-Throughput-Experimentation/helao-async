@@ -1610,7 +1610,7 @@ def launch_server_groups(
                     )
                 else:
                     LAUNCH_LOGGER.info(
-                        f"Launching {server} at {servHost}:{servPort} using helao/servers/{group}/{servPy}.py",
+                        f"Launching {server} at {servHost}:{servPort} using module {servPy}",
                     )
                     if codeKey == "fast":
                         if group == "orchestrator":
@@ -1847,7 +1847,15 @@ def git_changed_files(repo, old_sha, new_sha):
     """Return absolute paths changed between ``old_sha`` and ``new_sha`` in ``repo``."""
     try:
         out = subprocess.run(
-            ["git", "-C", repo, "diff", "--name-only", f"{old_sha}..{new_sha}"],
+            [
+                "git",
+                "-C",
+                repo,
+                "diff",
+                "--name-only",
+                "--no-renames",
+                f"{old_sha}..{new_sha}",
+            ],
             capture_output=True,
             text=True,
             timeout=30,

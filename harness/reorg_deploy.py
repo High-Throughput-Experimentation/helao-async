@@ -10,8 +10,11 @@ new module from the importer's new location is kept as it is. String literals an
 non-Python files are never rewritten: matches in scanned ``.py`` files are listed
 as leftovers for a person to fix, as is ``from pkg import submodule`` where the
 submodule moved but ``pkg`` did not (prefixed ``MANUAL``).
-Directories holding their own ``.git`` (nested private repos) are not scanned;
-they run this tool themselves with their own mapping.
+Directories holding their own ``.git`` (nested private repos) are not scanned
+in move mode. To fix a nested repo's imports of the moved modules, run
+``--rewrite-only --scan <dir> <mapping.json>...``: no files move, the old->new
+module map comes from the mappings' moves (a source without a suffix is a package
+prefix), and every ``.py`` under ``<dir>`` is rewritten even inside a nested repo.
 """
 
 from __future__ import annotations
@@ -177,7 +180,9 @@ def rewrite_source(
     return "".join(lines)
 
 
-def _scan_files(repo_root: Path, roots: list[str]) -> list[Path]:
+def _scan_files(
+    repo_root: Path, roots: list[str], skip_nested: bool = True
+) -> list[Path]:
     files: list[Path] = []
     for root in roots:
         if any(ch in root for ch in "*?"):
@@ -187,7 +192,7 @@ def _scan_files(repo_root: Path, roots: list[str]) -> list[Path]:
             rel_parts = f.relative_to(repo_root).parts
             if SKIP & set(rel_parts):
                 continue
-            if any(
+            if skip_nested and any(
                 (repo_root.joinpath(*rel_parts[:k]) / ".git").exists()
                 for k in range(2, len(rel_parts))
             ):
@@ -196,13 +201,18 @@ def _scan_files(repo_root: Path, roots: list[str]) -> list[Path]:
     return files
 
 
-def leftovers(repo_root: Path, roots: list[str], old_prefixes: list[str]) -> list[str]:
+def leftovers(
+    repo_root: Path,
+    roots: list[str],
+    old_prefixes: list[str],
+    skip_nested: bool = True,
+) -> list[str]:
     pats = [re.escape(p) for p in old_prefixes] + [
         re.escape(p.replace(".", "/")) for p in old_prefixes
     ]
     rx = re.compile(rf"(?:{'|'.join(pats)})(?![\w])")
     out = []
-    for f in _scan_files(repo_root, roots):
+    for f in _scan_files(repo_root, roots, skip_nested):
         for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
             if rx.search(line):
                 out.append(f"{f.relative_to(repo_root)}:{n}: {line.strip()}")
@@ -216,6 +226,33 @@ def _is_empty_pkg(d: Path) -> bool:
             if p.name != "__init__.py" or p.stat().st_size:
                 return False
     return True
+
+
+def _rewrite_files(repo_root, files, new_to_old, modmap, report) -> None:
+    for f in files:
+        rel = f.relative_to(repo_root)
+        old_rel = new_to_old.get(rel, rel)
+        text = f.read_text(encoding="utf-8")
+        manual: list[int] = []
+        try:
+            new = rewrite_source(
+                text,
+                module_name(old_rel),
+                module_name(rel),
+                rel.name == "__init__.py",
+                modmap,
+                manual,
+            )
+        except SyntaxError as e:
+            report.leftovers.append(f"UNPARSEABLE {rel}: {e}")
+            continue
+        for n in manual:
+            report.leftovers.append(
+                f"MANUAL {rel}:{n}: {new.splitlines()[n - 1].strip()}"
+            )
+        if new != text:
+            f.write_text(new, encoding="utf-8")
+            report.rewritten.append(str(rel))
 
 
 def apply(mapping_path: Path, repo_root: Path, dry_run: bool) -> Report:
@@ -255,42 +292,44 @@ def apply(mapping_path: Path, repo_root: Path, dry_run: bool) -> Report:
             )
             shutil.rmtree(d, ignore_errors=True)
             d = d.parent
-    for f in _scan_files(repo_root, roots):
-        rel = f.relative_to(repo_root)
-        old_rel = new_to_old.get(rel, rel)
-        text = f.read_text(encoding="utf-8")
-        manual: list[int] = []
-        try:
-            new = rewrite_source(
-                text,
-                module_name(old_rel),
-                module_name(rel),
-                rel.name == "__init__.py",
-                modmap,
-                manual,
-            )
-        except SyntaxError as e:
-            report.leftovers.append(f"UNPARSEABLE {rel}: {e}")
-            continue
-        for n in manual:
-            report.leftovers.append(
-                f"MANUAL {rel}:{n}: {new.splitlines()[n - 1].strip()}"
-            )
-        if new != text:
-            f.write_text(new, encoding="utf-8")
-            report.rewritten.append(str(rel))
+    _rewrite_files(repo_root, _scan_files(repo_root, roots), new_to_old, modmap, report)
     old_prefixes = sorted({k for k in modmap if k not in modmap.values()})
     report.leftovers += leftovers(repo_root, roots, old_prefixes)
     return report
 
 
+def rewrite_only(mapping_paths, scan: str, repo_root: Path) -> Report:
+    """Rewrite imports under ``scan`` for the moves in ``mapping_paths``; moves nothing."""
+    repo_root = Path(repo_root).resolve()
+    modmap: dict[str, str] = {}
+    for mp in mapping_paths:
+        for src, dst in load_mapping(Path(mp))[1]:
+            if src.suffix in ("", ".py"):
+                modmap[module_name(src)] = module_name(dst)
+    report = Report()
+    files = _scan_files(repo_root, [scan], skip_nested=False)
+    _rewrite_files(repo_root, files, {}, modmap, report)
+    old_prefixes = sorted({k for k in modmap if k not in modmap.values()})
+    report.leftovers += leftovers(repo_root, [scan], old_prefixes, skip_nested=False)
+    return report
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="python -m harness.reorg_deploy")
-    p.add_argument("mapping")
+    p.add_argument("mapping", nargs="+")
     p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--rewrite-only", action="store_true")
+    p.add_argument("--scan", help="directory to rewrite (with --rewrite-only)")
     a = p.parse_args(argv)
     repo_root = Path(__file__).resolve().parents[1]
-    r = apply(Path(a.mapping), repo_root, a.dry_run)
+    if a.rewrite_only:
+        if not a.scan:
+            p.error("--rewrite-only needs --scan <dir>")
+        r = rewrite_only(a.mapping, a.scan, repo_root)
+    else:
+        if len(a.mapping) != 1 or a.scan:
+            p.error("move mode takes one mapping and no --scan")
+        r = apply(Path(a.mapping[0]), repo_root, a.dry_run)
     print(f"moved {len(r.moved)} files, rewrote {len(r.rewritten)}")
     for line in r.leftovers:
         print(f"LEFTOVER {line}")

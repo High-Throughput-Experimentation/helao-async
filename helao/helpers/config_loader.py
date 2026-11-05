@@ -208,8 +208,9 @@ class ServerConfig(BaseModel):
         port: TCP port the server binds to.
         group: One of ``action``, ``orchestrator``, ``visualizer`` or
             ``operator``; selects the launcher and import path.
-        fast: Module name under ``servers/<group>/`` for FastAPI servers.
-        bokeh: Module name under ``servers/<group>/`` for Bokeh servers.
+        fast: Module name found at ``servers/*/<module>.py`` for FastAPI servers.
+        bokeh: Module name found at ``servers/*/<module>.py`` (visualizers also in
+            ``servers/visualizer/`` or ``servers/*/bokeh/``) for Bokeh servers.
         reflex: Reflex app module name for the Reflex UI stack. A Reflex
             server occupies two ports: ``port`` serves the static frontend and
             ``port + 1`` is the Reflex backend.

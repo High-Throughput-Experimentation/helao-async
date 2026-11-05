@@ -321,14 +321,15 @@ An action server declares which visualizer renders it:
 | `control_vis` | `control_visualizer` | `/control` | — (reads and writes the server's endpoints) |
 
 The value is a bare module name, or a list of names, resolved across
-deployments: the configured deployment first, then `hte`, then every other
-deployment that has a `servers/visualizer/` directory, alphabetically. The
-same name serves both UI stacks: `servers/visualizer/<name>.py` for Bokeh,
-`servers/reflex/<name>.py` for Reflex. A station therefore gains Reflex panels
+deployments: the configured deployment first, then the one other deployment
+that holds the module; if several others do, resolution is ambiguous and
+errors (or warns). The same name serves both UI stacks:
+`servers/visualizer/<name>.py` or `servers/*/bokeh/<name>.py` for Bokeh,
+`servers/reflex/<name>.py` or `servers/*/reflex/<name>.py` for Reflex. A station therefore gains Reflex panels
 by adding a `reflex:` server and changing nothing else, provided a Reflex
 module of that exact name exists. Discovery does no suffix rewriting. Where
 the Reflex panel has a different name, the deployment ships a re-export
-module under the Bokeh name (for example `test/servers/reflex/wssim_live_vis.py`).
+module under the Bokeh name (for example `test/servers/wssim/reflex/wssim_live_vis.py`).
 
 `control_vis` modules in `hte`: `digital_out_control`, `nidaqmx_control`,
 `motion_control_letter_scale`, `motion_control_inverse_scale`,
