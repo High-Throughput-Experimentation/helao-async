@@ -3,7 +3,7 @@
 ``import_autolibs`` walks the ``experiment_libraries`` or
 ``sequence_libraries`` entries of a world config, locates each named
 ``*.py`` under the deployment's library directory (with fallbacks to the
-``hte`` deployment and a glob across all deployments), executes it, and
+only deployment that has it), executes it, and
 collects the public callables advertised by the module's ``EXPERIMENTS`` or
 ``SEQUENCES`` list alongside their file hashes and source paths.
 """
@@ -177,30 +177,30 @@ def import_autolibs(
             )
             lib_path = repo_path(os.path.join(lib_dir, f"{lib_file}.py"))
             if not os.path.isfile(lib_path):
-                LOGGER.warning(
-                    f"{lib_type} library path {lib_path} does not exist, trying 'hte' deployment",
-                )
-                lib_path = repo_path(
-                    os.path.join(
-                        "helao", "deploy", "hte", f"{lib_type}s", f"{lib_file}.py"
-                    )
-                )
-            if not os.path.isfile(lib_path):
-                lib_paths = glob(
-                    repo_path(
-                        os.path.join(
-                            "helao", "deploy", "*", f"{lib_type}s", f"{lib_file}.py"
+                lib_paths = sorted(
+                    glob(
+                        repo_path(
+                            os.path.join(
+                                "helao", "deploy", "*", f"{lib_type}s", f"{lib_file}.py"
+                            )
                         )
                     )
                 )
-                if lib_paths:
+                if len(lib_paths) == 1:
                     lib_path = lib_paths[0]
                     LOGGER.warning(
-                        f"found {lib_type} library path {lib_path} in local deployments, using this path"
+                        f"{lib_type} library {lib_file} not in {lib_dir}; using {lib_path}"
+                    )
+                elif lib_paths:
+                    raise FileNotFoundError(
+                        f"{lib_type} library {lib_file}.py is not in {lib_dir} and "
+                        f"exists in several deployments: {lib_paths}. Give the entry "
+                        f"as an explicit .py path in the config."
                     )
                 else:
                     raise FileNotFoundError(
-                        f"{lib_type} library path {lib_path} does not exist, and no local deployments contain {lib_file}.py in their {lib_type}s folder. Please check your config and file paths."
+                        f"{lib_type} library path {lib_path} does not exist, and no "
+                        f"deployment has {lib_file}.py in its {lib_type}s folder."
                     )
         lib_file_hash = get_filehash(lib_path)
         tempd = SourceFileLoader(lib_file, lib_path).load_module().__dict__
@@ -234,7 +234,7 @@ def import_autolibs(
     lib_dir = repo_path(lib_dir or "")
     if not lib_dir or not os.path.isdir(lib_dir):
         # Not fatal, and NOT an early return. get_libs already falls back per
-        # entry -- 'hte', then a glob across every deployment -- and returning
+        # entry to the only deployment that has it -- and returning
         # here skipped all of it, handing the orchestrator an empty library and
         # the operator nothing to select. Blanking lib_dir routes each entry
         # straight into that fallback; entries written as explicit .py paths

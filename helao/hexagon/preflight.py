@@ -51,8 +51,6 @@ CODE_KEYS = ("fast", "bokeh", "reflex")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CHECKLIST_ROOT = REPO_ROOT / "helao" / "hexagon" / "tests" / "checklists"
-HTE_EXP = REPO_ROOT / "helao" / "deploy" / "hte" / "experiments"
-HTE_SEQ = REPO_ROOT / "helao" / "deploy" / "hte" / "sequences"
 # hte's canary configs (P3a/P3e) were relocated here, OUTSIDE helao/deploy/hte/
 # entirely, so they no longer carry "deploy"/"hte" in their path -- see the
 # fallback in _config_deployment below.
@@ -302,7 +300,8 @@ def _module_resolution(cfg: dict, deploy_root: Path = DEPLOY_ROOT):
                 resolved[key] = explicit
             else:
                 issues.append(
-                    f"{key}: deployment: {explicit} has no {module}.py under servers/"
+                    f"{key}: deployment: {explicit} has no servers/{group}/{module}.py "
+                    f"(nor {module}.py in any servers/* folder)"
                 )
             continue
         dep, found = _launcher_deployment(config_path, group, module)
@@ -343,12 +342,12 @@ def _checklist_presence(servers: dict, resolved: dict) -> tuple[list[str], list[
 
 
 def _lib_module_path(
-    entry: str, default_dir: Path, deployment: Optional[str] = None
+    entry: str, kind: str, deployment: Optional[str] = None
 ) -> Optional[Path]:
     """Resolve a library list entry (bare name or repo-relative path) to a file.
 
     Bare names resolve the way `helao.helpers.import_autolibs` does at runtime:
-    the config's own deployment first, then the `hte` fallback. Without the
+    the config's own deployment first, then the only deployment that has it. Without the
     deployment leg, a config whose libraries live only in its own deployment
     resolves to None here and is silently skipped by the collision check --
     the gate reads as passing while checking nothing.
@@ -357,18 +356,11 @@ def _lib_module_path(
         p = (REPO_ROOT / entry) if not Path(entry).is_absolute() else Path(entry)
         return p if p.exists() else None
     if deployment:
-        p = (
-            REPO_ROOT
-            / "helao"
-            / "deploy"
-            / deployment
-            / default_dir.name
-            / f"{entry}.py"
-        )
+        p = REPO_ROOT / "helao" / "deploy" / deployment / kind / f"{entry}.py"
         if p.exists():
             return p
-    p = default_dir / f"{entry}.py"
-    return p if p.exists() else None
+    found = sorted((REPO_ROOT / "helao" / "deploy").glob(f"*/{kind}/{entry}.py"))
+    return found[0] if len(found) == 1 else None
 
 
 def _top_level_funcs(path: Path) -> list[str]:
@@ -384,13 +376,13 @@ def _library_collisions(cfg: dict, deployment: Optional[str] = None) -> list[str
     if cfg.get("allow_shadow"):
         return []
     issues: list[str] = []
-    for cfg_key, default_dir in (
-        ("experiment_libraries", HTE_EXP),
-        ("sequence_libraries", HTE_SEQ),
+    for cfg_key, kind in (
+        ("experiment_libraries", "experiments"),
+        ("sequence_libraries", "sequences"),
     ):
         name_to_mods: dict[str, list[str]] = defaultdict(list)
         for entry in cfg.get(cfg_key, []) or []:
-            path = _lib_module_path(str(entry), default_dir, deployment)
+            path = _lib_module_path(str(entry), kind, deployment)
             if path is None:
                 continue
             for fn in _top_level_funcs(path):

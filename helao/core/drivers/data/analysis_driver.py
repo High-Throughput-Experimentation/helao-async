@@ -136,13 +136,12 @@ class AnalysisLoadError(RuntimeError):
     """
 
 
-#: Subpackage, under a deployment, that holds its analysis modules.
-_ANALYSES_SUBPKG = "drivers.data.analyses"
+ANALYSES_SUBPKGS = ("servers.analysis.analyses", "drivers.data.analyses")
+"""Where a deployment keeps its analyses, newest layout first."""
 
 
-def _analyses_package(deployment: str) -> str:
-    """Return the analyses package path for ``deployment``."""
-    return f"helao.deploy.{deployment}.{_ANALYSES_SUBPKG}"
+def _analyses_packages(deployment: str) -> list[str]:
+    return [f"helao.deploy.{deployment}.{sub}" for sub in ANALYSES_SUBPKGS]
 
 
 def _deployment_of_config(config_path: Optional[str]) -> Optional[str]:
@@ -194,15 +193,15 @@ def resolve_analyses_package(
         if candidate and candidate not in candidates:
             candidates.append(candidate)
     for candidate in candidates:
-        package = _analyses_package(candidate)
-        if _package_importable(package):
-            if candidate != deployment:
-                LOGGER.info(
-                    f"Analyses package resolved to '{package}' (deployment "
-                    f"'{deployment}' has none); candidates tried: {candidates}."
-                )
-            return package
-    return _analyses_package(deployment) if deployment else None
+        for package in _analyses_packages(candidate):
+            if _package_importable(package):
+                if candidate != deployment:
+                    LOGGER.info(
+                        f"Analyses package resolved to '{package}' (deployment "
+                        f"'{deployment}' has none); candidates tried: {candidates}."
+                    )
+                return package
+    return _analyses_packages(deployment)[0] if deployment else None
 
 
 def _resolve_analysis_class(module, module_name: str, class_name: str):

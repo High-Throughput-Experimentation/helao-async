@@ -6,11 +6,10 @@ and both SYNC drivers:
 1. a built-in, ``helao/core/hooks/builtin/<name>.py``;
 2. an existing ``.py`` path;
 3. ``helao/deploy/<CONFIG deployment>/processors/<name>.py``;
-4. ``helao/deploy/hte/processors/<name>.py``;
-5. any ``helao/deploy/*/processors/<name>.py`` (sorted, first wins).
+4. the only ``helao/deploy/*/processors/<name>.py``; a name held by several
+   deployments, none of them the config's own, is a ``HookConfigError``.
 
-Deployment paths are relative to the repo root, exactly as the retired
-``import_postprocessors`` resolved them. The module's class named ``Hook``
+Deployment paths are anchored on ``helao/deploy``, not the cwd. The module's class named ``Hook``
 (new) or ``PostProcess`` (existing) is used: a ``FinishHook`` subclass
 directly, an ``HloPostProcessor``/``MetaProcessor`` subclass through the
 adapters below, anything else is a startup error.
@@ -21,7 +20,6 @@ __all__ = ["HloPostProcessorHook", "MetaProcessorHook", "import_hook", "load_hoo
 import asyncio
 import importlib
 import os
-from glob import glob
 from importlib.util import module_from_spec, spec_from_file_location
 from typing import Optional
 
@@ -32,7 +30,7 @@ from helao.core.hooks import (
     HookSet,
     PrefinishContext,
 )
-from helao.helpers import config_loader
+from helao.helpers import config_loader, server_modules
 from helao.helpers import helao_logging as logging
 from helao.helpers.processors import HloPostProcessor, MetaProcessor
 
@@ -72,24 +70,24 @@ class MetaProcessorHook(FinishHook):
 
 
 def _resolve_path(name: str) -> Optional[str]:
+    """A processor path: explicit ``.py``, own deployment, else the only other one.
+
+    Anchored on ``helao/deploy`` (not the cwd). A name held by several
+    deployments, none of them the config's own, is a ``HookConfigError``.
+    """
     if name.endswith(".py") and os.path.exists(name):
         return name
-    deployment = (config_loader.CONFIG or {}).get("deployment", "")
-    candidates = [
-        (
-            os.path.join("helao", "deploy", deployment, "processors", f"{name}.py")
-            if deployment
-            else ""
-        ),
-        os.path.join("helao", "deploy", "hte", "processors", f"{name}.py"),
-    ]
-    found = next((p for p in candidates if p and os.path.exists(p)), None)
-    if found is None:
-        any_paths = sorted(
-            glob(os.path.join("helao", "deploy", "*", "processors", f"{name}.py"))
+    root = server_modules.DEPLOY_ROOT
+    own = (config_loader.CONFIG or {}).get("deployment", "")
+    if own and (root / own / "processors" / f"{name}.py").is_file():
+        return str(root / own / "processors" / f"{name}.py")
+    found = sorted(root.glob(f"*/processors/{name}.py"))
+    if len(found) > 1:
+        raise HookConfigError(
+            f"processor {name!r} exists in several deployments "
+            f"{[p.parent.parent.name for p in found]}; none is this config's own"
         )
-        found = any_paths[0] if any_paths else None
-    return found
+    return str(found[0]) if found else None
 
 
 def _load_module_from_path(path: str):

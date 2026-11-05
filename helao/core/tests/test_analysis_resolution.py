@@ -69,7 +69,7 @@ def test_candidate_order_prefers_deployment_then_config(monkeypatch):
     resolved = m.resolve_analyses_package(
         "second", config_path="/repo/helao/deploy/third/configs/somecfg.yml"
     )
-    assert resolved == "helao.deploy.second.drivers.data.analyses"
+    assert resolved == "helao.deploy.second.servers.analysis.analyses"
 
 
 def test_a_later_candidate_is_used_only_when_the_earlier_package_is_absent(
@@ -83,7 +83,7 @@ def test_a_later_candidate_is_used_only_when_the_earlier_package_is_absent(
     resolved = m.resolve_analyses_package(
         "second", config_path="/repo/helao/deploy/third/configs/somecfg.yml"
     )
-    assert resolved == "helao.deploy.third.drivers.data.analyses"
+    assert resolved == "helao.deploy.third.servers.analysis.analyses"
 
 
 def test_unresolvable_deployment_still_names_what_was_configured():
@@ -91,7 +91,7 @@ def test_unresolvable_deployment_still_names_what_was_configured():
     error the caller raises reports the package the config actually asked for."""
     assert (
         m.resolve_analyses_package("no_such_deployment")
-        == "helao.deploy.no_such_deployment.drivers.data.analyses"
+        == "helao.deploy.no_such_deployment.servers.analysis.analyses"
     )
 
 
