@@ -190,8 +190,9 @@ Rules:
 - Hardware dependencies leave `helao_dev_<os>.yml` and `requirements.txt`, but only
   as the last step: after every private deployment ships its folder env files and
   every station has run `setup_env <its prefixes>` once (otherwise a no-argument
-  `update_env` would drop drivers' packages). `pyftdi`, `pyft232` and `pyusb` have no
-  importer anywhere and are removed outright. The `*_pinned_*` files cover the base
+  `update_env` would drop drivers' packages). `pyftdi` and `pyusb` have no
+  importer anywhere and are removed outright. `pyft232` is used, dynamically, by
+  pylablib's ft232 backend, so it moves to `kinesis/requirements.txt`. The `*_pinned_*` files cover the base
   env only and are regenerated with `repin_envs.py`.
 - No uninstall and no `forget` command. To drop a prefix, edit the json.
 - `update.sh` / `update.bat` are unchanged and do not call `update_env`.

@@ -1559,9 +1559,10 @@ Expected: FAIL, listing e.g. `mfc: serial`, `gamry: comtypes`, `kinesis: pylabli
 |---|---|
 | gamry | `comtypes; sys_platform == "win32"` |
 | biologic | `comtypes; sys_platform == "win32"` |
+| kinesis | `pyft232` |
 | nidaqmx | `nidaqmx` |
 | pal | `nidaqmx` |
-| tec | `https://github.com/meerstetter/pyMeCom/archive/master.zip` (and a comment line `# pymecom`) |
+| tec | `https://github.com/meerstetter/pyMeCom/archive/master.zip` |
 
 `README.md` vendor notes (each one names what to install by hand and where the driver looks for it):
 - galil_io, galil_motion: Galil gclib (vendor installer plus its Python wrapper).
@@ -2297,7 +2298,7 @@ Remove `pyftdi`, `pylablib`, `pymodbus`, `pyserial`, `pyusb`, `pyvisa`, `pyvisa-
 
 - [ ] **Step 2: Remove from `requirements.txt`**
 
-Remove `nidaqmx`, `pyft232`, and the pyMeCom URL line.
+Remove `nidaqmx`, the pyMeCom URL line, and `pyft232` (kinesis/requirements.txt now declares it).
 
 - [ ] **Step 3: Regenerate pins**
 

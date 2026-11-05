@@ -2,4 +2,4 @@
 
 Install by hand (not pip/conda):
 
-- Thorlabs Kinesis (vendor DLLs used by `pylablib`).
+- Thorlabs Kinesis software: installs the FTDI D2XX driver that `pyft232` (see requirements.txt) talks through. pylablib does not load Kinesis DLLs.

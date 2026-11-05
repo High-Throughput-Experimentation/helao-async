@@ -1,2 +1,1 @@
-# pymecom
 https://github.com/meerstetter/pyMeCom/archive/master.zip
