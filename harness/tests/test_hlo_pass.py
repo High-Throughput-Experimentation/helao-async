@@ -101,3 +101,57 @@ def test_nan_vs_real_value_is_a_diff():
         tolerance=0,
     )
     assert any(d["key"] == "body.series_0" for d in diffs)
+
+
+def test_a_jsonl_pair_matches_its_legacy_twin(tmp_path):
+    from helao.helpers.meta_io import dumps_meta
+
+    rows = ['{"epoch_s": 1.0, "series_0": 0.5}', '{"epoch_s": 2.0, "series_0": 0.7}']
+    a = tmp_path / "a.hlo"
+    write_hlo(a, 111, rows)
+    (tmp_path / "b.meta.json").write_text(
+        dumps_meta(
+            {
+                "hlo_version": "2026.10.23",
+                "action_name": "WsSim",
+                "column_headings": ["epoch_s", "series_0"],
+                "epoch_ns": 999,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "b.jsonl").write_text("".join(r + "\n" for r in rows), encoding="utf-8")
+    diffs = diff_hlo(
+        a,
+        tmp_path / "b.jsonl",
+        "x/a.hlo",
+        UuidMapper(),
+        UuidMapper(),
+        make_manifest({}, {}),
+    )
+    assert diffs == []
+
+
+def test_a_changed_pair_value_is_caught(tmp_path):
+    a = tmp_path / "a.hlo"
+    write_hlo(a, 1, ['{"epoch_s": 1.0, "series_0": 0.5}'])
+    (tmp_path / "b.jsonl").write_text(
+        '{"epoch_s": 1.0, "series_0": 0.6}\n', encoding="utf-8"
+    )
+    from helao.helpers.meta_io import dumps_meta
+
+    (tmp_path / "b.meta.json").write_text(
+        dumps_meta(
+            {"action_name": "WsSim", "column_headings": ["epoch_s", "series_0"]}
+        ),
+        encoding="utf-8",
+    )
+    diffs = diff_hlo(
+        a,
+        tmp_path / "b.jsonl",
+        "x/a.hlo",
+        UuidMapper(),
+        UuidMapper(),
+        make_manifest({}, {}),
+    )
+    assert diffs  # the comparison is not vacuous across formats

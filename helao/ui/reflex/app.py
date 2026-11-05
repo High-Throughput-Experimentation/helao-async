@@ -30,6 +30,67 @@ from dataclasses import dataclass
 import reflex as rx
 from fastapi import FastAPI
 
+from helao.helpers import config_loader
+from helao.helpers import helao_logging as logging
+from helao.helpers.launcher_bootstrap import load_alert_config
+
+
+def _load_backend_config() -> None:
+    """Install the config and the server logger in a Reflex child process.
+
+    ``reflex_launcher`` spawns ``reflex run --backend-only`` as a *child*
+    process, and ``reflex export`` runs in its own process too. Both import this
+    module fresh, where ``config_loader.CONFIG`` is ``None`` -- it is installed
+    only in the launcher's own process. Without reading ``HELAO_REFLEX_CONFIG``
+    here, both build a bare ``rx.App()`` with zero pages: the backend serves
+    nothing, and the exported bundle ships no routes at all while still looking
+    plausible, because assets are copied verbatim regardless of page content.
+
+    Runs before the panel imports below: each binds ``LOGGER`` at import, so a
+    logger installed later never reaches them and every module builds its own,
+    without the alert handlers from ``alert_config_path``.
+    """
+    conf_arg = os.environ.get("HELAO_REFLEX_CONFIG")
+    if config_loader.CONFIG or not conf_arg:
+        return
+    cfg_dict, _validated = config_loader.read_validated_config(conf_arg)
+    config_loader.install_global_config(cfg_dict)
+    cfg = config_loader.CONFIG
+    assert cfg is not None  # install_global_config just set it
+    key = os.environ.get("HELAO_REFLEX_SERVER_KEY", "")
+    # bokeh_launcher sets this in its own process; the Reflex backend is
+    # a child that loads the config itself, so it must too. Without it
+    # deployment_search_order never tries the config's own deployment
+    # and every panel resolves to "module not found".
+    entry = (cfg.get("servers") or {}).get(key) or {}
+    cfg["deployment"] = entry.get(
+        "deployment",
+        os.path.basename(
+            os.path.dirname(os.path.dirname(cfg.get("loaded_config_path", "")))
+        ),
+    )
+    # Logs go to ``<root>/LOGS/<key>_backend.jsonl`` (or the launcher's unified
+    # file), not a temp dir no operator looks at. Its own file rather than
+    # reflex_launcher's `<key>.jsonl`: two processes rotating one file collide
+    # on Windows.
+    root = cfg.get("root")
+    if not root or logging.LOGGER is not None:
+        return
+    key = key or "reflex"
+    # frontend and backend are one server; ``logger`` tells them apart
+    logging.set_server_key(key)
+    logging.LOGGER = logging.make_logger(
+        logger_name=f"{key}_backend",
+        log_dir=os.path.join(root, "LOGS"),
+        email_config=load_alert_config(cfg),
+        log_level=cfg["servers"]
+        .get(key, {})
+        .get("log_level", cfg.get("log_level", 20)),
+    )
+
+
+_load_backend_config()
+
 # Imported at module scope, not inside the page callable: creating the state
 # class is what registers its event handlers, and `--backend-only` never
 # evaluates a page callable. No cycle -- app_reflex reaches back only as far as
@@ -77,12 +138,11 @@ from helao.ui.reflex.sync_quarantine import (
     configure_quarantine,
     sync_quarantine_page,
 )
+from helao.ui.reflex.logs import LogsState, configure_logs, logs_page
 from helao.ui.reflex.state import make_panel_state
 from helao.ui.reflex.xy_component import make_buffer_router
-from helao.helpers import config_loader
-from helao.helpers import helao_logging as logging
 
-LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+LOGGER = logging.LOGGER or logging.make_logger(__file__)
 
 #: Routes always registered so the navigation shell is complete even when a
 #: page has no content yet.
@@ -99,6 +159,7 @@ SHELL_ROUTES = (
     "/xrds",
     "/retire",
     "/quarantine",
+    "/logs",
 )
 
 #: Page name -> the config key whose panels belong on it.
@@ -359,6 +420,7 @@ def _nav():
             ),
         ),
         rx.link("Quarantine", href="/quarantine"),
+        rx.link("Logs", href="/logs"),
         width="100%",
         padding="0.75em 1em",
         align="center",
@@ -437,11 +499,6 @@ def _index_page(routes: dict):
         ),
         "/",
     )
-
-
-def _stub_page(title: str, spec_note: str, route: str = "/"):
-    """Render a placeholder route that states what will fill it."""
-    return _page(title, rx.text(spec_note, padding_x="1em"), route)
 
 
 def _ensure_panel_states(routes: dict) -> None:
@@ -530,6 +587,7 @@ def build_app(world_cfg: dict, server_key: str):
     assert XrdsState is not None
     assert RetireState is not None
     assert QuarantineState is not None
+    assert LogsState is not None
     # The operator's backend is built per session from this config; without
     # this the page renders but can never reach an orchestrator.
     configure_operator(world_cfg, server_key)
@@ -542,6 +600,7 @@ def build_app(world_cfg: dict, server_key: str):
     configure_retire(world_cfg, server_key)
     # And the sync-quarantine page, off unless this server opts in.
     configure_quarantine(world_cfg, server_key)
+    configure_logs(world_cfg, server_key)
 
     # The buffer route carries bulk column data out-of-band, so megabyte float
     # arrays never traverse Reflex's JSON state channel. `api_transformer` is
@@ -649,6 +708,11 @@ def build_app(world_cfg: dict, server_key: str):
         route="/quarantine",
         title="HELAO quarantine",
     )
+    application.add_page(
+        lambda: _page("Logs", logs_page(), "/logs"),
+        route="/logs",
+        title="HELAO logs",
+    )
 
     @contextlib.asynccontextmanager
     async def _ingest_lifespan():
@@ -673,60 +737,9 @@ def build_app(world_cfg: dict, server_key: str):
     return application
 
 
-def _install_backend_logger(cfg: dict) -> None:
-    """Send this child process's logs to ``<root>/LOGS/<key>_backend.log``.
-
-    ``make_logger`` defaults to a fresh temp directory, so without this every
-    panel warning raised in the Reflex backend lands somewhere no operator
-    looks. Its own file rather than the launcher's ``<key>.log``: two processes
-    rotating one file collide on Windows. Installed as the global logger before
-    ``build_app`` imports the panel modules, which pick it up at import.
-    """
-    global LOGGER
-    root = (cfg or {}).get("root")
-    if not root or logging.LOGGER is not None:
-        return
-    key = os.environ.get("HELAO_REFLEX_SERVER_KEY", "") or "reflex"
-    logging.LOGGER = logging.make_logger(
-        logger_name=f"{key}_backend", log_dir=os.path.join(root, "LOGS")
-    )
-    LOGGER = logging.LOGGER
-
-
 def _build_from_global_config():
-    """Build the app from the installed global config, loading it if needed.
-
-    ``reflex_launcher`` spawns ``reflex run --backend-only`` as a *child*
-    process, and ``reflex export`` runs in its own process too. Both import this
-    module fresh, where ``config_loader.CONFIG`` is ``None`` -- it is installed
-    only in the launcher's own process. Without reading ``HELAO_REFLEX_CONFIG``
-    here, both build a bare ``rx.App()`` with zero pages: the backend serves
-    nothing, and the exported bundle ships no routes at all while still looking
-    plausible, because assets are copied verbatim regardless of page content.
-    """
+    """Build the app from the config ``_load_backend_config`` or a launcher installed."""
     cfg = config_loader.CONFIG
-    if not cfg:
-        conf_arg = os.environ.get("HELAO_REFLEX_CONFIG")
-        if conf_arg:
-            cfg_dict, _validated = config_loader.read_validated_config(conf_arg)
-            config_loader.install_global_config(cfg_dict)
-            cfg = config_loader.CONFIG
-            _install_backend_logger(cfg)
-            # bokeh_launcher sets this in its own process; the Reflex backend is
-            # a child that loads the config itself, so it must too. Without it
-            # deployment_search_order never tries the config's own deployment
-            # and every panel resolves to "module not found".
-            if cfg is not None:
-                key = os.environ.get("HELAO_REFLEX_SERVER_KEY", "")
-                entry = (cfg.get("servers") or {}).get(key) or {}
-                cfg["deployment"] = entry.get(
-                    "deployment",
-                    os.path.basename(
-                        os.path.dirname(
-                            os.path.dirname(cfg.get("loaded_config_path", ""))
-                        )
-                    ),
-                )
     if not cfg:
         LOGGER.warning(
             "no HELAO config available (HELAO_REFLEX_CONFIG unset and none "

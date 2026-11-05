@@ -10,8 +10,9 @@ from bokeh.document import Document
 
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
-from helao.deploy.hte.servers.action import gamry_server2, power_supply_server
-from helao.deploy.hte.servers.action import spec_server
+from helao.deploy.hte.servers.gamry import gamry_server2
+from helao.deploy.hte.servers.power_supply import power_supply_server
+from helao.deploy.hte.servers.spec import spec_server
 
 SERV_KEY = "PSTAT"
 
@@ -221,7 +222,7 @@ def _build(module, serv_params=None):
 
 
 def test_biologic_vis_reads_num_channels_from_action_server_and_skips_extra():
-    from helao.deploy.hte.servers.visualizer import biologic_vis
+    from helao.deploy.hte.servers.biologic.bokeh import biologic_vis
 
     vis = _build(biologic_vis, {"num_channels": 2})
     assert vis.num_channels == 2
@@ -238,7 +239,7 @@ def test_biologic_vis_reads_num_channels_from_action_server_and_skips_extra():
 
 
 def test_spec_vis_survives_unreachable_spec_server(monkeypatch):
-    from helao.deploy.hte.servers.visualizer import spec_vis
+    from helao.deploy.hte.servers.spec.bokeh import spec_vis
 
     def down(*a, **k):
         raise ConnectionError("spec server down")
@@ -249,7 +250,7 @@ def test_spec_vis_survives_unreachable_spec_server(monkeypatch):
 
 
 def test_spec_vis_retries_wavelengths_after_startup_failure(monkeypatch):
-    from helao.deploy.hte.servers.visualizer import spec_vis
+    from helao.deploy.hte.servers.spec.bokeh import spec_vis
 
     def down(*a, **k):
         raise ConnectionError("spec server down")

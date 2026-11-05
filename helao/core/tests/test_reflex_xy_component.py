@@ -611,6 +611,80 @@ def test_controller_forwards_a_chart_click_to_on_select():
     assert out["clickWithoutCoordsIgnored"] is True
 
 
+_LAYOUT_RACE_HARNESS = """
+%(controller)s
+
+const pend = {};
+globalThis.fetch = async (url) =>
+  new Promise((res) => {
+    pend[url] = () => res({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) });
+  });
+let lastUrl = null;
+const renders = [];
+const fakeModule = {
+  decodeFrame: () => ({ message: {}, buffers: [lastUrl], byteLength: 8 }),
+  render: ({ model }) => {
+    renders.push({ spec: (model.get("spec") || {}).name, buf: model.get("buffers")[0] });
+    return () => {};
+  },
+};
+const specAt = (n, name) => ({ name, append: { seq: n, affected: [0] } });
+const tick = () => new Promise((r) => setTimeout(r, 0));
+const land = async (url) => { lastUrl = url; pend[url](); await tick(); await tick(); };
+
+// What the React effect does on every prop change, in this order.
+const effect = (st, spec, layout, url) => {
+  st.spec = spec;
+  st.applyLayout(layout);
+  st.refetch(url);
+};
+
+const out = {};
+(async () => {
+  const st = createController({ spec: specAt(4, "nmol"), onSelect: null });
+  st.attach(fakeModule, { addEventListener: () => {} });
+  effect(st, specAt(4, "nmol"), "nmol", "/b?v=4");
+  await land("/b?v=4");                       // mounted on the nanomoles layout
+  effect(st, specAt(5, "nmol"), "nmol", "/b?v=5");  // still in flight...
+  effect(st, specAt(6, "frac"), "frac", "/b?v=6");  // ...when the unit changes
+  await land("/b?v=5");                       // the stale frame lands first
+  if (pend["/b?v=6"]) await land("/b?v=6");
+  out.renders = renders;
+  out.appliedSeq = st.appliedSeq;
+  console.log(JSON.stringify(out));
+})();
+"""
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_a_frame_in_flight_across_a_layout_change_is_not_mounted():
+    """The rebuilt view must come from the new layout's frame, never the old.
+
+    A layout change resets ``appliedSeq`` so the rebuild accepts any version.
+    A fetch issued before the change and landing after it was therefore
+    accepted and mounted the view from the *old* spec (the composition map's
+    previous unit: its colorbar and trace name). The new frame then arrived on
+    the in-place path, which swaps columns only, and with ``st.layout`` already
+    equal to the new token every later Plot stayed in place on the stale view.
+    """
+    assert _JS_RUNTIME is not None
+    script = _LAYOUT_RACE_HARNESS % {"controller": xc._SHIM_CONTROLLER_JS}
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "race.mjs")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(script)
+        proc = subprocess.run(
+            [_JS_RUNTIME, path], capture_output=True, text=True, timeout=60
+        )
+    assert proc.returncode == 0, f"harness failed:\n{proc.stderr}"
+    out = json.loads(proc.stdout.strip().splitlines()[-1])
+    assert out["renders"] == [
+        {"spec": "nmol", "buf": "/b?v=4"},
+        {"spec": "frac", "buf": "/b?v=6"},
+    ]
+    assert out["appliedSeq"] == 6
+
+
 def test_component_passes_the_current_url_into_refetch():
     """Guards the wiring the controller tests cannot reach.
 

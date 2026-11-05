@@ -75,12 +75,11 @@ async def test_drain_loop_lazy_open_separator_and_rows(tmp_path):
     # close is needed before reading it back (same pattern as
     # test_native_data_file.py's stale-file-conn check).
     await active.file_conn_dict[dflt].file.close()
-    hlo = [f for f in os.listdir(out_dir) if f.endswith(".hlo")]
-    assert len(hlo) == 1
-    text = open(os.path.join(out_dir, hlo[0]), encoding="utf-8").read()
-    assert text.count("%%\n") == 1  # separator exactly once
-    body = text.split("%%\n", 1)[1]
-    lines = body.splitlines()
+    data = [f for f in os.listdir(out_dir) if f.endswith(".jsonl")]
+    assert len(data) == 1
+    text = open(os.path.join(out_dir, data[0]), encoding="utf-8").read()
+    assert "%%" not in text  # rows only; the header is the .meta.json
+    lines = text.splitlines()
     # hlo_json_dumps uses compact separators (verified: no spaces)
     assert lines[0] == '{"t_s":1,"value":2.5}'
     assert lines[1] == '{"error":"data was not serializable"}'

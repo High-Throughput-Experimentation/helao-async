@@ -1,6 +1,6 @@
 """Tests for the Reflex operator page.
 
-Driven against a fake OrchBackend: the real one is an ABC, so a stub is small,
+Driven against a fake RemoteBackend: a stub is small,
 and no orchestrator runs here. The page's logic lives in module-level functions
 for the same reason the browser's does -- rx.State cannot be instantiated
 outside a running app.
@@ -16,7 +16,7 @@ from helao.ui.reflex import operator as opx
 
 
 class FakeBackend:
-    """Only the OrchBackend methods the page calls."""
+    """Only the RemoteBackend methods the page calls."""
 
     def __init__(
         self,

@@ -158,7 +158,7 @@ def sample_status_unit_test() -> bool:
             _check_append(reporter, model_cls)
 
             reporter.section(
-                f"{model_cls.__name__}.remove_sample_status (sample_guarded_remove)"
+                f"{model_cls.__name__}.remove_sample_status (guarded_remove)"
             )
             _check_remove(reporter, model_cls)
 

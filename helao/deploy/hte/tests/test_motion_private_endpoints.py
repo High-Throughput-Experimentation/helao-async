@@ -36,8 +36,8 @@ dispatch must reach the log, since the return value can no longer carry it.
 Tests that assert what reached the controller therefore await the dispatched
 task (``_galil_move``) instead of the endpoint alone.
 
-Neither server's hardware is present (``gclib`` is Windows-only and no
-Thorlabs stage is attached), but neither is needed: the galil vendor seam is
+Neither server's hardware is present (the vendor ``gclib`` is not installed here and
+no Thorlabs stage is attached), but neither is needed: the galil vendor seam is
 ``GalilCommandChannel`` and the Kinesis one is ``Thorlabs.KinesisMotor``, and
 both are replaced with recorders.
 
@@ -56,9 +56,9 @@ from fastapi.testclient import TestClient
 
 from helao.core.error import ErrorCodes
 from helao.ui.shared.motion_control import Units
-from helao.deploy.hte.drivers.motion import kinesis_driver as kd
-from helao.deploy.hte.drivers.motion.kinesis_driver import KinesisMotor
-from helao.hexagon.adapters.native.galil_motion_native import NativeGalilMotion
+from helao.deploy.hte.servers.kinesis import kinesis_driver as kd
+from helao.deploy.hte.servers.kinesis.kinesis_driver import KinesisMotor
+from helao.deploy.hte.servers.galil_motion.galil_motion_native import NativeGalilMotion
 
 #: adss MOTOR's B-axis scale, copied from the tracked hte config and kept as a
 #: literal so a station recalibration cannot retune the regression witness: at
@@ -194,6 +194,7 @@ class FakeChannel:
     """Records commands; returns programmed responses (default ``'0'``)."""
 
     def __init__(self, responses: Optional[dict] = None):
+        self.programs: list = []
         self.commands: list = []
         self.opened: Optional[str] = None
         self.closed = False
@@ -208,6 +209,9 @@ class FakeChannel:
         if isinstance(r, list):
             return r.pop(0)
         return r
+
+    def download_program(self, program: str) -> None:
+        self.programs.append(program)
 
     def info(self) -> str:
         return "fake-info"
@@ -249,10 +253,11 @@ def _galil_responses(extra=None):
 
 def _galil_app(config=None, responses=None, busy_on=()):
     """Register the galil endpoints against a driver with no gclib behind it."""
-    from helao.deploy.hte.servers.action import galil_motion
+    from helao.deploy.hte.servers.galil_motion import galil_motion
 
     channel = FakeChannel(responses=responses or _galil_responses())
     driver = NativeGalilMotion(dict(config or GALIL_CFG), channel=channel)
+    driver.connect()  # the host connects before dyn_endpoints runs
     app = _FakeApp(driver, server_params=dict(config or GALIL_CFG))
 
     # The sample DB is server state this feature never touches, and building a
@@ -286,7 +291,7 @@ async def _settle_galil_moves():
     endpoint launched -- and inside the same event loop, since ``asyncio.run``
     closes the loop, and cancels anything still pending on it, on return.
     """
-    from helao.deploy.hte.servers.action import galil_motion
+    from helao.deploy.hte.servers.galil_motion import galil_motion
 
     while galil_motion.PANEL_MOVE_TASKS:
         await asyncio.gather(
@@ -390,7 +395,7 @@ def test_galil_mm_move_of_the_same_distance_loses_a_count():
 
 def test_galil_absolute_counts_move_emits_pa_not_pr():
     app, ch = _galil_app()
-    from helao.deploy.hte.drivers.motion.galil_motion_driver import MoveModes
+    from helao.deploy.hte.servers.galil_motion.enum import MoveModes
 
     _galil_move(app, axis="y", value=4321, mode=MoveModes.absolute, units=Units.counts)
     assert "PAB=4321" in ch.commands, ch.commands
@@ -418,7 +423,7 @@ def test_galil_move_uses_the_motor_frame_only():
     has had a chance to refuse anything. The refusal would land in the log, so
     that is asserted empty too.
     """
-    from helao.deploy.hte.servers.action import galil_motion
+    from helao.deploy.hte.servers.galil_motion import galil_motion
 
     app, ch = _galil_app()
     recorder = _Recorder()
@@ -446,7 +451,7 @@ def test_galil_move_is_refused_while_an_action_is_running():
     a move that is accepted, dispatched, and only then declined by the
     driver's own guard -- reported nowhere the panel can see.
     """
-    from helao.deploy.hte.servers.action import galil_motion
+    from helao.deploy.hte.servers.galil_motion import galil_motion
 
     app, ch = _galil_app(busy_on=("move",))
     error_code, payload = asyncio.run(
@@ -503,7 +508,7 @@ def test_galil_stop_during_an_action_logs_the_data_integrity_consequence():
     can therefore describe a move that did not happen, and the only evidence
     it was a panel stop is this log line.
     """
-    from helao.deploy.hte.servers.action import galil_motion
+    from helao.deploy.hte.servers.galil_motion import galil_motion
 
     app, _ = _galil_app(busy_on=("move",))
     recorder = _Recorder()
@@ -522,7 +527,7 @@ def test_galil_stop_during_an_action_logs_the_data_integrity_consequence():
 
 
 def test_galil_stop_when_idle_logs_no_warning():
-    from helao.deploy.hte.servers.action import galil_motion
+    from helao.deploy.hte.servers.galil_motion import galil_motion
 
     app, _ = _galil_app()
     recorder = _Recorder()
@@ -643,7 +648,7 @@ def test_galil_move_rejects_an_unconfigured_axis(galil_client):
 
 
 def test_galil_move_accepts_both_spelled_units(galil_client):
-    from helao.deploy.hte.servers.action import galil_motion
+    from helao.deploy.hte.servers.galil_motion import galil_motion
 
     client, channel = galil_client
     for units in ("mm", "counts"):
@@ -716,7 +721,7 @@ def test_galil_panel_move_holds_a_reference_to_its_task():
     has to hold a strong one until the move finishes -- and drop it after, or
     the set grows for the life of the server.
     """
-    from helao.deploy.hte.servers.action import galil_motion
+    from helao.deploy.hte.servers.galil_motion import galil_motion
 
     app, _ = _galil_app()
     released = asyncio.Event()
@@ -746,7 +751,7 @@ def test_galil_background_move_that_raises_is_logged_not_swallowed():
     turns it back into a record, and it has to name the axis and the value,
     since the panel is by then reporting a move it believes succeeded.
     """
-    from helao.deploy.hte.servers.action import galil_motion
+    from helao.deploy.hte.servers.galil_motion import galil_motion
 
     app, _ = _galil_app()
 
@@ -780,7 +785,7 @@ def test_galil_background_move_that_returns_an_error_code_is_logged():
     timeout. Those used to be the endpoint's return value and now have nowhere
     else to go.
     """
-    from helao.deploy.hte.servers.action import galil_motion
+    from helao.deploy.hte.servers.galil_motion import galil_motion
 
     app, _ = _galil_app()
 
@@ -859,7 +864,7 @@ def _kinesis_cfg(**axis_overrides) -> dict:
 @pytest.fixture
 def make_kinesis_app(monkeypatch):
     """Register the Kinesis endpoints against recorders, not hardware."""
-    from helao.deploy.hte.servers.action import kinesis_server
+    from helao.deploy.hte.servers.kinesis import kinesis_server
 
     def _factory(conn=None, scale=None, **kw):
         return FakeKinesisMotor(conn=conn, scale=scale)
@@ -869,6 +874,7 @@ def make_kinesis_app(monkeypatch):
     def _make(config=None, busy_on=(), position=0, status=()):
         config = config or _kinesis_cfg()
         driver = KinesisMotor(config=config)
+        driver.connect()  # the host connects after construction
         for motor in driver.motors.values():
             motor.position = position
             motor._status = list(status)
@@ -947,7 +953,7 @@ def test_kinesis_mm_move_keeps_the_vendor_scaling(make_kinesis_app):
 
 
 def test_kinesis_absolute_move_uses_move_to(make_kinesis_app):
-    from helao.deploy.hte.drivers.motion.kinesis_driver import MoveModes
+    from helao.deploy.hte.servers.kinesis.kinesis_driver import MoveModes
 
     app = make_kinesis_app()
     asyncio.run(
@@ -1050,3 +1056,28 @@ def test_kinesis_move_requires_an_axis_and_a_value(kinesis_client):
     )
     assert app.driver.motors["z"].calls == []
     print("test_kinesis_move_requires_an_axis_and_a_value PASS")
+
+
+def test_a_raising_connect_keeps_galil_motion_up_with_no_motion_routes(
+    monkeypatch, tmp_path, caplog
+):
+    from helao.deploy.hte.tests.hosted_server import start_with_raising_connect
+
+    out = start_with_raising_connect(
+        monkeypatch,
+        tmp_path,
+        caplog,
+        deployment="hte",
+        module="galil_motion",
+        prefix="adss3",
+        server_key="MOTOR",
+        driver_class=NativeGalilMotion,
+        ready=lambda app: hasattr(app, "unified_db"),  # dyn_endpoints has run
+        probe=lambda app: hasattr(app, "unified_db"),
+    )
+    assert len(out.startup_errors) == 1
+    assert "NativeGalilMotion" in out.startup_errors[0].getMessage()
+    assert out.get_status_code == 200
+    assert out.probe is True  # dyn_endpoints ran to completion against the driver
+    # galil_enabled is never set True, so the gated motion routes do not register
+    assert not any(p.endswith("/move") for p in out.route_paths if p)

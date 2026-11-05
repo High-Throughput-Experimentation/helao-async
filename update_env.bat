@@ -1,6 +1,6 @@
 @echo off
-for %%A IN ("%~dp0.") do set REPO_PARENT_FOLDER=%%~dpA
-set HA_DIR=%REPO_PARENT_FOLDER%helao-async
+set HA_DIR=%~dp0
+if "%HA_DIR:~-1%"=="\" set HA_DIR=%HA_DIR:~0,-1%
 conda env list | findstr /r /c:"^helao.*envs\\helao$"
 if ERRORLEVEL 1 (
     echo 'helao' conda environment was not found, creating it now...
@@ -14,6 +14,9 @@ if /I not "%CONDA_DEFAULT_ENV%"=="helao" (
     exit /b 1
 )
 uv pip install --python "%CONDA_PREFIX%\python.exe" -r "%~dp0requirements.txt"
+if ERRORLEVEL 1 exit /b 1
+set PYTHONPATH=%HA_DIR%
+python "%HA_DIR%\helao_env.py" update %*
 if ERRORLEVEL 1 exit /b 1
 echo setting PYTHONPATH in 'helao' conda environment vars
 call conda env config vars set PYTHONPATH=%HA_DIR%

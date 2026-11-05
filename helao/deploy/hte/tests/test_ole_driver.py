@@ -12,9 +12,9 @@ import asyncio
 import pytest
 
 from helao.core.drivers.helao_driver import DriverResponseType, DriverStatus
-from helao.deploy.hte.drivers.pstat.biologic_ole import technique as ot
-from helao.deploy.hte.drivers.pstat.biologic_ole.driver import BiologicOleDriver
-from helao.deploy.hte.drivers.pstat.biologic_ole.sim import SimConfig, set_sim_config
+from helao.deploy.hte.servers.biologic.biologic_ole import technique as ot
+from helao.deploy.hte.servers.biologic.biologic_ole.driver import BiologicOleDriver
+from helao.deploy.hte.servers.biologic.biologic_ole.sim import SimConfig, set_sim_config
 
 
 @pytest.fixture(autouse=True)

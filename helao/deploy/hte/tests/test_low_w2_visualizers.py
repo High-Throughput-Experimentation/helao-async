@@ -2,6 +2,8 @@
 
 import asyncio
 import importlib
+
+from helao.helpers.server_modules import import_path, module_file
 import types
 
 from bokeh.document import Document
@@ -13,8 +15,6 @@ from helao.deploy.hte.tests.test_pstat_vis_axis_selectors import (
     _FakeVis,
 )
 
-VIS = "helao.deploy.hte.servers.visualizer."
-
 
 def _pkg(action_name, uuid, data, status=None):
     return types.SimpleNamespace(
@@ -25,14 +25,16 @@ def _pkg(action_name, uuid, data, status=None):
 
 
 def test_co2_rolling_mean_line_is_bound_to_the_datasource():
-    vis = _build(importlib.import_module(VIS + "co2_vis"))
+    vis = _build(
+        importlib.import_module(import_path(module_file("hte", "co2_vis", "bokeh")))
+    )
     vis._add_plots()
     by_y = {_field(r.glyph.y): r.data_source for r in vis.plot.renderers}
     assert by_y["co2_ppm_mean"] is vis.datasource
 
 
 def test_mfc_empty_batch_does_not_raise():
-    mod = importlib.import_module(VIS + "mfc_vis")
+    mod = importlib.import_module(import_path(module_file("hte", "mfc_vis", "bokeh")))
     host = _FakeVis(Document())
     host.world_cfg = {
         "servers": {
@@ -60,7 +62,9 @@ def _row(vis, t_s):
 
 
 def test_nidaqmx_foreign_action_does_not_reset_the_live_plot():
-    mod = importlib.import_module(VIS + "nidaqmx_vis")
+    mod = importlib.import_module(
+        import_path(module_file("hte", "nidaqmx_vis", "bokeh"))
+    )
     vis = _build(mod)
     action = mod.VALID_ACTION_NAME[0]
     vis.add_points([_pkg(action, "uuid-cell", _row(vis, 1.0))])

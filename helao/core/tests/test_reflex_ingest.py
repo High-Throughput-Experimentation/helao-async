@@ -1,11 +1,10 @@
 """Tests for the Reflex UI stack's WebSocket ingest layer."""
 
 import asyncio
-import pickle
 import time
 
 import numpy as np
-import pyzstd
+from helao.helpers.ws_utils import wire_dumps
 import pytest
 import websockets
 
@@ -180,7 +179,7 @@ def test_normalize_treats_epoch_zero_as_a_real_timestamp():
 
 
 def test_normalize_data_package_unwraps_a_model_object():
-    """ws_data carries pickled DataPackageModel objects, not dicts.
+    """ws_data carries msgpack-encoded DataPackageModel objects, not dicts.
 
     normalize() drops them at its isinstance(message, dict) guard, which left
     the action visualizer permanently empty while its status still read "live".
@@ -281,7 +280,7 @@ async def test_ws_data_packets_reach_the_buffer_through_a_real_subscriber():
 
     Every other fixture writes into .buffer/.raw by hand, which is precisely why
     a normalizer that silently dropped every ws_data packet passed a green
-    suite. This drives a real pickled DataPackageModel over a socket, through
+    suite. This drives a real msgpack-encoded DataPackageModel over a socket, through
     WsIngest's drain loop, into the ring buffer.
     """
     import uuid
@@ -298,7 +297,7 @@ async def test_ws_data_packets_reach_the_buffer_through_a_real_subscriber():
     )
 
     async def handler(ws):
-        await ws.send(pyzstd.compress(pickle.dumps(pkg)))
+        await ws.send(wire_dumps(pkg))
         await asyncio.sleep(1.0)
 
     async with websockets.serve(handler, "127.0.0.1", 0) as server:
@@ -353,7 +352,7 @@ async def test_wsingest_fills_buffer_from_a_live_server():
     async def handler(ws):
         for i in range(5):
             payload = {"v": (float(i), 100.0 + i)}
-            await ws.send(pyzstd.compress(pickle.dumps(payload)))
+            await ws.send(wire_dumps(payload))
             await asyncio.sleep(0.01)
         await asyncio.sleep(1.0)
 
@@ -380,7 +379,7 @@ async def test_wsingest_recovers_after_the_server_restarts():
 
     async def handler(ws):
         sent["n"] += 1
-        await ws.send(pyzstd.compress(pickle.dumps({"v": (float(sent["n"]), 1.0)})))
+        await ws.send(wire_dumps({"v": (float(sent["n"]), 1.0)}))
         await ws.close()
 
     async with websockets.serve(handler, "127.0.0.1", 0) as server:

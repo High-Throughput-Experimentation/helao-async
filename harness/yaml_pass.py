@@ -35,7 +35,7 @@ from typing import Any, Optional, Union
 
 from harness.classify import normalize_name, normalize_relpath
 from harness.uuidmap import UuidMapper
-from helao.helpers.yml_tools import yml_load
+from helao.helpers.meta_io import read_meta
 
 # --- §5.5 volatile lists (exhaustive; keep in lockstep with the spec) ------
 UUID_KEY_SUFFIXES = ("_uuid",)
@@ -82,8 +82,8 @@ def to_plain(obj: Any) -> Any:
 
 
 def load_yml_plain(path: Union[str, Path]) -> Any:
-    """Load a YAML file into plain Python containers."""
-    return to_plain(yml_load(Path(path)))
+    """Load a record (``.json`` or ``.yml``) into plain Python containers."""
+    return to_plain(read_meta(Path(path)))
 
 
 def _stable_key(item: Any) -> str:

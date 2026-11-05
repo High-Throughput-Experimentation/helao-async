@@ -1,7 +1,7 @@
 """Offline proofs for small deferred fixes: PAL GC builders, ADSS, samples."""
 
-from helao.deploy.hte.drivers.robot.enum import GCsampletype
-from helao.deploy.hte.drivers.robot.pal_driver import PAL
+from helao.deploy.hte.servers.pal.enum import GCsampletype
+from helao.deploy.hte.servers.pal.pal_driver import PAL
 from helao.deploy.hte.experiments import ADSS_exp, samples_exp
 
 

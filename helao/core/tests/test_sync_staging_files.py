@@ -38,9 +38,8 @@ import asyncio  # noqa: E402
 
 import pytest  # noqa: E402
 
-import helao.core.drivers.data.sync_driver as legacy_mod  # noqa: E402
 import helao.hexagon.adapters.native.sync_driver as native_mod  # noqa: E402
-from helao.core.drivers.data.sync_driver import HelaoYml, Progress  # noqa: E402
+from helao.hexagon.adapters.native.sync_driver import HelaoYml, Progress  # noqa: E402
 from helao.hexagon.tests.sync_fixtures import (  # noqa: E402
     make_action,
     make_exp_tree,
@@ -196,7 +195,7 @@ def test_the_native_twin_heals_identically(tmp_path):
     assert native_mod.Progress(yml).dict["files_pending"] == []
 
 
-@pytest.mark.parametrize("mod_progress", [Progress, native_mod.Progress])
+@pytest.mark.parametrize("mod_progress", [native_mod.Progress])
 def test_pruning_is_not_persisted_by_itself(tmp_path, mod_progress):
     """Nothing is written back on read: a record that is never synced again is
     never rewritten, matching how re-anchoring already behaves."""
@@ -227,7 +226,7 @@ def _finished_action(root: Path):
     return act_yml
 
 
-@pytest.mark.parametrize("mod", [legacy_mod, native_mod])
+@pytest.mark.parametrize("mod", [native_mod])
 @pytest.mark.asyncio
 async def test_an_unuploadable_file_ends_the_pass_instead_of_spinning(tmp_path, mod):
     """``to_s3`` returns False rather than raising once its own retries are
@@ -258,7 +257,7 @@ async def test_an_unuploadable_file_ends_the_pass_instead_of_spinning(tmp_path, 
         await teardown_driver(drv)
 
 
-@pytest.mark.parametrize("mod", [legacy_mod, native_mod])
+@pytest.mark.parametrize("mod", [native_mod])
 @pytest.mark.asyncio
 async def test_a_file_that_vanishes_mid_pass_is_dropped_not_retried(tmp_path, mod):
     """The second line of defence, for the race the glob filter cannot close:

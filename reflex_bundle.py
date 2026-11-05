@@ -303,15 +303,6 @@ def baked_api_url(path) -> str:
 # --- Stamp ------------------------------------------------------------------
 
 
-def _sha1_file(path) -> Optional[str]:
-    """Return a file's SHA-1 hex digest, or ``None`` when it cannot be read."""
-    try:
-        with open(path, "rb") as handle:
-            return hashlib.sha1(handle.read()).hexdigest()
-    except OSError:
-        return None
-
-
 def _rel(repo_root: str, path: str) -> str:
     """Return ``path`` relative to ``repo_root``, with forward slashes.
 
@@ -443,9 +434,11 @@ def _extra_file_digests(repo_root: str) -> dict:
     process, so ``sys.modules`` cannot see it; the xy client is shipped inside
     the bundle and is not Python at all.
     """
-    out = {"rxconfig.py": _sha1_file(os.path.join(repo_root, APP_DIR, "rxconfig.py"))}
+    from helao.helpers.loaded_modules import sha1_file
+
+    out = {"rxconfig.py": sha1_file(os.path.join(repo_root, APP_DIR, "rxconfig.py"))}
     source = _xy_client_source()
-    out["xy-client.js"] = _sha1_file(source) if source else None
+    out["xy-client.js"] = sha1_file(source) if source else None
     return out
 
 

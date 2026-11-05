@@ -16,7 +16,8 @@ from pathlib import Path
 
 import pytest
 
-from helao.core.drivers.data import sync_driver as legacy_sync
+from helao.helpers import helao_logging
+
 from helao.core.models.helaodirs import HelaoDirs
 from helao.core.tests.set_plate_id import main
 from helao.core.tests.test_set_plate_id import (
@@ -52,6 +53,19 @@ def _offline(monkeypatch):
     set_api(monkeypatch, {"plate_id": NEW, "serial_no": OLD})
 
 
+@pytest.fixture(autouse=True)
+def _reset_logger():
+    """CLI mains install a root logger; keep it from leaking between tests."""
+    saved = helao_logging.LOGGER
+    yield
+    lg = helao_logging.LOGGER
+    if lg is not saved and lg is not None:
+        for h in list(lg.handlers):
+            lg.removeHandler(h)
+            h.close()
+    helao_logging.LOGGER = saved
+
+
 def _body(s3: Path, key: str) -> dict:
     return json.loads((s3 / BUCKET / key).read_text(encoding="utf-8"))
 
@@ -64,7 +78,7 @@ def _keys(s3: Path, prefix: str) -> set:
     }
 
 
-@pytest.mark.parametrize("mod", [legacy_sync, native_sync], ids=["core", "native"])
+@pytest.mark.parametrize("mod", [native_sync], ids=["native"])
 @pytest.mark.asyncio
 async def test_handback_then_finish_yml_uploads_the_corrected_bodies(
     tmp_path, monkeypatch, mod

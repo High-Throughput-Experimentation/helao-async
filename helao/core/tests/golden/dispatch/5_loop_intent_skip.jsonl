@@ -183,29 +183,8 @@
       "method": "intend_skip"
     },
     {
-      "act_dq": 3,
-      "event": "phase_enter",
-      "exp_dq": 0,
-      "loop_intent": "skip",
-      "loop_state": "started",
-      "orch_state": "idle",
-      "phase": "loop_task_dispatch_action",
-      "seq_dq": 0
-    },
-    {
       "event": "intent_call",
       "method": "intend_none"
-    },
-    {
-      "act_dq": 0,
-      "error_code": "none",
-      "event": "phase_exit",
-      "exp_dq": 0,
-      "loop_intent": "none",
-      "loop_state": "started",
-      "orch_state": "idle",
-      "phase": "loop_task_dispatch_action",
-      "seq_dq": 0
     },
     {
       "entries": [
@@ -236,10 +215,6 @@
         }
       ],
       "event": "put_lbuf"
-    },
-    {
-      "event": "intent_call",
-      "method": "intend_none"
     },
     {
       "event": "move_dir",

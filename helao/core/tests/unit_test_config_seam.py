@@ -66,12 +66,9 @@ def _wiring() -> PortWiring:
         config=_stub(),
         logging=_stub(),
         clock=_stub(),
-        transport=_stub(),
         state_persistence=_stub(),
-        status=_stub(),
         health=_stub(),
         artifact_store=_stub(),
-        data_sink=_stub(),
     )
 
 

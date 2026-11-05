@@ -48,6 +48,7 @@ class WEVersus(str, Enum):
 
     ref = "ref"
     rhe = "rhe"
+    ocv = "ocv"
 
 
 class BubbleGas(str, Enum):

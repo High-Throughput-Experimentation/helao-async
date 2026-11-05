@@ -1,6 +1,6 @@
 """Local-filesystem variant of the HELAO data loader.
 
-Indexes ``*-{seq,exp,act,prc}.yml`` files under a run tree (active, finished,
+Indexes ``*-{seq,exp,act,prc}.json`` (and legacy ``.yml``) files under a run tree (active, finished,
 synced, or diag) or a synced sequence ``.zip`` archive into pandas dataframes,
 and exposes ``LocalLoader`` + per-record wrappers that read YAML/HLO/parquet
 content via :class:`helao.helpers.file_mapper.FileMapper`.
@@ -8,7 +8,6 @@ content via :class:`helao.helpers.file_mapper.FileMapper`.
 
 import os
 from datetime import datetime
-from glob import glob
 from io import BytesIO
 from typing import Optional
 from uuid import UUID
@@ -17,15 +16,15 @@ from zipfile import ZipFile
 import pandas as pd
 
 from helao.core.drivers.data.loaders.model_base import (
-    HelaoArtifact,
     HelaoDataModelMixin,
     HloPayload,
 )
 from helao.core.drivers.data.process_locator import process_uuid_of
-from helao.core.models.run_dir import RunDir, is_legacy_path, is_run_root
+from helao.core.models.run_dir import RunDir, is_legacy_path
 from helao.helpers.file_mapper import FileMapper
-from helao.helpers.hlo_data import read_hlo_bytes
-from helao.helpers.yml_tools import yml_load
+from helao.helpers.hlo_data import read_hlo_via
+from helao.helpers.meta_io import meta_glob, read_meta
+from helao.hexagon.domain.naming import meta_kind
 
 
 def parse_seq_path(ymlp, target) -> tuple:
@@ -41,7 +40,7 @@ def parse_seq_path(ymlp, target) -> tuple:
     Returns:
         ``(timestamp, seq_name, seq_lab, plate_id, sample_no, yml_dir, ymlp)``.
     """
-    if ymlp.endswith(".yml") or target.endswith(".zip"):
+    if meta_kind(ymlp) is not None or target.endswith(".zip"):
         yml_dir = os.path.basename(os.path.dirname(ymlp))
         yml_file = os.path.basename(ymlp)
         if target.endswith(".zip"):
@@ -96,7 +95,7 @@ def parse_exp_path(ymlp) -> tuple:
     Returns:
         ``(timestamp, exp_name, yml_dir, ymlp)``.
     """
-    if ymlp.endswith(".yml"):
+    if meta_kind(ymlp) is not None:
         yml_dir = os.path.basename(os.path.dirname(ymlp))
     else:
         yml_dir = os.path.basename(ymlp)
@@ -121,7 +120,7 @@ def parse_act_path(ymlp) -> tuple:
     Raises:
         ValueError: If the directory name does not split into 4 or 5 fields.
     """
-    if ymlp.endswith(".yml"):
+    if meta_kind(ymlp) is not None:
         yml_dir = os.path.basename(os.path.dirname(ymlp))
     else:
         yml_dir = os.path.basename(ymlp)
@@ -152,7 +151,7 @@ def parse_prc_path(ymlp) -> tuple:
     yml_dir = os.path.basename(os.path.dirname(ymlp))
     _, exp_name = yml_dir.split("__")
     yml_file = os.path.basename(ymlp)
-    idx, prc_uuid, techname = yml_file.replace("-prc.yml", "").split("__")
+    idx, prc_uuid, techname = yml_file.rsplit("-prc.", 1)[0].split("__")
     prc_uuid = UUID(prc_uuid)
     prc_idx = int(idx)
     try:
@@ -258,34 +257,37 @@ class LocalLoader:
             with ZipFile(self.target, "r") as zf:
                 zip_contents = zf.namelist()
             self._is_microorch_zip = "MANIFEST.txt" in zip_contents
-            _yml_paths = [x for x in zip_contents if x.endswith(".yml")]
+            _yml_paths = [x for x in zip_contents if meta_kind(x) is not None]
             self._zip_members = set(_yml_paths)
             # The mirror still holds the processes of records synced before the
             # write moved into the RUNS_* tree. Union both, but never index the
             # same process twice: the in-zip copy wins.
             in_zip_uuids = {
-                process_uuid_of(x) for x in _yml_paths if x.endswith("-prc.yml")
+                process_uuid_of(x) for x in _yml_paths if meta_kind(x) == "prc"
             }
             _yml_paths += [
                 x
-                for x in glob(
-                    os.path.join(process_dir, "**", "*-prc.yml"), recursive=True
-                )
+                for x in map(str, meta_glob(process_dir, "prc", "**/*"))
                 if process_uuid_of(x) not in in_zip_uuids
             ]
         elif os.path.isdir(self.target):
             self._zip_members = set()
             for check_dir in check_dirs:
-                _yml_paths += glob(
-                    os.path.join(check_dir, "**", "*.yml"), recursive=True
-                )
+                _yml_paths += [
+                    str(p)
+                    for p in meta_glob(check_dir, ("seq", "exp", "act", "prc"), "**/*")
+                ]
         else:
             self._zip_members = set()
             for check_dir in check_dirs:
-                _yml_paths += glob(
-                    os.path.join(os.path.dirname(check_dir), "**", "*.yml"),
-                    recursive=True,
-                )
+                _yml_paths += [
+                    str(p)
+                    for p in meta_glob(
+                        os.path.dirname(check_dir),
+                        ("seq", "exp", "act", "prc"),
+                        "**/*",
+                    )
+                ]
 
         # check_dirs collapse to the same directory whenever the target is not
         # under a RUNS_* tree (the RUNS_* -> state replacements are then no-ops),
@@ -294,9 +296,7 @@ class LocalLoader:
         _yml_paths = list(dict.fromkeys(_yml_paths))
 
         for suffix in ("seq", "exp", "act", "prc"):
-            self._yml_paths[suffix] = [
-                x for x in _yml_paths if x.endswith(f"-{suffix}.yml")
-            ]
+            self._yml_paths[suffix] = [x for x in _yml_paths if meta_kind(x) == suffix]
 
         seq_parts = []
         for ymlp in self._yml_paths["seq"]:
@@ -457,11 +457,10 @@ class LocalLoader:
         # the tree that gets zipped, and false as soon as one is a zip member.
         if self.target.endswith(".zip") and path in self._zip_members:
             with ZipFile(self.target, "r") as zf:
-                metad = dict(
-                    yml_load(
-                        zf.open(path).read().replace(b"\x89", b"%").decode("utf-8")
-                    )
-                )
+                raw = zf.read(path)
+            if path.endswith(".yml"):
+                raw = raw.replace(b"\x89", b"%")  # legacy repair; never on JSON
+            metad = dict(read_meta(raw, name=path))
         else:
             # metad = yml_load("".join(builtins.open(path, "r").readlines()))
             FM = FileMapper(path)
@@ -666,8 +665,7 @@ class LocalLoader:
         if self.target.endswith(".zip"):
             hlotarget = "/".join([os.path.dirname(yml_path), hlo_fn])
             with ZipFile(self.target, "r") as zf:
-                content = zf.open(hlotarget).read()
-            return HloPayload(*read_hlo_bytes(content))
+                return HloPayload(*read_hlo_via(set(zf.namelist()), zf.read, hlotarget))
         else:
             # return read_hlo(os.path.join(os.path.dirname(yml_path), hlo_fn))
             FM = FileMapper(yml_path)
@@ -724,15 +722,6 @@ class LocalLoader:
             fbytes = FM.read_bytes(fpath)
         return BytesIO(fbytes)
 
-    def read_artifact_bytes(self, artifact: "HelaoArtifact") -> BytesIO:
-        """Read a :class:`HelaoArtifact`'s body via ``get_bytes`` as a ``BytesIO``.
-
-        The artifact's ``locator`` is a ``(yml_path, file_name)`` pair matching
-        :meth:`get_bytes`' signature (``yml_path=""`` routes through the
-        zip/sequence resolver for process-aggregated files).
-        """
-        return self.get_bytes(*artifact.locator)
-
     def get_parquet(self, yml_path: str, par_fn: str) -> pd.DataFrame:
         """Read a parquet file (zip-aware) into a dataframe.
 
@@ -747,6 +736,14 @@ class LocalLoader:
 
 
 ABBR_MAP = {"act": "action", "exp": "experiment", "seq": "sequence", "prc": "process"}
+
+
+def _mirror_identity(model) -> None:
+    """Also expose name/uuid/timestamp/params as ``<helao_type>_*`` (``technique_name`` for processes)."""
+    t = model.helao_type
+    setattr(model, "technique_name" if t == "process" else f"{t}_name", model.name)
+    for attr in ("uuid", "timestamp", "params"):
+        setattr(model, f"{t}_{attr}", getattr(model, attr))
 
 
 class HelaoModel:
@@ -795,8 +792,8 @@ class HelaoModel:
         self.timestamp = meta_dict.get(f"{helao_type}_timestamp")
         self.params = meta_dict.get(f"{helao_type}_params", {})
         self.meta_dict = meta_dict
-        self._meta_dict = self.meta_dict  # alias for HelaoLoader parity
         self.loader = loader
+        _mirror_identity(self)
 
     @property
     def json(self) -> dict:
@@ -807,9 +804,7 @@ class HelaoModel:
 class HelaoDataModel(HelaoDataModelMixin, HelaoModel):
     """``HelaoModel`` mixed with HLO-data accessors for action and process records.
 
-    Adds two parallel views over the record's ``files``: :attr:`files` (legacy
-    ``(file_name, file_type, run_use)`` tuples) and :attr:`artifacts`
-    (:class:`HelaoArtifact` objects that can read their own bytes).
+    Adds :attr:`files` (legacy ``(file_name, file_type, run_use)`` tuples).
     """
 
     @property
@@ -831,16 +826,6 @@ class HelaoDataModel(HelaoDataModelMixin, HelaoModel):
             for fd in self.json.get("files", [])
         ]
 
-    @property
-    def artifacts(self) -> list:
-        """Record ``files`` as :class:`HelaoArtifact` objects bound to the loader."""
-        return [
-            HelaoArtifact.from_meta(
-                fd, loader=self.loader, locator=(self.yml_path, fd["file_name"])
-            )
-            for fd in self.json.get("files", [])
-        ]
-
 
 class HelaoAction(HelaoDataModel):
     """Action record loaded from a local yml tree, with HLO accessors.
@@ -857,20 +842,6 @@ class HelaoAction(HelaoDataModel):
     action_timestamp: datetime
     action_params: dict
 
-    def __init__(self, yml_path: str, meta_dict: dict, loader: LocalLoader):
-        """Populate ``action_*`` attributes from the parsed yml.
-
-        Args:
-            yml_path: Source yml path.
-            meta_dict: Parsed yml dict.
-            loader: Owning ``LocalLoader``.
-        """
-        super().__init__(yml_path=yml_path, meta_dict=meta_dict, loader=loader)
-        self.action_name = self.name
-        self.action_uuid = self.uuid
-        self.action_timestamp = self.timestamp
-        self.action_params = self.params
-
 
 class HelaoExperiment(HelaoModel):
     """Experiment record loaded from a local yml tree.
@@ -886,20 +857,6 @@ class HelaoExperiment(HelaoModel):
     experiment_uuid: UUID
     experiment_timestamp: datetime
     experiment_params: dict
-
-    def __init__(self, yml_path: str, meta_dict: dict, loader: LocalLoader):
-        """Populate ``experiment_*`` attributes from the parsed yml.
-
-        Args:
-            yml_path: Source yml path.
-            meta_dict: Parsed yml dict.
-            loader: Owning ``LocalLoader``.
-        """
-        super().__init__(yml_path=yml_path, meta_dict=meta_dict, loader=loader)
-        self.experiment_name = self.name
-        self.experiment_uuid = self.uuid
-        self.experiment_timestamp = self.timestamp
-        self.experiment_params = self.params
 
 
 class HelaoSequence(HelaoModel):
@@ -920,18 +877,8 @@ class HelaoSequence(HelaoModel):
     sequence_params: dict
 
     def __init__(self, yml_path: str, meta_dict: dict, loader: LocalLoader):
-        """Populate ``sequence_*`` attributes from the parsed yml.
-
-        Args:
-            yml_path: Source yml path.
-            meta_dict: Parsed yml dict.
-            loader: Owning ``LocalLoader``.
-        """
+        """Populate the base attributes plus ``sequence_label``."""
         super().__init__(yml_path=yml_path, meta_dict=meta_dict, loader=loader)
-        self.sequence_name = self.name
-        self.sequence_uuid = self.uuid
-        self.sequence_timestamp = self.timestamp
-        self.sequence_params = self.params
         self.sequence_label = meta_dict.get("sequence_label", "")
 
 
@@ -949,20 +896,6 @@ class HelaoProcess(HelaoDataModelMixin, HelaoModel):
     process_uuid: UUID
     process_timestamp: datetime
     process_params: dict
-
-    def __init__(self, yml_path: str, meta_dict: dict, loader: LocalLoader):
-        """Populate ``process_*`` and ``technique_name`` attributes from the parsed yml.
-
-        Args:
-            yml_path: Source yml path.
-            meta_dict: Parsed yml dict.
-            loader: Owning ``LocalLoader``.
-        """
-        super().__init__(yml_path=yml_path, meta_dict=meta_dict, loader=loader)
-        self.process_uuid = self.uuid
-        self.process_timestamp = self.timestamp
-        self.process_params = self.params
-        self.technique_name = self.name
 
     @property
     def experiment(self) -> "HelaoExperiment":
@@ -993,24 +926,6 @@ class HelaoProcess(HelaoDataModelMixin, HelaoModel):
         ]
 
     @property
-    def artifacts(self) -> list:
-        """Contributing action files as :class:`HelaoArtifact` objects.
-
-        Each artifact's ``locator`` is ``("", rel_path)`` so ``read_artifact_bytes``
-        resolves it through the loader's zip/sequence-aware path, mirroring how
-        :attr:`files` paths are consumed today.
-        """
-        act_map = self._artifact_paths
-        return [
-            HelaoArtifact.from_meta(
-                fd,
-                loader=self.loader,
-                locator=("", f"{act_map[fd['action_uuid']]}/{fd['file_name']}"),
-            )
-            for fd in self.json.get("files", [])
-        ]
-
-    @property
     def hlo(self) -> HloPayload:
         """:class:`HloPayload` of the primary data file, read from its action.
 
@@ -1020,61 +935,14 @@ class HelaoProcess(HelaoDataModelMixin, HelaoModel):
             return HloPayload()
         fd = self.hlo_file
         rel = f"{self._artifact_paths[fd['action_uuid']]}/{fd['file_name']}"
-        # Through get_bytes("", ...) like ``artifacts``, so a synced sequence
-        # zip works too. Process files name the S3 ``.hlo.json`` conversion;
-        # on disk and in the zip it is the raw ``.hlo``.
-        names = [rel, rel[: -len(".json")]] if rel.endswith(".hlo.json") else [rel]
-        for name in names:
-            try:
-                raw = self.loader.get_bytes("", name).read()
-            except (FileNotFoundError, KeyError):
-                continue
-            return HloPayload(*read_hlo_bytes(raw))
-        raise FileNotFoundError(f"{rel} not found under {self.loader.target}")
 
-    def read_action_file(self, relative_path: str) -> bytes:
-        """Read the raw bytes of an action file by its run-tree-relative path.
+        # Through get_bytes("", ...) so a synced sequence zip works too.
+        # Process files name the S3 ``.hlo.json``; on disk and in the zip it
+        # is the ``.jsonl`` pair or the legacy ``.hlo``.
+        def _get(name: str) -> bytes:
+            return self.loader.get_bytes("", name).read()
 
-        The process yml now sits beside its ``-exp.yml`` (colocated in the
-        same ``RUNS_<state>`` tree, or the legacy ``PROCESSES`` mirror for a
-        pre-cutover record), not in a separate location, but the file is
-        still resolved against the run tree rather than relative to
-        ``self.yml_path`` -- :class:`FileMapper` needs only the run root, and
-        deriving it that way lets it also find files that moved to a
-        different state directory than the prc did. ``relative_path`` (as
-        produced by :attr:`files`) is rooted at the ``RUNS_<state>`` directory
-        — ``YY.WW/MMDD/<seq_dir>/<exp>/<act>/<file>`` — which is enough for
-        :class:`FileMapper` to deduce and read from the owning synced sequence
-        zip (``RUNS_SYNCED/YY.WW/MMDD/<seq_dir>.zip``) once the loose file is
-        gone. Only the run root is taken from ``self.yml_path``.
-
-        This requires ``self.yml_path`` to be a real filesystem path inside
-        a ``RUNS_*``/``PROCESSES`` tree. A process loaded from a
-        fully-synced sequence zip has a bare zip-member name as its
-        ``yml_path`` (e.g. ``"<exp_dir>/<name>-prc.yml"``, with no
-        ``RUNS_*``/``PROCESSES`` segment for :class:`FileMapper` to anchor
-        on); that case is rejected explicitly below rather than left to
-        raise an opaque ``IndexError`` out of :class:`FileMapper`'s
-        constructor.
-
-        Args:
-            relative_path: Action file path relative to the ``RUNS_<state>``
-                root.
-
-        Returns:
-            Raw file bytes.
-
-        Raises:
-            ValueError: ``self.yml_path`` has no ``RUNS_*``/``PROCESSES``
-                segment for :class:`FileMapper` to anchor on -- e.g. a
-                zip-member path from a fully-synced record.
-        """
-        parts = os.path.normpath(self.yml_path).split(os.sep)
-        if not any(is_run_root(p) for p in parts):
-            raise ValueError(
-                f"read_action_file: yml_path {self.yml_path!r} has no "
-                "RUNS_*/PROCESSES segment (likely a zip-member path from a "
-                "fully-synced record); FileMapper cannot anchor on it"
-            )
-        fm = FileMapper(self.yml_path)
-        return fm.read_bytes(relative_path)
+        try:
+            return HloPayload(*read_hlo_via(None, _get, rel))
+        except FileNotFoundError:
+            raise FileNotFoundError(f"{rel} not found under {self.loader.target}")

@@ -168,7 +168,7 @@ def normalize_data_package(messages: list) -> tuple:
     """Turn ``ws_data`` packets into numeric columns and per-message rows.
 
     ``/ws_data`` is served by ``data_publisher.broadcast``, and ``WsPublisher``
-    defaults to an identity ``xform_func`` -- so each message is a pickled
+    defaults to an identity ``xform_func`` -- so each message is a wire-encoded
     :class:`DataPackageModel` **object**, not a dict. Its payload lives at
     ``.datamodel.data[file_conn_key][column]`` and is reached by attribute
     access, which is why the Bokeh ``oersim_vis`` reads

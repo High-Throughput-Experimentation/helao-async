@@ -1,81 +1,43 @@
 """Auxiliary ports (spec §4.3.12)."""
 
-from collections.abc import Callable
-from pathlib import Path
 from typing import Optional, Protocol, runtime_checkable
 
 __all__ = [
     "HealthPort",
-    "LibraryPort",
-    "NotifyPort",
-    "PlateInfoPort",
     "StatePersistencePort",
-    "UuidFactoryPort",
 ]
 
 
 @runtime_checkable
 class StatePersistencePort(Protocol):
-    """queues.pck export/import. Pickle shape per core-01 §2 including
+    """The queues.pck file contract: where it lives, how it is written, read,
+    quarantined and archived. Pickle shape per core-01 §2 including
     globalstatusmodel (runtime FSM state persists across restore — a parity
-    behavior). Import archives the consumed pck (queues_imported_<ts>.pck)."""
+    behavior). Building the payload, the schema check and applying it stay with
+    ``QueuePersister``. All paths are ``os.path`` strings: ``/export_queues`` and
+    ``/import_queues`` return them on the wire.
 
-    def export_queues(self, payload: dict, timestamp_pck: bool = False) -> Path: ...
+    - ``export_queues`` writes ``STATES/queues.pck`` (or the timestamped
+      ``queues_<ts>.pck``, pruning that series) and returns its path.
+    - ``load_queues`` returns ``(path, payload)``; ``payload`` is ``None`` when
+      the file is missing, or unreadable (the file is first moved to
+      ``queues_unreadable_<ts>.pck``).
+    - ``archive_consumed`` renames a restored file to ``queues_imported_<ts>.pck``
+      so a later unconditional ``--restore`` cannot replay it.
+    """
 
-    def import_queues(self) -> Optional[dict]: ...
+    def export_queues(self, payload: dict, timestamp_pck: bool = False) -> str: ...
 
+    def load_queues(
+        self, pck_path: Optional[str] = None
+    ) -> tuple[str, Optional[dict]]: ...
 
-@runtime_checkable
-class PlateInfoPort(Protocol):
-    """PLATE_API / HTEPlateAPI queries + the plate gate (verify_plates)."""
-
-    async def get_platemap_plateid(self, plate_id: int) -> list: ...
-
-    async def has_access(self, plate_id: int, usernames: list[str]) -> bool: ...
-
-
-@runtime_checkable
-class LibraryPort(Protocol):
-    """Dynamic import of experiment/sequence/postprocessor libs +
-    codehash/codepath provenance. Flat name-keyed registries with a LOAD-TIME
-    COLLISION CHECK (silent shadowing becomes a loud preflight error,
-    config-overridable for intentional shadowing)."""
-
-    def experiment_lib(self) -> dict[str, Callable]: ...
-
-    def sequence_lib(self) -> dict[str, Callable]: ...
-
-    def provenance(self, func_name: str) -> tuple[str, str]:
-        """Return (codehash, codepath) for a registered library function."""
-        ...
+    def archive_consumed(self, path: str) -> Optional[str]: ...
 
 
 @runtime_checkable
 class HealthPort(Protocol):
-    """HEAD-probe endpoints_available, ping_action_servers, heartbeat
-    monitors (active_action_monitor default 10 s + ignore_heartbeats;
-    driver-health status_summary gate)."""
+    """HEAD-probe endpoints_available, heartbeat monitors (HexHealthMonitor:
+    default 10 s + ignore_heartbeats)."""
 
     async def endpoints_available(self, urls: list[str]) -> list[tuple[str, bool]]: ...
-
-    async def ping_action_servers(self) -> dict[str, str]: ...
-
-    def status_summary(self) -> dict[str, str]:
-        """server_key -> driver status string; 'unknown' gates dispatch."""
-        ...
-
-
-@runtime_checkable
-class NotifyPort(Protocol):
-    """Live buffer put, LOGGER.alert."""
-
-    def put_lbuf_nowait(self, payload: dict) -> None: ...
-
-    def alert(self, msg: str) -> None: ...
-
-
-@runtime_checkable
-class UuidFactoryPort(Protocol):
-    """Identity minting seam so domain policies stay deterministic in tests."""
-
-    def __call__(self) -> object: ...

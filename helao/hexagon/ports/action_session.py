@@ -1,9 +1,9 @@
 """The interface the native write collaborators require of an action session.
 
-**This Protocol is derived, not authored.** Its 26 members are exactly what
+**This Protocol is derived, not authored.** Its 27 members are exactly what
 ``adapters/native/{data_stream,data_file,finalizer}.py`` read off their
 ``self.active`` back-reference, extracted by AST walk on 2026-08-14 and split
-into 9 async methods, 7 sync methods and 10 attributes. Needing to add a member
+into 10 async methods, 7 sync methods and 10 attributes. Needing to add a member
 by hand later — because something failed at runtime — means the derivation was
 incomplete: re-run it across all three modules rather than patching the member
 in.
@@ -85,6 +85,8 @@ class ActionSessionPort(Protocol):
     ) -> Action: ...
 
     async def add_status(self, action: Optional[Action] = None) -> None: ...
+
+    async def drain_data(self, timeout_s: float) -> bool: ...
 
     async def enqueue_data(
         self, datamodel: DataModel, action: Optional[Action] = None

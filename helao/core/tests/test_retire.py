@@ -342,7 +342,7 @@ def test_processes_by_sequence_non_list_raises(tmp_path):
     """Mutation: dropping the isinstance(list) check."""
     client = _full_client()
 
-    async def bad(*, sequence_uuid):
+    async def bad(*, sequence_uuid, **_page):
         return {"detail": "x"}
 
     setattr(client, "read_processes_by_sequence", bad)
@@ -373,7 +373,7 @@ def test_null_uuid_in_api_list_rows_is_skipped(tmp_path):
     """Mutation: indexing ["process_uuid"]/["analysis_uuid"] without .get/skip."""
     client = FakeMetadataClient({"SEQUENCE": {U}})
 
-    async def procs(*, sequence_uuid):
+    async def procs(*, sequence_uuid, **_page):
         return [{"process_uuid": None}, {"process_uuid": "P9"}]
 
     async def ans(*, process_uuid):

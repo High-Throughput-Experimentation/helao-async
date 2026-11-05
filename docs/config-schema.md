@@ -65,8 +65,9 @@ issue it found:
   `host:port` collisions, including a Reflex server's `port + 1` and a plate
   aligner's port;
 - module resolution: every `fast:`/`bokeh:` module exists in a deployment the
-  launcher searches; the retired `legacy_module:` and `deployment: hexagon`
-  keys, a `fast:`/`bokeh:` value of `graft`, and a blank `deployment:` are
+  launcher searches; the two retired hexagon-routing keys (the legacy-module
+  key and a `deployment:` naming the hexagon shim), a `fast:`/`bokeh:` value of
+  `graft`, and a blank `deployment:` are
   reported;
 - an `hte` action module whose endpoint checklist was frozen at B7c still has
   it (any other missing checklist prints as a note and does not fail);
@@ -106,9 +107,9 @@ issue it found:
 | `sequence_params` | dict | — | The same, for sequence functions. |
 | `experiment_path` / `sequence_path` | str | `helao/deploy/<deployment>/{experiments,sequences}` | Overrides where library modules are looked up (`import_autolibs`). Undeclared in `HelaoConfig`. |
 | `allow_shadow` | bool | `False` | Preflight only: allow the same function name in two library modules (the later one wins in the flat namespace). |
-| `sync_finished` | bool | `True` | Declared in `HelaoConfig` and given a helper (`sync_finished_enabled`), but **no production code reads it yet**, so setting it changes nothing. Not the same as the per-record `sync_data` field. |
 | `show_debug` | bool | `False` | **No effect in a launched group.** It is read only when a server builds its own logger, and every launcher builds the logger first without it. |
-| `log_level` | int | `20` | File-log threshold for `launch.py` and every launched server (FastAPI, Bokeh, Reflex launcher); a server-level `log_level` overrides it for that server. Console output stays at INFO, and the Reflex backend child's `<key>_backend.log` stays at 20. |
+| `log_level` | int | `20` | File-log threshold for `launch.py` and every launched server (FastAPI, Bokeh, Reflex launcher); a server-level `log_level` overrides it for that server. Console output stays at INFO, and the Reflex backend child's `<key>_backend.jsonl` stays at 20. Artefact hash records ignore this threshold and always reach the ledger. |
+| `log_port` | int | one above the highest port any server occupies (excluding RPC and plate-aligner ports) | The launcher's log collector port on 127.0.0.1. Never a server port, its RPC port or an aligner port. A `--reconnect` launcher re-binds the same port. A visualizer-only launcher (`extraopt` `liveonly` or `gpvis`) starts **no** collector and sets no log endpoint: its children write their own fallback `<key>.jsonl` files, because it shares this config, and so this port, with the full launcher of the group. |
 | `run_unit_tests` | bool | `False` | `launch.py` runs `run_unit_tests.py` before launching and aborts on failure. |
 | `hot_reload` | map | `{enabled: true, poll_seconds: 30}` | See [Hot reload](#hot-reload). |
 | `alert_config_path` | str | — | Alert config (email and webhook). Overridden by the `ALERT_CONFIG_PATH` env var. |
@@ -185,8 +186,9 @@ is created without asking.
   RUNS/             the single run tree; records are written once and never move
   RUNS_SUPERSEDED/  sequences retired through /retire (the one exception)
   DIAG/             manual (diagnostic) actions, a sibling of RUNS/
-  LOGS/             <server_key>.log per server, rotated daily and gzipped
-                    (old archives are not pruned)
+  LOGS/             JSONL logs: helao_<prefix>.jsonl under a launcher,
+                    <server_key>.jsonl without; rotated every 300,000 records
+                    and gzipped; rotated logs deleted after 90 days
   STATES/           pid pickles, queue exports, per-server run-state journals
                     (runstate_<server_key>.jsonl), loaded_modules_<key>.json,
                     reflex-bundles/, /retire ledgers
@@ -197,10 +199,6 @@ is created without asking.
   FAULTS/           faulthandler crash dumps, <server_key>_faults.txt
                     (created at every FastAPI server's startup)
 ```
-
-When `helao_dirs` runs, it also zips and removes any `*.txt` left under
-`LOGS/<server_name>/` by the older per-directory logger, naming the archive
-from the first timestamp in the file.
 
 A record's lifecycle state (`active`, `unsynced`, `quarantined`, `done`) is
 kept in the `STATES/runstate_*.jsonl` journals, not in its directory name. The
@@ -252,8 +250,8 @@ two is a launch-time error.
 
 | Code key | Launcher | What the value names |
 |---|---|---|
-| `fast` | `fast_launcher.py` (uvicorn) | a module under `servers/<group>/` exposing `makeApp(server_key) -> HelaoFastAPI` |
-| `bokeh` | `bokeh_launcher.py` (Bokeh `Server`) | a module under `servers/<group>/` exposing `makeBokehApp(doc, confPrefix, server_key, helao_repo_root)`, served at `/<module>` |
+| `fast` | `fast_launcher.py` (uvicorn) | a module at `servers/*/<module>.py` exposing `makeApp(server_key) -> HelaoFastAPI` |
+| `bokeh` | `bokeh_launcher.py` (Bokeh `Server`) | a module at `servers/*/<module>.py` (same lookup as `fast`) exposing `makeBokehApp(doc, confPrefix, server_key, helao_repo_root)`, served at `/<module>` |
 | `reflex` | `reflex_launcher.py` | the app bundle (`helao_ui`); only its presence matters, and the app imported is always `helao.ui.reflex.app` |
 
 **Omitting the code key is legal for `launch.py`**: the server appears in the
@@ -288,13 +286,13 @@ a config with an externally managed server cannot pass preflight.
 ### Deployment resolution
 
 Without a `deployment:` key, the launcher globs every deployment for
-`servers/<group>/<module>.py`, and:
+`servers/*/<module>.py` (`servers/reflex/` excluded), and:
 
-- one match — uses it, logging `Auto-detected deployment`;
-- several matches — prefers the one under the config's own path, else takes
-  the first and warns that an explicit `deployment:` key would disambiguate;
+- one match — uses it; logs `Auto-detected deployment` only when that match is not the config's own deployment;
+- several matches — prefers the config's own deployment, else takes the
+  first in sorted order and logs a WARNING that an explicit `deployment:` key would disambiguate;
 - no match — fails with `FileNotFoundError: Could not find deployment for
-  <module> in <group>`.
+  <module>`.
 
 Set `deployment:` on the server to pin it. For a config inside
 `helao/deploy/*/configs/`, it is needed only when the module exists in two or
@@ -323,14 +321,15 @@ An action server declares which visualizer renders it:
 | `control_vis` | `control_visualizer` | `/control` | — (reads and writes the server's endpoints) |
 
 The value is a bare module name, or a list of names, resolved across
-deployments: the configured deployment first, then `hte`, then every other
-deployment that has a `servers/visualizer/` directory, alphabetically. The
-same name serves both UI stacks: `servers/visualizer/<name>.py` for Bokeh,
-`servers/reflex/<name>.py` for Reflex. A station therefore gains Reflex panels
+deployments: the configured deployment first, then the one other deployment
+that holds the module; if several others do, resolution is ambiguous and
+errors (`ModuleNotFoundError` naming them). The same name serves both UI stacks:
+`servers/visualizer/<name>.py` or `servers/*/bokeh/<name>.py` for Bokeh,
+`servers/reflex/<name>.py` or `servers/*/reflex/<name>.py` for Reflex. A station therefore gains Reflex panels
 by adding a `reflex:` server and changing nothing else, provided a Reflex
 module of that exact name exists. Discovery does no suffix rewriting. Where
 the Reflex panel has a different name, the deployment ships a re-export
-module under the Bokeh name (for example `test/servers/reflex/wssim_live_vis.py`).
+module under the Bokeh name (for example `test/servers/wssim/reflex/wssim_live_vis.py`).
 
 `control_vis` modules in `hte`: `digital_out_control`, `nidaqmx_control`,
 `motion_control_letter_scale`, `motion_control_inverse_scale`,
@@ -374,7 +373,7 @@ All four keys are **server-level keys, not `params:`**:
 | `prefinish_sequence_hooks` | the orchestrator | sequences |
 | `postfinish_hooks` | the `SYNC` server | `action:` / `experiment:` / `sequence:` sub-maps |
 
-`MicroOrch` reads the two orchestrator keys (or their aliases) from the first
+`MicroOrch` reads the two orchestrator keys from the first
 `group: orchestrator` entry in the config, unless its constructor is given
 `prefinish_experiment_hooks` / `prefinish_sequence_hooks`.
 
@@ -412,7 +411,7 @@ is valid at action level only (`prefinish_hooks`). Helper code under
 | Hook | Phase | Levels | Blocking | Args |
 |---|---|---|---|---|
 | `s3_upload` | post-finish | all | yes: a failure keeps the record unsynced and counts a strike (see [Sync quarantine](#sync-quarantine)) | — |
-| `dispatch_analysis` | post-finish | experiment, sequence | no: a failure is recorded and the chain continues | `server_key` and `endpoint` (required); `params` (alias `analysis_params`); optional `host` + `port` |
+| `dispatch_analysis` | post-finish | experiment, sequence | no: a failure is recorded and the chain continues | `server_key` and `endpoint` (required); `params`; optional `host` + `port` |
 
 `dispatch_analysis` checks its args when it runs, not at startup. A missing
 `server_key`/`endpoint`, or a `server_key` that is neither given with
@@ -435,9 +434,7 @@ Private deployments may add their own under
 ### Post-finish defaults
 
 When `postfinish_hooks` is absent, the chain is `s3_upload: ["*"]` at every
-level. If the SYNC server has `params.auto_analyze_sequences`, that value is
-translated to `sequence: {dispatch_analysis: ...}`, with a deprecation
-warning. **A present `postfinish_hooks` owns the whole chain.** Leave out
+level. **A present `postfinish_hooks` owns the whole chain.** Leave out
 `s3_upload` and nothing uploads:
 
 ```yaml
@@ -469,26 +466,21 @@ disables parking (strikes are still recorded). `/tasks` lists parked records,
 and `POST /finish_yml` on a parked record releases and re-queues it. Spec:
 `docs/superpowers/specs/2026-10-14-sync-quarantine-design.md`.
 
-### Deprecated aliases
+### Removed keys
 
-| Alias | Replacement |
-|---|---|
-| `hlo_postprocess_libs` | `prefinish_hooks` |
-| `exp_postprocess_libs` | `prefinish_experiment_hooks` |
-| `seq_postprocess_libs` | `prefinish_sequence_hooks` |
-| SYNC `params.auto_analyze_sequences` | `postfinish_hooks.sequence.dispatch_analysis` |
-
-A list alias `[a, b]` means `{a: ["*"], b: ["*"]}`. `auto_analyze_sequences`
-is a mapping (sequence name → analysis block) and becomes the
-`dispatch_analysis` args unchanged. Each alias logs one deprecation warning.
+`hlo_postprocess_libs`, `exp_postprocess_libs`, `seq_postprocess_libs` and SYNC
+`params.auto_analyze_sequences` are refused at startup with a `HookConfigError`
+naming the replacement, so an old config fails loudly instead of running
+without hooks. The `analysis_params` arg of `dispatch_analysis` is no longer
+read. Use `prefinish_hooks`, `prefinish_experiment_hooks`, `prefinish_sequence_hooks`,
+`postfinish_hooks.sequence.dispatch_analysis` (a mapping of sequence name to
+analysis block) and `params`.
 
 ### Errors that stop startup
 
 A bad hook config never quietly becomes "no hooks". Startup fails with
 `HookConfigError` when:
 
-- an alias and its replacement are both set, or a list alias is not a list of
-  names;
 - a map has the wrong shape (not a mapping, an empty list or mapping, a
   non-string record name, or args that are not a mapping);
 - `postfinish_hooks` has a key other than `action`, `experiment` or
@@ -519,6 +511,7 @@ route, whatever its config says:
 | `/uvvis`, `/xafs`, `/xrds` | plate spectra | credentials (below); `/xafs` reads local analysis arrays under `root/ANALYSES` unless set to read from S3; the wafer-photo underlay also needs the plate API |
 | `/retire` | retire mis-identified sequences | credentials (below), `params.retire: true` on this Reflex server, and a `root` |
 | `/quarantine` | release or write off parked sync records | `params.sync_quarantine: true` on this Reflex server, and a `SYNC` server in the config |
+| `/logs` | live tail of the group's JSONL logs (`<root>/LOGS`) | the config's `root`; always registered |
 
 **Credential-gated pages.** `/composition`, `/uvvis`, `/xafs`, `/xrds` and
 `/retire` read the metadata API or S3. If the Reflex process has no
@@ -575,8 +568,9 @@ nothing checks the RPC port:
 |---|---|---|
 | The server itself | `port` | yes |
 | Reflex backend | `port + 1` | yes — `reserved_addresses` returns both |
-| Plate-aligner Bokeh (`params.enable_aligner`) | `params.bokeh_port`, else `port + 1000` | **no** (preflight checks it) |
+| Plate-aligner Bokeh (`params.enable_aligner`) | `params.bokeh_port`, else (absent or null) `port + 1000` | **no** (preflight checks it) |
 | ZMQ RPC (every FastAPI server) | `port + 10000` | **no** |
+| Log collector (launcher) | `log_port`, else one above the highest server port | no (`resolve_log_port` avoids server, RPC and aligner ports) |
 
 `validateConfig` rejects duplicate `host:port` pairs across the group. It does
 not model the RPC offset, so two servers 10000 apart pass validation and then
@@ -602,10 +596,32 @@ Shared by every action server (`ActionHost`):
 | Param | Default | Effect |
 |---|---|---|
 | `allow_concurrent_actions` | `True` | `False`: an action whose endpoint is busy is parked in one server-wide queue, released when no endpoint is running an action; an action for an idle endpoint starts at once. `True`: parked per endpoint. `start_condition: no_wait` bypasses either. Some `hte` servers force `False` in code. |
-| `enable_aligner` / `bokeh_port` | — / `port + 1000` | Motion servers: host the Bokeh plate aligner on a second port. Preflight reserves it; `validateConfig` does not. |
+| `enable_aligner` / `bokeh_port` | — / `port + 1000` | Motion servers: host the Bokeh plate aligner on a second port; a null `bokeh_port` means the default. Preflight reserves it; `validateConfig` does not. |
 | `positions` | — | Sample-archive positions. At most one server per config may declare it (see [Validation rules](#validation-rules)). |
 
-`SYNC` (`sync_server`, `HelaoSyncer`). An orchestrator or other host that
+Control-panel keys. A server that declares `control_vis` gets a motion or
+digital-output panel (Bokeh and Reflex) built from its own `params`; the shared
+readers are `helao/ui/shared/motion_control.py` and
+`helao/ui/shared/io_control.py`. A panel module picks the schema by its
+`AXIS_SOURCE` (`letter_scale`, `name_scale` or `inverse_scale`) and its
+`DO_GROUPS`; a server whose params do not match the panel's schema gets an
+empty panel, and an unknown `AXIS_SOURCE` is logged and yields no controls.
+
+| Param | Schema | Default | Effect |
+|---|---|---|---|
+| `axis_id` | `letter_scale`, `name_scale` | — | Mapping `axis name: letter`. Its keys are the panel's axes (`motion_control.py:236`); for `letter_scale` the value is the letter that indexes `count_to_mm` (`:293`). |
+| `count_to_mm` | `letter_scale` (keyed by letter), `name_scale` (keyed by axis name) | — | Millimetres per encoder count. A missing, non-numeric, non-finite or non-positive value gives no scale, so the panel shows no mm conversion for that axis (`:296`, `:298`). |
+| `axes` | `inverse_scale` | — | Mapping `axis name: {pos_scale, move_limit_mm, ...}`. Its keys are the panel's axes (`:238`). `pos_scale` is counts per mm; the panel uses `1 / pos_scale`, and a missing or zero value gives no scale (`:300`). `move_limit_mm` feeds the warn threshold below (`:357`). |
+| `warn_above_mm` | all | — | Mapping `axis name: mm`. A move longer than this asks for confirmation. Resolution order: this value, then `axes[axis].move_limit_mm`, then `10.0` (`DEFAULT_WARN_ABOVE_MM`, `:98`). A non-positive or non-finite value is skipped (`:358-364`). |
+| `dev_do` (and the other `dev_*` groups a panel lists in `DO_GROUPS`) | digital-out panels | — | Mapping `output name: line`. Each name becomes a toggle in group order, then config order. A name in two groups gets a control only in the first and an error is logged (`io_control.py:98`, `:103-110`). |
+
+Galil (`galil_io`, `galil_motion`):
+
+| Param | Default | Effect |
+|---|---|---|
+| `gclib_api` | `"1"` | gclib Python wrapper API: `"1"` (wrapper 1.0.1, `gclib.py()`) or `"2"` (wrapper 2.x, `gclib.Controller`, Python >= 3.12). YAML ints `1`/`2` are accepted; any other value raises `ValueError` at driver construction. Must match the wrapper installed in the env, else connect fails with a message naming `gclib_api`. `"2"` is not yet verified at a station (reply trimming, gcaps bypass, unsolicited output without `-s ALL`); before using it in production run `helao/deploy/hte/tests/smoke/golden_capture_galil.py` and `golden_capture_galil_io.py` with `"1"` and with `"2"` and diff the captures. Install steps: each server's `README.md`. |
+
+`SYNC` (`sync_server`, `NativeSyncer`). An orchestrator or other host that
 builds a syncer without its own `aws_config_path` reads these from the `SYNC`
 entry:
 
@@ -618,7 +634,6 @@ entry:
 | `sync_pending_on_startup` | `True` | Sweep and enqueue unsynced records at startup. `False` leaves them for `/finish_pending`. |
 | `quarantine_strikes` | `5` | See [Sync quarantine](#sync-quarantine). `0` disables parking. |
 | `quarantine_hours` | `24` | See [Sync quarantine](#sync-quarantine). |
-| `auto_analyze_sequences` | — | Deprecated; see [Deprecated aliases](#deprecated-aliases). |
 | `testing` | — | **Nothing reads it.** |
 
 `ANA` (`analysis_server`):
@@ -806,8 +821,8 @@ server, so nothing it records is uploaded.
 - [ ] at most one server declares `params.positions`
 - [ ] the Bokeh operator names the right `orch_key`, and each operator UI
       carries its own `seqspec_*` params
-- [ ] finish hooks use `prefinish_*` / `postfinish_hooks`, not the deprecated
-      `*_postprocess_libs` lists
+- [ ] finish hooks use `prefinish_*` / `postfinish_hooks`; the removed
+      `*_postprocess_libs` and `auto_analyze_sequences` keys are refused at startup
 - [ ] a `postfinish_hooks` block still lists `s3_upload` at every level that
       should upload
 - [ ] the syncer server is keyed `SYNC`, and `ignore_heartbeats` entries are

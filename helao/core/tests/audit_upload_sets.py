@@ -6,10 +6,10 @@ NOTESTS and it must be invoked directly.
 
     python helao/core/tests/audit_upload_sets.py <archive_root> [--limit N]
 
-``archive_root`` is any directory containing action ymls -- a whole
-``RUNS_SYNCED`` tree, or one sequence directory. The script pairs each
-``*-act.yml`` with its own directory and prints every name that a glob would
-have picked up but the yml's ``files`` list does not mention.
+``archive_root`` is any directory containing action records -- a whole
+``RUNS``/``RUNS_SYNCED`` tree, or one sequence directory. The script pairs each
+``*-act.json``/``*-act.yml`` with its own directory and prints every name that
+a glob would have picked up but the record's ``files`` list does not mention.
 
 Spec: docs/superpowers/specs/2026-09-25-runs-layout-and-state-journal-design.md §3.5.1
 """
@@ -19,7 +19,8 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from helao.helpers.yml_tools import yml_load
+from helao.helpers.meta_io import meta_glob, read_meta
+from helao.hexagon.domain.naming import HEADER_SUFFIX, meta_kind
 
 
 def _is_bookkeeping(path: Path) -> bool:
@@ -50,7 +51,13 @@ def glob_set(action_dir: Path) -> set[str]:
     for p in action_dir.rglob("*"):
         if not p.is_file() or _is_bookkeeping(p):
             continue
-        if p.suffix == ".yml":
+        # Records (any format), data headers and non-record ymls are metadata,
+        # not the run artifacts an upload set is audited for.
+        if (
+            p.suffix == ".yml"
+            or meta_kind(p) is not None
+            or p.name.endswith(HEADER_SUFFIX)
+        ):
             continue
         out.add(p.relative_to(action_dir).as_posix())
     return out
@@ -63,7 +70,7 @@ def files_set(act_yml: Path) -> set[str]:
     *addressability*, not the upload decision. A nosync file that ``files``
     names is not a gap.
     """
-    meta = yml_load(act_yml, fast=True) or {}
+    meta = read_meta(act_yml) or {}
     out = set()
     for entry in meta.get("files") or []:
         name = (entry or {}).get("file_name")
@@ -87,7 +94,7 @@ def main(argv=None) -> int:
     by_suffix: Counter = Counter()
     examples: dict[str, str] = {}
 
-    for act_yml in args.archive_root.rglob("*-act.yml"):
+    for act_yml in meta_glob(args.archive_root, "act", "**/*"):
         scanned += 1
         gap = glob_set(act_yml.parent) - files_set(act_yml)
         if gap:
@@ -102,6 +109,12 @@ def main(argv=None) -> int:
     print(f"actions scanned : {scanned}")
     print(f"actions with gap: {with_gap}")
     print()
+    if not scanned:
+        print(
+            "no -act.json/-act.yml record found; not reporting 'no gap'",
+            file=sys.stderr,
+        )
+        return 1
     if not by_suffix:
         print("no gap: every globbed file is named in its action's files list")
         return 0

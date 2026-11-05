@@ -1,11 +1,9 @@
 """Low-severity latent-crash fixes in the hte deployment (fakes only)."""
 
 import asyncio
-import json
 import logging as pylogging
 import sys
 import tempfile
-import types
 from types import SimpleNamespace
 
 import numpy as np
@@ -44,7 +42,7 @@ def strict_log():
 
 
 def test_echeuvis_missing_presitu_spectrum_returns_false(monkeypatch):
-    from helao.deploy.hte.drivers.data.analyses import echeuvis_stability as es
+    from helao.deploy.hte.servers.analysis.analyses import echeuvis_stability as es
 
     good = (np.linspace(400, 800, 5), [0.0], np.ones((1, 5)))
     monkeypatch.setattr(
@@ -62,7 +60,7 @@ def test_echeuvis_missing_presitu_spectrum_returns_false(monkeypatch):
 
 
 def test_tray_load_logs_the_sample_without_a_format_error(strict_log):
-    from helao.deploy.hte.drivers.data import archive_driver as ad
+    from helao.deploy.hte.servers.sample import archive_driver as ad
 
     strict_log(ad.LOGGER)
 
@@ -77,7 +75,7 @@ def test_tray_load_logs_the_sample_without_a_format_error(strict_log):
 
 
 def test_tray_export_csv_with_empty_slot_writes_header_only():
-    from helao.deploy.hte.drivers.data.archive_driver import Archive
+    from helao.deploy.hte.servers.sample.archive_driver import Archive
 
     written = []
 
@@ -96,7 +94,7 @@ def test_tray_export_csv_with_empty_slot_writes_header_only():
 
 
 def test_get_voltage_async_success_is_reported_as_success():
-    from helao.deploy.hte.drivers.power_supply.power_supply_driver import (
+    from helao.deploy.hte.servers.power_supply.power_supply_driver import (
         PowerSupplyDriver,
     )
     from helao.core.drivers.helao_driver import DriverResponseType
@@ -108,30 +106,11 @@ def test_get_voltage_async_success_is_reported_as_success():
     assert resp.data == {"voltage_v": 3.3}
 
 
-# --- galil_motion_driver ----------------------------------------------------
-
-
-def test_galil_motor_disconnect_failure_is_json_serialisable(monkeypatch):
-    class GclibError(Exception):
-        pass
-
-    monkeypatch.setitem(sys.modules, "gclib", SimpleNamespace(GclibError=GclibError))
-    from helao.deploy.hte.drivers.motion.galil_motion_driver import Galil
-
-    def _close():
-        raise GclibError("link down")
-
-    drv = object.__new__(Galil)
-    drv.g = SimpleNamespace(GClose=_close)
-    out = asyncio.run(drv.motor_disconnect())
-    assert "link down" in json.loads(json.dumps(out))["connection"]
-
-
 # --- kinesis ----------------------------------------------------------------
 
 
 def test_kinesis_dev_enum_exists_when_an_axis_fails_to_open(monkeypatch):
-    from helao.deploy.hte.drivers.motion import kinesis_driver as kd
+    from helao.deploy.hte.servers.kinesis import kinesis_driver as kd
 
     def _motor(conn=None, scale=None):
         if conn == "bad":
@@ -148,6 +127,7 @@ def test_kinesis_dev_enum_exists_when_an_axis_fails_to_open(monkeypatch):
             }
         }
     )
+    drv.connect()  # the host connects after construction; "bad" fails to open
     assert sorted(e.value for e in drv.dev_kinesis) == ["x", "y"]
 
 
@@ -155,7 +135,7 @@ def test_kinesis_dev_enum_exists_when_an_axis_fails_to_open(monkeypatch):
 
 
 def test_simdos_get_mode_retries_a_missed_reply(monkeypatch):
-    import helao.deploy.hte.drivers.pump.simdos_driver as simdos
+    import helao.deploy.hte.servers.diapump.simdos_driver as simdos
 
     monkeypatch.setattr(simdos.serial, "Serial", lambda **kw: kw)
     drv = simdos.SIMDOS(config={"port": "COM7", "address": 1})
@@ -169,7 +149,7 @@ def test_simdos_get_mode_retries_a_missed_reply(monkeypatch):
 
 def test_readz_get_data_debug_log_formats(monkeypatch, strict_log):
     from helao.core.drivers.helao_driver import DriverResponseType
-    from helao.deploy.hte.drivers.pstat.gamry import readz
+    from helao.deploy.hte.servers.gamry import readz
 
     strict_log(readz.LOGGER)
     fake_client = SimpleNamespace(PumpEvents=lambda rate: None)
@@ -185,7 +165,7 @@ def test_readz_get_data_debug_log_formats(monkeypatch, strict_log):
 
 
 def _sm303(pxwl, data):
-    from helao.deploy.hte.drivers.spec import spectral_products_driver as sp
+    from helao.deploy.hte.servers.spec import spectral_products_driver as sp
 
     drv = object.__new__(sp.SM303)
     drv.set_trigger_mode = lambda t: True  # type: ignore
@@ -298,7 +278,7 @@ def _app(monkeypatch, module, server_params=None):
 
 
 def test_cancel_acquire_image_with_nothing_running_still_finishes(monkeypatch):
-    from helao.deploy.hte.servers.action import cam_server
+    from helao.deploy.hte.servers.cam import cam_server
 
     app = _app(monkeypatch, cam_server)
     finished = SimpleNamespace(as_dict=lambda: {"done": True})
@@ -314,7 +294,7 @@ def test_cancel_acquire_image_with_nothing_running_still_finishes(monkeypatch):
 
 
 def test_pal_anec_aliquot_needs_archive_and_a_gas_method(monkeypatch):
-    from helao.deploy.hte.servers.action import pal_server
+    from helao.deploy.hte.servers.pal import pal_server
 
     liquid_only = _app(
         monkeypatch, pal_server, {"cams": {"injection_custom_GC_liquid_start": {}}}
@@ -346,7 +326,7 @@ def test_pal_anec_aliquot_needs_archive_and_a_gas_method(monkeypatch):
 
 @pytest.mark.parametrize("name", ["PAL_dilute", "PAL_autodilute"])
 def test_pal_dilute_endpoints_return_a_clear_error(monkeypatch, name):
-    from helao.deploy.hte.servers.action import pal_server
+    from helao.deploy.hte.servers.pal import pal_server
 
     cam = name.split("_")[1]
     app = _app(monkeypatch, pal_server, {"cams": {cam: {}}})
@@ -357,7 +337,7 @@ def test_pal_dilute_endpoints_return_a_clear_error(monkeypatch, name):
 
 
 def test_db_new_samples_with_no_reference_samples_does_not_raise(monkeypatch):
-    from helao.deploy.hte.servers.action import sample_server
+    from helao.deploy.hte.servers.sample import sample_server
 
     app = _app(monkeypatch, sample_server)
 
@@ -391,27 +371,11 @@ def test_db_new_samples_with_no_reference_samples_does_not_raise(monkeypatch):
     assert "_fast_sample_out" not in active.action.action_params
 
 
-# --- gcld_operator ----------------------------------------------------------
-
-
-def test_insitu_potential_list_rejects_an_unknown_z_start(monkeypatch):
-    fake = types.ModuleType("data_request_client.client")
-    fake.CreateDataRequestModel = fake.DataRequestsClient = object  # type: ignore
-    monkeypatch.setitem(sys.modules, "data_request_client", types.ModuleType("x"))
-    monkeypatch.setitem(sys.modules, "data_request_client.client", fake)
-    from helao.deploy.hte.servers.operator import gcld_operator as g
-
-    assert g.insitu_potential_list(0.5, scan_down=False) is None
-    pots = g.insitu_potential_list(0.4, scan_down=False)
-    assert pots is not None and pots[:3] == [0.4, 0.6, 0.8]
-    assert sorted(pots) == sorted(g.ECHEUVIS_multiCA_led_defaults["CA_potential_vsRHE"])
-
-
 # --- sample_vis -------------------------------------------------------------
 
 
 def test_sample_vis_bad_max_smps_input_keeps_the_previous_value():
-    from helao.deploy.hte.servers.visualizer import sample_vis
+    from helao.deploy.hte.servers.sample.bokeh import sample_vis
 
     vis = object.__new__(sample_vis.C_vis)
     vis.max_smps = 10

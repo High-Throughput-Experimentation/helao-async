@@ -76,13 +76,6 @@ class PostfinishContext:
     #: decision A3): force_s3, force_api, compress, retries.
     opts: dict = field(default_factory=dict)
 
-    @property
-    def data(self):
-        """``HelaoData`` over the finished record, built on first access (A7)."""
-        from helao.helpers.helao_data import HelaoData
-
-        return HelaoData(str(self.yml.target))
-
 
 @dataclass
 class HookSet:

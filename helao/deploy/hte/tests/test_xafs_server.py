@@ -25,8 +25,8 @@ from helao.core.drivers.helao_driver import (
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.sample import SolidSample
-from helao.deploy.hte.servers.action import xafs_server
-from helao.deploy.hte.servers.action.xafs_server import XafsScanExec
+from helao.deploy.hte.servers.xafs import xafs_server
+from helao.deploy.hte.servers.xafs.xafs_server import XafsScanExec
 from helao.hexagon.app.executor_runner import ExecutorRunner
 
 FCK = uuid4()
@@ -40,23 +40,36 @@ REF_LABEL = "xafs-std__ZnO_film"
 
 def ok(data=None):
     return DriverResponse(
-        response=DriverResponseType.success, message="ok", data=data, status=DriverStatus.ok
+        response=DriverResponseType.success,
+        message="ok",
+        data=data,
+        status=DriverStatus.ok,
     )
 
 
 def fail(http_status=None):
     data = {"http_status": http_status, "detail": "x"} if http_status else None
     return DriverResponse(
-        response=DriverResponseType.failed, message="bad", data=data, status=DriverStatus.error
+        response=DriverResponseType.failed,
+        message="bad",
+        data=data,
+        status=DriverStatus.error,
     )
 
 
 class FakeDriver:
     def __init__(
-        self, states=GOOD_STATES, fail_state_call=None, start=None, est_total=1.0, transient=(),
-        no_exd=False
+        self,
+        states=GOOD_STATES,
+        fail_state_call=None,
+        start=None,
+        est_total=1.0,
+        transient=(),
+        no_exd=False,
     ):
-        self.transient = set(transient)  # 1-based scan_state calls failing without http_status
+        self.transient = set(
+            transient
+        )  # 1-based scan_state calls failing without http_status
         self.states = list(states)
         self.fail_state_call = fail_state_call  # 1-based scan_state call that fails 404
         self.start_resp = start or ok({"scan_id": "s1"})
@@ -89,7 +102,11 @@ class FakeDriver:
                 "n_expected": 4,
                 "elapsed": 1.0,
                 "est_total": self.est_total,
-                "exd_path": "/data/run/Zn_x_000_exd.csv.zip" if state in ("done", "stopped") and not self.no_exd else None,
+                "exd_path": (
+                    "/data/run/Zn_x_000_exd.csv.zip"
+                    if state in ("done", "stopped") and not self.no_exd
+                    else None
+                ),
                 "error": "Traceback boom" if state == "error" else None,
             }
         )
@@ -336,8 +353,11 @@ async def test_reference_scan_missing_fields_errors(tmp_path, over):
 @pytest.mark.asyncio
 async def test_izero_without_roi_element_errors(tmp_path):
     s, ex, d = make(
-        tmp_path, samples=[], run_use="izero",
-        reference_name="ZnO_film", reference_label=REF_LABEL,
+        tmp_path,
+        samples=[],
+        run_use="izero",
+        reference_name="ZnO_film",
+        reference_label=REF_LABEL,
     )
     await run(s, ex)
     assert s.action.error_code != ErrorCodes.none
@@ -529,7 +549,8 @@ class EpActive:
     def __init__(self, params, samples=()):
         self.action = SimpleNamespace(
             action_params=params,
-            action_name="ep", action_uuid="u",
+            action_name="ep",
+            action_uuid="u",
             samples_in=list(samples),
             file_conn_keys=[FCK],
             run_use=None,
@@ -619,7 +640,10 @@ async def test_status_returns_health_and_hw(tmp_path):
     eps = await make_eps(tmp_path, d)
     a = EpActive({})
     await eps["status"](EpCtx(a))
-    assert a.dflt[0]["status"] == {"health": {"state": None}, "hw": {"mono_calibrated": True}}
+    assert a.dflt[0]["status"] == {
+        "health": {"state": None},
+        "hw": {"mono_calibrated": True},
+    }
     assert a.action.error_code == ErrorCodes.none
 
 
@@ -637,7 +661,9 @@ async def test_calibrate_timeout_errors(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_make_app_registers_routes_and_reaches_driver_shutdown(tmp_path, monkeypatch):
+async def test_make_app_registers_routes_and_reaches_driver_shutdown(
+    tmp_path, monkeypatch
+):
     """makeApp builds an ActionHost; startup's dyn_endpoints registers the actions
     (no sidecar: fake driver) and ActionHost.shutdown reaches the driver hook."""
     from helao.helpers import config_loader
@@ -671,7 +697,14 @@ async def test_make_app_registers_routes_and_reaches_driver_shutdown(tmp_path, m
     app.driver = Fake()
     await app._dyn_endpoints(app)
     paths = {r.path for r in app.routes}
-    for name in ("normal_scan", "initialize", "calibrate", "status", "set_xray", "shutter"):
+    for name in (
+        "normal_scan",
+        "initialize",
+        "calibrate",
+        "status",
+        "set_xray",
+        "shutter",
+    ):
         assert f"/XAFS/{name}" in paths, name
     assert app.server_params["allow_concurrent_actions"] is False
 

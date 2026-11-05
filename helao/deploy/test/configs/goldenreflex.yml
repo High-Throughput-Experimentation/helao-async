@@ -64,7 +64,7 @@ servers:
       plate_id: 2750
   # GPSIM was absent while gpsim_driver still imported gpflow, which needs
   # tensorflow and so has no Python 3.14 build. The surrogate now runs on
-  # gpytorch (see drivers/data/gp_backend.py), so the server imports and the
+  # gpytorch (see servers/gpsim/gp_backend.py), so the server imports and the
   # OERSIM experiments -- every one of which routes through GPSIM -- are
   # runnable again. That also restores /action's only real data source:
   # CPSIM streams ws_data during a measurement it cannot start without a

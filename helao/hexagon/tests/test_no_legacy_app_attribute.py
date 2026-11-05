@@ -2,9 +2,8 @@
 
 ``ActionHost`` **is** the FastAPI app. ``Base`` was not -- it held a reference
 to one -- so legacy deployment code reads the driver and the poller as
-``base.app.driver`` / ``base.app.poller``. ``app`` is on
-``test_action_host_member_coverage.DELIBERATELY_ABSENT``: the host does not
-reproduce it, and every such expression raises
+``base.app.driver`` / ``base.app.poller``. The host does not
+reproduce ``app``, and every such expression raises
 
     AttributeError: 'ActionHost' object has no attribute 'app'
 

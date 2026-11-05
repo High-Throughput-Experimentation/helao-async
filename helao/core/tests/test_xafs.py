@@ -76,7 +76,7 @@ class _Client:
         plate = {"named": 10131, "other": 42}.get(sequence_uuid)
         return {"sequence_params": {} if plate is None else {"plate_id": plate}}
 
-    async def read_processes_by_sequence(self, sequence_uuid):
+    async def read_processes_by_sequence(self, sequence_uuid, **_page):
         return [_proc(7, seq=sequence_uuid)]
 
 
@@ -337,3 +337,21 @@ def test_changing_x_or_y_redraws_from_memory_and_keeps_the_selection() -> None:
     assert state.wl_min == pytest.approx(-9600.0)  # the window refit to the new x
     assert page.unit_of("flattened_norm") == ""
     xafs.reset_analyses()
+
+
+def test_processes_are_read_in_pages_until_the_key_is_null() -> None:
+    """A large sequence is over the API's response limit unless paged."""
+    calls = []
+
+    class Paged:
+        async def read_processes_by_sequence(self, *, sequence_uuid, **page):
+            calls.append(page)
+            key = page["last_evaluated_key"]
+            if key is None:
+                return {"processes": [{"n": 1}, {"n": 2}], "exclusive_start_key": "k1"}
+            return {"processes": [{"n": 3}], "exclusive_start_key": None}
+
+    got = asyncio.run(spectra.read_processes_by_sequence(Paged(), "S"))
+    assert [p["n"] for p in got] == [1, 2, 3]
+    assert [c["last_evaluated_key"] for c in calls] == [None, "k1"]
+    assert all(c["limit"] == spectra.PROCESS_PAGE for c in calls)

@@ -7,9 +7,7 @@ import pytest
 SMOKE = Path(__file__).parent / "smoke"
 
 
-@pytest.mark.parametrize(
-    "script", ["control_negative_run.sh", "parity_run.sh", "conc_run.sh"]
-)
+@pytest.mark.parametrize("script", ["control_negative_run.sh", "conc_run.sh"])
 def test_rm_rf_is_guarded_by_safe_root(script):
     lines = (SMOKE / script).read_text(encoding="utf-8").splitlines()
     rms = [i for i, ln in enumerate(lines) if ln.startswith("rm -rf ")]

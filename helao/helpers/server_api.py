@@ -67,6 +67,7 @@ class HelaoFastAPI(FastAPI):
         self.helao_srv = helao_srv
         self.server_cfg = self.helao_cfg["servers"][self.helao_srv]
         self.server_params = self.server_cfg.get("params", {})
+        logging.set_server_key(helao_srv)
         if logging.LOGGER is None:
             logging.LOGGER = logging.make_logger(
                 logger_name=helao_srv,
@@ -93,11 +94,10 @@ class HelaoFastAPI(FastAPI):
             # decorator delegates through self.router (not self.add_api_route),
             # so an override at the app level would not catch them.
             #
-            # Action routes (path "/<server_key>/...") are intentionally
-            # included; callers using the RPC path bypass the action-queuing
-            # middleware and are responsible for their own coordination.  In
-            # practice today only ``update_status`` is migrated, but the
-            # registration lets future callers opt in without code churn.
+            # Action routes (path "/<server_key>/...") are included too; an
+            # ActionHost sets ``rpc_dispatcher.admit`` so they go through the
+            # same ActionAdmission (queue / repeat-uuid) as the HTTP
+            # middleware.  Other routes, e.g. ``update_status``, skip it.
             from fastapi.routing import APIRoute  # local to avoid import order issues
 
             for route in self.routes:
@@ -166,6 +166,7 @@ class HelaoBokehAPI:
         self.helao_cfg = helao_cfg if helao_cfg is not None else config_loader.CONFIG
         self.server_cfg = self.helao_cfg["servers"][self.helao_srv]
         self.server_params = self.server_cfg.get("params", {})
+        logging.set_server_key(helao_srv)
         if logging.LOGGER is None:
             logging.LOGGER = logging.make_logger(
                 logger_name=helao_srv,

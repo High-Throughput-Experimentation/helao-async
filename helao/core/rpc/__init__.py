@@ -10,6 +10,7 @@ from helao.core.rpc.zmq_rpc import (
     RPCClient,
     RPCDispatcher,
     RPCError,
+    RPCHandlerError,
     RPCRequest,
     RPCResponse,
     RPCSyncClient,
@@ -23,5 +24,6 @@ __all__ = [
     "RPCRequest",
     "RPCResponse",
     "RPCError",
+    "RPCHandlerError",
     "derive_rpc_port",
 ]

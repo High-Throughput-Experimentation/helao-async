@@ -109,6 +109,7 @@ import hashlib
 import json
 import os
 import re
+import threading
 from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -266,10 +267,14 @@ def _parse_norm(text: str) -> "dict[str, str]":
 
 
 def _split_hlo(body: str):
-    """Split an .hlo body into (header_text, [data_line, ...])."""
+    """Split a data body into (header_text, [data_line, ...]).
+
+    A legacy ``.hlo`` carries its header before ``%%``; a ``.jsonl`` is rows
+    only (its header is the separate ``.meta.json`` member).
+    """
     lines = body.splitlines()
     if "%%" not in lines:
-        return body, []
+        return "", [line for line in lines if line.strip()]
     idx = lines.index("%%")
     header = "\n".join(lines[:idx])
     data_lines = [line for line in lines[idx + 1 :] if line.strip()]
@@ -378,7 +383,7 @@ def _compare_norm(name: str, ref_text: str, cur_text: str) -> "list[str]":
         )
     for rel in sorted(ref_keys & cur_keys):
         body_ref, body_cur = ref[rel], cur[rel]
-        if rel.endswith(".hlo"):
+        if rel.endswith((".hlo", ".jsonl")):
             h_ref, d_ref = _split_hlo(body_ref)
             h_cur, d_cur = _split_hlo(body_cur)
             if h_ref != h_cur:
@@ -455,6 +460,9 @@ class _RecordingMSQ(MultisubscriberQueue):
         super().__init__()
         self._record_fn = record_fn
         self._trace = trace
+        # thread id of every put_nowait, kept off the trace so the references
+        # stay thread-independent; scenario 14 and the marshalling tests read it
+        self.put_threads: list = []
 
     def _maybe_record(self, data):
         if data is StopAsyncIteration:
@@ -468,6 +476,7 @@ class _RecordingMSQ(MultisubscriberQueue):
         await super().put(data)
 
     def put_nowait(self, data):
+        self.put_threads.append(threading.get_ident())
         self._maybe_record(data)
         super().put_nowait(data)
 
@@ -1106,11 +1115,10 @@ async def _scenario_finish_late_data_drain(save_root: Path) -> dict:
 
     Every other scenario drains each enqueued packet (``_drain_data``) before the
     next lifecycle step, so ``num_data_queued == num_data_written`` at finish
-    entry and the finished-packet write-drain loops in ``_finish``
-    (``adapters/native/finalizer.py``, the two capped retry+``sleep(0.1)`` loops
-    that let the threadpool file writes complete BEFORE the file connections are
-    closed) never have anything to flush: the late-data-vs-file-close race is
-    unobservable.
+    entry and the finished-packet write drain in ``_finish``
+    (``adapters/native/finalizer.py``, the marker drain that lets the threadpool
+    file writes complete BEFORE the file connections are closed) never have
+    anything to flush: the late-data-vs-file-close race is unobservable.
 
     Here we open the file with one drained packet, then enqueue a SECOND packet
     with ``enqueue_data_nowait`` and IMMEDIATELY call ``finish()`` with NO drain
@@ -1147,6 +1155,51 @@ async def _scenario_finish_late_data_drain(save_root: Path) -> dict:
         )
         undrained = active.num_data_queued > active.num_data_written
         trace.append({"event": "pre_finish", "undrained": undrained})
+
+        await active.finish()
+        await _ticks(10)
+        trace.append(
+            {"event": "post_finish", "action_status": _status_list(active.action)}
+        )
+    return {"trace": trace}
+
+
+async def _scenario_nowait_from_foreign_thread(save_root: Path) -> dict:
+    """Scenario 14: the thread-safe port members, called from a foreign thread.
+
+    ``get_realtime_nowait``, ``finish_hlo_header`` and 20 ``enqueue_data_nowait``
+    calls run on a ``threading.Thread`` (the NI-DAQmx hardware callback does this),
+    in that order. The coroutine joins the thread, then drains and finishes. The
+    frozen consequence is the ``.hlo`` bytes: every row is present, in order.
+    Which thread did each put is NOT recorded in the trace (``put_threads`` on the
+    queue holds it), so this reference is the same before and after the
+    marshalling fix."""
+    trace: list = []
+    base = _make_host(save_root, trace)
+    with _PatchedBaseGlobals(trace):
+        action = _mk_action("fthread")
+        active = ActionSession(base, _active_params(base, action))
+        await active.myinit()
+        await _ticks()
+        dflt = base.dflt_file_conn_key()
+
+        def _hardware_callback() -> None:
+            now = active.get_realtime_nowait()
+            active.finish_hlo_header(realtime=now)
+            for i in range(1, 21):
+                active.enqueue_data_nowait(
+                    DataModel(
+                        data={dflt: {"t": i, "v": i * 10}},
+                        errors=[],
+                        status=HloStatus.active,
+                    )
+                )
+
+        worker = threading.Thread(target=_hardware_callback)
+        worker.start()
+        worker.join()
+        await _ticks()
+        await _drain_data(active)
 
         await active.finish()
         await _ticks(10)
@@ -1316,6 +1369,7 @@ SCENARIOS = {
     "11_executor_oneoff": _scenario_executor_oneoff,
     "12_finalizer_global_params_dict": _scenario_finalizer_global_params_dict,
     "13_finish_late_data_drain": _scenario_finish_late_data_drain,
+    "14_nowait_from_foreign_thread": _scenario_nowait_from_foreign_thread,
 }
 
 

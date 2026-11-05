@@ -18,7 +18,7 @@ from typing import Any
 
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
-from helao.deploy.hte.drivers.io.nidaqmx_driver import TTLExec, cNIMAX
+from helao.deploy.hte.servers.nidaqmx.nidaqmx_driver import TTLExec, cNIMAX
 
 DEV_TTL = {"trigger_out": "PXI-6284/port0/line5", "shutter": "PXI-6284/port0/line6"}
 
@@ -135,7 +135,7 @@ def test_estop_drives_ttl_lines_low():
 
 
 def _build_app(monkeypatch, server_params) -> Any:
-    from helao.deploy.hte.servers.action import nidaqmx_server
+    from helao.deploy.hte.servers.nidaqmx import nidaqmx_server
 
     class _FakeHost:
         def __init__(self, **kwargs):

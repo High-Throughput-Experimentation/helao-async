@@ -294,7 +294,13 @@ async def move_dir(hobj, base: Optional[object] = None, retry_delay: int = 5):
     yml_dir = os.path.normpath(os.path.join(save_dir, target_subdir))
 
     timestamp = getattr(hobj, f"{obj_type}_timestamp").strftime("%y%m%d.%H%M%S%f")
-    yml_path = os.path.join(yml_dir, f"{timestamp}-{obj_type[:3]}.yml")
+    # Local import: meta_io imports this module. The handoff names the record
+    # the writer actually produced -- .json, or an in-flight .yml.
+    from helao.helpers.meta_io import resolve_meta_path
+
+    yml_path = str(
+        resolve_meta_path(os.path.join(yml_dir, f"{timestamp}-{obj_type[:3]}.json"))
+    )
 
     # The producing server evicts here, before the handoff: whether or not a
     # syncer exists, this server is done with the record (spec §4.3). A manual

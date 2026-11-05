@@ -19,6 +19,7 @@ from helao.core.drivers.data import analysis_layout
 from helao.core.tests import set_plate_id
 from helao.core.tests.set_plate_id import main, rewrite_doc
 from helao.deploy.test.servers.action.sim_db_server import RecordingS3Client
+from helao.helpers.meta_io import write_meta
 from helao.helpers.plate_api import HTEPlateAPI, PlateAPIUnavailable
 from helao.helpers.yml_tools import yml_dumps, yml_load
 
@@ -799,3 +800,229 @@ def test_analyses_refuse_a_missing_analysis_dir(tmp_path, monkeypatch, capsys):
         "--analysis-dir ANALYSES/no/such is not a directory"
         in captured.out + captured.err
     )
+
+
+# ------------------------------------------------- RUNS layout and JSON records
+
+SYNCED_PRG = "yml: x\nsynced: true\n"
+SEQ_COMMENT = "# written by an old build\n"
+
+
+def build_runs_record(tmp_path, fmt="json"):
+    """``build_record``'s sequence laid out in the single ``RUNS`` tree.
+
+    Every record is ``.json`` (``fmt="json"``), or the ``-seq`` stays a
+    commented ``.yml`` above ``.json`` children (``fmt="mixed"``). Each
+    seq/exp/act record has a ``synced: true`` ``.prg``; the processes (the
+    foreign one included) sit beside their experiment. Returns the sequence
+    directory.
+    """
+    z, pdir, _ = build_record(tmp_path)
+    seq_dir = tmp_path / "RUNS" / "2025" / "1003" / SEQ_NAME
+    with zipfile.ZipFile(z) as zf:
+        for name in zf.namelist():
+            data = zf.read(name)
+            if name.endswith(".prg"):
+                continue
+            out = seq_dir / name
+            out.parent.mkdir(parents=True, exist_ok=True)
+            if not name.endswith(".yml"):
+                out.write_bytes(data)
+                continue
+            if name == SEQ_MEMBER and fmt == "mixed":
+                out.write_text(SEQ_COMMENT + data.decode(), encoding="utf-8")
+            else:
+                out = write_meta(out.with_suffix(".json"), yml_load(data.decode()))
+            out.with_suffix(".prg").write_text(SYNCED_PRG, encoding="utf-8")
+    for prc in pdir.rglob("*-prc.yml"):
+        write_meta(seq_dir / EXP_DIR / prc.with_suffix(".json").name, yml_load(prc))
+    z.unlink()
+    return seq_dir
+
+
+def _json(path: Path) -> dict:
+    text = path.read_text(encoding="utf-8")
+    assert text.startswith("{\n  "), path  # pretty JSON, not YAML
+    return json.loads(text)
+
+
+@pytest.mark.parametrize("fmt", ["json", "mixed"])
+def test_record_on_a_runs_sequence_edits_each_file_in_its_own_format(
+    tmp_path, capsys, fmt
+):
+    seq_dir = build_runs_record(tmp_path, fmt)
+    assert _run(seq_dir) == 0
+    out = capsys.readouterr().out
+
+    if fmt == "mixed":
+        seq_path = seq_dir / SEQ_MEMBER
+        assert seq_path.read_text(encoding="utf-8").startswith(SEQ_COMMENT)
+        seq = yml_load(seq_path)
+    else:
+        seq_path = (seq_dir / SEQ_MEMBER).with_suffix(".json")
+        seq = _json(seq_path)
+    assert seq["sequence_params"]["plate_id"] == NEW
+    sample = _json((seq_dir / ACT_SAMPLE_MEMBER).with_suffix(".json"))
+    assert sample["samples_in"][0]["global_label"] == NEW_LABEL
+    prc = _json(seq_dir / EXP_DIR / f"0__{PRC_SAMPLE}__GRID_scan-prc.json")
+    assert prc["samples_in"][0]["plate_id"] == NEW
+    foreign = _json(seq_dir / EXP_DIR / f"0__{OTHER_SEQ_UUID}__GRID_scan-prc.json")
+    assert foreign["samples_in"][0]["plate_id"] == OLD  # another sequence's
+    assert not list(seq_dir.rglob("*.prg"))
+    assert f"/finish_yml?yml_path={seq_path}" in out
+    assert "made 7 change(s)" in out
+
+
+def test_record_refuses_a_runs_sequence_that_is_not_fully_synced(tmp_path, capsys):
+    seq_dir = build_runs_record(tmp_path)
+    (seq_dir / EXP_MEMBER).with_suffix(".prg").write_text(
+        "yml: x\nsynced: false\n", encoding="utf-8"
+    )
+    before = _tree_bytes(seq_dir)
+    for extra in ([], ["--no-reset"], ["--dry-run"]):
+        assert _run(seq_dir, *extra) != 0
+        assert "-exp.json" in capsys.readouterr().err
+        assert _tree_bytes(seq_dir) == before
+
+
+@pytest.mark.parametrize("no_reset", [[], ["--no-reset"]])
+def test_record_rerun_on_a_corrected_runs_sequence_changes_nothing(
+    tmp_path, capsys, no_reset
+):
+    seq_dir = build_runs_record(tmp_path)
+    assert _run(seq_dir, "--no-reset") == 0
+    before = _tree_bytes(seq_dir)
+    capsys.readouterr()
+
+    assert _run(seq_dir, *no_reset) == 0
+
+    assert "nothing to change" in capsys.readouterr().out
+    assert _tree_bytes(seq_dir) == before  # every .prg kept: no needless re-push
+
+
+def test_record_rerun_on_a_corrected_zip_with_no_reset_exits_zero(tmp_path, capsys):
+    z, _, _ = build_record(tmp_path)
+    assert _run(z, "--no-reset") == 0
+    before = _sha(z)
+    capsys.readouterr()
+
+    assert _run(z, "--no-reset") == 0
+
+    assert "nothing to change" in capsys.readouterr().out
+    assert _sha(z) == before
+
+
+def test_analyses_find_ana_json_and_prc_json(tmp_path, monkeypatch):
+    _, yml, ana_dir, loader = build_analysis(tmp_path, monkeypatch)
+    jdir = tmp_path / "PRC_JSON"
+    jdir.mkdir()
+    for prc in (tmp_path / "PROCESSES").rglob("*-prc.yml"):
+        write_meta(jdir / prc.with_suffix(".json").name, yml_load(prc))
+    doc = yml_load(yml)
+    del doc["analysis_uuid"]  # the S3 key then comes from the file name alone
+    ana = write_meta(ana_dir / f"{ANA_UUID}-ana.json", doc)
+    yml.unlink()
+
+    assert _ana(jdir, tmp_path) == 0
+
+    assert loader.uploads == 1
+    for body in (_s3_body(tmp_path), _json(ana)):
+        assert body["global_sample_label"] == NEW_LABEL
+        assert body["inputs"][0]["global_sample_label"] == NEW_LABEL
+        assert body["inputs"][1]["global_sample_label"] == STD_LABEL
+    assert not yml.exists()  # written back as JSON, no YAML twin
+
+
+def test_record_refuses_a_written_off_runs_sequence(tmp_path, capsys):
+    seq_dir = build_runs_record(tmp_path)
+    (seq_dir / EXP_MEMBER).with_suffix(".prg").write_text(
+        "yml: x\nsynced: true\nwrite_off:\n  operator: op\n  groups: {}\n",
+        encoding="utf-8",
+    )
+    before = _tree_bytes(seq_dir)
+    for extra in ([], ["--dry-run"], ["--reset-only"]):
+        assert _run(seq_dir, *extra) != 0
+        assert "write_off" in capsys.readouterr().err
+        assert _tree_bytes(seq_dir) == before
+
+
+def test_record_reset_only_hands_back_a_runs_sequence_and_refuses_a_zip(
+    tmp_path, capsys
+):
+    seq_dir = build_runs_record(tmp_path)
+    assert _run(seq_dir, "--no-reset") == 0
+    capsys.readouterr()
+    assert _run(seq_dir) == 0
+    assert "--reset-only" in capsys.readouterr().out
+    assert _run(seq_dir, "--reset-only") == 0
+    assert not list(seq_dir.rglob("*.prg"))
+    assert "/finish_yml" in capsys.readouterr().out
+
+    z, _, _ = build_record(tmp_path / "z")
+    assert _run(z, "--reset-only") != 0
+
+
+def test_record_dry_run_on_a_runs_sequence_reports_colocated_processes(
+    tmp_path, capsys
+):
+    seq_dir = build_runs_record(tmp_path)
+    assert _run(seq_dir, "--dry-run") == 0
+    out = capsys.readouterr().out
+    assert f"0__{PRC_SAMPLE}__GRID_scan-prc.json: samples_in[0].plate_id" in out
+
+
+@pytest.fixture(autouse=True)
+def _reset_logger():
+    """CLI mains install a root logger; keep it from leaking between tests."""
+    from helao.helpers import helao_logging
+
+    saved = helao_logging.LOGGER
+    yield
+    lg = helao_logging.LOGGER
+    if lg is not saved and lg is not None:
+        for h in list(lg.handlers):
+            lg.removeHandler(h)
+            h.close()
+    helao_logging.LOGGER = saved
+
+
+def _ledger_rows(root, tool):
+    import hashlib
+
+    from helao.helpers import helao_logging
+
+    for h in helao_logging.LOGGER.handlers:
+        h.flush()
+    p = root / "LOGS" / f"artifacts_{tool}.jsonl"
+    rows = [json.loads(x) for x in p.read_bytes().splitlines()]
+    for r in rows:
+        f = Path(r["path"])
+        f = f if f.is_absolute() else root / f
+        assert r["sha256"] == hashlib.sha256(f.read_bytes()).hexdigest()
+    return rows
+
+
+def test_record_main_ledgers_rewrites_beside_the_runs_tree(tmp_path):
+    seq_dir = build_runs_record(tmp_path)
+    assert _run(seq_dir) == 0
+    rows = _ledger_rows(tmp_path, "set_plate_id")
+    assert {r["event"] for r in rows} == {"artifact_rewritten"}
+    assert {r["reason"] for r in rows} == {"set_plate_id"}
+    assert {r["kind"] for r in rows} >= {"seq", "act", "prc"}
+
+
+def test_record_dry_run_logs_nothing(tmp_path):
+    seq_dir = build_runs_record(tmp_path)
+    assert _run(seq_dir, "--dry-run") == 0
+    assert not (tmp_path / "LOGS").exists()
+
+
+def test_analyses_main_ledgers_beside_the_analyses_tree(tmp_path, monkeypatch):
+    pdir, yml, _, _ = build_analysis(tmp_path, monkeypatch)
+    (tmp_path / "RUNS").mkdir(exist_ok=True)
+    assert _ana(pdir, tmp_path) == 0
+    rows = _ledger_rows(tmp_path, "set_plate_id")
+    (r,) = [r for r in rows if r["event"] == "artifact_rewritten"]
+    assert r["reason"] == "set_plate_id"
+    assert r["uuid"] == ANA_UUID
+    assert Path(r["path"]).name == yml.name

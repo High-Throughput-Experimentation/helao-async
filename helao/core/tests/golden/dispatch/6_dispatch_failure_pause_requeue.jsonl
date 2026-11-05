@@ -190,29 +190,8 @@
       "seq_dq": 0
     },
     {
-      "act_dq": 2,
-      "event": "phase_enter",
-      "exp_dq": 0,
-      "loop_intent": "stop",
-      "loop_state": "started",
-      "orch_state": "idle",
-      "phase": "loop_task_dispatch_action",
-      "seq_dq": 0
-    },
-    {
       "event": "intent_call",
       "method": "intend_none"
-    },
-    {
-      "act_dq": 2,
-      "error_code": "none",
-      "event": "phase_exit",
-      "exp_dq": 0,
-      "loop_intent": "none",
-      "loop_state": "stopped",
-      "orch_state": "idle",
-      "phase": "loop_task_dispatch_action",
-      "seq_dq": 0
     },
     {
       "event": "intent_call",

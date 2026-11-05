@@ -43,7 +43,6 @@ def _make_base() -> ActionHost:
     )
     base.server_cfg = {"host": "127.0.0.1", "port": 8000}
     base.actionservermodel = ActionServerModel(action_server=base.server)
-    base.actionservermodel.init_endpoints()
     base.status_clients = set()
     return base
 

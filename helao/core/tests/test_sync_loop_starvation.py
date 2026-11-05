@@ -20,7 +20,6 @@ import time
 
 import pytest
 
-import helao.core.drivers.data.sync_driver as legacy_mod
 import helao.hexagon.adapters.native.sync_driver as native_mod
 from helao.hexagon.tests.sync_fixtures import (
     drain,
@@ -52,7 +51,7 @@ async def _ticks_during(coro, interval=0.01):
     return result, ticks
 
 
-@pytest.mark.parametrize("mod", [legacy_mod, native_mod])
+@pytest.mark.parametrize("mod", [native_mod])
 @pytest.mark.asyncio
 async def test_parent_with_a_queued_child_is_requeued_unparsed(tmp_path, mod):
     drv = make_sync_driver(tmp_path, mod.SyncDriver)
@@ -76,7 +75,7 @@ async def test_parent_with_a_queued_child_is_requeued_unparsed(tmp_path, mod):
         await teardown_driver(drv)
 
 
-@pytest.mark.parametrize("mod", [legacy_mod, native_mod])
+@pytest.mark.parametrize("mod", [native_mod])
 @pytest.mark.asyncio
 async def test_record_parse_runs_off_the_event_loop(tmp_path, mod):
     drv = make_sync_driver(tmp_path, mod.SyncDriver)
@@ -105,7 +104,7 @@ async def test_record_parse_runs_off_the_event_loop(tmp_path, mod):
         await teardown_driver(drv)
 
 
-@pytest.mark.parametrize("mod", [legacy_mod, native_mod])
+@pytest.mark.parametrize("mod", [native_mod])
 @pytest.mark.asyncio
 async def test_child_enumeration_runs_off_the_event_loop(tmp_path, mod, monkeypatch):
     drv = make_sync_driver(tmp_path, mod.SyncDriver)
@@ -131,7 +130,7 @@ async def test_child_enumeration_runs_off_the_event_loop(tmp_path, mod, monkeypa
         await teardown_driver(drv)
 
 
-@pytest.mark.parametrize("mod", [legacy_mod, native_mod])
+@pytest.mark.parametrize("mod", [native_mod])
 @pytest.mark.asyncio
 async def test_a_reposted_shipped_child_does_not_strand_its_parent(tmp_path, mod):
     """Review finding: a shipped child counted as busy dropped its parent."""
@@ -158,7 +157,7 @@ async def test_a_reposted_shipped_child_does_not_strand_its_parent(tmp_path, mod
         await teardown_driver(drv)
 
 
-@pytest.mark.parametrize("mod", [legacy_mod, native_mod])
+@pytest.mark.parametrize("mod", [native_mod])
 @pytest.mark.asyncio
 async def test_parent_with_a_running_child_is_requeued_unparsed(tmp_path, mod):
     drv = make_sync_driver(tmp_path, mod.SyncDriver)

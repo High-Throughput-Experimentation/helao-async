@@ -1,8 +1,8 @@
 """Simulated data-packaging server for golden-master capture (spec §6.3, D5).
 
-Hosts the REAL :class:`HelaoSyncer` with ``aws_bucket`` set and no
-``aws_config_path``, so the full RUNS_FINISHED -> RUNS_SYNCED -> S3 sync leg
-runs on Linux without AWS credentials. Two modes, selected by the server's
+Hosts the REAL :class:`NativeSyncer` with ``aws_bucket`` set and no
+``aws_config_path``, so the full sync leg (records are finished in place under
+``RUNS``, then uploaded to S3) runs on Linux without AWS credentials. Two modes, selected by the server's
 ``params``:
 
 - local-only (default): ``SyncDriver.to_s3`` returns True with ``self.s3``
@@ -13,10 +13,10 @@ runs on Linux without AWS credentials. Two modes, selected by the server's
   recorder object later serves the hexagon syncer, recording both stacks
   identically.
 
-No legacy patch is needed: ``SyncDriver`` leaves ``self.s3 = None`` without
+No patch is needed: ``SyncDriver`` leaves ``self.s3 = None`` without
 ``aws_config_path``, only calls ``self.s3.upload_fileobj(fileobj, bucket,
 key)`` / ``self.s3.upload_file(filename, bucket, key)`` from a worker thread
-(``asyncio.to_thread`` — sync_driver.py:1776), and never uses ``self.s3r``
+(``asyncio.to_thread``), and never uses ``self.s3r``
 beyond assignment, so post-construction injection is sufficient and
 behavior-identical when ``s3_record`` is unset.
 
@@ -33,9 +33,11 @@ import shutil
 import threading
 from pathlib import Path
 
-from helao.core.drivers.data.sync_driver import HelaoSyncer
+from helao.hexagon.adapters.native.native_syncer import NativeSyncer
+from helao.hexagon.adapters.native.sync_adapter import NativeSyncAdapter
 from helao.hexagon.app.action_context import ActionContext
 from helao.hexagon.app.action_host import ActionHost
+from helao.hexagon.domain.naming import meta_kind
 
 
 class RecordingS3Client:
@@ -76,8 +78,8 @@ class RecordingS3Client:
         self._record(bucket, key, "file")
 
 
-class SimHelaoSyncer(HelaoSyncer):
-    """HelaoSyncer that swaps in the recorder when ``params.s3_record`` is set."""
+class SimNativeSyncer(NativeSyncer):
+    """NativeSyncer that swaps in the recorder when ``params.s3_record`` is set."""
 
     def __init__(self, action_serv):
         super().__init__(action_serv)
@@ -94,57 +96,61 @@ def makeApp(server_key) -> ActionHost:
         server_title=server_key,
         description="Simulated data packaging server (golden capture)",
         version=0.1,
-        driver_classes=[SimHelaoSyncer],
+        driver_classes=[SimNativeSyncer],
     )
+
+    # Bind the SyncPort once the host's own startup has built ``app.driver``
+    # (this handler is registered after it). Routes read the port at call time.
+    @app.on_event("startup")
+    def _bind_sync_port():
+        if app.driver is not None:
+            app.hexagon_wiring.sync = NativeSyncAdapter(app.driver)
 
     @app.post("/finish_yml", tags=["private"])
     async def finish_yml(yml_path: str) -> str:
-        """Enqueue a finished YAML for sync (rank by -seq/-exp/-act suffix)."""
+        """Enqueue a finished YAML for sync (rank by -seq/-exp/-act suffix, ``.json`` or legacy ``.yml``)."""
         clean_path = yml_path.strip('"').strip("'")
-        if clean_path.endswith("-seq.yml"):
-            rank = 2
-        elif clean_path.endswith("-exp.yml"):
-            rank = 1
-        elif clean_path.endswith("-act.yml"):
-            rank = 0
-        else:
-            rank = -1
-        await app.driver.enqueue_yml(clean_path, rank)
+        rank = {"seq": 2, "exp": 1, "act": 0}.get(meta_kind(clean_path) or "", -1)
+        await app.hexagon_wiring.sync.enqueue_yml(clean_path, rank)  # type: ignore[union-attr]
         return yml_path
 
     @app.post("/list_pending", tags=["private"])
     def list_pending():
         """List sequence YAML files in RUNS_FINISHED awaiting sync."""
-        return app.driver.list_pending()
+        return app.hexagon_wiring.sync.list_pending()  # type: ignore[union-attr]
 
     @app.post("/finish_pending", tags=["private"])
     async def finish_pending(actions_first: bool = True):
         """Discover RUNS_FINISHED YAML files and enqueue them for sync."""
-        return await app.driver.finish_pending(actions_first=actions_first)
+        return await app.hexagon_wiring.sync.finish_pending(  # type: ignore[union-attr]
+            actions_first=actions_first
+        )
 
     @app.post("/reset_sync", tags=["private"])
     def reset_sync(sync_path: str) -> str:
         """Reset a synced sequence zip or partially-synced folder for re-sync."""
-        app.driver.reset_sync(sync_path.strip('"').strip("'"))
+        app.hexagon_wiring.sync.reset_sync(sync_path.strip('"').strip("'"))  # type: ignore[union-attr]
         return sync_path
 
     @app.post("/tasks", tags=["private"])
     async def running() -> dict:
         """Return identifiers of running sync tasks and the queued count."""
+        sync = app.hexagon_wiring.sync
         return {
-            "running": list(app.driver.running_tasks.keys()),
-            "num_queued": (app.driver.task_queue.qsize()),
+            "running": list(sync.running_tasks().keys()),  # type: ignore[union-attr]
+            "num_queued": sync.n_queue(),  # type: ignore[union-attr]
         }
 
     @app.post("/list_exceptions", tags=["private"])
     async def list_exceptions() -> dict:
         """Return exceptions captured on currently running sync tasks."""
-        return {k: d.exception() for k, d in app.driver.running_tasks.items()}
+        sync = app.hexagon_wiring.sync
+        return {k: d.exception() for k, d in sync.running_tasks().items()}  # type: ignore[union-attr]
 
     @app.post("/n_queue", tags=["private"])
     async def n_queue() -> int:
         """Return the number of items waiting in the sync task queue."""
-        return app.driver.task_queue.qsize()
+        return app.hexagon_wiring.sync.n_queue()  # type: ignore[union-attr]
 
     @app.post("/current_progress", tags=["private"])
     async def current_progress():

@@ -10,7 +10,6 @@ import asyncio
 
 import pytest
 
-import helao.core.drivers.data.sync_driver as legacy_mod
 import helao.hexagon.adapters.native.sync_driver as native_mod
 from helao.hexagon.tests.sync_fixtures import (
     act_meta,
@@ -24,7 +23,7 @@ from helao.hexagon.tests.sync_fixtures import (
     write_yml,
 )
 
-MODS = [legacy_mod, native_mod]
+MODS = [native_mod]
 GROUPS = {0: [0, 1], 1: [2, 3]}
 
 

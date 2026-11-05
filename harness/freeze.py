@@ -71,6 +71,7 @@ from harness.endpoints import (
     matches_pin,
     normalize_annotation,
 )
+from helao.helpers import server_modules
 from helao.hexagon.preflight import _checklist_dir
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -484,10 +485,11 @@ def freeze_deployment(
         stem = Path(module).stem
         if wanted and stem != wanted:
             continue
-        src = REPO_ROOT / "helao" / "deploy" / deployment
-        src = src / "servers" / entry.get("group", "action") / module
-        if not src.is_file():
-            blockers.append(f"{stem}: module missing at {src.relative_to(REPO_ROOT)}")
+        src = server_modules.module_file(
+            deployment, stem, "app", REPO_ROOT / "helao" / "deploy"
+        )
+        if src is None:
+            blockers.append(f"{stem}: {deployment}: no {module} under servers/")
             continue
         dst = checklist_dir / f"{stem}.json"
         frozen = json.loads(dst.read_text(encoding="utf-8")) if dst.is_file() else []

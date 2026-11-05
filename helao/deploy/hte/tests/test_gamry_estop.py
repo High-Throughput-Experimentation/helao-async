@@ -8,7 +8,7 @@ same two calls ``cleanup()`` makes: ``SetCell(CellOff)`` and ``SetDigitalOut``
 clearing each TTL line. Release is a no-op: it never turns the cell back on.
 
 ``comtypes`` is Windows-only, so the pstat is a recorder and the COM thread has
-its COM hooks stubbed, as in ``helao/hexagon/tests/test_gamry_com.py``.
+its COM hooks stubbed, as in ``helao/deploy/hte/servers/gamry/tests/test_gamry_com.py``.
 """
 
 import threading
@@ -16,11 +16,11 @@ import threading
 import pytest
 from starlette.testclient import TestClient
 
-from helao.deploy.hte.drivers.pstat.gamry.device import TTL_OFF
-from helao.deploy.hte.drivers.pstat.gamry.driver import GamryDriver
+from helao.deploy.hte.servers.gamry.device import TTL_OFF
+from helao.deploy.hte.servers.gamry.driver import GamryDriver
 from helao.helpers.dispatcher import _query_safe
 from helao.helpers.premodels import Action
-from helao.hexagon.adapters.native.gamry_com import GamryComAdapter, GamryComThread
+from helao.deploy.hte.servers.gamry.gamry_com import GamryComAdapter, GamryComThread
 
 CELL_OFF = object()
 _CELL_OFF_CALL = ("SetCell", (CELL_OFF,))
@@ -127,12 +127,9 @@ def _host(key):
             config=_Stub(),
             logging=_Stub(),
             clock=_Clock(),
-            transport=_Stub(),
             state_persistence=_Stub(),
-            status=_Stub(),
             health=_Stub(),
             artifact_store=NativeArtifactStoreAdapter(config=_Stub(), clock=_Clock()),
-            data_sink=_Stub(),
         ),
         helao_cfg={
             "root": "/tmp",

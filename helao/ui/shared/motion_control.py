@@ -4,8 +4,8 @@ The engineering control panel exists in both UI stacks -- a Bokeh document and
 a Reflex page -- and, as with the digital outputs beside them, the behaviour
 lives here so the two cannot drift. Nothing in this module imports ``bokeh`` or
 ``reflex``; it knows only the config and the private endpoints. That is also
-what leaves a later ``ControlSurface`` port free to wrap this module and its
-digital-output sibling as one thing rather than two.
+what lets the harness (``harness/control_negative.py``) drive this module and
+its digital-output sibling directly, with no UI stack in the way.
 
 Three things are shared:
 

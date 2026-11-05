@@ -4,12 +4,10 @@ The :class:`Executor` defines the four-phase contract used by
 :class:`Base.contain_action` and its action handlers: ``_pre_exec``
 (setup), ``_exec`` (one-shot work), ``_poll`` (repeated work returning
 status), and ``_post_exec`` (cleanup), plus a ``_manual_stop`` hook for
-abort. Drivers and action implementations either subclass this or use
-the ``set_*`` setters to attach custom phase callables at runtime.
+abort. Drivers and action implementations subclass this to supply the phases.
 """
 
 import time
-from types import MethodType
 from typing import Optional
 
 from helao.core.error import ErrorCodes
@@ -22,7 +20,7 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 class Executor:
     """Lifecycle host that wraps a driver call against the active action.
 
-    Subclasses (or callers using the ``set_*`` setters) supply the actual
+    Subclasses supply the actual
     setup/execute/poll/cleanup behaviour; the default implementations are
     no-ops that simply return ``ErrorCodes.none``. The ``oneoff`` flag
     selects single-shot ``_exec`` execution; otherwise ``_poll`` is
@@ -86,16 +84,6 @@ class Executor:
         LOGGER.info("generic Executor running setup methods.")
         return {"error": ErrorCodes.none}
 
-    def set_pre_exec(self, pre_exec_func) -> None:
-        """Bind ``pre_exec_func`` as the executor's setup phase.
-
-        Args:
-            pre_exec_func: Async callable with ``self`` as its first
-                argument, returning the same dict shape as
-                :meth:`_pre_exec`.
-        """
-        self._pre_exec = MethodType(pre_exec_func, self)
-
     async def _exec(self) -> dict:
         """One-shot execution phase; runs when ``oneoff`` is true.
 
@@ -103,15 +91,6 @@ class Executor:
             ``{"data": {}, "error": ErrorCodes.none}`` for the no-op default.
         """
         return {"data": {}, "error": ErrorCodes.none}
-
-    def set_exec(self, exec_func) -> None:
-        """Bind ``exec_func`` as the executor's one-shot execution phase.
-
-        Args:
-            exec_func: Async callable with ``self`` as its first argument,
-                returning the same dict shape as :meth:`_exec`.
-        """
-        self._exec = MethodType(exec_func, self)
 
     async def _poll(self) -> dict:
         """Single polling iteration; called repeatedly when ``oneoff`` is false.
@@ -123,15 +102,6 @@ class Executor:
         """
         return {"data": {}, "error": ErrorCodes.none, "status": HloStatus.finished}
 
-    def set_poll(self, poll_func) -> None:
-        """Bind ``poll_func`` as the executor's polling phase.
-
-        Args:
-            poll_func: Async callable with ``self`` as its first argument,
-                returning the same dict shape as :meth:`_poll`.
-        """
-        self._poll = MethodType(poll_func, self)
-
     async def _post_exec(self) -> dict:
         """Cleanup phase hook invoked once after ``_exec`` / ``_poll`` finishes.
 
@@ -140,16 +110,6 @@ class Executor:
         """
         return {"data": {}, "error": ErrorCodes.none}
 
-    def set_post_exec(self, post_exec_func) -> None:
-        """Bind ``post_exec_func`` as the executor's cleanup phase.
-
-        Args:
-            post_exec_func: Async callable with ``self`` as its first
-                argument, returning the same dict shape as
-                :meth:`_post_exec`.
-        """
-        self._post_exec = MethodType(post_exec_func, self)
-
     async def _manual_stop(self) -> dict:
         """Hook invoked when the action is aborted by the orchestrator.
 
@@ -157,13 +117,3 @@ class Executor:
             ``{"error": ErrorCodes.none}`` for the no-op default.
         """
         return {"error": ErrorCodes.none}
-
-    def set_manual_stop(self, manual_stop_func) -> None:
-        """Bind ``manual_stop_func`` as the executor's abort hook.
-
-        Args:
-            manual_stop_func: Async callable with ``self`` as its first
-                argument, returning the same dict shape as
-                :meth:`_manual_stop`.
-        """
-        self._manual_stop = MethodType(manual_stop_func, self)

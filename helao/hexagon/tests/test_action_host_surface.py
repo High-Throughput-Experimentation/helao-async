@@ -16,7 +16,7 @@ from harness import openapi_capture
 
 REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 FROZEN: Final[Path] = (
-    REPO_ROOT / "helao/hexagon/tests/checklists/hte/_baseapi_system_surface.json"
+    REPO_ROOT / "helao/deploy/hte/tests/checklists/_baseapi_system_surface.json"
 )
 
 #: Every private route BaseAPI/Base registers on an action server, captured live
@@ -112,12 +112,9 @@ def _host():
         config=_Stub(),
         logging=_Stub(),
         clock=_Stub(),
-        transport=_Stub(),
         state_persistence=_Stub(),
-        status=_Stub(),
         health=_Stub(),
         artifact_store=_Stub(),
-        data_sink=_Stub(),
     )
     return ActionHost(
         server_key="SIM",

@@ -46,6 +46,7 @@ from harness.manifest import ProvenanceManifest
 from harness.treepass import PARITY_TOPS
 from helao.core.error import ErrorCodes
 from helao.helpers.dispatcher import private_dispatcher
+from helao.helpers.meta_io import meta_glob
 from helao.helpers.premodels import ExperimentPlanMaker, Sequence
 from helao.helpers.time_utils import gen_uuid
 
@@ -281,7 +282,9 @@ def runs_active_empty(root: Path) -> bool:
         if not active.is_dir():
             return True
         return next(active.rglob("*.yml"), None) is None
-    acts = [p for tree in ("RUNS", "DIAG") for p in (root / tree).rglob("*-act.yml")]
+    acts = [
+        p for tree in ("RUNS", "DIAG") for p in meta_glob(root / tree, "act", "**/*")
+    ]
     if not acts:
         # Nothing has been written yet: a run that has not started is not a
         # run that has settled.
@@ -290,11 +293,11 @@ def runs_active_empty(root: Path) -> bool:
 
 
 def _act_is_terminal(act_yml: Path) -> bool:
-    """Whether one ``-act.yml`` records a terminal ``action_status``."""
+    """Whether one ``-act`` record (``.json`` or ``.yml``) records a terminal ``action_status``."""
     try:
-        from helao.helpers.yml_tools import yml_load
+        from helao.helpers.meta_io import read_meta
 
-        status = yml_load(act_yml.read_text(encoding="utf-8")).get("action_status")
+        status = read_meta(act_yml).get("action_status")
     except Exception:
         return False
     if isinstance(status, str):

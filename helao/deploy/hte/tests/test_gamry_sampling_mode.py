@@ -15,9 +15,9 @@ import types
 
 import pytest
 
-from helao.deploy.hte.drivers.pstat.gamry.device import GAMRY_DEVICES
-from helao.deploy.hte.drivers.pstat.gamry.driver import DUMMY_SINK, GamryDriver
-from helao.deploy.hte.drivers.pstat.gamry.technique import TECH_CV
+from helao.deploy.hte.servers.gamry.device import GAMRY_DEVICES
+from helao.deploy.hte.servers.gamry.driver import DUMMY_SINK, GamryDriver
+from helao.deploy.hte.servers.gamry.technique import TECH_CV
 
 EMPTY = object()
 

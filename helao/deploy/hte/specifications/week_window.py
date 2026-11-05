@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 
 from helao.helpers import helao_logging as logging
 from helao.helpers.helao_data import HelaoData
+from helao.helpers.meta_io import meta_glob
 from helao.helpers.sequence_constructor import constructor
 from helao.helpers.specification_parser import BaseParser
 
@@ -50,7 +51,9 @@ class WeekWindowSpecParser(BaseParser):
         specfiles = []
         for i in range(self.WEEKS * 7):
             day = (now - timedelta(days=i)).strftime("%Y/%m%d")
-            seqymls = glob.glob(os.path.join(folderpath, day, "*", "*-seq.yml"))
+            seqymls = [
+                str(p) for p in meta_glob(os.path.join(folderpath, day), "seq", "*/*")
+            ]
             specfiles += sorted({os.path.dirname(p) for p in seqymls}, reverse=True)
         for i in range(self.WEEKS):
             # %U (Sunday-start) is what get_sequence_dir wrote; %W was a week off.

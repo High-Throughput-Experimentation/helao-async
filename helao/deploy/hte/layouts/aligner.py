@@ -49,7 +49,7 @@ from helao.ui.bokeh.vis import Vis
 from helao.helpers import helao_logging as logging
 from helao.helpers.plate_api import HTEPlateAPI
 
-from ..drivers.motion.enum import MoveModes, TransformationModes
+from helao.deploy.hte.servers.galil_motion.enum import MoveModes, TransformationModes
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 

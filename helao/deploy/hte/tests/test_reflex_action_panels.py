@@ -118,7 +118,8 @@ def test_select_cells_ignores_a_cell_the_stream_does_not_carry():
 
 
 def test_every_action_panel_exposes_the_contract():
-    from helao.deploy.hte.servers.reflex import nidaqmx_vis, power_supply_vis
+    from helao.deploy.hte.servers.nidaqmx.reflex import nidaqmx_vis
+    from helao.deploy.hte.servers.power_supply.reflex import power_supply_vis
 
     for module in (nidaqmx_vis, power_supply_vis):
         assert module.WS_PATH == "ws_data"
@@ -127,13 +128,15 @@ def test_every_action_panel_exposes_the_contract():
 
 
 def test_the_action_panels_do_not_share_a_state_class():
-    from helao.deploy.hte.servers.reflex import nidaqmx_vis, power_supply_vis
+    from helao.deploy.hte.servers.nidaqmx.reflex import nidaqmx_vis
+    from helao.deploy.hte.servers.power_supply.reflex import power_supply_vis
 
     assert nidaqmx_vis.STATE_BASE is not power_supply_vis.STATE_BASE
 
 
 def test_action_panel_ids_are_distinct_per_panel_and_session():
-    from helao.deploy.hte.servers.reflex import nidaqmx_vis, power_supply_vis
+    from helao.deploy.hte.servers.nidaqmx.reflex import nidaqmx_vis
+    from helao.deploy.hte.servers.power_supply.reflex import power_supply_vis
 
     assert nidaqmx_vis.panel_id("NI", "tok") != power_supply_vis.panel_id("NI", "tok")
     assert nidaqmx_vis.panel_id("NI", "a") != nidaqmx_vis.panel_id("NI", "b")
@@ -141,6 +144,6 @@ def test_action_panel_ids_are_distinct_per_panel_and_session():
 
 def test_nidaqmx_declares_the_columns_its_server_streams():
     """t_s is the x axis and must not be plotted as a series."""
-    from helao.deploy.hte.servers.reflex import nidaqmx_vis
+    from helao.deploy.hte.servers.nidaqmx.reflex import nidaqmx_vis
 
     assert nidaqmx_vis.X_COLUMN == "t_s"

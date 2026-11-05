@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from helao.core.drivers.data.sync_driver import SyncDriver
+from helao.hexagon.adapters.native.sync_driver import SyncDriver
 from helao.helpers.run_state import (
     ACTIVE,
     DONE,
@@ -61,32 +61,11 @@ def journal_of(driver: SyncDriver) -> RunStateJournal:
     return driver.run_journal
 
 
-# --- config surface (spec §6) ------------------------------------------------
-
-
-def test_sync_finished_defaults_to_true():
-    from helao.helpers.config_loader import sync_finished_enabled
-
-    cfg = {"servers": {"SYNC": {"group": "action"}}}
-    assert sync_finished_enabled(cfg) is True
-    assert sync_finished_enabled({**cfg, "sync_finished": False}) is False
-    assert sync_finished_enabled({**cfg, "sync_finished": True}) is True
-
-
-def test_no_sync_server_means_sync_finished_is_false():
-    """Spec §6: a group with no syncer behaves as sync_finished: false."""
-    from helao.helpers.config_loader import sync_finished_enabled
-
-    cfg = {"sync_finished": True, "servers": {"ORCH": {"group": "orchestrator"}}}
-    assert sync_finished_enabled(cfg) is False
-    assert sync_finished_enabled({}) is False
-
-
 # --- the handoff (spec §4.1, §4.3) -------------------------------------------
 
 
 def test_a_record_that_finishes_without_syncing_is_evicted(tmp_path: Path):
-    """sync_finished: false -> straight to done, never enters the unsynced set."""
+    """A record that goes ACTIVE -> DONE never enters the unsynced set."""
     producer = RunStateJournal(tmp_path, "SIM")
     producer.append("u1", "action", ACTIVE, "RUNS/a")
     producer.append("u1", "action", DONE, "RUNS/a")
@@ -213,7 +192,7 @@ def test_a_corrupt_journal_is_rebuilt_from_the_run_tree(tmp_path: Path):
 
 def test_a_degraded_rebuild_is_escalated(tmp_path: Path, monkeypatch):
     """Plan A8: an unreadable directory means records that will never sync."""
-    from helao.core.drivers.data import sync_driver
+    from helao.hexagon.adapters.native import sync_driver
 
     driver = _fake_syncer(tmp_path)
     journal_of(driver).states_root.mkdir(parents=True, exist_ok=True)

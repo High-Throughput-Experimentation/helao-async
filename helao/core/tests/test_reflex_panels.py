@@ -55,7 +55,7 @@ def test_generated_state_owns_its_vars_rather_than_inheriting_them():
     cls = make_panel_state("wssim_panel", "SIM_OWN", LiveVisState, "ws_live")
     for name in ("server_key", "ws_path", "connection", "window_points"):
         assert name in cls.vars
-        assert name not in cls.inherited_vars, f"'{name}' is shared across panels"
+        assert name in cls.base_vars, f"'{name}' is shared across panels"
 
 
 def test_two_generated_states_do_not_share_var_storage():
@@ -188,13 +188,14 @@ def test_make_panel_state_keys_the_cache_on_the_base_class_not_its_name():
 
 
 PANEL_MODULES = ["wssim_panel", "oersim_panel", "gpsim_panel"]
+PANEL_SIM = {"wssim_panel": "wssim", "oersim_panel": "cpsim", "gpsim_panel": "gpsim"}
 
 
 @pytest.mark.parametrize("name", PANEL_MODULES)
 def test_panel_module_satisfies_the_contract(name):
     from importlib import import_module
 
-    mod = import_module(f"helao.deploy.test.servers.reflex.{name}")
+    mod = import_module(f"helao.deploy.test.servers.{PANEL_SIM[name]}.reflex.{name}")
     assert mod.WS_PATH in ("ws_live", "ws_data")
     assert issubclass(mod.STATE_BASE, VisPanelState)
     assert callable(mod.build)
@@ -205,7 +206,7 @@ def test_panel_builds_a_component_without_an_ingest_layer(name):
     """A panel must render before any data arrives."""
     from importlib import import_module
 
-    mod = import_module(f"helao.deploy.test.servers.reflex.{name}")
+    mod = import_module(f"helao.deploy.test.servers.{PANEL_SIM[name]}.reflex.{name}")
     state_cls = make_panel_state(name, "TESTKEY", mod.STATE_BASE, mod.WS_PATH)
     assert mod.build("TESTKEY", state_cls) is not None
 
@@ -215,7 +216,7 @@ def test_panel_state_declares_the_chart_binding_vars(name):
     """build() binds these; pull() drives them. Both halves are required."""
     from importlib import import_module
 
-    mod = import_module(f"helao.deploy.test.servers.reflex.{name}")
+    mod = import_module(f"helao.deploy.test.servers.{PANEL_SIM[name]}.reflex.{name}")
     assert hasattr(mod.STATE_BASE, "chart_spec")
     assert hasattr(mod.STATE_BASE, "chart_url")
 
@@ -224,7 +225,7 @@ def test_wssim_extract_reads_series_columns_from_the_buffer():
     import numpy as np
 
     from helao.ui.reflex.ingest import WsIngest
-    from helao.deploy.test.servers.reflex import wssim_panel
+    from helao.deploy.test.servers.wssim.reflex import wssim_panel
 
     ing = WsIngest("127.0.0.1", 1, "ws_live")
     ing.buffer.append(
@@ -238,7 +239,7 @@ def test_wssim_extract_reads_series_columns_from_the_buffer():
 
 def test_wssim_extract_skips_the_epoch_column_in_the_series_set():
     from helao.ui.reflex.ingest import WsIngest
-    from helao.deploy.test.servers.reflex import wssim_panel
+    from helao.deploy.test.servers.wssim.reflex import wssim_panel
 
     ing = WsIngest("127.0.0.1", 1, "ws_live")
     ing.buffer.append({"epoch": [1.0], "series_0": [5.0]})
@@ -247,7 +248,7 @@ def test_wssim_extract_skips_the_epoch_column_in_the_series_set():
 
 def test_wssim_extract_on_an_empty_buffer_returns_empty_not_none():
     from helao.ui.reflex.ingest import WsIngest
-    from helao.deploy.test.servers.reflex import wssim_panel
+    from helao.deploy.test.servers.wssim.reflex import wssim_panel
 
     ing = WsIngest("127.0.0.1", 1, "ws_live")
     cols = wssim_panel.extract(ing, window=10)
@@ -263,7 +264,7 @@ def test_panel_id_is_stable_per_session_and_distinct_across_sessions():
     key while the version counter is per-session state, so each tab 404s the
     other into a permanently frozen chart with a "live" badge.
     """
-    from helao.deploy.test.servers.reflex import wssim_panel as w
+    from helao.deploy.test.servers.wssim.reflex import wssim_panel as w
 
     assert w.panel_id("SIM", "tok-a") == w.panel_id("SIM", "tok-a")
     assert w.panel_id("SIM", "tok-a") != w.panel_id("OTHER", "tok-a")
@@ -274,14 +275,16 @@ def test_every_panel_scopes_its_buffer_key_by_session():
     from importlib import import_module
 
     for name in PANEL_MODULES:
-        mod = import_module(f"helao.deploy.test.servers.reflex.{name}")
+        mod = import_module(
+            f"helao.deploy.test.servers.{PANEL_SIM[name]}.reflex.{name}"
+        )
         assert mod.panel_id("SIM", "tok-a") != mod.panel_id("SIM", "tok-b"), name
         assert hasattr(mod.STATE_BASE, "panel_key"), name
 
 
 def test_gpsim_histograms_are_extracted_from_raw_batches():
     from helao.ui.reflex.ingest import WsIngest
-    from helao.deploy.test.servers.reflex import gpsim_panel
+    from helao.deploy.test.servers.gpsim.reflex import gpsim_panel
 
     ing = WsIngest("127.0.0.1", 1, "ws_live")
     ing.raw.append(
@@ -304,7 +307,7 @@ def test_oersim_plots_t_s_as_x_not_epoch():
     import numpy as np
 
     from helao.ui.reflex.ingest import WsIngest
-    from helao.deploy.test.servers.reflex import oersim_panel
+    from helao.deploy.test.servers.cpsim.reflex import oersim_panel
 
     ing = WsIngest("127.0.0.1", 1, "ws_data")
     ing.buffer.append({"t_s": [0.1, 0.2], "erhe_v": [1.2, 1.3]})
@@ -316,7 +319,7 @@ def test_oersim_plots_t_s_as_x_not_epoch():
 
 def test_oersim_surfaces_the_streamed_action_uuid():
     from helao.ui.reflex.ingest import WsIngest
-    from helao.deploy.test.servers.reflex import oersim_panel
+    from helao.deploy.test.servers.cpsim.reflex import oersim_panel
 
     ing = WsIngest("127.0.0.1", 1, "ws_data")
     ing.rows.append({"action_uuid": "abc-123", "status": "active"})
@@ -329,7 +332,7 @@ def test_gpsim_table_includes_the_numeric_columns():
     Reading the table from .rows left three of five columns permanently blank.
     """
     from helao.ui.reflex.ingest import WsIngest
-    from helao.deploy.test.servers.reflex import gpsim_panel
+    from helao.deploy.test.servers.gpsim.reflex import gpsim_panel
 
     ing = WsIngest("127.0.0.1", 1, "ws_live")
     ing.raw.append(
@@ -358,7 +361,7 @@ def test_gpsim_table_does_not_re_append_the_same_batch():
     "Last 20 acquisitions" table collapses to one row repeated.
     """
     from helao.ui.reflex.ingest import WsIngest
-    from helao.deploy.test.servers.reflex import gpsim_panel
+    from helao.deploy.test.servers.gpsim.reflex import gpsim_panel
 
     ing = WsIngest("127.0.0.1", 1, "ws_live")
     ing.raw.append(
@@ -391,14 +394,14 @@ def test_gpsim_table_does_not_re_append_the_same_batch():
 
 def test_gpsim_table_rows_on_an_empty_raw_deque_is_empty():
     from helao.ui.reflex.ingest import WsIngest
-    from helao.deploy.test.servers.reflex import gpsim_panel
+    from helao.deploy.test.servers.gpsim.reflex import gpsim_panel
 
     assert gpsim_panel.extract_table_rows(WsIngest("127.0.0.1", 1, "ws_live")) == []
 
 
 def test_gpsim_histograms_on_an_empty_raw_deque_is_empty():
     from helao.ui.reflex.ingest import WsIngest
-    from helao.deploy.test.servers.reflex import gpsim_panel
+    from helao.deploy.test.servers.gpsim.reflex import gpsim_panel
 
     assert gpsim_panel.extract_histograms(WsIngest("127.0.0.1", 1, "ws_live")) == {}
 
@@ -407,7 +410,7 @@ def test_gpsim_passes_raw_samples_to_the_facade_not_prebinned_data():
     """xy has a native hist mark; binning in Python would be redundant work."""
     import inspect
 
-    from helao.deploy.test.servers.reflex import gpsim_panel
+    from helao.deploy.test.servers.gpsim.reflex import gpsim_panel
 
     src = inspect.getsource(gpsim_panel)
     assert "plots.histogram" in src
@@ -641,7 +644,9 @@ def test_the_sim_panels_do_not_use_gridjs(module_name):
     import importlib
     import pathlib
 
-    module = importlib.import_module(f"helao.deploy.test.servers.reflex.{module_name}")
+    module = importlib.import_module(
+        f"helao.deploy.test.servers.{PANEL_SIM[module_name]}.reflex.{module_name}"
+    )
     # The call, not the name: the comment explaining the replacement must not
     # fail the check it explains.
     source = pathlib.Path(module.__file__).read_text(encoding="utf-8")
@@ -655,7 +660,9 @@ def test_the_sim_panels_write_through_assign(module_name):
     import importlib
     import inspect
 
-    module = importlib.import_module(f"helao.deploy.test.servers.reflex.{module_name}")
+    module = importlib.import_module(
+        f"helao.deploy.test.servers.{PANEL_SIM[module_name]}.reflex.{module_name}"
+    )
     source = inspect.getsource(module.STATE_BASE.pull)
     for name in ("chart_spec", "chart_url", "chart_layout"):
         assert f'assign(self, "{name}"' in source, name
@@ -668,7 +675,9 @@ def test_the_sim_panels_annotate_their_foreach_var(module_name):
     at import, so it looks fine until `reflex export` runs."""
     import importlib
 
-    module = importlib.import_module(f"helao.deploy.test.servers.reflex.{module_name}")
+    module = importlib.import_module(
+        f"helao.deploy.test.servers.{PANEL_SIM[module_name]}.reflex.{module_name}"
+    )
     field = module.STATE_BASE.get_fields()["table_rows"]
     assert field.outer_type_ == list[list[str]], module_name
 
@@ -676,7 +685,7 @@ def test_the_sim_panels_annotate_their_foreach_var(module_name):
 def test_gpsims_accumulators_are_backend_only():
     """Nothing renders either one, and `_hist_samples` carries every plate's
     whole sample array -- as a client var that crossed the wire every tick."""
-    from helao.deploy.test.servers.reflex import gpsim_panel
+    from helao.deploy.test.servers.gpsim.reflex import gpsim_panel
 
     fields = gpsim_panel.STATE_BASE.get_fields()
     assert "hist_samples" not in fields

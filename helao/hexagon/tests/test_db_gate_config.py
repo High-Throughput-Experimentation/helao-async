@@ -13,7 +13,7 @@ _REPO_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
 _CFG_DIR = os.path.join(_REPO_ROOT, "helao", "deploy", "test", "configs")
-_FAMILY = ["goldenhex", "goldenhexid", "goldenhexconc", "goldenhexvis"]
+_FAMILY = ["goldenhex", "goldenhexconc", "goldenhexvis"]
 
 
 def _load(prefix):

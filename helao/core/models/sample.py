@@ -20,7 +20,6 @@ __all__ = [
     "GasSample",
     "SolidSample",
     "AssemblySample",
-    "SampleList",
     "SampleUnion",
     "TypedSampleUnion",
     "object_to_sample",
@@ -169,9 +168,9 @@ class SampleModel(BaseModel, HelaoDict):
 
     def remove_sample_status(self, old_status: "SampleStatus") -> None:
         """Remove `old_status` from `status` via the guarded (log-only) transition."""
-        from helao.core.models.status_transitions import sample_guarded_remove
+        from helao.core.models.status_transitions import guarded_remove
 
-        sample_guarded_remove(
+        guarded_remove(
             self.status,
             old_status,
             owner=f"sample {self.global_label or self.sample_type}",
@@ -452,18 +451,6 @@ class AssemblySample(SampleModel):
         return part_dict_list
 
 
-# TODO: this needs to be removed in the near future
-# and all calls to SampleList replaced by SampleUnion
-class SampleList(BaseModel, HelaoDict):
-    """Container holding a list of samples of any supported type.
-
-    Attributes:
-        samples (Optional[list]): The contained samples (union of sample types).
-    """
-
-    samples: Optional[list[SampleUnion]] = Field(default=[])
-
-
 # Design C, two-stage nested union (CARDS P3 3c, D1): the four enum-tagged
 # subtypes get true discriminator routing; NoneSample and the SampleModel
 # fallback sit in the outer (smart) union so today's acceptance surface is
@@ -500,4 +487,3 @@ def object_to_sample(data):
 
 
 AssemblySample.model_rebuild()
-SampleList.model_rebuild()

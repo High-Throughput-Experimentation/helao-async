@@ -59,9 +59,9 @@ MATRIX_DIR = os.path.join(REPO_ROOT, ".browser-parity")
 #: No lane is paired: each runs its checks on its own.
 LANES = {
     "bokeh_hexagon": {
-        "config": "goldenhexgraft",
+        "config": "goldenhexvis",
         "check": "helao/core/tests/browser_parity/check_bokeh_docs.py",
-        "args": ["goldenhexgraft"],
+        "args": ["goldenhexvis"],
         "ports": [5001, 5002, 5003, 8001, 8002, 8010],
     },
     "reflex": {
@@ -93,7 +93,7 @@ LANES = {
         # action-server process, so P7d's ui_host port is what the check
         # composes directly. Nothing to launch, nothing to tear down.
         "config": None,
-        "check": "helao/core/tests/browser_parity/check_aligner.py",
+        "check": "helao/deploy/hte/tests/browser_parity/check_aligner.py",
         "args": [],
         "ports": [],
     },

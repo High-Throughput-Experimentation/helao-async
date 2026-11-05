@@ -5,8 +5,8 @@ Queue CRUD is partly exercised (byte-for-byte) by
 ``test_orch_dispatch_golden_master.py --check`` via the dispatch loop's own
 appends/pops of ``sequence_dq``/``experiment_dq``/``action_dq``, but that
 harness never drives the operator-facing surface directly: ``move_*``/
-``remove_*``/``prepend_sequences``/``drop_experiment_inds``/
-``supplement_error_action``/``replace_action``, or the uuid-history helpers.
+``remove_*``/``prepend_sequences``/``drop_experiment_inds``, or the
+uuid-history helpers.
 This module is the S5-specific behavior-preservation gate for that surface.
 
 Mirrors the ``OrchHost.__new__`` bypass fixture used by
@@ -29,7 +29,6 @@ import asyncio
 import traceback
 from uuid import uuid4
 
-from helao.core.models.hlostatus import HloStatus
 from helao.core.models.machine import MachineModel
 from helao.core.models.server import GlobalStatusModel
 from helao.core.tests._test_utils import TestReporter
@@ -209,22 +208,12 @@ async def _check_experiment_crud() -> bool:
 
 async def _check_action_crud() -> bool:
     orch = _make_orch()
-    # append_action's empty-queue branch reads the dispatched-action counter
-    # off the active experiment; a counter of 0 floors `last_action_order` to
-    # 0 (since counter - 1 < 0), so the first-ever append lands at order 1,
-    # not 0 -- a genuine pre-existing quirk of the moved formula, preserved
-    # verbatim here rather than "fixed" to a more intuitive 0-based order.
-    orch.active_experiment = _mk_experiment("host_exp")
-    orch.globalstatusmodel.counter_dispatched_actions[
-        orch.active_experiment.experiment_uuid
-    ] = 0
-
-    orch.run_queues.append_action(_mk_action(orch, "act1"))
-    orch.run_queues.append_action(_mk_action(orch, "act2"))
-    orch.run_queues.append_action(_mk_action(orch, "act3"))
+    # Seed the deque directly: the append/replace helpers are gone, and the
+    # move/remove/clear surface under test only needs queued actions.
+    for order, name in enumerate(["act1", "act2", "act3"], start=1):
+        orch.action_dq.append(_mk_action(orch, name, order=order))
     names = [a.action_name for a in orch.list_actions()]
     add_order_ok = names == ["act1", "act2", "act3"]
-    orders_ok = [a.action_order for a in orch.action_dq] == [1, 2, 3]
 
     await orch.move_action(0, 2)
     move_ok = [a.action_name for a in orch.list_actions()] == ["act2", "act3", "act1"]
@@ -235,52 +224,7 @@ async def _check_action_crud() -> bool:
     await orch.clear_actions()
     clear_ok = len(orch.action_dq) == 0
 
-    # replace_action by index -- note the preserved `if by_index:` truthiness
-    # quirk means index 0 is indistinguishable from "no index given", so this
-    # exercises index 1 (the only way `by_index` is exercised as truthy).
-    orch.run_queues.append_action(_mk_action(orch, "orig1"))
-    orch.run_queues.append_action(_mk_action(orch, "orig2"))
-    replacement = _mk_action(orch, "replaced")
-    orch.run_queues.replace_action(replacement, by_index=1)
-    replace_ok = [a.action_name for a in orch.action_dq] == ["orig1", "replaced"] and (
-        orch.action_dq[1].action_order == 2
-    )
-
-    return (
-        add_order_ok and orders_ok and move_ok and remove_ok and clear_ok and replace_ok
-    )
-
-
-async def _check_supplement_error_action() -> bool:
-    """P5b fix: the errored-action-retry path copied ``EA_act.actual_order`` onto
-    ``new_action.actual_order``, but the real declared field on ``Action`` is
-    ``action_actual_order`` (``actual_order`` was never a field) -- against real
-    pydantic model instances that raised ``AttributeError`` and no retry was ever
-    queued. Now corrected to ``action_actual_order``. This asserts the fixed
-    behavior: the replacement is queued to the front of ``action_dq`` with the
-    errored action's ``action_order``/``action_actual_order`` copied and
-    ``action_retry`` incremented, with no exception.
-    """
-    orch = _make_orch()
-    errored = _mk_action(orch, "errored_act", order=5)
-    errored.action_actual_order = 3
-    errored.action_retry = 1
-    check_uuid = errored.action_uuid
-    orch.globalstatusmodel.nonactive_dict[HloStatus.errored] = {check_uuid: errored}
-
-    replacement = _mk_action(orch, "retry_act")
-    orch.run_queues.supplement_error_action(check_uuid, replacement)
-
-    # zdeque stores by value, so assert on the queued action's fields (not identity)
-    if len(orch.action_dq) != 1:
-        return False
-    queued = orch.action_dq[0]
-    return (
-        queued.action_name == "retry_act"
-        and queued.action_order == 5
-        and queued.action_actual_order == 3
-        and queued.action_retry == 2
-    )
+    return add_order_ok and move_ok and remove_ok and clear_ok
 
 
 # ---------------------------------------------------------------------------
@@ -340,7 +284,6 @@ async def _run_checks() -> dict:
         "sequence_crud": await _check_sequence_crud(),
         "experiment_crud": await _check_experiment_crud(),
         "action_crud": await _check_action_crud(),
-        "supplement_error_action": await _check_supplement_error_action(),
         "get_active_and_last": _check_get_active_and_last(),
         "base_collaborator_seam": _check_base_collaborator_seam(),
     }
@@ -375,15 +318,8 @@ def orch_queues_unit_test() -> bool:
 
     reporter.section("action CRUD")
     reporter.check(
-        "append_action assigns increasing action_order; move/remove/clear/replace_action behave",
+        "seeded actions list in order; move/remove/clear behave",
         lambda: res["action_crud"],
-    )
-
-    reporter.section("supplement_error_action")
-    reporter.check(
-        "P5b fix: queues the retry to the front with action_order/action_actual_order"
-        " copied and action_retry incremented (no AttributeError)",
-        lambda: res["supplement_error_action"],
     )
 
     reporter.section("get_sequence / get_experiment")

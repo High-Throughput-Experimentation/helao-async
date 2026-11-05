@@ -2,12 +2,12 @@
 extracted from ``Orch`` (CARDS P5, Stage S6).
 
 ``Orch.finish_active_sequence``/``finish_active_experiment``/
-``write_active_experiment_exp``/``write_active_sequence_seq``/``start_wait``/
+``write_active_experiment_exp``/``write_active_sequence_seq``/
 ``dispatch_wait_task`` implement the orchestrator's run-lifecycle cluster:
 finalizing the active sequence/experiment (status transition, pre-finish hooks,
 disk write, roll-over to ``last_*``, DB move), the two small
 ``initial_global_params``-then-write helpers used mid-run, and the wait-action
-background-task machinery. This module moves those 6 method bodies into a
+background-task machinery. This module moves those 5 method bodies into a
 ``RunLifecycle`` collaborator that ``Orch`` delegates to.
 
 Per the P5 constraints (:doc:`CARDS_REFACTOR_P5.md` sec 3.1 rule 3):
@@ -285,11 +285,6 @@ class RunLifecycle:
                 getattr(hobj, "sequence_uuid", None) if kind == "experiment" else None
             ),
         )
-
-    def start_wait(self, active: "ActionSession"):
-        """Schedule :meth:`dispatch_wait_task` for ``active`` as a background task."""
-        orch = self.orch
-        orch.wait_task = asyncio.create_task(orch.dispatch_wait_task(active))
 
     async def dispatch_wait_task(
         self, active: "ActionSession", print_every_secs: int = 5

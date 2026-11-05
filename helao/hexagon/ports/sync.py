@@ -1,6 +1,24 @@
-"""Sync port (spec §4.3.4): HelaoSyncer/SyncDriver surface + S3 face.
+"""Sync port (spec §4.3.4): the syncer surface callers actually use.
 
-Semantics carried by the P1b adapter (documented here as the contract):
+Bound at startup, not at ``build_wiring``: the syncer's ``__init__`` calls
+``asyncio.create_task``, which needs a running loop. The orchestrator binds it
+when ``use_sync`` is set; the SYNC server and the sim DB server bind it when
+their ``app.driver`` exists. ``sync`` is in neither REQUIRED set, because
+orchestrators with no SYNC server run without one.
+
+Callers and the members they use:
+
+- the orchestrator: ``to_s3`` (experiment and sequence meta, best effort);
+- the SYNC / sim DB servers' routes: ``enqueue_yml``, ``release_quarantine``,
+  ``list_pending``, ``finish_pending``, ``reset_sync``, ``write_off``,
+  ``quarantined``, ``running_tasks``, ``n_queue``, and ``has_pending_work``
+  (the hot-reload idle gate).
+
+``reset_sync``, ``list_pending``, ``release_quarantine`` and ``quarantined`` are
+synchronous on purpose: their routes are plain ``def`` and run in FastAPI's
+threadpool, where a blocking unzip belongs.
+
+Semantics carried by the native syncer (documented here as the contract):
 hierarchical seq-RW/exp-mutex locks; children gate with
 estopped-children-terminal rule; priority re-enqueue with rank floor -5;
 file push; process reconcile+flush writing -prc.yml; patched meta JSON;
@@ -9,25 +27,13 @@ a config-defined post-finish hook chain (built-in s3_upload,
 dispatch_analysis; see docs/superpowers/specs/2026-09-28-finish-hooks-design.md)
 runs after the local gates and reconcile, tracked via the .prg `hooks`/
 `synced` sidecar state; reset_sync reversal. S3: retries <=5 x 30 s via
-asyncio.to_thread; unset S3 config => local-only success. The Sim DB
-server (P0) implements S3FacePort with a recording sink.
+asyncio.to_thread; unset S3 config => local-only success.
 """
 
 from pathlib import Path
 from typing import Protocol, Union, runtime_checkable
 
-__all__ = ["S3FacePort", "SyncPort"]
-
-
-@runtime_checkable
-class S3FacePort(Protocol):
-    async def upload(
-        self,
-        key: str,
-        body: Union[dict, bytes, Path],
-        content_type: str = "application/json",
-        compress: bool = False,
-    ) -> bool: ...
+__all__ = ["SyncPort"]
 
 
 @runtime_checkable
@@ -36,19 +42,27 @@ class SyncPort(Protocol):
         self, upath: Union[str, Path], rank: int = 0, rank_limit: int = -5
     ) -> None: ...
 
-    async def sync_yml(
-        self,
-        yml_path: Path,
-        retries: int = 3,
-        rank: int = 5,
-        force_s3: bool = False,
-        force_api: bool = False,
-        compress: bool = False,
+    def release_quarantine(self, yml_path: Union[Path, str]) -> bool: ...
+
+    def list_pending(self, omit_manual_exps: bool = True) -> list: ...
+
+    async def finish_pending(
+        self, omit_manual_exps: bool = True, actions_first: bool = False
+    ) -> list: ...
+
+    def reset_sync(self, sync_path: str) -> bool: ...
+
+    async def write_off(
+        self, yml_path: Union[Path, str], reason: str, operator: str
     ) -> dict: ...
 
-    async def finish_pending(self) -> list: ...
+    def quarantined(self) -> list: ...
 
-    async def reset_sync(self, sync_path: str) -> bool: ...
+    def running_tasks(self) -> dict: ...
+
+    def n_queue(self) -> int: ...
+
+    def has_pending_work(self) -> bool: ...
 
     async def to_s3(
         self,
@@ -57,7 +71,3 @@ class SyncPort(Protocol):
         retries: int = 5,
         compress: bool = False,
     ) -> bool: ...
-
-    def list_pending(self, omit_manual_exps: bool = True) -> list: ...
-
-    def n_queue(self) -> int: ...

@@ -7,11 +7,28 @@ helpers for retrieving the platemap, the element list, and the
 multi-element ink concentration matrix for a given ``plateid``.
 """
 
-__all__ = ["HTELegacyAPI"]
+__all__ = [
+    "HTELegacyAPI",
+    "FileAttrs",
+    "labview_epoch_to_utc",
+    "parse_file_attrs",
+    "decode_legacy_text",
+    "rcp_text_to_dict",
+    "read_eche_file",
+    "read_exp",
+    "read_run_rcp",
+    "read_zip_member_text",
+    "rename_column",
+    "resolve_run_zip",
+    "split_technique",
+]
 
+import glob
 import os
+import re
 import zipfile
-from re import compile as regexcompile
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import numpy
@@ -19,6 +36,210 @@ import numpy
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+
+def rcp_text_to_dict(text: str) -> dict:
+    """Parse legacy JCAP rcp-format text (.rcp/.exp/.ana/.info) to a nested dict.
+
+    Depth is the raw leading-space count, so any deeper indent nests; a key whose
+    next line is deeper becomes a dict, a
+    repeated key at one level becomes a list, blank lines are skipped, and the
+    value is everything after the first ':' (so Windows paths survive).
+    """
+    rows = []
+    for line in text.splitlines():
+        if not line.strip() or ":" not in line:
+            continue
+        key, val = line.split(":", 1)
+        depth = len(key) - len(key.lstrip(" "))
+        rows.append((depth, key.strip(), val.strip()))
+
+    def build(i: int, depth: int) -> tuple[dict, int]:
+        out: dict = {}
+        while i < len(rows) and rows[i][0] >= depth:
+            d, k, v = rows[i]
+            if d > depth:  # malformed over-indent: attach to previous level
+                i += 1
+                continue
+            if i + 1 < len(rows) and rows[i + 1][0] > depth:
+                v, i = build(i + 1, rows[i + 1][0])
+            else:
+                i += 1
+            if k in out:
+                if not isinstance(out[k], list):
+                    out[k] = [out[k]]
+                out[k].append(v)
+            else:
+                out[k] = v
+        return out, i
+
+    return build(0, 0)[0]
+
+
+def decode_legacy_text(raw: bytes) -> str:
+    """Decode legacy text bytes as utf-8, falling back to cp1252."""
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return raw.decode("cp1252")
+
+
+def read_zip_member_text(zf: zipfile.ZipFile, member: str) -> str:
+    """Decode one archive member as utf-8, falling back to cp1252."""
+    return decode_legacy_text(zf.read(member))
+
+
+def _single_member(zip_path: str, ext: str) -> dict:
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        names = [n for n in zf.namelist() if n.lower().endswith(ext)]
+        if len(names) != 1:
+            raise ValueError(f"{zip_path}: expected one {ext} member, found {names}")
+        return rcp_text_to_dict(read_zip_member_text(zf, names[0]))
+
+
+def read_exp(zip_path: str) -> dict:
+    """Parse the single .exp member of a legacy experiment zip (read-only)."""
+    return _single_member(zip_path, ".exp")
+
+
+def read_run_rcp(zip_path: str) -> dict:
+    """Parse the single .rcp member of a legacy run zip (read-only)."""
+    return _single_member(zip_path, ".rcp")
+
+
+@dataclass(frozen=True)
+class FileAttrs:
+    """A legacy file-attribute string, normalised across its field-count variants."""
+
+    file_type: str
+    keys: tuple[str, ...]
+    nhead: int | None
+    nrows: int | None
+    sample_no: int
+
+
+_SAMPLE_FN = re.compile(r"^Sample(\d+)_")
+
+
+def _sample_from_name(filename: str) -> int:
+    m = _SAMPLE_FN.match(filename)
+    return int(m.group(1)) if m else 0
+
+
+def parse_file_attrs(filename: str, value: str) -> FileAttrs:
+    """Parse ``type;keys;nhead;nrows;sample`` by position (1-5 fields).
+
+    Empty keys give ``()``, empty nhead/nrows give ``None``. With two fields the
+    second is the sample if all digits, else the keys. A missing or empty sample
+    falls back to the ``Sample<N>_`` filename prefix, else 0.
+    """
+    parts = value.split(";")
+    ftype = parts[0]
+    keys_s = nhead_s = nrows_s = smp = ""
+    if len(parts) == 2:
+        if parts[1].strip().isdigit():
+            smp = parts[1]
+        else:
+            keys_s = parts[1]
+    elif len(parts) == 3:
+        keys_s, smp = parts[1], parts[2]
+    elif len(parts) >= 4:
+        keys_s, nhead_s, nrows_s = parts[1], parts[2], parts[3]
+        smp = parts[4] if len(parts) >= 5 else ""
+    keys = tuple(k for k in keys_s.split(",") if k)
+    nhead = int(nhead_s) if nhead_s.strip() else None
+    nrows = int(nrows_s) if nrows_s.strip() else None
+    sample_no = int(smp) if smp.strip().isdigit() else _sample_from_name(filename)
+    return FileAttrs(ftype, keys, nhead, nrows, sample_no)
+
+
+_TECH = re.compile(r"^([A-Za-z_]+?)(\d*)$")
+
+
+def split_technique(tech_key: str) -> tuple[str, int]:
+    """Split ``CA12`` into ``("CA", 12)``; a key with no digits gets index 0."""
+    m = _TECH.match(tech_key)
+    if not m:
+        return tech_key, 0
+    return m.group(1), int(m.group(2) or 0)
+
+
+_RUN_STAMP = re.compile(r"\d{8}\.\d{6}")
+
+
+def resolve_run_zip(run_root: str, run_path: str) -> str | None:
+    """Locate a legacy run zip from an .exp ``run_path`` (read-only lookups).
+
+    Tries the path as given, then with ``.zip`` appended, then any zip in the
+    same directory whose name starts with the 15-character run timestamp
+    (only when that stamp looks like ``YYYYMMDD.HHMMSS``). With several hits the
+    lexically last is returned, i.e. the newest copy stamp.
+    """
+    rel = run_path.lstrip("/").replace("\\", "/")
+    full = os.path.join(run_root, rel)
+    for cand in (full, full + ".zip"):
+        if cand.endswith(".zip") and os.path.isfile(cand):
+            return cand
+    stamp = os.path.basename(rel)[:15]
+    if not _RUN_STAMP.fullmatch(stamp):
+        return None
+    hits = sorted(
+        glob.glob(os.path.join(os.path.dirname(full), glob.escape(stamp) + "*.zip"))
+    )
+    return hits[-1] if hits else None
+
+
+_LABVIEW_EPOCH = datetime(1904, 1, 1, tzinfo=timezone.utc)
+_UNIT = re.compile(r"^(.*?)\((.*)\)$")
+
+
+def labview_epoch_to_utc(epoch_s: float) -> datetime:
+    """Convert LabVIEW seconds-since-1904 (UTC) to an aware UTC datetime."""
+    return _LABVIEW_EPOCH + timedelta(seconds=float(epoch_s))
+
+
+def rename_column(col: str) -> str:
+    """``X(u)`` -> ``X_u``; names without a unit are unchanged."""
+    m = _UNIT.match(col.strip())
+    return f"{m.group(1)}_{m.group(2)}" if m else col.strip()
+
+
+def _tab_cells(line: str) -> list[str]:
+    """Split on tabs, dropping one trailing empty cell; middle cells are kept."""
+    cells = line.split("\t")
+    if cells and not cells[-1].strip():
+        cells.pop()
+    return cells
+
+
+def read_eche_file(
+    zf: zipfile.ZipFile, member: str
+) -> tuple[dict[str, str], dict[str, list[float]]]:
+    """Read one legacy eche .txt: ``%key=value`` header, then tab-separated floats."""
+    header: dict[str, str] = {}
+    names: list[str] = []
+    data: list[list[float]] = []
+    for lineno, line in enumerate(
+        read_zip_member_text(zf, member).splitlines(), start=1
+    ):
+        if not line.strip():
+            continue
+        if line.startswith("%"):
+            k, _, v = line[1:].partition("=")
+            header[k.strip()] = v.strip()
+            if k.strip() == "column_headings":
+                names = [rename_column(c) for c in _tab_cells(v)]
+            continue
+        cells = _tab_cells(line)
+        if len(cells) != len(names):
+            raise ValueError(
+                f"{member}:{lineno}: {len(cells)} cells, expected {len(names)} columns"
+            )
+        try:
+            data.append([float(x) for x in cells])
+        except ValueError as e:
+            raise ValueError(f"{member}:{lineno}: {e}") from e
+    return header, {n: [row[i] for row in data] for i, n in enumerate(names)}
 
 
 class HTELegacyAPI:
@@ -52,11 +273,6 @@ class HTELegacyAPI:
         return any([os.path.exists(mp) for mp in self.PLATEMAPFOLDERS]) and any(
             [os.path.exists(pp) for pp in self.PLATEFOLDERS]
         )
-
-    def get_rcp_plateid(self, plateid: int):
-        """Log a lookup request and return ``None`` (RCP lookup is unimplemented)."""
-        LOGGER.info(f" ... get rcp for plateid: {plateid}")
-        return None
 
     def get_info_plateid(self, plateid: int):
         """Return the platemap dict-list for a plate, or ``None`` if missing.
@@ -225,8 +441,8 @@ class HTELegacyAPI:
     def rcp_to_dict(self, rcppath):  # read standard rcp/exp/ana/info structure to dict
         """Parse an indentation-structured RCP/EXP/ANA/INFO file into a nested dict.
 
-        Supports either a plain text file or a ``*.copied.zip`` archive (in
-        which case the matching ``.rcp``/``.exp``/``.ana`` member is read).
+        Supports either a plain text file or a zip archive (in which case the
+        single member with the extension implied by the path is read).
 
         Args:
             rcppath: Path to the file or zip archive.
@@ -234,12 +450,6 @@ class HTELegacyAPI:
         Returns:
             Nested dictionary representation of the file.
         """
-        dlist = []
-
-        def _tab_level(astr):
-            """Count number of leading tabs in a string"""
-            return (len(astr) - len(astr.lstrip("    "))) / 4
-
         if rcppath.endswith(".zip"):
             if "analysis" in os.path.dirname(rcppath):
                 ext = ".ana"
@@ -247,57 +457,9 @@ class HTELegacyAPI:
                 ext = ".exp"
             else:
                 ext = ".rcp"
-            rcpfn = os.path.basename(rcppath).split(".copied")[0] + ext
-            archive = zipfile.ZipFile(rcppath, "r")
-            with archive.open(rcpfn, "r") as f:
-                for l in f:
-                    k, v = l.decode("ascii").split(":", 1)
-                    lvl = _tab_level(l.decode("ascii"))
-                    dlist.append({"name": k.strip(), "value": v.strip(), "level": lvl})
-        else:
-            with open(rcppath, "r", encoding="utf-8") as f:
-                for l in f:
-                    k, v = l.split(":", 1)
-                    lvl = _tab_level(l)
-                    dlist.append({"name": k.strip(), "value": v.strip(), "level": lvl})
-
-        def ttree_to_json(ttree, level=0):
-            result = {}
-            for i in range(0, len(ttree)):
-                cn = ttree[i]
-                try:
-                    nn = ttree[i + 1]
-                except:
-                    nn = {"level": -1}
-
-                # Edge cases
-                if cn["level"] > level:
-                    continue
-                if cn["level"] < level:
-                    return result
-                # Recursion
-                if nn["level"] == level:
-                    dict_insert_or_append(result, cn["name"], cn["value"])
-                elif nn["level"] > level:
-                    rr = ttree_to_json(ttree[i + 1 :], level=nn["level"])
-                    dict_insert_or_append(result, cn["name"], rr)
-                else:
-                    dict_insert_or_append(result, cn["name"], cn["value"])
-                    return result
-            return result
-
-        def dict_insert_or_append(adict, key, val):
-            """Insert a value in dict at key if one does not exist
-            Otherwise, convert value to list and append
-            """
-            if key in adict:
-                if type(adict[key]) != list:
-                    adict[key] = [adict[key]]
-                adict[key].append(val)
-            else:
-                adict[key] = val
-
-        return ttree_to_json(dlist)
+            return _single_member(rcppath, ext)
+        with open(rcppath, "rb") as f:
+            return rcp_text_to_dict(decode_legacy_text(f.read()))
 
     def getplatemappath_plateid(
         self,
@@ -519,7 +681,7 @@ class HTELegacyAPI:
         if not (searchstr1 in printd and searchstr2 in printd):
             if return_defaults_if_none:
                 nels_printchannels = [
-                    len(regexcompile("[A-Z][a-z]*").findall(el)) for el in els
+                    len(re.compile("[A-Z][a-z]*").findall(el)) for el in els
                 ]
                 if max(nels_printchannels) > 1:
                     return (
@@ -554,7 +716,7 @@ class HTELegacyAPI:
         if len(cels_set) < len(cels) or True in [
             conclist[0] != cv for cv in conclist
         ]:  # concentrations available where an element is used multiple times. or 1 of the concentrations is different from the rest
-            els_printchannels = [regexcompile("[A-Z][a-z]*").findall(el) for el in els]
+            els_printchannels = [re.compile("[A-Z][a-z]*").findall(el) for el in els]
             els_tuplist = [
                 (el, i, j)
                 for i, l in enumerate(els_printchannels)

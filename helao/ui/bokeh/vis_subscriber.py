@@ -35,8 +35,6 @@ __all__ = [
 import asyncio
 import time
 from functools import lru_cache, partial
-from importlib import import_module
-from importlib import util as importlib_util
 
 from bokeh.layouts import Spacer
 
@@ -88,22 +86,9 @@ def import_vis_class(module_name: str, class_name: str = VIS_CLASS_NAME):
     Raises:
         ModuleNotFoundError: If no deployment provides ``module_name``.
     """
-    tried = []
-    for deployment in _deployment_search_order():
-        modpath = f"helao.deploy.{deployment}.servers.visualizer.{module_name}"
-        tried.append(modpath)
-        try:
-            spec = importlib_util.find_spec(modpath)
-        except ModuleNotFoundError:
-            spec = None
-        if spec is None:
-            continue
-        module = import_module(modpath)
-        return getattr(module, class_name)
-    raise ModuleNotFoundError(
-        f"could not locate visualizer module '{module_name}' in any deployment; "
-        f"tried: {tried}"
-    )
+    from helao.ui.shared.discovery import _resolve
+
+    return getattr(_resolve(module_name, "bokeh"), class_name)
 
 
 def mount_visualizers(app, vis_cfg_key: str) -> list:

@@ -16,7 +16,7 @@ server launch and no hardware:
    skipped.
 3. **endpoint-checklist presence** -- an action server's frozen endpoint
    checklist is looked up in its OWNING deployment (the one gate 2 resolved).
-   Fails only when a checklist frozen at B7c's base (`CHECKLISTS_AT_B7C`) is gone;
+   Fails only when a checklist frozen at B7c's base (`_at_b7c.json`) is gone;
    any other absence is reported as a note.
 4. **library collision** -- the config's `experiment_libraries` +
    `sequence_libraries` lists carry no flat-namespace function-name collision
@@ -33,13 +33,13 @@ with "PREFLIGHT OK" or 1 listing the issues.
 from __future__ import annotations
 
 import ast
-import os
+import json
 import sys
 from collections import defaultdict
-from glob import glob
 from pathlib import Path
 from typing import Optional
 
+from helao.helpers import server_modules
 from helao.helpers.config_loader import read_config
 
 #: The launcher's server code keys, pinned to ``launch.py``'s ``codeKeys``. A
@@ -52,12 +52,6 @@ CODE_KEYS = ("fast", "bokeh", "reflex")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CHECKLIST_ROOT = REPO_ROOT / "helao" / "hexagon" / "tests" / "checklists"
-HTE_EXP = REPO_ROOT / "helao" / "deploy" / "hte" / "experiments"
-HTE_SEQ = REPO_ROOT / "helao" / "deploy" / "hte" / "sequences"
-# hte's canary configs (P3a/P3e) were relocated here, OUTSIDE helao/deploy/hte/
-# entirely, so they no longer carry "deploy"/"hte" in their path -- see the
-# fallback in _config_deployment below.
-HTE_SMOKE_CONFIGS = REPO_ROOT / "helao" / "hexagon" / "tests" / "smoke" / "configs"
 
 
 def _config_deployment(config: str) -> Optional[str]:
@@ -76,13 +70,6 @@ def _config_deployment(config: str) -> Optional[str]:
             i = parts.index("deploy")
             if i + 1 < len(parts):
                 return parts[i + 1]
-        # Relocated hte canary config: lives under HTE_SMOKE_CONFIGS instead
-        # of helao/deploy/hte/configs/, so "deploy" never appears in its path.
-        # Every config under this centralized, hte-only directory belongs to
-        # "hte" by construction (P3a/P3e relocation) -- infer it directly so
-        # gate 4's deployment-first library lookup isn't skipped post-move.
-        if m.parent == HTE_SMOKE_CONFIGS:
-            return "hte"
     return None
 
 
@@ -94,13 +81,10 @@ def _server_module(server: dict) -> Optional[str]:
 def _checklist_dir(deployment: Optional[str]) -> Optional[Path]:
     """Where a deployment's frozen endpoint checklists live.
 
-    A PRIVATE nested deployment keeps its checklists INSIDE its own repo
-    (helao/deploy/<dep>/tests/checklists/) — the public parent cannot host a
-    directory named after a private deployment. The public deployments (hte,
-    test) keep theirs centrally under helao/hexagon/tests/checklists/<dep>/.
-    Prefer the in-repo location when it exists, else the central one; the path
-    is BUILT from the resolved deployment at runtime, so this parent source
-    names nothing private.
+    Every deployment keeps its checklists INSIDE its own tree
+    (helao/deploy/<dep>/tests/checklists/); the path is BUILT from the resolved
+    deployment at runtime, so this source names no deployment. The central
+    CHECKLIST_ROOT/<dep> is only a fallback for a deployment without one.
     """
     if not deployment:
         return None
@@ -116,6 +100,14 @@ def _checklist_dir(deployment: Optional[str]) -> Optional[Path]:
 #: WHICH invisible claim it is or it reads as a plain typo.
 _REFLEX_BACKEND_LABEL = "reflex backend port, port + 1"
 _ALIGNER_BOKEH_LABEL = "aligner Bokeh port, params.bokeh_port or port + 1000"
+
+
+def aligner_bokeh_port(server_cfg: dict) -> int:
+    """Bokeh port of a server's plate aligner: ``params.bokeh_port`` when set
+    (not ``None``), else ``server_cfg['port'] + 1000``. A null value counts as
+    unset, which ``dict.get(key, default)`` would not."""
+    port = (server_cfg.get("params") or {}).get("bokeh_port")
+    return int(int(server_cfg["port"]) + 1000 if port is None else port)
 
 
 def _aligner_port(server: dict) -> Optional[int]:
@@ -139,7 +131,7 @@ def _aligner_port(server: dict) -> Optional[int]:
     port = server.get("port")
     if port is None:
         return None
-    return int(params.get("bokeh_port", int(port) + 1000))
+    return aligner_bokeh_port(server)
 
 
 def _claimed_addresses(server: dict) -> list[tuple[str, str]]:
@@ -208,59 +200,28 @@ _RULE = (
 #: The retired routing deployment; matched only to reject it.
 _RETIRED_DEPLOYMENT = "hexagon"
 
-#: E4: the per-server hte checklists tracked at 7592729b. Gate 3 fails only when one
-#: of these goes missing; any other absent checklist is reported.
-CHECKLISTS_AT_B7C: dict[str, frozenset[str]] = {
-    "hte": frozenset(
-        {
-            "HTEdata_server",
-            "analysis_server",
-            "andor_server",
-            "biologic_server",
-            "calc_server",
-            "cam_server",
-            "co2sensor_server",
-            "diapump_server",
-            "galil_io",
-            "galil_motion",
-            "gamry_server2",
-            "kinesis_server",
-            "mfc_server",
-            "nidaqmx_server",
-            "o2sensor_server",
-            "pal_server",
-            "pdu_server",
-            "power_supply_server",
-            "sample_server",
-            "spec_server",
-            "sync_server",
-            "syringe_server",
-            "tec_server",
-        }
-    ),
-}
+
+# E4: per-server checklists tracked at 7592729b, listed in the owning deployment's
+# ``_at_b7c.json`` beside its checklists. Gate 3 fails only when one of these goes
+# missing; any other absent checklist is reported.
+def _frozen_checklists(cdir: Path) -> frozenset[str]:
+    f = cdir / "_at_b7c.json"
+    if not f.exists():
+        return frozenset()
+    return frozenset(json.loads(f.read_text(encoding="utf-8")))
 
 
 def _launcher_deployment(config_path: str, group: str, module: str):
-    """fast_launcher.py:102-152's auto-detection, with its own string operations.
+    """The launcher's auto-detection (``resolve_app_deployment``), shared code.
 
-    Returns ``(deployment or None, candidate deployments)``. ``None`` with candidates
-    means ambiguous: more than one deployment has the module, none is the config's own,
-    and the launcher would take the first in sorted order (and only warn).
-    The glob root is the config's great-grandparent, as in the launcher: for a smoke
-    config that root holds no deployments, so every smoke entry needs deployment:.
+    Returns ``(deployment or None, candidate deployments)``. ``None`` with
+    candidates means ambiguous. The search root is the config's great-grandparent,
+    as in the launcher, so a smoke config outside helao/deploy needs deployment:.
     """
-    search = os.path.dirname(os.path.dirname(os.path.dirname(config_path)))
-    found = sorted(glob(os.path.join(search, "*", "servers", group, f"{module}.py")))
-    deps = [
-        os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(p))))
-        for p in found
-    ]
-    if len(found) == 1:
-        return deps[0], deps
-    own_dir = os.path.dirname(os.path.dirname(config_path))
-    own = [d for p, d in zip(found, deps) if p.startswith(own_dir)]
-    return (own[0] if own else None), deps
+    cfg = Path(config_path).resolve()
+    return server_modules.locate(
+        module, "app", own=cfg.parents[1].name, deploy_root=cfg.parents[2]
+    )
 
 
 def _module_resolution(cfg: dict, deploy_root: Path = DEPLOY_ROOT):
@@ -300,11 +261,12 @@ def _module_resolution(cfg: dict, deploy_root: Path = DEPLOY_ROOT):
                     f"and would import a deployment named {explicit!r}"
                 )
                 continue
-            if (deploy_root / explicit / "servers" / group / f"{module}.py").is_file():
+            if server_modules.module_file(explicit, module, "app", deploy_root):
                 resolved[key] = explicit
             else:
                 issues.append(
-                    f"{key}: deployment: {explicit} has no servers/{group}/{module}.py"
+                    f"{key}: deployment: {explicit} has no servers/{group}/{module}.py "
+                    f"(nor {module}.py in any servers/* folder)"
                 )
             continue
         dep, found = _launcher_deployment(config_path, group, module)
@@ -312,11 +274,11 @@ def _module_resolution(cfg: dict, deploy_root: Path = DEPLOY_ROOT):
             resolved[key] = dep
         elif not found:
             issues.append(
-                f"{key}: {group}/{module}.py exists in no deployment the launcher searches"
+                f"{key}: {module}.py exists in no deployment the launcher searches"
             )
         else:
             issues.append(
-                f"{key}: {group}/{module}.py exists in {found}, none of them this config's "
+                f"{key}: {module}.py exists in {found}, none of them this config's "
                 f"own, so the launcher would pick '{found[0]}' by sorted order; add "
                 f"deployment: <owner>"
             )
@@ -335,7 +297,7 @@ def _checklist_presence(servers: dict, resolved: dict) -> tuple[list[str], list[
         cdir = _checklist_dir(owner)
         if cdir is not None and (cdir / f"{module}.json").exists():
             continue
-        if cdir is not None and module in CHECKLISTS_AT_B7C.get(owner, frozenset()):
+        if cdir is not None and module in _frozen_checklists(cdir):
             issues.append(
                 f"{key}: frozen endpoint checklist {module}.json is gone from {cdir}"
             )
@@ -345,12 +307,12 @@ def _checklist_presence(servers: dict, resolved: dict) -> tuple[list[str], list[
 
 
 def _lib_module_path(
-    entry: str, default_dir: Path, deployment: Optional[str] = None
+    entry: str, kind: str, deployment: Optional[str] = None
 ) -> Optional[Path]:
     """Resolve a library list entry (bare name or repo-relative path) to a file.
 
     Bare names resolve the way `helao.helpers.import_autolibs` does at runtime:
-    the config's own deployment first, then the `hte` fallback. Without the
+    the config's own deployment first, then the only deployment that has it. Without the
     deployment leg, a config whose libraries live only in its own deployment
     resolves to None here and is silently skipped by the collision check --
     the gate reads as passing while checking nothing.
@@ -359,18 +321,19 @@ def _lib_module_path(
         p = (REPO_ROOT / entry) if not Path(entry).is_absolute() else Path(entry)
         return p if p.exists() else None
     if deployment:
-        p = (
-            REPO_ROOT
-            / "helao"
-            / "deploy"
-            / deployment
-            / default_dir.name
-            / f"{entry}.py"
-        )
+        p = REPO_ROOT / "helao" / "deploy" / deployment / kind / f"{entry}.py"
         if p.exists():
             return p
-    p = default_dir / f"{entry}.py"
-    return p if p.exists() else None
+    found = sorted((REPO_ROOT / "helao" / "deploy").glob(f"*/{kind}/{entry}.py"))
+    return found[0] if len(found) == 1 else None
+
+
+def _holding_deployments(entry: str, kind: str) -> list[str]:
+    """Deployments with a bare ``entry`` library; [] for an explicit path."""
+    if entry.endswith(".py") or "/" in entry:
+        return []
+    found = (REPO_ROOT / "helao" / "deploy").glob(f"*/{kind}/{entry}.py")
+    return sorted(p.parent.parent.name for p in found)
 
 
 def _top_level_funcs(path: Path) -> list[str]:
@@ -386,14 +349,20 @@ def _library_collisions(cfg: dict, deployment: Optional[str] = None) -> list[str
     if cfg.get("allow_shadow"):
         return []
     issues: list[str] = []
-    for cfg_key, default_dir in (
-        ("experiment_libraries", HTE_EXP),
-        ("sequence_libraries", HTE_SEQ),
+    for cfg_key, kind in (
+        ("experiment_libraries", "experiments"),
+        ("sequence_libraries", "sequences"),
     ):
         name_to_mods: dict[str, list[str]] = defaultdict(list)
         for entry in cfg.get(cfg_key, []) or []:
-            path = _lib_module_path(str(entry), default_dir, deployment)
+            path = _lib_module_path(str(entry), kind, deployment)
             if path is None:
+                deps = _holding_deployments(str(entry), kind)
+                if len(deps) > 1:
+                    issues.append(
+                        f"{cfg_key}: '{entry}' exists in several deployments "
+                        f"{deps}; give an explicit .py path"
+                    )
                 continue
             for fn in _top_level_funcs(path):
                 name_to_mods[fn].append(path.name)

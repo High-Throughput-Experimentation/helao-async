@@ -24,34 +24,37 @@ region of ``sync_driver.py`` requires.
 import os
 from pathlib import Path
 
+from helao.helpers.meta_io import meta_glob
+from helao.hexagon.domain.naming import meta_kind
+
 
 def process_uuid_of(path: "str | os.PathLike[str]") -> str:
     """The process uuid a ``-prc.yml`` filename carries.
 
     Args:
-        path: Path to a ``-prc.yml``.
+        path: Path to a ``-prc.json`` (or legacy ``-prc.yml``).
 
     Returns:
         The uuid segment, or ``""`` when the name does not match the format.
     """
     name = Path(path).name
-    parts = name[: -len("-prc.yml")].split("__") if name.endswith("-prc.yml") else []
+    parts = name.rsplit("-prc.", 1)[0].split("__") if meta_kind(name) == "prc" else []
     return parts[1] if len(parts) >= 3 else ""
 
 
 def _experiment_dir(experiment: "str | os.PathLike[str]") -> Path:
     p = Path(experiment)
-    return p.parent if p.is_file() or p.name.endswith(".yml") else p
+    return p.parent if p.is_file() or meta_kind(p) is not None else p
 
 
 def find_process_ymls(
     experiment: "str | os.PathLike[str]",
     process_root: "str | os.PathLike[str] | None" = None,
 ) -> list[Path]:
-    """Every ``-prc.yml`` belonging to one experiment, from both locations.
+    """Every ``-prc.json`` (or legacy ``-prc.yml``) belonging to one experiment, from both locations.
 
     Args:
-        experiment: The experiment's ``-exp.yml`` path, or its directory.
+        experiment: The experiment's ``-exp`` record path, or its directory.
         process_root: Root of the legacy ``PROCESSES`` mirror. When ``None``,
             only the colocated artifacts are returned.
 
@@ -62,7 +65,7 @@ def find_process_ymls(
     """
     exp_dir = _experiment_dir(experiment)
     found = sorted(
-        (x for x in exp_dir.glob("*-prc.yml") if x.is_file()), key=lambda x: x.name
+        (x for x in meta_glob(exp_dir, "prc") if x.is_file()), key=lambda x: x.name
     )
     if process_root is None:
         return found
@@ -73,7 +76,7 @@ def find_process_ymls(
         return found
 
     for x in sorted(
-        (y for y in mirror.glob("*-prc.yml") if y.is_file()), key=lambda y: y.name
+        (y for y in meta_glob(mirror, "prc") if y.is_file()), key=lambda y: y.name
     ):
         uuid = process_uuid_of(x)
         if uuid and uuid in seen:

@@ -52,3 +52,13 @@ def test_lists_legacy_zips_under_sunday_start_week(tmp_path, monkeypatch):
     open(zpath, "w", encoding="utf-8").close()
 
     assert WeekWindowSpecParser().lister(str(tmp_path)) == [zpath]
+
+
+def test_lists_json_sequence_dirs(tmp_path):
+    now = datetime.now()
+    path = os.path.join(
+        tmp_path, now.strftime("%Y"), now.strftime("%m%d"), "120000__SEQ_J__lbl"
+    )
+    os.makedirs(path)
+    open(os.path.join(path, "SEQ_J-seq.json"), "w", encoding="utf-8").close()
+    assert WeekWindowSpecParser().lister(str(tmp_path)) == [path]

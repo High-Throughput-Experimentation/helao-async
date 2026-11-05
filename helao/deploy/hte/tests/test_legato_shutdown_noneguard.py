@@ -23,7 +23,7 @@ import asyncio
 import logging as _logging
 import sys
 
-from helao.deploy.hte.drivers.pump.legato_driver import (
+from helao.deploy.hte.servers.syringe.legato_driver import (
     KDS100,
     LOGGER,
     KDS100Poller,

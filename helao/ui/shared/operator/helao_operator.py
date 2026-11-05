@@ -137,15 +137,3 @@ class HelaoOperator:
         return self.request(
             "append_sequence", json_params={"sequence": sequence.as_dict()}
         )
-
-    def get_latest_sequences(self) -> dict:
-        """Return the most recently dispatched sequence UUIDs from the orchestrator."""
-        return self.request("latest_sequence_uuids")
-
-    def get_latest_experiments(self) -> dict:
-        """Return the most recently dispatched experiment UUIDs from the orchestrator."""
-        return self.request("latest_experiment_uuids")
-
-    def get_latest_actions(self) -> dict:
-        """Return the most recently dispatched action UUIDs from the orchestrator."""
-        return self.request("latest_action_uuids")

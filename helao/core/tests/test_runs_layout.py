@@ -14,21 +14,12 @@ from helao.core.models.run_dir import (
 )
 
 
-import helao.core.drivers.data.sync_driver as _legacy_sync_driver
 import helao.hexagon.adapters.native.sync_driver as _native_sync_driver
 
 
-@pytest.fixture(
-    params=[_legacy_sync_driver, _native_sync_driver], ids=["legacy", "native"]
-)
+@pytest.fixture(params=[_native_sync_driver], ids=["native"])
 def sd(request):
-    """Both syncer implementations, so every new-layout assertion runs twice.
-
-    The hexagon-native syncer is a byte-pinned mirror of the legacy one, and
-    no config in this repository routes a SYNC server to it -- so without
-    this, its behaviour on a RUNS tree would be established only by the
-    parity argument, never by a test that runs it.
-    """
+    """The syncer module every new-layout assertion runs against."""
     return request.param
 
 

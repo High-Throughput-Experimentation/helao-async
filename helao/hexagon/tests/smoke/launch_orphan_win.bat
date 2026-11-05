@@ -16,8 +16,8 @@ REM the group when the launcher's handle closes. THAT MECHANISM HAS NEVER BEEN
 REM CONFIRMED ON WINDOWS -- it was written and unit-tested on Linux against a
 REM fake kernel32. This script is how it gets confirmed at a station.
 REM
-REM The stakes are higher here than a held port: the Windows-only drivers are
-REM Galil (gclib) and Gamry (comtypes), and an orphaned Gamry server still owns
+REM The stakes are higher here than a held port: the Windows-only drivers include
+REM Gamry (comtypes), and an orphaned Gamry server still owns
 REM GamryCOM and the potentiostat, so the next launch cannot acquire the
 REM instrument at all.
 REM

@@ -1,93 +1,61 @@
-"""Hardware port (spec §4.3.1): the HelaoDriver seam, promoted to an interface.
+"""Hardware-side port: what a driver, poller or executor may read from its host.
 
-Contract (normative, from helao/core/drivers/helao_driver.py + core-03):
-- Construction from ``config: dict`` (the server YAML ``params:`` block) with
-  NO I/O in ``__init__`` — the port bans constructor-connect. Adapters that
-  wrap legacy constructor-connecting drivers defer real connection to
-  ``connect()``.
-- Disconnected construct is first-class: every adapter must be constructible
-  (and schema-introspectable) without hardware or vendor runtime present.
-- ``DriverResponse`` two-axis result kept verbatim (``response`` = did this
-  call work; ``status`` = driver state), including ``DriverStatus.retry`` and
-  the empty-``DriverResponse()`` = "skip this sample" poller sentinel.
-- Lifecycle is async-first; adapters wrap legacy sync drivers with explicit
-  thread offload where needed.
+The hardware contract itself is the ``HelaoDriver`` ABC
+(``helao/core/drivers/helao_driver.py``) plus its ``connect_on_startup`` flag;
+there is no driver-lifecycle port. ``ActionHost`` satisfies ``DriverHostPort``
+structurally and there is no adapter. ``test_driver_host_surface.py`` gates
+hardware-side classes to these members.
+
+Data members are read-only properties, which are covariant: a plain
+``poller: Optional[DriverPoller]`` attribute is invariant and would reject the
+host's own attribute. Each member's thread class is in a trailing comment.
 """
 
-from contextlib import AbstractAsyncContextManager
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
 
-from helao.core.drivers.helao_driver import (
-    DriverResponse,
-    DriverResponseType,
-    DriverStatus,
-)
-from helao.hexagon.domain.models import ErrorCodes
+if TYPE_CHECKING:
+    from helao.core.drivers.helao_driver import DriverPoller
 
-__all__ = [
-    "ExclusiveAccess",
-    "HardwarePort",
-    "driver_response_to_error_code",
-]
-
-
-def driver_response_to_error_code(resp: DriverResponse) -> ErrorCodes:
-    """The single DriverResponse -> ErrorCodes mapping (spec §4.3.1).
-
-    Legacy duplicates this string-compare in every executor phase
-    (``resp.response == "success"``); adapters and executors must use this
-    function instead.
-    """
-    if resp.response == DriverResponseType.success:
-        return ErrorCodes.none
-    if resp.status == DriverStatus.busy:
-        return ErrorCodes.in_progress
-    return ErrorCodes.critical_error
+__all__ = ["DriverHostPort"]
 
 
 @runtime_checkable
-class ExclusiveAccess(Protocol):
-    """Async context manager serializing poller-vs-command bus contention.
-
-    Replaces the ad-hoc ``polling``-flag handshakes (AliCat, legato
-    ``_send_sync`` fork, Advantech pause/resume) and the disabled Gamry poller.
-    """
-
-    def exclusive(self) -> AbstractAsyncContextManager[None]: ...
-
-
-@runtime_checkable
-class HardwarePort(Protocol):
-    """Async driver lifecycle: connect/arm/start/drain/abort/cleanup/disconnect."""
-
-    async def connect(self) -> DriverResponse: ...
-
-    async def get_status(self) -> DriverResponse: ...
-
-    async def arm(self, **setup_params) -> DriverResponse:
-        """Legacy convention ``setup(...)`` — arm a measurement."""
+class DriverHostPort(Protocol):
+    def get_lbuf(self, live_key: str) -> tuple:  # thread-safe (dict read)
         ...
 
-    async def start(self, **measure_params) -> DriverResponse:
-        """Legacy convention ``measure()`` / ``start_channel()``."""
+    async def put_lbuf(self, live_dict: dict) -> None:  # loop
         ...
 
-    async def drain(self, **kwargs) -> DriverResponse:
-        """Legacy convention ``get_data(...)`` — incremental column-dict delta."""
+    def dflt_file_conn_key(self) -> Any:  # loop
         ...
 
-    async def abort(self, **kwargs) -> DriverResponse:
-        """Legacy ABC ``stop()`` — abort ALL activity."""
+    # HelaoDirs / ActionServerModel live under helao.core.models, which a port
+    # may not import (test_boundaries), so they are typed Any.
+    @property
+    def helaodirs(self) -> Any:  # read-only
         ...
 
-    async def cleanup(self, **kwargs) -> DriverResponse:
-        """De-arm without disconnecting."""
+    @property
+    def actionservermodel(self) -> Any:  # thread-safe (bool read of .estop)
         ...
 
-    async def reset(self) -> DriverResponse: ...
+    @property
+    def executors(self) -> dict:  # loop
+        ...
 
-    async def disconnect(self) -> DriverResponse: ...
+    @property
+    def server_params(self) -> dict:  # read-only
+        ...
 
-    async def estop(self, switch: bool) -> DriverResponse: ...
+    @property
+    def world_cfg(self) -> dict:  # read-only
+        ...
 
-    async def shutdown(self) -> DriverResponse: ...
+    @property
+    def poller(self) -> "Optional[DriverPoller]":  # read-only
+        ...
+
+    @property
+    def server_key(self) -> str:  # read-only
+        ...

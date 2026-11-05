@@ -220,7 +220,6 @@ def test_the_host_binds_its_health_adapter_and_starts_no_legacy_heartbeat():
     from helao.hexagon.app.ingestion import HexHealthMonitor
 
     host = _host()
-    assert host.hexagon_wiring.health._orch is host  # type: ignore[attr-defined]
     assert isinstance(host._hex_health, HexHealthMonitor)
     assert host.heartbeat_monitor is None
 

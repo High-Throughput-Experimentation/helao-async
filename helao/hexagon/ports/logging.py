@@ -6,8 +6,7 @@ Wraps the legacy helao.helpers.helao_logging in P1b — nothing is vendored
 ``helao/helpers/helao_logging.py:412``) — that fallback is the F3 regression
 this port exists to close. The port's file-logger factory MUST raise when
 asked to create a file logger without a resolved log root; the mkdtemp()
-fallback is unreachable through the port. Contractual path:
-<root>/LOGS/<server_key>.log.
+fallback is unreachable through the port. Contractual path: `<log_root>/<server_key>.jsonl` (the fallback file; under the launcher, records go to `<root>/LOGS/helao_<prefix>.jsonl`)
 """
 
 from typing import Protocol, runtime_checkable
@@ -19,7 +18,7 @@ __all__ = ["LoggingPort"]
 class LoggingPort(Protocol):
     def file_logger(self, server_key: str, log_root: str) -> object:
         """Create/return the named singleton logger writing
-        <log_root>/<server_key>.log. MUST raise ValueError when log_root is
+        <log_root>/<server_key>.jsonl. MUST raise ValueError when log_root is
         falsy — never fall back to a tempdir (F3)."""
         ...
 

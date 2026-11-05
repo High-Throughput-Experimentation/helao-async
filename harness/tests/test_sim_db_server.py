@@ -51,4 +51,6 @@ def test_module_imports_and_exposes_makeapp():
     import helao.deploy.test.servers.action.sim_db_server as mod
 
     assert callable(mod.makeApp)
-    assert issubclass(mod.SimHelaoSyncer, object)
+    from helao.hexagon.adapters.native.native_syncer import NativeSyncer
+
+    assert issubclass(mod.SimNativeSyncer, NativeSyncer)

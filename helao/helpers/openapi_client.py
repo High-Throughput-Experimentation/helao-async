@@ -24,7 +24,6 @@ import json
 from urllib.parse import quote, urljoin
 
 import httpx
-from tqdm import tqdm
 
 
 class _BaseOpenAPIClient:
@@ -35,21 +34,18 @@ class _BaseOpenAPIClient:
     that performs a single API call).
     """
 
-    def __init__(self, openapi_json_url: str, api_key: str = "", pagination=None):
+    def __init__(self, openapi_json_url: str, api_key: str = ""):
         """Fetch the OpenAPI spec and bind dynamic methods.
 
         Args:
             openapi_json_url: URL of the ``openapi.json`` document.
             api_key: Optional value sent as the ``X-Api-Key`` header.
-            pagination: Optional PaginationStrategy; None disables pagination,
-                limit kwarg then inert.
 
         Raises:
             RuntimeError: If the spec cannot be fetched or parsed.
         """
         self.openapi_json_url = openapi_json_url
         self.api_key = api_key
-        self.pagination = pagination
         self.headers = {"X-Api-Key": self.api_key} if self.api_key else None
         self._client = None
 
@@ -188,111 +184,6 @@ class _BaseOpenAPIClient:
             quoted[key] = quote(value, safe="") if isinstance(value, str) else value
         return quoted
 
-    @staticmethod
-    def _merge_params(base_params, extra):
-        """Merge next-page params into the running params, dropping the
-        internal ``__next_url__`` redirect key."""
-        merged = dict(base_params)
-        for key, value in extra.items():
-            if key != "__next_url__":
-                merged[key] = value
-        return merged
-
-    def _pagination_setup(self, op_id, first_response, limit):
-        """Shared first-page handling. Returns (items, body) or (None, body)
-        when not paginated. Emits the 'detected' message when paginated."""
-        body = self._handle_response(op_id, first_response)
-        if self.pagination is None:
-            return None, body
-        items = self.pagination.extract_items(first_response, body)
-        if items is None:
-            return None, body
-        scope = "all" if limit is None else f"up to {limit}"
-        print(f"Pagination detected for '{op_id}'; fetching {scope} items.")
-        return list(items), body
-
-    def _paginate(self, op_id, sent_params, first_response, limit, do_request):
-        """Sync pagination loop. ``do_request(extra_params) -> httpx.Response``."""
-        collected, body = self._pagination_setup(op_id, first_response, limit)
-        if collected is None:
-            return body  # not paginated
-        strat = self.pagination
-        response, params = first_response, dict(sent_params)
-        seen_requests = set()
-        bar = (
-            tqdm(total=strat.total_hint(first_response, body))
-            if limit is None
-            else None
-        )
-        try:
-            while True:
-                nxt = strat.next_request(response, body, params)
-                if limit is not None and len(collected) >= limit:
-                    if nxt is not None:
-                        print(
-                            f"Reached limit={limit} for '{op_id}'; more results available."
-                        )
-                    return collected[:limit]
-                if nxt is None:
-                    return collected
-                signature = tuple(sorted(nxt.items()))
-                if signature in seen_requests:
-                    return collected  # next request repeated -> no progress, stop
-                seen_requests.add(signature)
-                response = do_request(nxt)
-                body = self._handle_response(op_id, response)
-                page = strat.extract_items(response, body) or []
-                collected.extend(page)
-                if bar is not None:
-                    bar.update(len(page))
-                params = self._merge_params(params, nxt)
-                if not page:
-                    return collected
-        finally:
-            if bar is not None:
-                bar.close()
-
-    async def _apaginate(self, op_id, sent_params, first_response, limit, do_request):
-        """Async twin of ``_paginate``. ``do_request`` is a coroutine fn."""
-        collected, body = self._pagination_setup(op_id, first_response, limit)
-        if collected is None:
-            return body
-        strat = self.pagination
-        response, params = first_response, dict(sent_params)
-        seen_requests = set()
-        bar = (
-            tqdm(total=strat.total_hint(first_response, body))
-            if limit is None
-            else None
-        )
-        try:
-            while True:
-                nxt = strat.next_request(response, body, params)
-                if limit is not None and len(collected) >= limit:
-                    if nxt is not None:
-                        print(
-                            f"Reached limit={limit} for '{op_id}'; more results available."
-                        )
-                    return collected[:limit]
-                if nxt is None:
-                    return collected
-                signature = tuple(sorted(nxt.items()))
-                if signature in seen_requests:
-                    return collected  # next request repeated -> no progress, stop
-                seen_requests.add(signature)
-                response = await do_request(nxt)
-                body = self._handle_response(op_id, response)
-                page = strat.extract_items(response, body) or []
-                collected.extend(page)
-                if bar is not None:
-                    bar.update(len(page))
-                params = self._merge_params(params, nxt)
-                if not page:
-                    return collected
-        finally:
-            if bar is not None:
-                bar.close()
-
     def _raw_request(self, op_id, http_method, url, raw_query, body):
         """Issue one request, returning the raw httpx.Response. Subclass impl."""
         raise NotImplementedError
@@ -362,11 +253,6 @@ class _BaseOpenAPIClient:
                 else:
                     rb_type = rb_schema.get("type", "object")
             param_docs_list.append(f"    request_body ({rb_type}, {rb_req}): {rb_desc}")
-
-        param_docs_list.append(
-            "    limit (int|None, optional): Max objects to return across pages; "
-            "None fetches all pages with a progress bar (default 100)."
-        )
 
         docstring_parts.append(
             "\n\nArgs:\n"
@@ -502,8 +388,8 @@ class OpenAPIClient(_BaseOpenAPIClient):
         base_url,
         op_details,
     ):
-        def dynamic_method(self_instance, limit=100, **kwargs):
-            """Generated method that dispatches an API call with pagination."""
+        def dynamic_method(self_instance, **kwargs):
+            """Generated method that dispatches one API call."""
             full_url, raw_query, body = self_instance._build_request(
                 op_id,
                 http_method,
@@ -513,21 +399,12 @@ class OpenAPIClient(_BaseOpenAPIClient):
                 base_url,
                 kwargs,
             )
-
-            def do_request(extra):
-                if "__next_url__" in extra:
-                    return self_instance._raw_request(
-                        op_id, http_method, extra["__next_url__"], {}, body
-                    )
-                merged = self_instance._merge_params(raw_query, extra)
-                return self_instance._raw_request(
-                    op_id, http_method, full_url, merged, body
-                )
-
-            first = self_instance._raw_request(
-                op_id, http_method, full_url, raw_query, body
+            return self_instance._handle_response(
+                op_id,
+                self_instance._raw_request(
+                    op_id, http_method, full_url, raw_query, body
+                ),
             )
-            return self_instance._paginate(op_id, raw_query, first, limit, do_request)
 
         return dynamic_method
 
@@ -571,8 +448,8 @@ class AsyncOpenAPIClient(_BaseOpenAPIClient):
         base_url,
         op_details,
     ):
-        async def dynamic_method(self_instance, limit=100, **kwargs):
-            """Generated async method that dispatches an API call with pagination."""
+        async def dynamic_method(self_instance, **kwargs):
+            """Generated async method that dispatches one API call."""
             full_url, raw_query, body = self_instance._build_request(
                 op_id,
                 http_method,
@@ -582,22 +459,11 @@ class AsyncOpenAPIClient(_BaseOpenAPIClient):
                 base_url,
                 kwargs,
             )
-
-            async def do_request(extra):
-                if "__next_url__" in extra:
-                    return await self_instance._raw_request(
-                        op_id, http_method, extra["__next_url__"], {}, body
-                    )
-                merged = self_instance._merge_params(raw_query, extra)
-                return await self_instance._raw_request(
-                    op_id, http_method, full_url, merged, body
-                )
-
-            first = await self_instance._raw_request(
-                op_id, http_method, full_url, raw_query, body
-            )
-            return await self_instance._apaginate(
-                op_id, raw_query, first, limit, do_request
+            return self_instance._handle_response(
+                op_id,
+                await self_instance._raw_request(
+                    op_id, http_method, full_url, raw_query, body
+                ),
             )
 
         return dynamic_method

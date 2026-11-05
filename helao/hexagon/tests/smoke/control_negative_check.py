@@ -1,8 +1,8 @@
 """Row-15 negative, run live against a launched group (P7g gate).
 
 Drives all five private control routes against a running ``controlneg`` group
-through the **same** shared wrappers both UI stacks use -- via the hexagon's
-``ControlSurface`` -- and asserts the run tree is unchanged afterwards.
+through the **same** shared wrappers both UI stacks use (``io_control`` and
+``motion_control``) and asserts the run tree is unchanged afterwards.
 
 The two things that make this more than a tautology:
 
@@ -35,6 +35,7 @@ from pathlib import Path
 
 from harness.control_negative import ControlTarget, run_negative
 from helao.helpers.config_loader import read_config
+from helao.hexagon.domain.naming import meta_kind
 
 #: Which config keys carry which controls. Read from the config rather than
 #: hardcoded so that a config edit cannot leave this driver silently probing a
@@ -83,6 +84,11 @@ def targets_from_config(config: dict) -> list:
     return targets
 
 
+def has_records(d: Path) -> bool:
+    """True when ``d`` holds any seq/exp/act/prc/ana record (.json or .yml)."""
+    return d.is_dir() and any(p.is_file() and meta_kind(p) for p in d.rglob("*"))
+
+
 def seed_baseline(root: Path) -> None:
     """Plant one finished-sequence tree so the member set is non-empty.
 
@@ -91,9 +97,7 @@ def seed_baseline(root: Path) -> None:
     """
     from harness.tests.synthtree import build_tree
 
-    if (root / "RUNS_FINISHED").is_dir() and any(
-        (root / "RUNS_FINISHED").rglob("*.yml")
-    ):
+    if has_records(root / "RUNS_FINISHED"):
         print("[control_negative] RUNS_FINISHED already populated; not seeding")
         return
     root.mkdir(parents=True, exist_ok=True)

@@ -32,8 +32,8 @@ colour *and* the achieved contrast.
 
 Run it against a launched group::
 
-    python launch.py goldenhexgraft
-    python helao/core/tests/browser_parity/check_bokeh_docs.py goldenhexgraft
+    python launch.py goldenhexvis
+    python helao/core/tests/browser_parity/check_bokeh_docs.py goldenhexvis
 """
 
 import json
@@ -326,7 +326,7 @@ def run(config: str) -> tuple:
 def main() -> int:
     """CLI: ``check_bokeh_docs.py [config] [--json out.json]``."""
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    config = args[0] if args else "goldenhexgraft"
+    config = args[0] if args else "goldenhexvis"
     out = None
     for index, arg in enumerate(sys.argv):
         if arg == "--json" and index + 1 < len(sys.argv):

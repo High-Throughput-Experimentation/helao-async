@@ -11,13 +11,13 @@ import math
 
 import pytest
 
-from helao.deploy.hte.drivers.pstat.biologic_ole import technique as ot
-from helao.deploy.hte.drivers.pstat.biologic_ole.mpr_cursor import (
+from helao.deploy.hte.servers.biologic.biologic_ole import technique as ot
+from helao.deploy.hte.servers.biologic.biologic_ole.mpr_cursor import (
     MprCursor,
     empty_frame,
 )
-from helao.deploy.hte.drivers.pstat.biologic_ole.olecom_client import OleComClient
-from helao.deploy.hte.drivers.pstat.biologic_ole.sim import SimConfig, make_factory
+from helao.deploy.hte.servers.biologic.biologic_ole.olecom_client import OleComClient
+from helao.deploy.hte.servers.biologic.biologic_ole.sim import SimConfig, make_factory
 
 
 def running_client(config: SimConfig) -> tuple[OleComClient, str]:

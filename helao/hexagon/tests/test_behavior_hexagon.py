@@ -68,9 +68,9 @@ def test_s9_1_composition_log_file_lands_under_root_logs(hex_world, monkeypatch)
     log_root = os.path.join(hex_world["root"], "LOGS")
     lg = w.logging.file_logger("HEXBEH", log_root)
     lg.info("hexagon §9.1 behavior check")  # type: ignore[attr-defined]
-    assert (Path(log_root) / "HEXBEH.log").exists()  # flat file, no subdir
+    assert (Path(log_root) / "HEXBEH.jsonl").exists()  # flat file, no subdir
     assert not any(
-        (Path(d) / "HEXBEH.log").exists() for d in mkdtemp_dirs
+        (Path(d) / "HEXBEH.jsonl").exists() for d in mkdtemp_dirs
     ), "log file must never land in a temp dir"
     # no parallel LOGS_FW-style directory, ever (§9.1 rule 2)
     assert not (Path(hex_world["root"]) / "LOGS_FW").exists()

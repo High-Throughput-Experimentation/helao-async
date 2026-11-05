@@ -7,8 +7,8 @@ what it returns, so these tests assert the registration too — a route that
 slipped back under ``tags=["action"]``, or under the ``/{server_key}/`` prefix,
 would still work and would still be wrong.
 
-Neither server's hardware is present here (gclib and NI-DAQmx are both
-Windows-only vendor SDKs), so the drivers are stubbed at the two methods the
+Neither server's hardware is present (the vendor gclib and NI-DAQmx
+SDKs are not installed), so the drivers are stubbed at the two methods the
 endpoints call. What is under test is the server layer: name resolution, the
 bool coercion, and the shape of the ``(error_code, {name: state})`` pair.
 
@@ -21,7 +21,7 @@ import asyncio
 import pytest
 
 from helao.core.error import ErrorCodes
-from helao.deploy.hte.servers.action.galil_io import do_value_to_bool
+from helao.deploy.hte.servers.galil_io.galil_io import do_value_to_bool
 
 
 class _FakeRoute:
@@ -148,7 +148,7 @@ class _FakeGalil:
 
 
 def _galil_app(dev_do, readback=" 1.0000"):
-    from helao.deploy.hte.servers.action.galil_io import galil_dyn_endpoints
+    from helao.deploy.hte.servers.galil_io.galil_io import galil_dyn_endpoints
 
     app = _FakeApp(_FakeGalil(dev_do, readback))
     asyncio.run(galil_dyn_endpoints(app))
@@ -224,7 +224,7 @@ NI_PARAMS = {
 
 
 def test_nidaqmx_groups_flatten_into_one_namespace():
-    from helao.deploy.hte.servers.action.nidaqmx_server import build_do_port_map
+    from helao.deploy.hte.servers.nidaqmx.nidaqmx_server import build_do_port_map
 
     do_ports, do_owners = build_do_port_map(NI_PARAMS)
 
@@ -242,7 +242,7 @@ def test_nidaqmx_flags_a_name_two_groups_claim():
     # No config in this repo does this, but nothing forbids it either, and
     # picking either group would drive the wrong physical line — so the map
     # records both owners and the endpoint refuses the name.
-    from helao.deploy.hte.servers.action.nidaqmx_server import build_do_port_map
+    from helao.deploy.hte.servers.nidaqmx.nidaqmx_server import build_do_port_map
 
     _, do_owners = build_do_port_map(
         {
@@ -258,7 +258,7 @@ def test_nidaqmx_flags_a_name_two_groups_claim():
 def test_nidaqmx_map_is_empty_when_no_group_is_configured():
     # The endpoints are registered only when this is non-empty, so a server
     # with no digital outputs gains no private routes.
-    from helao.deploy.hte.servers.action.nidaqmx_server import build_do_port_map
+    from helao.deploy.hte.servers.nidaqmx.nidaqmx_server import build_do_port_map
 
     assert build_do_port_map({}) == ({}, {})
     assert build_do_port_map({"dev_monitor": {"T1": "ai0"}}) == ({}, {})
@@ -275,8 +275,8 @@ def test_nidaqmx_do_groups_match_the_endpoints_that_take_on_bool():
     import re
     from pathlib import Path
 
-    from helao.deploy.hte.servers.action import nidaqmx_server
-    from helao.deploy.hte.servers.action.nidaqmx_server import DO_GROUPS
+    from helao.deploy.hte.servers.nidaqmx import nidaqmx_server
+    from helao.deploy.hte.servers.nidaqmx.nidaqmx_server import DO_GROUPS
 
     src = Path(nidaqmx_server.__file__).read_text(encoding="utf-8")
     # Each toggle endpoint is registered under `if dev_<group>:` and takes a
@@ -313,7 +313,7 @@ def test_nidaqmx_driver_mirror_starts_unknown_and_records_writes():
     unwritten name must be absent (rendered unknown) rather than present as
     ``False`` — the line may be energised from a previous run.
     """
-    from helao.deploy.hte.drivers.io.nidaqmx_driver import cNIMAX
+    from helao.deploy.hte.servers.nidaqmx.nidaqmx_driver import cNIMAX
 
     driver = cNIMAX.__new__(cNIMAX)  # no connect(), no NI-DAQmx import
     driver.do_state = {}
@@ -348,7 +348,7 @@ def test_nidaqmx_driver_mirror_starts_unknown_and_records_writes():
     ],
 )
 def test_do_readback_to_bool(raw, expected):
-    from helao.deploy.hte.servers.action.nidaqmx_server import _do_readback_to_bool
+    from helao.deploy.hte.servers.nidaqmx.nidaqmx_server import _do_readback_to_bool
 
     assert _do_readback_to_bool(raw) is expected
 
@@ -360,7 +360,7 @@ def test_a_line_readback_cannot_read_falls_back_to_the_mirror():
     last wrote is still a better answer than unknown — and where it fails *and*
     nothing has been written, unknown is the honest answer.
     """
-    from helao.deploy.hte.servers.action.nidaqmx_server import _do_readback_to_bool
+    from helao.deploy.hte.servers.nidaqmx.nidaqmx_server import _do_readback_to_bool
 
     mirror = {"written": True}
 
@@ -375,3 +375,54 @@ def test_a_line_readback_cannot_read_falls_back_to_the_mirror():
     # neither knows -> unknown, not off
     assert resolve(None, "never_written") is None
     print("test_a_line_readback_cannot_read_falls_back_to_the_mirror PASS")
+
+
+# --------------------------------------------------------------------------
+# galil_io: a raising host connect keeps the server up
+# --------------------------------------------------------------------------
+
+
+def test_a_raising_connect_keeps_galil_io_up_with_no_gated_routes(
+    monkeypatch, tmp_path, caplog
+):
+    from helao.deploy.hte.servers.galil_io.galil_io_driver import Galil
+    from helao.deploy.hte.tests.hosted_server import start_with_raising_connect
+
+    out = start_with_raising_connect(
+        monkeypatch,
+        tmp_path,
+        caplog,
+        deployment="hte",
+        module="galil_io",
+        prefix="anec",
+        server_key="IO",
+        driver_class=Galil,
+        ready=lambda app: False,  # no late routes register; wait out the window
+        wait_s=1.5,
+    )
+    assert len(out.startup_errors) == 1
+    assert out.get_status_code == 200
+    # galil_enabled is never set True, so the gated action routes do not register
+    assert not any(p.endswith("/get_digital_in") for p in out.route_paths if p)
+
+
+def test_a_raising_connect_keeps_nidaqmx_up(monkeypatch, tmp_path, caplog):
+    from helao.deploy.hte.servers.nidaqmx.nidaqmx_driver import cNIMAX
+    from helao.deploy.hte.tests.hosted_server import start_with_raising_connect
+
+    out = start_with_raising_connect(
+        monkeypatch,
+        tmp_path,
+        caplog,
+        deployment="hte",
+        module="nidaqmx_server",
+        prefix="adss3",
+        server_key="NI",
+        driver_class=cNIMAX,
+        ready=lambda app: hasattr(app, "unified_db"),  # dyn_endpoints has run
+        probe=lambda app: hasattr(app, "unified_db"),
+    )
+    assert len(out.startup_errors) == 1
+    assert "cNIMAX" in out.startup_errors[0].getMessage()
+    assert out.get_status_code == 200
+    assert out.probe is True

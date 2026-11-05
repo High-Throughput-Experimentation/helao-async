@@ -1,0 +1,9 @@
+{
+  "exp": {},
+  "seq": {
+    "ECHEUVIS_postseq": [
+      "ECHEUVIS_seq.py",
+      "HISPEC_seq.py"
+    ]
+  }
+}

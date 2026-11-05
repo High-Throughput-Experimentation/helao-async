@@ -1,13 +1,10 @@
-"""NativeSyncer (P2c, D2): boundary-clean replacement for legacy
-``HelaoSyncer`` (helao/core/drivers/data/sync_driver.py:2059-2093).
+"""NativeSyncer (P2c, D2): the syncer the orchestrator, the SYNC server and the
+sim DB server construct, reached through ``SyncPort``.
 
-``HelaoSyncer`` takes a live HELAO ``Base`` server and reads
-``server_cfg``/``world_cfg``/``helaodirs`` off it. ``NativeSyncer`` reads the
-same three attributes off the narrow ``SyncerHost`` protocol instead, so this
-module never imports ``helao.core.servers.*`` — the whole point of the P2c
-native write runtime. It subclasses the verbatim ``SyncDriver`` re-body
-(``helao.hexagon.adapters.native.sync_driver``), which owns all pipeline
-behavior; only the config-resolution constructor is deliberately rewritten
+It reads ``server_cfg``/``world_cfg``/``helaodirs`` off the narrow
+``SyncerHost`` protocol, so this module never imports ``helao.core.servers.*``.
+It subclasses ``SyncDriver`` (``helao.hexagon.adapters.native.sync_driver``),
+which owns all pipeline behavior; only the config-resolution constructor lives
 here (D2).
 """
 
@@ -32,14 +29,12 @@ class SyncerHost(Protocol):
 
 
 class NativeSyncer(SyncDriver):
-    """Boundary-clean replacement for legacy ``HelaoSyncer`` (D2).
+    """Boundary-clean syncer: config resolution against ``SyncerHost`` (D2).
 
-    Replicates HelaoSyncer.__init__'s config resolution
-    (helao/core/drivers/data/sync_driver.py:2072-2093) against the
-    ``SyncerHost`` protocol: local ``server_cfg['params']`` first, falling
-    back to the global ``servers[sync_server_name]['params']`` block when the
-    local params carry no ``aws_config_path``. The P2e sync shim constructs
-    this class; nothing in P2c wires it live.
+    Local ``server_cfg['params']`` first, falling back to the global
+    ``servers[sync_server_name]['params']`` block when the local params carry
+    no ``aws_config_path``. Constructed at startup (its ``__init__`` needs a
+    running loop) by the orchestrator, the SYNC server and the sim DB server.
     """
 
     def __init__(self, action_serv: SyncerHost, sync_server_name: Optional[str] = None):

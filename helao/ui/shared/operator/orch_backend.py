@@ -1,7 +1,7 @@
 """Orchestrator-access backend for the Bokeh operator UI.
 
-The :class:`BokehOperator` UI talks only to an :class:`OrchBackend`.
-:class:`RemoteBackend` drives a remote orchestrator (``OrchHost``) over its
+The :class:`BokehOperator` UI talks only to a :class:`RemoteBackend`, which
+drives a remote orchestrator (``OrchHost``) over its
 HTTP/RPC endpoints and its status WebSocket.
 
 List/state methods return *normalized plain dicts* so the UI never has to
@@ -9,8 +9,6 @@ branch on object-vs-JSON. See the method docstrings for the contract.
 """
 
 import asyncio
-from abc import ABC, abstractmethod
-from collections.abc import Callable
 from typing import Optional
 
 from helao.core.error import ErrorCodes
@@ -20,127 +18,6 @@ from helao.helpers.import_autolibs import import_autolibs
 from helao.helpers.ws_utils import WsSubscriber as Wss
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-
-
-class OrchBackend(ABC):
-    """Abstract orchestrator access used by :class:`BokehOperator`."""
-
-    #: name -> callable sequence library (local in every backend)
-    sequence_lib: dict
-    #: name -> callable experiment library (local in every backend)
-    experiment_lib: dict
-    #: name -> source-file hash for the sequence/experiment libraries
-    sequence_codehash: dict
-    experiment_codehash: dict
-
-    @abstractmethod
-    def unpack_sequence(self, sequence_name: str, sequence_params: dict) -> list:
-        """Expand a library sequence into a list of planned Experiment models."""
-
-    @abstractmethod
-    def get_step_flags(self) -> dict:
-        """Return {'actions': bool, 'experiments': bool, 'sequences': bool}."""
-
-    @abstractmethod
-    async def set_step_flag(self, kind: str, value: bool) -> None:
-        """Set one step-through flag ('actions'|'experiments'|'sequences')."""
-
-    @abstractmethod
-    async def list_sequences(
-        self, limit: Optional[int] = None, offset: int = 0
-    ) -> list:
-        """One page of the sequence queue; ``limit=None`` is the whole queue."""
-
-    @abstractmethod
-    async def list_experiments(
-        self, limit: Optional[int] = None, offset: int = 0
-    ) -> list:
-        """One page of the experiment queue; ``limit=None`` is the whole queue."""
-
-    @abstractmethod
-    async def list_actions(self, limit: Optional[int] = None, offset: int = 0) -> list:
-        """One page of the action queue; ``limit=None`` is the whole queue."""
-
-    @abstractmethod
-    async def get_queue_object(self, kind: str, idx: int) -> dict: ...
-
-    @abstractmethod
-    async def get_histories(self) -> dict: ...
-
-    @abstractmethod
-    async def get_history_page(
-        self, kind: str, limit: Optional[int] = None, offset: int = 0
-    ) -> dict:
-        """One newest-first page of one history container.
-
-        Returns ``kind``, ``total``, ``offset`` and ``items``. Separate from
-        :meth:`get_histories`, which returns all three containers whole.
-        """
-
-    @abstractmethod
-    async def get_status_summary(self) -> dict: ...
-
-    @abstractmethod
-    async def get_orch_state(self) -> dict: ...
-
-    @abstractmethod
-    async def add_sequence(self, sequence) -> object: ...
-
-    @abstractmethod
-    async def add_split_sequences(self, sequence) -> object: ...
-
-    @abstractmethod
-    async def prepend_sequences(self, sequences: list) -> object: ...
-
-    @abstractmethod
-    async def move_sequence(self, from_idx: int, to_idx: int) -> None: ...
-
-    @abstractmethod
-    async def remove_sequence(self, idx: int) -> None: ...
-
-    @abstractmethod
-    async def move_experiment(self, from_idx: int, to_idx: int) -> None: ...
-
-    @abstractmethod
-    async def remove_experiment(self, idx: int) -> None: ...
-
-    @abstractmethod
-    async def move_action(self, from_idx: int, to_idx: int) -> None: ...
-
-    @abstractmethod
-    async def remove_action(self, idx: int) -> None: ...
-
-    @abstractmethod
-    async def start(self) -> None: ...
-
-    @abstractmethod
-    async def stop(self, reset_run_id: bool = False) -> None: ...
-
-    @abstractmethod
-    async def skip(self) -> None: ...
-
-    @abstractmethod
-    async def estop(self) -> None: ...
-
-    @abstractmethod
-    async def clear_estop(self) -> None: ...
-
-    @abstractmethod
-    async def clear_sequences(self) -> None: ...
-
-    @abstractmethod
-    async def clear_experiments(self) -> None: ...
-
-    @abstractmethod
-    async def clear_actions(self) -> None: ...
-
-    @abstractmethod
-    def subscribe(self, on_change: Callable[[], None]) -> None:
-        """Register a callback fired whenever orch state may have changed."""
-
-    @abstractmethod
-    def close(self) -> None:
-        """Tear down subscriptions / background tasks."""
 
 
 _SEQ_KEYS = [
@@ -167,7 +44,7 @@ def _page(limit: Optional[int], offset: int) -> dict:
     return params
 
 
-class RemoteBackend(OrchBackend):
+class RemoteBackend:
     """Backend that drives a remote orchestrator over its HTTP endpoints.
 
     Libraries are loaded locally (identical config -> identical libs as the
@@ -232,12 +109,15 @@ class RemoteBackend(OrchBackend):
         return resp
 
     def unpack_sequence(self, sequence_name, sequence_params):
+        """Expand a library sequence into a list of planned Experiment models."""
         return self.sequence_lib[sequence_name](**sequence_params)
 
     def get_step_flags(self):
+        """Return {'actions': bool, 'experiments': bool, 'sequences': bool}."""
         return dict(self._step_flags)
 
     async def set_step_flag(self, kind, value):
+        """Set one step-through flag ('actions'|'experiments'|'sequences')."""
         resp = await self._call(
             "set_step_flag", params_dict={"kind": kind, "value": value}
         )
@@ -248,18 +128,21 @@ class RemoteBackend(OrchBackend):
             self._step_flags[kind] = bool(value)
 
     async def list_sequences(self, limit: Optional[int] = None, offset: int = 0):
+        """One page of the sequence queue; ``limit=None`` is the whole queue."""
         resp = (
             await self._call("list_sequences", params_dict=_page(limit, offset)) or []
         )
         return [{k: row.get(k) for k in _SEQ_KEYS} for row in resp]
 
     async def list_experiments(self, limit: Optional[int] = None, offset: int = 0):
+        """One page of the experiment queue; ``limit=None`` is the whole queue."""
         resp = (
             await self._call("list_experiments", params_dict=_page(limit, offset)) or []
         )
         return [{k: row.get(k) for k in _EXP_KEYS} for row in resp]
 
     async def list_actions(self, limit: Optional[int] = None, offset: int = 0):
+        """One page of the action queue; ``limit=None`` is the whole queue."""
         resp = await self._call("list_actions", params_dict=_page(limit, offset)) or []
         out = []
         for row in resp:
@@ -296,6 +179,12 @@ class RemoteBackend(OrchBackend):
     async def get_history_page(
         self, kind: str, limit: Optional[int] = None, offset: int = 0
     ):
+        """One newest-first page of one history container.
+
+        Returns ``kind``, ``total``, ``offset`` and ``items``. Separate from
+        :meth:`get_histories`, which returns all three containers whole.
+
+        """
         params = _page(limit, offset)
         params["kind"] = kind
         resp = await self._call("get_history_page", params_dict=params)
@@ -383,6 +272,8 @@ class RemoteBackend(OrchBackend):
         await self._call("clear_actions")
 
     def subscribe(self, on_change):
+        """Register a callback fired whenever orch state may have changed."""
+
         async def _prime():
             resp = await self._call("get_step_flags")
             if resp:
@@ -417,6 +308,7 @@ class RemoteBackend(OrchBackend):
             on_change()
 
     def close(self):
+        """Tear down subscriptions / background tasks."""
         for t in (self._ws_task, self._poll_task, self._prime_task):
             if t is not None:
                 t.cancel()

@@ -7,7 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from sqlmodel import create_engine
+from sqlalchemy import create_engine
 
 from helao.core.drivers.data.loaders import helao_loader
 from helao.core.drivers.data.loaders.localfs import LocalLoader
@@ -113,10 +113,6 @@ def test_sql_access_is_deprecated():
     hl.engine = create_engine("sqlite://")
     with pytest.warns(DeprecationWarning, match="SQL"):
         hl.run_raw_query("select 1")
-    hl.cache_sql = False
-    hl._query = lambda _q: []
-    with pytest.warns(DeprecationWarning, match="SQL"):
-        assert hl.get_sql("action", "u") == {}
 
 
 def test_local_process_hlo_from_synced_zip_with_hlo_json_name(tmp_path):
@@ -163,17 +159,6 @@ def test_query_df_warning_points_at_the_caller(monkeypatch):
 def test_payload_copy_stays_a_payload():
     meta, data = HloPayload({"a": 1}, {}).copy()
     assert meta == {"a": 1}
-
-
-def test_meta_dict_warns_once_at_the_caller(monkeypatch):
-    hl = object.__new__(helao_loader.HelaoLoader)
-    hl.cache_sql, hl._query = False, lambda _q: []
-    monkeypatch.setattr(helao_loader, "LOADER", hl)
-    act = object.__new__(helao_loader.HelaoAction)
-    act.helao_type, act.uuid = "action", "u"
-    with pytest.warns(DeprecationWarning) as rec:
-        assert act._meta_dict == {}
-    assert len(rec) == 1 and rec[0].filename == __file__
 
 
 def test_local_lookup_by_uuid(tmp_path):
@@ -232,8 +217,7 @@ def test_remote_reads_use_the_credential_bucket():
     )
     hl.get_hlo("u", "d.hlo")
     hl.get_json("action", "u")
-    hl.read_artifact_bytes(SimpleNamespace(locator="k"))
-    assert buckets == ["other.bucket"] * 3
+    assert buckets == ["other.bucket"] * 2
 
 
 def test_empty_credential_bucket_falls_back_to_helao_data_and_warns_once(caplog):

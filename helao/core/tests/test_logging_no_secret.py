@@ -20,7 +20,7 @@ def test_disabled_alert_log_line_omits_the_password(tmp_path):
         h.flush()
     text = "".join(
         open(p, encoding="utf-8").read()
-        for p in glob.glob(f"{tmp_path}/**/*.log*", recursive=True)
+        for p in glob.glob(f"{tmp_path}/**/*.jsonl*", recursive=True)
     )
     assert "alerts not enabled" in text, "branch under test did not run"
     assert SENTINEL not in text

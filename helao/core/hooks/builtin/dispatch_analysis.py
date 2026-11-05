@@ -1,11 +1,9 @@
-"""Built-in post-finish hook: today's ``auto_analyze_sequences`` dispatch.
+"""Built-in post-finish hook: dispatch an analysis action for a finished record.
 
 Non-blocking (spec §6.1). ``args`` = the per-record analysis block:
-``server_key`` and ``endpoint`` are required; ``params`` (or the alias
-``analysis_params``) are forwarded; ``host``/``port`` are used as the target
-server entry when both are present (that is what an ``auto_analyze_sequences``
-block carries, and it keeps the dispatch payload identical to today), else the
-entry comes from the syncer's world config (settled decision A4). The payload
+``server_key`` and ``endpoint`` are required; ``params`` is forwarded;
+``host``/``port`` are used as the target server entry when both are present,
+else the entry comes from the syncer's world config (settled decision A4). The payload
 names a directory -- ``sequence_path`` or ``experiment_path`` by level (D9).
 """
 
@@ -43,7 +41,7 @@ class Hook(FinishHook):
                     f"{server_key!r} in the world config"
                 )
             target_cfg = servers[server_key]
-        params = args.get("params", args.get("analysis_params", {}))
+        params = args.get("params", {})
         LOGGER.info(f"dispatching auto-analysis {args['endpoint']} for {name}")
         await dispatcher.async_action_dispatcher(
             world_config_dict={"servers": {server_key: target_cfg}},

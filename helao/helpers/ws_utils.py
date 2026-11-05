@@ -1,6 +1,7 @@
 """WebSocket publisher/subscriber helpers used by HELAO server fan-out.
 
-Messages are pickled and zstd-compressed on the wire. :class:`WsPublisher`
+Messages travel as a zstd-compressed msgspec msgpack ``[tag, payload]`` envelope
+(a pydantic model carries its ``module:Class`` tag; see :func:`wire_dumps`). :class:`WsPublisher`
 fans an in-process queue out to many WebSocket clients, :class:`WsSubscriber`
 asynchronously buffers received messages, and :class:`WsSyncClient` is a
 blocking one-shot reader.
@@ -11,19 +12,18 @@ __all__ = [
     "WsSubscriber",
     "WsSyncClient",
     "wire_loads",
+    "wire_dumps",
     "WireDecodeError",
 ]
 
 import asyncio
 import collections
-import enum
-import io
-import os
+import importlib
 import pathlib
-import pickle
-import sys
 import time
+from typing import Any
 
+import msgspec
 import numpy
 import pyzstd
 import websockets
@@ -35,78 +35,22 @@ from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
-MAX_DECOMPRESSED_BYTES = 16 * 1024 * 1024
+MAX_DECOMPRESSED_BYTES = 4 * 1024 * 1024
 """Cap on a decompressed frame. Measured: recorded producer frames are <= 1.6 KB
-and a 100k-point float64 spectrum is ~0.8 MB, so 16 MiB is >10x the largest real
-payload. Opcode amplification (memo refs) costs ~11x the cap in RAM, hence not
-larger. Larger frames are rejected."""
+and a 100k-point float64 spectrum is ~0.8 MB, so 4 MiB is ~5x the largest real
+payload. Not larger: msgpack decoding of a hostile frame of empty containers
+allocates ~70x its size (16 MiB peaked at 1.2 GB), so the cap bounds that
+memory to ~300 MB. Larger frames are rejected."""
 
 MAX_RATIO = 1000
 """Frames over 1 MiB decompressed must compress by less than this ratio (real
-pickled floats compress ~2-10x); a higher ratio is a bomb."""
+float payloads compress ~2-10x); a higher ratio is a bomb."""
 
+_FRAME_CACHE_MAX = 8
+"""Encoded frames a publisher keeps for clients a few messages behind. Small,
+because the cache holds each message and its frame: 8 large spectra is ~32 MB."""
 _WIRE_LOG_INTERVAL_S = 30.0
 _wire_last_log = 0.0
-
-# Real C types / builtin functions: a BUILD opcode cannot setattr on them.
-# set/frozenset/bytearray/range are deliberately absent: protocol 5 producers
-# emit opcodes for them, and as callables they amplify a tiny frame into GBs.
-_SAFE_GLOBALS = (
-    {("builtins", n) for n in ("complex", "slice")}
-    | {("datetime", n) for n in ("datetime", "date", "time", "timedelta", "timezone")}
-    | {("uuid", "UUID"), ("collections", "OrderedDict"), ("numpy", "dtype")}
-    | {(f"numpy.{c}.multiarray", "scalar") for c in ("core", "_core")}
-)
-
-
-# Pure Python classes/functions below are handed out as factories, never as the
-# object itself: a BUILD opcode on a returned class would setattr on it and
-# poison it process-wide. A factory is reached by REDUCE only.
-def _posix(*a):
-    return pathlib.PosixPath(*a) if os.name != "nt" else pathlib.PurePosixPath(*a)
-
-
-def _windows(*a):  # a peer on the other OS: decode as the pure equivalent
-    return pathlib.PureWindowsPath(*a)
-
-
-def _pure_posix(*a):
-    return pathlib.PurePosixPath(*a)
-
-
-def _pure_windows(*a):
-    return pathlib.PureWindowsPath(*a)
-
-
-_NP_CORE = getattr(numpy, "_core", None) or numpy.core  # numpy 2.x / 1.x
-
-
-class _NdarrayToken:
-    """Stands in for ``numpy.ndarray``; only :func:`_np_reconstruct` accepts it."""
-
-
-def _np_reconstruct(cls, shape, dtype):
-    # numpy only ever emits shape (0,) here (data arrives via BUILD), so a hostile
-    # shape cannot allocate.
-    if cls is not _NdarrayToken or tuple(shape) != (0,):
-        raise pickle.UnpicklingError("numpy _reconstruct restricted to shape (0,)")
-    return _NP_CORE.multiarray._reconstruct(numpy.ndarray, (0,), dtype)
-
-
-def _np_frombuffer(*a):
-    return _NP_CORE.numeric._frombuffer(*a)  # type: ignore[attr-defined]
-
-
-_FACTORIES = {
-    ("pathlib", "PosixPath"): _posix,
-    ("pathlib", "WindowsPath"): _windows,
-    ("pathlib", "PurePosixPath"): _pure_posix,
-    ("pathlib", "PureWindowsPath"): _pure_windows,
-    ("numpy", "ndarray"): _NdarrayToken,
-}
-for _c in ("core", "_core"):  # numpy 1.x / 2.x module paths
-    _FACTORIES[(f"numpy.{_c}.multiarray", "_reconstruct")] = _np_reconstruct
-    _FACTORIES[(f"numpy.{_c}.numeric", "_frombuffer")] = _np_frombuffer
 
 
 def _core_ok(module: str) -> bool:
@@ -117,84 +61,58 @@ def _core_ok(module: str) -> bool:
     )
 
 
-def _enum_value(v):
-    """Stand-in for an enum from a module this process has not loaded."""
-    if type(v) not in (str, int, float):
-        raise pickle.UnpicklingError("enum value must be str/int/float")
-    return v
-
-
 class WireDecodeError(Exception):
     """A frame was rejected (disallowed class, bad data or oversize)."""
 
 
-class _WireUnpickler(pickle.Unpickler):
-    """Unpickler that resolves only the classes real HELAO frames reference.
+def _enc_hook(obj):
+    """Types msgspec has no native encoding for (UUID, Enum, datetime are native)."""
+    if isinstance(obj, numpy.ndarray):
+        return obj.tolist()
+    if isinstance(obj, numpy.generic):
+        return obj.item()
+    if isinstance(obj, pathlib.PurePath):
+        return str(obj)
+    raise NotImplementedError(f"cannot encode {type(obj).__name__} on the wire")
 
-    Never imports a module because a frame names it, except the core model
-    modules. Enum members are guarded against BUILD poisoning.
+
+_ENCODER = msgspec.msgpack.Encoder(enc_hook=_enc_hook)
+
+
+def wire_dumps(obj) -> bytes:
+    """Encode one message as a zstd-compressed msgpack ``[tag, payload]`` frame.
+
+    A pydantic model travels as ``("module:Class", model_dump())`` so the
+    decoder can rebuild the same type; anything else travels with tag ``None``.
     """
-
-    def __init__(self, file):
-        super().__init__(file)
-        self._members: list = []  # (member, __dict__ snapshot)
-        self._enum_factories: dict = {}
-
-    def _enum_factory(self, cls):
-        if cls not in self._enum_factories:
-
-            def make(v):
-                m = cls(v)
-                self._members.append((m, dict(m.__dict__)))
-                return m
-
-            self._enum_factories[cls] = make
-        return self._enum_factories[cls]
-
-    def restore_members(self) -> bool:
-        """Undo any BUILD that wrote into an enum member; True if one did.
-
-        Compared by identity (``is``) so an ndarray value cannot raise or
-        compare equal to the original.
-        """
-        bad = False
-        for m, snap in self._members:
-            cur = m.__dict__
-            if cur.keys() != snap.keys() or any(cur[k] is not snap[k] for k in snap):
-                cur.clear()
-                cur.update(snap)
-                bad = True
-        return bad
-
-    def find_class(self, module, name):
-        key = (module, name)
-        if key in _FACTORIES:
-            return _FACTORIES[key]
-        if key in _SAFE_GLOBALS:
-            return super().find_class(module, name)
-        # Dotted names are rejected (protocol 4 walks attributes, which would
-        # reach e.g. ``os`` through a module global).
-        if "." in name or not module.startswith("helao."):
-            raise pickle.UnpicklingError(f"wire class not allowed: {module}.{name}")
-        if _core_ok(module):
-            obj = super().find_class(module, name)
-        elif module in sys.modules:  # never import on a peer's say-so
-            obj = vars(sys.modules[module]).get(name)  # no module __getattr__
-        else:
-            return _enum_value  # unloaded module: decode to the raw value
-        if isinstance(obj, type) and obj.__module__ == module:
-            if issubclass(obj, enum.Enum):
-                return self._enum_factory(obj)
-            if issubclass(obj, BaseModel) and _core_ok(module):
-                return obj
-        raise pickle.UnpicklingError(f"wire class not allowed: {module}.{name}")
+    if isinstance(obj, BaseModel):
+        cls = type(obj)
+        envelope = [f"{cls.__module__}:{cls.__qualname__}", obj.model_dump()]
+    else:
+        envelope = [None, obj]
+    return pyzstd.compress(_ENCODER.encode(envelope))
 
 
-def wire_loads(recv_bytes: bytes | str):
-    """Decode one zstd+pickle frame with the restricted unpickler.
+def _resolve_model(tag: str):
+    """Resolve a ``module:Class`` tag to an allowed pydantic model class."""
+    module, sep, name = tag.partition(":")
+    if not sep or not name.isidentifier() or not _core_ok(module):
+        raise WireDecodeError(f"wire class not allowed: {tag!r}")
+    obj = vars(importlib.import_module(module)).get(name)  # no module __getattr__
+    if not (
+        isinstance(obj, type)
+        and issubclass(obj, BaseModel)
+        and obj.__module__ == module
+    ):
+        raise WireDecodeError(f"wire class not allowed: {tag!r}")
+    return obj
+
+
+def wire_loads(recv_bytes: bytes | str) -> Any:
+    """Decode one zstd+msgpack frame produced by :func:`wire_dumps`.
 
     Raises:
-        WireDecodeError: frame oversize, corrupt, or referencing a class
+        WireDecodeError: frame oversize, corrupt, malformed, or naming a class
             outside the allowlist.
     """
     try:
@@ -208,14 +126,15 @@ def wire_loads(recv_bytes: bytes | str):
             raise WireDecodeError(
                 f"frame too large or over-compressed ({len(raw)} decompressed bytes)"
             )
-        up = _WireUnpickler(io.BytesIO(raw))
-        try:
-            out = up.load()
-        finally:  # runs on a failed load too: a poisoned member is always undone
-            poisoned = up.restore_members()
-        if poisoned:
-            raise WireDecodeError("frame modified an enum member")
-        return out
+        env = msgspec.msgpack.decode(raw)
+        if not (isinstance(env, list) and len(env) == 2):
+            raise WireDecodeError("malformed envelope")
+        tag, payload = env
+        if tag is None:
+            return payload
+        if not isinstance(tag, str):
+            raise WireDecodeError("malformed envelope tag")
+        return _resolve_model(tag).model_validate(payload)
     except WireDecodeError:
         raise
     except Exception as exc:
@@ -234,8 +153,12 @@ def _log_rejected(url, exc):
 class WsPublisher:
     """Broadcast messages from a multi-subscriber queue to WebSocket clients.
 
-    Each message is run through ``xform_func``, pickled, and zstd-compressed
-    before being written to a connected WebSocket.
+    Each message is run through ``xform_func``, encoded with :func:`wire_dumps`
+    and written to a connected WebSocket. The frame is encoded once per message
+    (identity-keyed cache) and shared by every client's broadcast loop.
+
+    Producers must put a new object for each publish: re-putting the same
+    object after mutating it would send the frame encoded the first time.
 
     Attributes:
         active_connections: WebSocket connections that have completed handshake.
@@ -250,6 +173,28 @@ class WsPublisher:
         self.active_connections = []
         self.source_queue = source_queue
         self.xform_func = xform_func
+        self._frames: collections.OrderedDict = collections.OrderedDict()
+
+    def _frame(self, msg) -> bytes | None:
+        """Return the wire frame for ``msg``, encoding it once per message object.
+
+        Holding ``msg`` in the cache keeps its ``id`` from being reused, so an
+        identity hit is exact. A client lagging past the bound just re-encodes.
+        A message that cannot be encoded yields ``None`` and is skipped: one bad
+        value from a driver must not end every client's stream.
+        """
+        hit = self._frames.get(id(msg))
+        if hit is not None and hit[0] is msg:
+            return hit[1]
+        try:
+            frame = wire_dumps(self.xform_func(msg))
+        except Exception as exc:
+            _log_rejected("this publisher (encode)", exc)
+            frame = None
+        self._frames[id(msg)] = (msg, frame)
+        if len(self._frames) > _FRAME_CACHE_MAX:
+            self._frames.popitem(last=False)
+        return frame
 
     async def connect(self, websocket: WebSocket):
         """Accept a new WebSocket handshake and track the connection."""
@@ -283,9 +228,9 @@ class WsPublisher:
         """
         try:
             async for source_msg in self.source_queue.subscribe():
-                await websocket.send_bytes(
-                    pyzstd.compress(pickle.dumps(self.xform_func(source_msg)))
-                )
+                frame = self._frame(source_msg)
+                if frame is not None:
+                    await websocket.send_bytes(frame)
         except websockets.ConnectionClosedError:
             LOGGER.info("client closed the connection without a close frame")
         except asyncio.CancelledError:

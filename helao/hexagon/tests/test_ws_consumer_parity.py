@@ -1,23 +1,20 @@
 """P7b task 2: wire-consumer parity tests over the `harness/ws_frames`
 substrate.
 
-Extends `test_ws_publish_bridge.py` past its WsSubscriber-only, base_api-only
-coverage (§10.1(3)'s named insufficiency) with:
+Wire-consumer coverage for both producer families:
 
-1. The hexagon's `WsPublishBridge` produces byte-identical frames to the
-   legacy `WsPublisher` for identical inputs.
-2. The orchestrator's `orch_ws_publishers` encoding (no wire test at all
+1. The orchestrator's `orch_ws_publishers` encoding (no wire test at all
    before this slice) is pinned: it carries dicts, never the typed model
    `ActionHost` sends.
-3. The Reflex ingest normalizers are proven correct per-channel AND proven to
+2. The Reflex ingest normalizers are proven correct per-channel AND proven to
    yield nothing when handed the *other* channel's frame -- the emptiness is
    asserted explicitly, not inferred from a right-pair pass (the plan's named
    vacuity trap: "returns empty" must never read as a pass on its own).
-4. `/ws_globstat` has no route registration on either host, and the sender is
+3. `/ws_globstat` has no route registration on either host, and the sender is
    deleted (Corrections §C1b) -- extracted statically via `harness.endpoints`, the same tool the
    repo already uses for its endpoint-parity checklist, so this isn't a
    hand-rolled route scan either.
-5. The operator's `RemoteBackend._ws_loop` is shape-blind: it fires the same
+4. The operator's `RemoteBackend._ws_loop` is shape-blind: it fires the same
    `on_change` callback for both producer families' ws_status frames,
    documented so nobody cites it as evidence of ws_status parity.
 """
@@ -31,93 +28,9 @@ import pytest
 from harness import ws_frames as wf
 from harness.endpoints import extract_routes
 from helao.ui.reflex.ingest import normalize, normalize_data_package
-from helao.helpers.multisubscriber_queue import MultisubscriberQueue
-from helao.helpers.ws_utils import WsPublisher
-from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
 
 ACTION_HOST_PATH = Path("helao/hexagon/app/action_host.py")
 ORCH_HOST_PATH = Path("helao/hexagon/app/orch_host.py")
-
-
-@pytest.mark.asyncio
-async def test_ws_publish_bridge_frames_byte_identical_to_legacy():
-    """For identical inputs, WsPublishBridge's frame == the legacy
-    WsPublisher's frame, byte-compared -- extends test_ws_publish_bridge.py
-    past its type-restoration-only assertions."""
-    status_q = MultisubscriberQueue()
-    legacy_pub = WsPublisher(status_q)
-    bridge_q = MultisubscriberQueue()
-    bridge = WsPublishBridge(bridge_q, bridge_q, bridge_q)
-
-    legacy_ws = wf.FakeWebSocket()
-    bridge_ws = wf.FakeWebSocket()
-    # FakeWebSocket deliberately duck-types the two methods WsPublisher.broadcast
-    # calls (accept/send_bytes) instead of being a real starlette WebSocket, so
-    # the real encode step runs without a live socket per frame (see ws_frames.py).
-    legacy_task = asyncio.ensure_future(
-        legacy_pub.broadcast(legacy_ws)  # type: ignore[arg-type]
-    )
-    bridge_pub = WsPublisher(bridge_q)
-    bridge_task = asyncio.ensure_future(
-        bridge_pub.broadcast(bridge_ws)  # type: ignore[arg-type]
-    )
-
-    for q in (status_q, bridge_q):
-        for _ in range(200):
-            if q.subscribers:
-                break
-            await asyncio.sleep(0.01)
-        assert q.subscribers
-
-    status_dict = wf.build_status_payload().as_dict()
-    # Both sides must reconstruct via ActionModel.model_validate(dict) --
-    # WsPublishBridge always does (that is its whole job); the legacy path
-    # normally pickles a *live* Base-owned object instead, whose
-    # __pydantic_fields_set__ differs from one rebuilt from a full dict (all
-    # keys "set" vs. only the two kwargs originally passed), which pickles
-    # to different bytes despite equal field *values*. Reconstructing both
-    # from the identical dict is the honest "for identical inputs" control.
-    from helao.core.models.action import ActionModel
-
-    await status_q.put(ActionModel.model_validate(status_dict))  # legacy path
-    await bridge.publish_status(status_dict)  # bridge: model_validate then put
-
-    for ws in (legacy_ws, bridge_ws):
-        for _ in range(200):
-            if ws.frames:
-                break
-            await asyncio.sleep(0.01)
-        assert ws.frames, "no frame produced"
-
-    await status_q.close()
-    await bridge_q.close()
-    await asyncio.wait_for(legacy_task, timeout=5)
-    await asyncio.wait_for(bridge_task, timeout=5)
-
-    assert legacy_ws.frames[0] == bridge_ws.frames[0], (
-        "hexagon WsPublishBridge frame diverged from the legacy WsPublisher "
-        "frame for an identical ActionModel payload"
-    )
-    # Mutation probe: a *different* payload must NOT collide -- proves the
-    # byte-comparison above can actually fail, not just always pass.
-    other = wf.build_status_payload(action_name="different_action").as_dict()
-    other_ws = wf.FakeWebSocket()
-    # Same intentional duck-typed double as above.
-    other_task = asyncio.ensure_future(
-        bridge_pub.broadcast(other_ws)  # type: ignore[arg-type]
-    )
-    for _ in range(200):
-        if bridge_q.subscribers:
-            break
-        await asyncio.sleep(0.01)
-    await bridge.publish_status(other)
-    for _ in range(200):
-        if other_ws.frames:
-            break
-        await asyncio.sleep(0.01)
-    await bridge_q.close()
-    await asyncio.wait_for(other_task, timeout=5)
-    assert other_ws.frames[0] != legacy_ws.frames[0]
 
 
 @pytest.mark.asyncio

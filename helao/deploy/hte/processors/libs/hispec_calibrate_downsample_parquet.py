@@ -10,45 +10,16 @@ the spectral time axis. Used by
 
 import json
 import os
-from pathlib import Path
-from typing import Union
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import ruamel.yaml
 from scipy.interpolate import UnivariateSpline
 from scipy.optimize import curve_fit
 from scipy.signal import sawtooth
 
 from helao.core.models.run_dir import RunDir
 from helao.helpers.hlo_data import read_hlo
-
-
-def yml_load(input: Union[str, Path]):
-    """Parse a YAML document from a file path, a :class:`Path`, or a string.
-
-    Args:
-        input: Either a path-like pointing at an existing YAML file or
-            the raw YAML text itself.
-
-    Returns:
-        The parsed YAML document as ruamel.yaml round-trip objects.
-
-    Raises:
-        ruamel.yaml.YAMLError: If the YAML content cannot be parsed.
-    """
-    yaml = ruamel.yaml.YAML(typ="rt")
-    yaml.version = (1, 2)
-    if isinstance(input, Path):
-        with input.open("r", encoding="utf-8") as f:
-            obj = yaml.load(f)
-    elif os.path.exists(input):
-        with open(input, "r", encoding="utf-8") as f:
-            obj = yaml.load(f)
-    else:
-        obj = yaml.load(input)
-    return obj
 
 
 def read_CV_hlo(

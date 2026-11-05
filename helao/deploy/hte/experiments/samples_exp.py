@@ -8,7 +8,6 @@ EXPERIMENTS = [
     "generate_sample_no_list",
     "load_liquid_sample",
     "orch_sub_wait",
-    "sort_plate_sample_no_list",
 ]
 
 
@@ -236,24 +235,6 @@ def create_assembly_sample(
             ],
         },
     )
-
-    return apm.planned_actions  # returns complete action list to orch
-
-
-@experiment(version=1)
-def sort_plate_sample_no_list(
-    plate_sample_no_list: list = [2],
-) -> list:
-    """Placeholder that returns an empty plan; reserved for plate-sample sorting.
-
-    Args:
-        plate_sample_no_list: Plate sample numbers (currently unused).
-
-    Returns:
-        Empty list of planned actions.
-    """
-
-    apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     return apm.planned_actions  # returns complete action list to orch
 

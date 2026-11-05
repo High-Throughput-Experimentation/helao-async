@@ -6,7 +6,7 @@ from helao.helpers.lib_decorators import sequence
 from helao.helpers.premodels import ExperimentPlanMaker
 
 
-@sequence(version=5)
+@sequence(version=6)
 def UVIS_T(
     plate_id: int = 1,
     plate_sample_no_list: list = [2],
@@ -61,87 +61,8 @@ def UVIS_T(
         list: Ordered list of planned ``Experiment`` objects.
     """
     epm = ExperimentPlanMaker()
-    epm.add("UVIS_sub_unloadall_customs", {})
-    if use_z_motor:
-        epm.add(
-            "ECHEUVIS_sub_disengage",
-            {"clear_we": True, "clear_ce": True, "z_height": cell_disengaged_z},
-        )
-    epm.add(
-        "UVIS_sub_setup_ref",
-        {
-            "reference_mode": reference_mode,
-            "solid_custom_position": custom_position,
-            "solid_plate_id": plate_id,
-            "solid_sample_no": plate_sample_no_list[0],
-            "specref_code": specref_code,
-        },
-    )
-    if use_z_motor:
-        epm.add(
-            "ECHEUVIS_sub_engage",
-            {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z},
-        )
-    # dark ref
-    epm.add(
-        "UVIS_sub_measure",
-        {
-            "spec_type": "T",
-            "spec_int_time_ms": spec_int_time_ms,
-            "spec_n_avg": spec_n_avg,
-            "duration_sec": duration_sec,
-            "toggle_source": led_names[0],
-            "toggle_is_shutter": toggle_is_shutter,
-            "illumination_wavelength": led_wavelengths_nm[0],
-            "illumination_intensity": led_intensities_mw[0],
-            "illumination_intensity_date": led_date,
-            "illumination_side": led_type,
-            "technique_name": "T_UVVIS",
-            "run_use": "ref_dark",
-            "reference_mode": reference_mode,
-        },
-    )
-    # light ref
-    epm.add(
-        "UVIS_sub_measure",
-        {
-            "spec_type": "T",
-            "spec_int_time_ms": spec_int_time_ms,
-            "spec_n_avg": spec_n_avg,
-            "duration_sec": duration_sec,
-            "toggle_source": led_names[0],
-            "toggle_is_shutter": toggle_is_shutter,
-            "illumination_wavelength": led_wavelengths_nm[0],
-            "illumination_intensity": led_intensities_mw[0],
-            "illumination_intensity_date": led_date,
-            "illumination_side": led_type,
-            "technique_name": "T_UVVIS",
-            "run_use": "ref_light",
-            "reference_mode": reference_mode,
-        },
-    )
 
-    if use_z_motor:
-        epm.add(
-            "ECHEUVIS_sub_disengage",
-            {"clear_we": False, "clear_ce": False, "z_height": cell_disengaged_z},
-        )
-    for plate_sample in plate_sample_no_list:
-        epm.add("UVIS_sub_unloadall_customs", {})
-        epm.add(
-            "UVIS_sub_startup",  # move to solid sample, assign to cell position
-            {
-                "solid_custom_position": custom_position,
-                "solid_plate_id": plate_id,
-                "solid_sample_no": plate_sample,
-            },
-        )
-        if use_z_motor:
-            epm.add(
-                "ECHEUVIS_sub_engage",
-                {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z},
-            )
-        # perform transmission spec
+    def measure(run_use):
         epm.add(
             "UVIS_sub_measure",
             {
@@ -156,79 +77,60 @@ def UVIS_T(
                 "illumination_intensity_date": led_date,
                 "illumination_side": led_type,
                 "technique_name": "T_UVVIS",
-                "run_use": "data",
+                "run_use": run_use,
                 "reference_mode": reference_mode,
             },
         )
-        if use_z_motor:
+
+    def z(engage, clear=False):
+        if not use_z_motor:
+            return
+        if engage:
+            epm.add(
+                "ECHEUVIS_sub_engage",
+                {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z},
+            )
+        else:
             epm.add(
                 "ECHEUVIS_sub_disengage",
-                {"clear_we": False, "clear_ce": False, "z_height": cell_disengaged_z},
+                {"clear_we": clear, "clear_ce": clear, "z_height": cell_disengaged_z},
             )
 
-    epm.add("UVIS_sub_unloadall_customs", {})
-    epm.add(
-        "UVIS_sub_setup_ref",
-        {
-            "reference_mode": reference_mode,
-            "solid_custom_position": custom_position,
-            "solid_plate_id": plate_id,
-            "solid_sample_no": plate_sample_no_list[-1],
-            "specref_code": specref_code,
-        },
-    )
-    if use_z_motor:
+    def refs(sample_no, first):
+        epm.add("UVIS_sub_unloadall_customs", {})
+        if first:
+            z(False, clear=True)
         epm.add(
-            "ECHEUVIS_sub_engage",
-            {"flow_we": False, "flow_ce": False, "z_height": cell_engaged_z},
+            "UVIS_sub_setup_ref",
+            {
+                "reference_mode": reference_mode,
+                "solid_custom_position": custom_position,
+                "solid_plate_id": plate_id,
+                "solid_sample_no": sample_no,
+                "specref_code": specref_code,
+            },
         )
-    # dark ref
-    epm.add(
-        "UVIS_sub_measure",
-        {
-            "spec_type": "T",
-            "spec_int_time_ms": spec_int_time_ms,
-            "spec_n_avg": spec_n_avg,
-            "duration_sec": duration_sec,
-            "toggle_source": led_names[0],
-            "toggle_is_shutter": toggle_is_shutter,
-            "illumination_wavelength": led_wavelengths_nm[0],
-            "illumination_intensity": led_intensities_mw[0],
-            "illumination_intensity_date": led_date,
-            "illumination_side": led_type,
-            "technique_name": "T_UVVIS",
-            "run_use": "ref_dark",
-            "reference_mode": reference_mode,
-        },
-    )
-    # light ref
-    epm.add(
-        "UVIS_sub_measure",
-        {
-            "spec_type": "T",
-            "spec_int_time_ms": spec_int_time_ms,
-            "spec_n_avg": spec_n_avg,
-            "duration_sec": duration_sec,
-            "toggle_source": led_names[0],
-            "toggle_is_shutter": toggle_is_shutter,
-            "illumination_wavelength": led_wavelengths_nm[0],
-            "illumination_intensity": led_intensities_mw[0],
-            "illumination_intensity_date": led_date,
-            "illumination_side": led_type,
-            "technique_name": "T_UVVIS",
-            "run_use": "ref_light",
-            "reference_mode": reference_mode,
-        },
-    )
+        z(True)
+        measure("ref_dark")
+        measure("ref_light")
+        z(False)
 
-    if use_z_motor:
+    refs(plate_sample_no_list[0], first=True)
+    for plate_sample in plate_sample_no_list:
         epm.add(
-            "ECHEUVIS_sub_disengage",
-            {"clear_we": False, "clear_ce": False, "z_height": cell_disengaged_z},
+            "UVIS_sub_startup",  # move to solid sample, assign to cell position
+            {
+                "solid_custom_position": custom_position,
+                "solid_plate_id": plate_id,
+                "solid_sample_no": plate_sample,
+            },
         )
+        z(True)
+        measure("data")
+        z(False)
+    refs(plate_sample_no_list[-1], first=False)
     epm.add("UVIS_sub_shutdown", {})
-
-    return epm.planned_experiments  # returns complete experiment list
+    return epm.planned_experiments
 
 
 @sequence(version=1)

@@ -152,7 +152,10 @@ def test_latest_rows_are_all_strings():
 def test_every_live_panel_exposes_the_contract():
     """A panel missing one of these fails at render time inside the page, not
     at import, so the check is worth making explicitly."""
-    from helao.deploy.hte.servers.reflex import co2_vis, mfc_vis, pressure_vis, temp_vis
+    from helao.deploy.hte.servers.co2sensor.reflex import co2_vis
+    from helao.deploy.hte.servers.mfc.reflex import mfc_vis
+    from helao.deploy.hte.servers.reflex import pressure_vis
+    from helao.deploy.hte.servers.reflex import temp_vis
 
     for module in (co2_vis, mfc_vis, pressure_vis, temp_vis):
         assert module.WS_PATH == "ws_live"
@@ -161,7 +164,10 @@ def test_every_live_panel_exposes_the_contract():
 
 
 def test_each_panel_declares_its_own_axis_label():
-    from helao.deploy.hte.servers.reflex import co2_vis, mfc_vis, pressure_vis, temp_vis
+    from helao.deploy.hte.servers.co2sensor.reflex import co2_vis
+    from helao.deploy.hte.servers.mfc.reflex import mfc_vis
+    from helao.deploy.hte.servers.reflex import pressure_vis
+    from helao.deploy.hte.servers.reflex import temp_vis
 
     labels = {module.Y_LABEL for module in (co2_vis, mfc_vis, pressure_vis, temp_vis)}
     assert len(labels) == 4
@@ -170,13 +176,15 @@ def test_each_panel_declares_its_own_axis_label():
 def test_the_panels_do_not_share_a_state_class():
     """A var declared on a concrete rx.State is shared by every substate under
     it; each panel needs its own mixin."""
-    from helao.deploy.hte.servers.reflex import co2_vis, temp_vis
+    from helao.deploy.hte.servers.co2sensor.reflex import co2_vis
+    from helao.deploy.hte.servers.reflex import temp_vis
 
     assert co2_vis.STATE_BASE is not temp_vis.STATE_BASE
 
 
 def test_panel_ids_are_distinct_per_panel_and_session():
-    from helao.deploy.hte.servers.reflex import co2_vis, temp_vis
+    from helao.deploy.hte.servers.co2sensor.reflex import co2_vis
+    from helao.deploy.hte.servers.reflex import temp_vis
 
     assert co2_vis.panel_id("CO2", "tok") != temp_vis.panel_id("CO2", "tok")
     assert co2_vis.panel_id("CO2", "tok-a") != co2_vis.panel_id("CO2", "tok-b")

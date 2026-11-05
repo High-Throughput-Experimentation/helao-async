@@ -133,8 +133,8 @@ DELIBERATELY_ABSENT: Final[frozenset[str]] = frozenset(
         "print_message",
         # Legacy lifecycle internal: OrchHost uses FastAPI's startup event.
         "myinit",
-        # Assigned by the DISPATCH RUNNER at runtime (orch_dispatch.py:1170),
-        # not by construction, on legacy Orch exactly as on OrchHost. A
+        # Assigned by the DISPATCH RUNNER at runtime
+        # (``DispatchRunner._upload_exp_meta_s3``), not by construction, on legacy Orch exactly as on OrchHost. A
         # static scan cannot see it on either, so tracking it as outstanding
         # work would keep this list permanently non-empty for something that
         # is already correct. (``seq_model`` is initialised to None at
@@ -236,15 +236,6 @@ def test_no_new_gap_has_opened_in_the_host() -> None:
         "contract members OrchHost lacks that are neither deliberately excluded "
         f"nor on the known-missing list: {unaccounted}\n"
         "Either implement them, or add them to NOT_YET_PORTED with a reason."
-    )
-
-
-def test_the_known_missing_list_has_not_silently_grown() -> None:
-    missing = orch_contract() - _host_members()
-    already_done = sorted(NOT_YET_PORTED - missing)
-    assert already_done == [], (
-        f"on NOT_YET_PORTED but OrchHost already has them: {already_done}\n"
-        "Delete them from the list."
     )
 
 

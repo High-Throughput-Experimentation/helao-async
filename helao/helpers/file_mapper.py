@@ -7,8 +7,8 @@ from zipfile import ZipFile
 
 from helao.core.models.run_dir import RunDir, is_legacy_path, is_run_root
 
-from .hlo_data import read_hlo_bytes
-from .yml_tools import yml_load
+from .hlo_data import read_hlo_via, resolve_data_file
+from .meta_io import read_meta
 
 
 class FileMapper:
@@ -123,23 +123,38 @@ class FileMapper:
         """
         if "PROCESSES" in p:
             return p
-        # ``.hlo`` data files are recorded in metadata under their canonical
-        # ``.hlo.json`` (S3/JSON) name, but the local/zip artifact is the raw
-        # ``.hlo``. Try the name as given, then fall back to the physical name.
-        candidates = [p]
-        if p.endswith(".hlo.json"):
-            candidates.append(p[: -len(".json")])
-        for cand in candidates:
-            for root in self.roots:
-                testp = Path(os.path.join(self.prestr, root, cand))
-                if testp.exists():
-                    return testp
-            # Only archives were ever zipped, and only they need the search.
-            if self.is_legacy:
-                zip_hit = self._locate_in_zip(cand)
-                if zip_hit is not None:
-                    return zip_hit
+        # Metadata records a data file under its S3 name ``X.hlo.json``; the
+        # local or zipped artifact is ``X.jsonl`` (current) or ``X.hlo``
+        # (legacy). resolve_data_file tries the name as given, then those.
+        hits: dict = {}
+
+        def _probe(cand: str) -> bool:
+            hits[cand] = self._locate_one(cand)
+            return hits[cand] is not None
+
+        found = resolve_data_file(_probe, p)
+        return hits[found] if found is not None else None
+
+    def _locate_one(self, p: str):
+        """:meth:`locate` for exactly one candidate name (no redirect)."""
+        for root in self.roots:
+            testp = Path(os.path.join(self.prestr, root, p))
+            if testp.exists():
+                return testp
+        # Only archives were ever zipped, and only they need the search.
+        if self.is_legacy:
+            return self._locate_in_zip(p)
         return None
+
+    def _read_one(self, p: str) -> bytes:
+        """Bytes of exactly the file named ``p``; ``FileNotFoundError`` if absent."""
+        lp = self._locate_one(p)
+        if lp is None:
+            raise FileNotFoundError(p)
+        if isinstance(lp, tuple):
+            with ZipFile(lp[0], "r") as zf:
+                return zf.read(lp[1])
+        return lp.read_bytes()
 
     def _locate_in_zip(self, p: str):
         """Locate ``p`` inside the synced sequence zip under ``RUNS_SYNCED``.
@@ -196,7 +211,8 @@ class FileMapper:
         The file is located via :meth:`locate` (run-state dirs and synced
         sequence zips) and its bytes pulled with :meth:`read_bytes`, so loose
         files and zip members are handled uniformly; the bytes are then parsed
-        by :func:`read_hlo_bytes`. :class:`ValueError` from the parser
+        by :func:`read_hlo_via` (``.jsonl`` pair, legacy ``.hlo`` or S3
+        ``.hlo.json``), reading each candidate name exactly. :class:`ValueError` from the parser
         (typically a not-yet-flushed file) triggers up to ``retries`` re-reads.
 
         Args:
@@ -212,13 +228,13 @@ class FileMapper:
         """
         for _ in range(retries + 1):
             try:
-                return read_hlo_bytes(self.read_bytes(p))
+                return read_hlo_via(None, self._read_one, p)
             except ValueError:  # retry in case file not fully written
                 continue
         return None
 
     def read_yml(self, p: str) -> dict:
-        """Resolve and parse a YAML file from the run tree.
+        """Resolve and parse a metadata file (``.json`` or legacy ``.yml``).
 
         Args:
             p: Path relative to the ``RUNS_<state>`` root.
@@ -235,11 +251,14 @@ class FileMapper:
         elif isinstance(lp, tuple):
             zip_path, member = lp
             with ZipFile(zip_path, "r") as zf:
-                content = zf.read(member).replace(b"\x89", b"%").decode("utf-8")
-            return dict(yml_load(content))
+                raw = zf.read(member)
+            if member.endswith(".yml"):
+                # Legacy zips carry a stray 0x89 byte. Never on JSON: 0x89 is a
+                # UTF-8 continuation byte there (Review Focus 3).
+                raw = raw.replace(b"\x89", b"%")
+            return dict(read_meta(raw, name=member))
         else:
-            # print(lp)
-            return dict(yml_load(Path(lp)))
+            return dict(read_meta(lp))
 
     def read_lines(self, p: str) -> list:
         """Resolve and read a text file from the run tree, split on newlines.

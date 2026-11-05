@@ -7,22 +7,19 @@ __all__ = [
     "file_in_use",
     "staging_path",
     "replace_when_free",
-    "rm_tree",
-    "rm_tree_async",
     "zip_dir",
     "unzpickle",
-    "zpickle",
 ]
 
 import _pickle as cPickle
 import asyncio
 import os
+import shutil
 import zipfile
 from pathlib import Path
 from typing import Union
 from uuid import uuid1
 
-import anyio
 import pyzstd
 
 from helao.helpers import helao_logging as logging
@@ -131,41 +128,6 @@ def file_in_use(file_path) -> bool:
         return True
 
 
-async def rm_tree_async(pth: Union[anyio.Path, str]) -> None:
-    """Recursively delete a directory and its contents using :mod:`anyio`.
-
-    Args:
-        pth: Directory to remove; strings and :class:`pathlib.Path`
-            values are coerced to :class:`anyio.Path`.
-    """
-    if isinstance(pth, str):
-        pth = anyio.Path(pth)
-    elif isinstance(pth, Path):
-        pth = anyio.Path(str(pth))
-
-    async for child in pth.glob("*"):
-        if await child.is_file():
-            await child.unlink()
-        else:
-            await rm_tree_async(child)
-    await pth.rmdir()
-
-
-def rm_tree(pth) -> None:
-    """Recursively delete a directory and its contents.
-
-    Args:
-        pth: Path-like pointing at the directory to remove.
-    """
-    pth = Path(pth)
-    for child in pth.glob("*"):
-        if child.is_file():
-            child.unlink()
-        else:
-            rm_tree(child)
-    pth.rmdir()
-
-
 def zip_dir(target_dir: Union[Path, str], filename: Union[Path, str]) -> None:
     """Zip ``target_dir`` into ``filename`` and delete the source on success.
 
@@ -192,14 +154,14 @@ def zip_dir(target_dir: Union[Path, str], filename: Union[Path, str]) -> None:
         LOGGER.error("Error while zipping folder, cannot remove.", exc_info=True)
 
     if success:
-        rm_tree(target_dir)
+        shutil.rmtree(target_dir)
 
 
 def unzpickle(fpath):
     """Load a zstandard-compressed pickle from disk.
 
     Args:
-        fpath: Path to a file written by :func:`zpickle`.
+        fpath: Path to a zstandard-compressed pickle file.
 
     Returns:
         The deserialised Python object.
@@ -207,19 +169,3 @@ def unzpickle(fpath):
     data = pyzstd.ZstdFile(fpath, "rb")
     data = cPickle.load(data)
     return data
-
-
-def zpickle(fpath, data) -> bool:
-    """Pickle ``data`` to ``fpath`` with zstandard compression.
-
-    Args:
-        fpath: Destination file path.
-        data: Object to serialise.
-
-    Returns:
-        ``True`` once the write completes.
-    """
-    with pyzstd.ZstdFile(fpath, "wb") as f:
-        cPickle.dump(data, f)
-    print(f"wrote to {os.path.abspath(fpath)}")
-    return True

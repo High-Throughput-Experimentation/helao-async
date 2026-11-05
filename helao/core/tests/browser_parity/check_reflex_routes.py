@@ -57,8 +57,6 @@ import json
 import sys
 from typing import Optional
 
-from playwright.sync_api import sync_playwright
-
 from helao.ui.shared.palette import (
     REFLEX_PAGE_TINTS,
     REFLEX_TABLE_HUES,
@@ -653,6 +651,9 @@ def run(base: str, config: str = "goldenreflex") -> tuple:
     Returns:
         tuple: ``(measurements, problems)``.
     """
+    # Lazy: importing this module for its pure helpers must not need playwright.
+    from playwright.sync_api import sync_playwright
+
     expectations = CONFIG_EXPECTATIONS[config]
     measurements = []
     with sync_playwright() as playwright:

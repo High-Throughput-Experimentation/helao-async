@@ -147,6 +147,17 @@ def photo_controls(S):
         S: A concrete page state class that mixes in :class:`PlatePhotoState`.
     """
     return rx.hstack(
+        photo_select(S),
+        photo_adjust(S),
+        spacing="3",
+        align="center",
+        flex_wrap="wrap",
+    )
+
+
+def photo_select(S):
+    """The photo dropdown alone, for a page that lays the controls out apart."""
+    return rx.hstack(
         rx.text("photo", size="1", class_name=reflex_muted_text_class()),
         rx.select(
             S.photo_options,
@@ -154,6 +165,14 @@ def photo_controls(S):
             on_change=S.set_photo_choice,
             width="26em",
         ),
+        spacing="3",
+        align="center",
+    )
+
+
+def photo_adjust(S):
+    """The opacity slider and the photo note, without the dropdown."""
+    return rx.hstack(
         rx.text("opacity", size="1", class_name=reflex_muted_text_class()),
         # Commit, not change: each value republishes the whole photo.
         rx.slider(

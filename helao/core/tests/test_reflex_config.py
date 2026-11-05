@@ -449,6 +449,48 @@ def test_the_backend_child_process_resolves_its_panels():
     ), f"panels unresolvable in the backend child:\n{proc.stdout}\n{proc.stderr}"
 
 
+def test_the_backend_child_process_panels_share_the_alerting_logger(tmp_path):
+    """Panel modules bind LOGGER at import; the backend child must install the
+    server logger, alert handlers included, before it imports them."""
+    import os
+    import subprocess
+    import sys
+
+    alert = tmp_path / "alert.yml"
+    alert.write_text(
+        "mailhost: localhost\nmailport: 1\nfromaddr: a@b\nusername: u\n"
+        "password: p\nrecipients: [a@b]\n",
+        encoding="utf-8",
+    )
+    root = os.getcwd()
+    env = dict(os.environ)
+    env["PYTHONPATH"] = root
+    env["HELAO_REFLEX_CONFIG"] = "goldenreflex"
+    env["HELAO_REFLEX_SERVER_KEY"] = "UI"
+    env["ALERT_CONFIG_PATH"] = str(alert)
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from logging.handlers import QueueHandler\n"
+            "from helao.helpers import helao_logging, run_state\n"
+            "from helao.ui.reflex import app, composition, operator\n"
+            "lg = helao_logging.LOGGER\n"
+            "assert lg.name == 'UI_backend', lg.name\n"
+            "assert any(isinstance(h, QueueHandler) for h in lg.handlers)\n"
+            "assert composition.LOGGER is lg and operator.LOGGER is lg\n"
+            "assert app.LOGGER is lg and run_state._log() is lg\n"
+            "print('SHARED')",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=root,
+        timeout=180,
+    )
+    assert "SHARED" in proc.stdout, f"{proc.stdout}\n{proc.stderr}"
+
+
 def test_only_plots_module_imports_xy():
     """Only the facade and the binding may touch the alpha xy API."""
     import pathlib

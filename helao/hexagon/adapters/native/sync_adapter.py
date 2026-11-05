@@ -1,11 +1,14 @@
-"""SyncPort adapter over the P2c native syncer (D4): thin delegation onto a
+"""SyncPort adapter over the native syncer: thin delegation onto a
 ``NativeSyncer``/``SyncDriver`` instance from
 ``helao.hexagon.adapters.native.sync_driver``. All pipeline semantics (locks,
 children gate, priority floor, process reconcile, .prg lifecycle) stay inside
-the wrapped native driver — same shape as adapters/shared/sync.py, which this
-class replaces at the P2e DB cut-over. reset_sync/list_pending are sync in
-the driver — bridged without behavior change. NOT constructed by
-build_wiring in P2c (PortWiring.sync stays Optional-None; no REQUIRED entry)."""
+the wrapped driver. ``reset_sync``, ``list_pending``, ``release_quarantine`` and
+``quarantined`` are synchronous in the driver and stay synchronous here.
+
+Not constructed by ``build_wiring``: the syncer's ``__init__`` needs a running
+loop, so ``OrchHost``, the SYNC server and the sim DB server bind it from a
+startup handler (``PortWiring.sync`` stays ``None`` until then, with no
+REQUIRED entry)."""
 
 from pathlib import Path
 from typing import Union
@@ -24,32 +27,38 @@ class NativeSyncAdapter:
     ) -> None:
         await self._syncer.enqueue_yml(upath, rank=rank, rank_limit=rank_limit)
 
-    async def sync_yml(
-        self,
-        yml_path: Path,
-        retries: int = 3,
-        rank: int = 5,
-        force_s3: bool = False,
-        force_api: bool = False,
-        compress: bool = False,
-    ) -> dict:
-        # native SyncDriver.sync_yml (verbatim legacy body) has early-exit
-        # `return False` gate paths alongside its dict returns; the SyncPort
-        # contract holds for callers that reach a real sync outcome.
-        return await self._syncer.sync_yml(  # type: ignore[reportReturnType]
-            yml_path,
-            retries=retries,
-            rank=rank,
-            force_s3=force_s3,
-            force_api=force_api,
-            compress=compress,
+    def release_quarantine(self, yml_path: Union[Path, str]) -> bool:
+        return self._syncer.release_quarantine(yml_path)
+
+    def list_pending(self, omit_manual_exps: bool = True) -> list:
+        return self._syncer.list_pending(omit_manual_exps=omit_manual_exps)
+
+    async def finish_pending(
+        self, omit_manual_exps: bool = True, actions_first: bool = False
+    ) -> list:
+        return await self._syncer.finish_pending(
+            omit_manual_exps=omit_manual_exps, actions_first=actions_first
         )
 
-    async def finish_pending(self) -> list:
-        return await self._syncer.finish_pending()
+    def reset_sync(self, sync_path: str) -> bool:
+        return self._syncer.reset_sync(sync_path)
 
-    async def reset_sync(self, sync_path: str) -> bool:
-        return bool(self._syncer.reset_sync(sync_path))
+    async def write_off(
+        self, yml_path: Union[Path, str], reason: str, operator: str
+    ) -> dict:
+        return await self._syncer.write_off(yml_path, reason, operator)
+
+    def quarantined(self) -> list:
+        return self._syncer.quarantined()
+
+    def running_tasks(self) -> dict:
+        return self._syncer.running_tasks
+
+    def n_queue(self) -> int:
+        return int(self._syncer.task_queue.qsize())
+
+    def has_pending_work(self) -> bool:
+        return self._syncer.has_pending_work()
 
     async def to_s3(
         self,
@@ -59,9 +68,3 @@ class NativeSyncAdapter:
         compress: bool = False,
     ) -> bool:
         return await self._syncer.to_s3(msg, target, retries=retries, compress=compress)
-
-    def list_pending(self, omit_manual_exps: bool = True) -> list:
-        return self._syncer.list_pending(omit_manual_exps=omit_manual_exps)
-
-    def n_queue(self) -> int:
-        return int(self._syncer.task_queue.qsize())

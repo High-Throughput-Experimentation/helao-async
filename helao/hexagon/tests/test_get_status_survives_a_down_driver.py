@@ -73,12 +73,9 @@ def _host():
         config=_Stub(),
         logging=_Stub(),
         clock=_Stub(),
-        transport=_Stub(),
         state_persistence=_Stub(),
-        status=_Stub(),
         health=_Stub(),
         artifact_store=_Stub(),
-        data_sink=_Stub(),
     )
     return ActionHost(
         server_key="SIM",

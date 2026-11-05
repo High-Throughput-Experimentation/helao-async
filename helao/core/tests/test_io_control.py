@@ -245,3 +245,42 @@ def test_the_heading_drops_the_config_prefix():
     # Not a `dev_` block at all: passed through rather than mangled.
     assert group_heading("outputs") == "outputs"
     print("test_the_heading_drops_the_config_prefix PASS")
+
+
+# --------------------------------------------------------------------------
+# panel call budget, error bodies, gclib pin
+# --------------------------------------------------------------------------
+
+
+def test_io_calls_use_the_panel_timeout_and_the_read_write_retry_counts(dispatched):
+    calls, _ = dispatched
+    asyncio.run(read_digital_outs("IO", "127.0.0.1", 8005))
+    asyncio.run(set_digital_out("IO", "127.0.0.1", 8005, do_name="d", on=False))
+
+    # 5 s, not the dispatcher's 60: these run on a UI callback.
+    assert [c["timeout"] for c in calls] == [io_control.CALL_TIMEOUT] * 2
+    assert io_control.CALL_TIMEOUT == 5
+    assert calls[0]["retries"] == io_control.READ_RETRIES
+    assert calls[1]["retries"] == io_control.WRITE_RETRIES
+    assert io_control.WRITE_RETRIES != io_control.READ_RETRIES
+    print("test_io_calls_use_the_panel_timeout_and_the_read_write_retry_counts PASS")
+
+
+def test_an_error_body_never_becomes_a_phantom_control(dispatched):
+    calls, reply = dispatched
+    # A 404 is still a JSON dict; parsing it would render a control "detail".
+    reply["value"] = ({"detail": "Not Found"}, ErrorCodes.not_available)
+
+    assert asyncio.run(read_digital_outs("IO", "127.0.0.1", 8005)) == {}
+    assert calls  # a discard, not a short-circuit
+    print("test_an_error_body_never_becomes_a_phantom_control PASS")
+
+
+def test_the_gclib_string_coercion_stays_on_the_server_side(dispatched):
+    # ``MG @OUT[port]`` returns " 0.0000", a non-empty string: plain bool() is
+    # True. The float() rule lives in galil_io.do_value_to_bool, never here.
+    _, reply = dispatched
+    reply["value"] = ({"led": " 0.0000"}, ErrorCodes.none)
+
+    assert asyncio.run(read_digital_outs("IO", "127.0.0.1", 8005)) == {"led": True}
+    print("test_the_gclib_string_coercion_stays_on_the_server_side PASS")

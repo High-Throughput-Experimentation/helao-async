@@ -10,7 +10,7 @@ bucket* lives here and nowhere else:
   grammar and its two suffix rules (:func:`analysis_suffix`,
   :func:`analysis_dir`),
 * the local write and the S3 upload of the model plus one JSON per output group
-  (:func:`write_model_yml`, :func:`publish_outputs`).
+  (:func:`write_model_json`, :func:`publish_outputs`).
 
 Two callers share it. :mod:`helao.core.drivers.data.analysis_driver` is the
 live analysis server (``AnalysisSyncer.sync_ana``); the second is
@@ -37,6 +37,7 @@ that choice explicit is what stops it being decided by luck.
 __all__ = [
     "ANALYSES_DIRNAME",
     "analysis_dir",
+    "local_output_path",
     "analysis_model_key",
     "analysis_output_models",
     "analysis_root",
@@ -47,7 +48,7 @@ __all__ = [
     "publish_outputs",
     "upload_json",
     "write_json",
-    "write_model_yml",
+    "write_model_json",
 ]
 
 import asyncio
@@ -66,7 +67,8 @@ from helao.core.models.analysis import AnalysisOutputModel
 from helao.core.models.s3locator import S3Locator
 from helao.helpers import helao_logging as logging
 from helao.helpers.time_utils import set_time
-from helao.helpers.yml_tools import yml_dumps
+from helao.helpers.artifact_hash import log_artifact_hashes
+from helao.helpers.meta_io import resolve_meta_path, write_meta
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -288,22 +290,17 @@ def write_json(obj: dict, path: str) -> None:
         json.dump(obj, f)
 
 
-def write_model_yml(local_ana_dir: str, analysis_uuid, model_dict: dict) -> str:
-    """Write ``<local_ana_dir>/<analysis_uuid>.yml``, creating the directory.
+def write_model_json(local_ana_dir: str, analysis_uuid, model_dict: dict) -> str:
+    """Write ``<local_ana_dir>/<analysis_uuid>-ana.json`` atomically; return its path.
 
     Args:
         local_ana_dir: Directory from :func:`analysis_dir`.
         analysis_uuid: UUID naming the file.
         model_dict: The cleaned ``AnalysisModel`` dict to dump.
-
-    Returns:
-        The path written.
     """
-    os.makedirs(local_ana_dir, exist_ok=True)
-    path = os.path.join(local_ana_dir, f"{analysis_uuid}.yml")
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(yml_dumps(model_dict))
-    return path
+    return str(
+        write_meta(os.path.join(local_ana_dir, f"{analysis_uuid}-ana.json"), model_dict)
+    )
 
 
 async def upload_json(
@@ -396,6 +393,13 @@ async def upload_json(
         return False
 
 
+def local_output_path(output: dict, local_ana_dir: str) -> str:
+    """Where :func:`publish_outputs` writes one output group locally."""
+    return os.path.join(
+        local_ana_dir, os.path.basename(output["analysis_output_path"]["key"])
+    )
+
+
 async def publish_outputs(
     model_dict: dict,
     values: dict,
@@ -425,33 +429,54 @@ async def publish_outputs(
         True when every upload succeeded (or none was attempted).
     """
     analysis_uuid = model_dict.get("analysis_uuid")
-    model_success = True
-    if uploader is not None:
-        LOGGER.info("uploading analysis model to S3 bucket")
-        try:
-            model_success = await uploader(
-                model_dict, analysis_model_key(analysis_uuid)
-            )
-        except Exception:
-            LOGGER.error(
-                f"Failed to upload analysis model {analysis_uuid} to S3.",
-                exc_info=True,
-            )
-            model_success = False
-    else:
-        LOGGER.info("Analysis publish is local_only, skipping S3/API push.")
-
-    output_successes = []
-    for output in model_dict.get("outputs", []):
-        keys = output["output_keys"]
-        body = {k: v for k, v in values.items() if k in keys}
-        target = output["analysis_output_path"]["key"]
-        local_json_out = os.path.join(local_ana_dir, os.path.basename(target))
-        # Array outputs serialize to megabytes of JSON; keep that off the event
-        # loop for the same reason as the analysis itself.
-        await asyncio.to_thread(write_json, body, local_json_out)
+    try:
+        model_success = True
         if uploader is not None:
-            output_successes.append(await uploader(body, target, compress=False))
+            LOGGER.info("uploading analysis model to S3 bucket")
+            try:
+                model_success = await uploader(
+                    model_dict, analysis_model_key(analysis_uuid)
+                )
+            except Exception:
+                LOGGER.error(
+                    f"Failed to upload analysis model {analysis_uuid} to S3.",
+                    exc_info=True,
+                )
+                model_success = False
         else:
-            output_successes.append(True)
-    return model_success and all(output_successes)
+            LOGGER.info("Analysis publish is local_only, skipping S3/API push.")
+
+        output_successes = []
+        for output in model_dict.get("outputs", []):
+            keys = output["output_keys"]
+            body = {k: v for k, v in values.items() if k in keys}
+            target = output["analysis_output_path"]["key"]
+            local_json_out = local_output_path(output, local_ana_dir)
+            # Array outputs serialize to megabytes of JSON; keep that off the event
+            # loop for the same reason as the analysis itself.
+            await asyncio.to_thread(write_json, body, local_json_out)
+            if uploader is not None:
+                output_successes.append(await uploader(body, target, compress=False))
+            else:
+                output_successes.append(True)
+        return model_success and all(output_successes)
+    finally:
+        # the record and outputs are final on disk once publish ends, whether
+        # or not the uploads succeeded (spec §5)
+        await log_artifact_hashes(
+            [
+                resolve_meta_path(
+                    os.path.join(local_ana_dir, f"{analysis_uuid}-ana.json")
+                )
+            ],
+            kind="ana",
+            owner_uuid=analysis_uuid,
+        )
+        await log_artifact_hashes(
+            [
+                local_output_path(o, local_ana_dir)
+                for o in model_dict.get("outputs", [])
+            ],
+            kind="output",
+            owner_uuid=analysis_uuid,
+        )

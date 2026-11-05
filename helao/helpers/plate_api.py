@@ -25,6 +25,9 @@ from helao.helpers.legacy_api import HTELegacyAPI
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
+#: Process/carrier gases dropped from a print's element list.
+_GASES = ("O", "Ar", "N", "C", "He", "Ne", "Kr", "Xe", "Rn", "")
+
 
 class PlateAPIUnavailable(RuntimeError):
     """The live plate API could not answer (as opposed to "plate not found")."""
@@ -237,11 +240,6 @@ class HTEPlateAPI:
         else:
             return infolist
 
-    def get_rcp_plateid(self, plateid: int):
-        """Forward an RCP lookup to ``HTELegacyAPI`` (currently a no-op)."""
-        LOGGER.info(f" ... get rcp for plateid: {plateid}")
-        return self.legacy_api.get_rcp_plateid(plateid)
-
     def check_plateid(self, plateid: int) -> bool:
         """Return ``True`` when an info record exists for ``plateid``."""
         infod = self.get_info(plateid)
@@ -332,9 +330,22 @@ class HTEPlateAPI:
                         **kwargs,
                     )
                 return None
+        # A legacy plate can have a live record whose print carries no sources;
+        # its elements then live only on the legacy share.
+        legacy = isinstance(plateid, int) and plateid < self.legacy_plateid_threshold
+
+        def legacy_elements():
+            # the same gas filter the live print path applies below
+            els = self.legacy_api.get_elements_plateid(
+                plateid=plateid,
+                exclude_elements_list=exclude_elements_list,
+                **kwargs,
+            )
+            return None if els is None else [e for e in els if e not in _GASES]
+
         print_id: str | None = infofiled.get("screening_print_id", None)
         if print_id is None:
-            return None
+            return legacy_elements() if legacy else None
 
         printd = self.get_print(print_id)
         if (printd is None or "sources" not in printd) and isinstance(plateid, int):
@@ -348,16 +359,17 @@ class HTEPlateAPI:
             els = [
                 d["chemical_id"].split("_")[0].capitalize() for d in printd["sources"]
             ]
-            els = [
-                el
-                for el in els
-                if el not in ("O", "Ar", "N", "C", "He", "Ne", "Kr", "Xe", "Rn", "")
-            ]
+            els = [el for el in els if el not in _GASES]
             el_syms = [mendeleev.element(el).symbol for el in els]
 
             return [el for el in el_syms if el not in exclude_elements_list]
 
         else:
+            if legacy:
+                LOGGER.info(
+                    f"plate {plateid}: no print sources; using the legacy share"
+                )
+                return legacy_elements()
             LOGGER.warning("Could not retrieve elements.")
             LOGGER.warning(f"printd: {printd}")
             LOGGER.warning(f"loader: {self.loader}")

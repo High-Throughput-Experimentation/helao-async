@@ -8,7 +8,7 @@ actually does -- shipping run trees to S3.
 ``DB`` is no longer accepted. It is still recognised for one purpose only: a
 config that still carries a ``DB`` server block and no ``SYNC`` block is
 rejected loudly by :func:`resolve_sync_server_key`. Silently ignoring it would
-disable the syncer (the orchestrator only instantiates ``HelaoSyncer`` when it
+disable the syncer (the orchestrator only instantiates ``NativeSyncer`` when it
 finds the key), and unsynced runs are far worse than a refused launch.
 """
 

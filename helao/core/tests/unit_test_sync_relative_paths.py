@@ -36,7 +36,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from helao.core.drivers.data.sync_driver import Progress  # noqa: E402
+from helao.hexagon.adapters.native.sync_driver import Progress  # noqa: E402
 from helao.helpers.yml_tools import yml_dumps  # noqa: E402
 
 ACT_YML = """access: hte

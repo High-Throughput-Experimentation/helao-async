@@ -6,7 +6,7 @@ event loop:
 * :class:`DriverStatus` and :class:`DriverResponseType` — enum
   membership and string-value round-tripping.
 * :class:`DriverResponse` — defaults, ``timestamp`` auto-stamping,
-  ``timestamp_str`` format, and explicit-field round-trip.
+  and explicit-field round-trip.
 * :class:`HelaoDriver` — instantiation through a fully concrete
   subclass, the recorded creation ``timestamp``, the ``config`` echo,
   and that the ABC refuses to instantiate when any of the five
@@ -139,10 +139,6 @@ def helao_driver_unit_test() -> bool:
             "timestamp is stamped at construction",
             lambda: isinstance(resp.timestamp, datetime),
         )
-        reporter.check(
-            "timestamp_str is a non-empty formatted string",
-            lambda: isinstance(resp.timestamp_str, str) and len(resp.timestamp_str) > 0,
-        )
 
         reporter.section("DriverResponse honours explicit fields")
         rich = DriverResponse(
@@ -170,10 +166,6 @@ def helao_driver_unit_test() -> bool:
         reporter.check(
             "HelaoDriver records a creation timestamp",
             lambda: isinstance(drv.timestamp, datetime),
-        )
-        reporter.check(
-            "HelaoDriver._created_at exposes a formatted timestamp",
-            lambda: isinstance(drv._created_at, str) and len(drv._created_at) > 0,
         )
 
         # Confirm each abstract method dispatches to its concrete impl.

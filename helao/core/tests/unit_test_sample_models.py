@@ -1,9 +1,9 @@
 """Standalone unit test for the sample pydantic models.
 
 Exercises :class:`LiquidSample`, :class:`GasSample`, :class:`SolidSample`,
-:class:`AssemblySample`, :class:`NoneSample`, and :class:`SampleList` to
+:class:`AssemblySample`, and :class:`NoneSample` to
 verify their type tags, default ``machine_name`` values, and that a
-``SampleList`` constructed from either model instances or their
+``list[SampleUnion]`` validated from either model instances or their
 ``model_dump`` dicts preserves the per-sample concrete subclass.
 
 The single public entry point is :func:`sample_model_unit_test`, invoked
@@ -17,17 +17,20 @@ import traceback
 
 import colorama
 from colorama import Fore, Style
+from pydantic import TypeAdapter
 
 from helao.core.models.sample import (
     AssemblySample,
     GasSample,
     LiquidSample,
     NoneSample,
-    SampleList,
+    SampleUnion,
     SolidSample,
 )
 
 colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
+
+_validate_samples = TypeAdapter(list[SampleUnion]).validate_python  # type: ignore
 
 
 def sample_model_unit_test() -> bool:
@@ -35,7 +38,7 @@ def sample_model_unit_test() -> bool:
 
     Each individual check prints a numbered line describing whether it
     passed or failed; failures clear the cumulative success flag instead
-    of aborting. A fatal exception while building a ``SampleList`` causes
+    of aborting. A fatal exception while building the sample list causes
     an early ``False`` return.
 
     Returns:
@@ -121,8 +124,8 @@ def sample_model_unit_test() -> bool:
 
         try:
             print(f"sample_model test {testcounter} ", end="")
-            test_sample_list = SampleList(
-                samples=[
+            test_sample_list = _validate_samples(
+                [
                     test_liquid,
                     test_gas,
                     test_solid,
@@ -143,7 +146,7 @@ def sample_model_unit_test() -> bool:
         try:
             print(f"sample_model test {testcounter} ", end="")
             testcounter += 1
-            assert test_sample_list.samples[0].sample_type == "liquid", fail_msg
+            assert test_sample_list[0].sample_type == "liquid", fail_msg
             print(passed_msg)
         except AssertionError:
             print(fail_msg, "sample_type is not liquid.")
@@ -152,7 +155,7 @@ def sample_model_unit_test() -> bool:
         try:
             print(f"sample_model test {testcounter} ", end="")
             testcounter += 1
-            assert test_sample_list.samples[1].sample_type == "gas", fail_msg
+            assert test_sample_list[1].sample_type == "gas", fail_msg
             print(passed_msg)
         except AssertionError:
             print(fail_msg, "sample_type is not gas.")
@@ -161,7 +164,7 @@ def sample_model_unit_test() -> bool:
         try:
             print(f"sample_model test {testcounter} ", end="")
             testcounter += 1
-            assert test_sample_list.samples[2].sample_type == "solid", fail_msg
+            assert test_sample_list[2].sample_type == "solid", fail_msg
             print(passed_msg)
         except AssertionError:
             print(fail_msg, "sample_type is not solid.")
@@ -170,7 +173,7 @@ def sample_model_unit_test() -> bool:
         try:
             print(f"sample_model test {testcounter} ", end="")
             testcounter += 1
-            assert test_sample_list.samples[2].machine_name == "legacy", fail_msg
+            assert test_sample_list[2].machine_name == "legacy", fail_msg
             print(passed_msg)
         except AssertionError:
             print(fail_msg, "machine_name is not legacy.")
@@ -179,7 +182,7 @@ def sample_model_unit_test() -> bool:
         try:
             print(f"sample_model test {testcounter} ", end="")
             testcounter += 1
-            assert test_sample_list.samples[3].sample_type == "assembly", fail_msg
+            assert test_sample_list[3].sample_type == "assembly", fail_msg
             print(passed_msg)
         except AssertionError:
             print(fail_msg, "sample_type is not assembly.")
@@ -188,63 +191,63 @@ def sample_model_unit_test() -> bool:
         try:
             print(f"sample_model test {testcounter} ", end="")
             testcounter += 1
-            assert type(test_sample_list.samples[0]) == type(test_liquid), fail_msg
+            assert type(test_sample_list[0]) == type(test_liquid), fail_msg
             print(passed_msg)
-            # print(type(test_sample_list.samples[0]))
+            # print(type(test_sample_list[0]))
         except AssertionError:
             print(fail_msg, "sample_type is not liquid.")
-            print(type(test_sample_list.samples[0]))
+            print(type(test_sample_list[0]))
             success = False
 
         try:
             print(f"sample_model test {testcounter} ", end="")
             testcounter += 1
-            assert type(test_sample_list.samples[1]) == type(test_gas), fail_msg
+            assert type(test_sample_list[1]) == type(test_gas), fail_msg
             print(passed_msg)
         except AssertionError:
             print(fail_msg, "sample_type is not gas.")
-            print(type(test_sample_list.samples[1]))
+            print(type(test_sample_list[1]))
             success = False
 
         try:
             print(f"sample_model test {testcounter} ", end="")
             testcounter += 1
-            assert type(test_sample_list.samples[2]) == type(test_solid), fail_msg
+            assert type(test_sample_list[2]) == type(test_solid), fail_msg
             print(passed_msg)
-            # print(type(test_sample_list.samples[2]))
+            # print(type(test_sample_list[2]))
         except AssertionError:
             print(fail_msg, "sample_type is not solid.")
-            print(type(test_sample_list.samples[2]))
+            print(type(test_sample_list[2]))
             success = False
 
         try:
             print(f"sample_model test {testcounter} ", end="")
             testcounter += 1
-            assert type(test_sample_list.samples[3]) == type(test_assembly), fail_msg
+            assert type(test_sample_list[3]) == type(test_assembly), fail_msg
             print(passed_msg)
-            # print(type(test_sample_list.samples[2]))
+            # print(type(test_sample_list[2]))
         except AssertionError:
             print(fail_msg, "sample_type is not solid.")
-            print(type(test_sample_list.samples[3]))
+            print(type(test_sample_list[3]))
             success = False
 
         try:
             print(f"sample_model test {testcounter} ", end="")
             testcounter += 1
-            assert type(test_sample_list.samples[4]) == type(test_assembly2), fail_msg
+            assert type(test_sample_list[4]) == type(test_assembly2), fail_msg
             print(passed_msg)
-            # print(type(test_sample_list.samples[2]))
+            # print(type(test_sample_list[2]))
         except AssertionError:
             print(fail_msg, "sample_type is not solid.")
-            print(type(test_sample_list.samples[4]))
+            print(type(test_sample_list[4]))
             success = False
 
         print(" --- testing sample list when converted from dict---")
         # testing sample list basemodel functions
         try:
             print(f"sample_model test {testcounter} ", end="")
-            test_sample_list = SampleList(
-                samples=[
+            test_sample_list = _validate_samples(
+                [
                     test_liquid.model_dump(),
                     test_gas.model_dump(),
                     test_solid.model_dump(),
@@ -265,7 +268,7 @@ def sample_model_unit_test() -> bool:
         try:
             print(f"sample_model test {testcounter} ", end="")
             testcounter += 1
-            assert test_sample_list.samples[0].sample_type == "liquid", fail_msg
+            assert test_sample_list[0].sample_type == "liquid", fail_msg
             print(passed_msg)
         except AssertionError:
             print(fail_msg, "sample_type is not liquid.")
@@ -274,7 +277,7 @@ def sample_model_unit_test() -> bool:
         try:
             print(f"sample_model test {testcounter} ", end="")
             testcounter += 1
-            assert test_sample_list.samples[1].sample_type == "gas", fail_msg
+            assert test_sample_list[1].sample_type == "gas", fail_msg
             print(passed_msg)
         except AssertionError:
             print(fail_msg, "sample_type is not gas.")
@@ -283,7 +286,7 @@ def sample_model_unit_test() -> bool:
         try:
             print(f"sample_model test {testcounter} ", end="")
             testcounter += 1
-            assert test_sample_list.samples[2].sample_type == "solid", fail_msg
+            assert test_sample_list[2].sample_type == "solid", fail_msg
             print(passed_msg)
         except AssertionError:
             print(fail_msg, "sample_type is not solid.")
@@ -292,7 +295,7 @@ def sample_model_unit_test() -> bool:
         try:
             print(f"sample_model test {testcounter} ", end="")
             testcounter += 1
-            assert test_sample_list.samples[2].machine_name == "legacy", fail_msg
+            assert test_sample_list[2].machine_name == "legacy", fail_msg
             print(passed_msg)
         except AssertionError:
             print(fail_msg, "machine_name is not legacy.")
@@ -301,7 +304,7 @@ def sample_model_unit_test() -> bool:
         try:
             print(f"sample_model test {testcounter} ", end="")
             testcounter += 1
-            assert test_sample_list.samples[3].sample_type == "assembly", fail_msg
+            assert test_sample_list[3].sample_type == "assembly", fail_msg
             print(passed_msg)
         except AssertionError:
             print(fail_msg, "sample_type is not assembly.")
@@ -310,54 +313,54 @@ def sample_model_unit_test() -> bool:
         try:
             print(f"sample_model test {testcounter} ", end="")
             testcounter += 1
-            assert type(test_sample_list.samples[0]) == type(test_liquid), fail_msg
+            assert type(test_sample_list[0]) == type(test_liquid), fail_msg
             print(passed_msg)
-            # print(type(test_sample_list.samples[0]))
+            # print(type(test_sample_list[0]))
         except AssertionError:
             print(fail_msg, "sample_type is not liquid.")
-            print(type(test_sample_list.samples[0]))
+            print(type(test_sample_list[0]))
             success = False
 
         try:
             print(f"sample_model test {testcounter} ", end="")
             testcounter += 1
-            assert type(test_sample_list.samples[1]) == type(test_gas), fail_msg
+            assert type(test_sample_list[1]) == type(test_gas), fail_msg
             print(passed_msg)
         except AssertionError:
             print(fail_msg, "sample_type is not gas.")
-            print(type(test_sample_list.samples[1]))
+            print(type(test_sample_list[1]))
             success = False
 
         try:
             print(f"sample_model test {testcounter} ", end="")
             testcounter += 1
-            assert type(test_sample_list.samples[2]) == type(test_solid), fail_msg
+            assert type(test_sample_list[2]) == type(test_solid), fail_msg
             print(passed_msg)
-            # print(type(test_sample_list.samples[2]))
+            # print(type(test_sample_list[2]))
         except AssertionError:
             print(fail_msg, "sample_type is not solid.")
-            print(type(test_sample_list.samples[2]))
+            print(type(test_sample_list[2]))
             success = False
 
         try:
             print(f"sample_model test {testcounter} ", end="")
             testcounter += 1
-            assert type(test_sample_list.samples[3]) == type(test_assembly), fail_msg
+            assert type(test_sample_list[3]) == type(test_assembly), fail_msg
             print(passed_msg)
-            # print(type(test_sample_list.samples[2]))
+            # print(type(test_sample_list[2]))
         except AssertionError:
             print(fail_msg, "sample_type is not solid.")
-            print(type(test_sample_list.samples[3]))
+            print(type(test_sample_list[3]))
             success = False
 
         try:
             print(f"sample_model test {testcounter} ", end="")
             testcounter += 1
-            assert type(test_sample_list.samples[4]) == type(test_assembly2), fail_msg
+            assert type(test_sample_list[4]) == type(test_assembly2), fail_msg
             print(passed_msg)
         except AssertionError:
             print(fail_msg, "sample_type is not solid.")
-            print(type(test_sample_list.samples[4]))
+            print(type(test_sample_list[4]))
             success = False
 
         return success

@@ -1,6 +1,6 @@
 """calc_uvis_abs on an R-only (DR_UVVIS) sequence takes wavelengths from "R", not "T"."""
 
-from helao.deploy.hte.drivers.data.calc_driver import Calc
+from helao.deploy.hte.servers.calc.calc_driver import Calc
 from helao.deploy.hte.tests.test_calc_uvis_trapezoid import EV_PARTS, BIN, _entry
 
 

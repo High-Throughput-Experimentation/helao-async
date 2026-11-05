@@ -149,7 +149,8 @@ def test_tables_for_survives_a_malformed_response():
 
 
 def test_both_panels_expose_the_contract():
-    from helao.deploy.hte.servers.reflex import sample_vis, spec_vis
+    from helao.deploy.hte.servers.sample.reflex import sample_vis
+    from helao.deploy.hte.servers.spec.reflex import spec_vis
 
     for module in (spec_vis, sample_vis):
         assert module.WS_PATH == "ws_data"
@@ -158,6 +159,7 @@ def test_both_panels_expose_the_contract():
 
 
 def test_they_do_not_share_a_state_class():
-    from helao.deploy.hte.servers.reflex import sample_vis, spec_vis
+    from helao.deploy.hte.servers.sample.reflex import sample_vis
+    from helao.deploy.hte.servers.spec.reflex import spec_vis
 
     assert spec_vis.STATE_BASE is not sample_vis.STATE_BASE

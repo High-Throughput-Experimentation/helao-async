@@ -237,7 +237,7 @@ def test_verify_external_confirms_the_route_in_its_registrar():
     blind spot. So the registrar's own module is extracted and the route is looked
     up there.
     """
-    ref = "helao.deploy.hte.servers.action.gamry_server2:gamry_dyn_endpoints"
+    ref = "helao.deploy.hte.servers.gamry.gamry_server2:gamry_dyn_endpoints"
     ok, problems = freeze.verify_external([_external("/PSTAT/run_CA", ref)], "PSTAT")
     assert ok == ["/PSTAT/run_CA"] and problems == []
 

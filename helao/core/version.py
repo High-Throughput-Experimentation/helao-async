@@ -1,6 +1,5 @@
 """Helpers for resolving HELAO version strings and source-file git hashes."""
 
-import inspect
 import os
 import subprocess
 from datetime import datetime
@@ -86,27 +85,6 @@ def get_hlo_version(work_tree_path: str = _REPO_ROOT) -> str:
         get_branch_commithash(work_tree_path)[1]
         or f"{gethostname()}_{datetime.now().strftime('%y%m%d')}"
     )
-
-
-def get_caller_filehash() -> tuple:
-    """Return ``(short_hash, filename)`` for the immediate caller's source file."""
-    try:
-        caller_frame = inspect.stack()[1]
-        caller_filename_full = caller_frame.filename
-        short_hash = get_filehash(caller_filename_full)
-        return short_hash, caller_filename_full
-    except Exception:
-        return "", ""
-
-
-def get_object_filehash(obj) -> tuple:
-    """Return ``(short_hash, filename)`` for the source file that defines `obj`."""
-    try:
-        filename = inspect.getabsfile(obj)
-        short_hash = get_filehash(filename)
-        return short_hash, filename
-    except Exception:
-        return "", ""
 
 
 # version number, gets written into every exp/prg and hlo file

@@ -1,0 +1,127 @@
+"""Chronopotentiometry simulation server.
+
+Hosts :class:`CPSim`, which replays a subset of 3 mA/cm^2 CP measurements
+from https://doi.org/10.1039/C8MH01641K . The server exposes actions for
+running a simulated CP (``measure_cp``/``cancel_measure_cp``), switching
+plates (``change_plate``), and reporting the loaded plate together with
+the requesting orchestrator's coordinates (``get_loaded_plate``).
+"""
+
+__all__ = ["makeApp"]
+
+
+from helao.core.error import ErrorCodes
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_host import ActionHost
+from helao.helpers import helao_logging as logging
+
+from helao.deploy.test.servers.cpsim.cpsim_driver import CPSim, CPSimExec
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+
+def makeApp(server_key):
+    """Build the CP-simulator FastAPI app.
+
+    Wires :class:`CPSim` into a :class:`BaseAPI` and registers actions:
+    ``measure_cp`` and ``cancel_measure_cp`` (driven by :class:`CPSimExec`),
+    ``get_loaded_plate``, and ``change_plate``, plus private listing
+    endpoints.
+
+    Args:
+        server_key: Server name in the launched config.
+
+    Returns:
+        Configured :class:`HelaoFastAPI` app.
+    """
+    app = ActionHost(
+        server_key=server_key,
+        server_title=server_key,
+        description="OER CP simulator",
+        version=1.0,
+        driver_classes=[CPSim],
+    )
+
+    @app.action()
+    async def measure_cp(
+        ctx: ActionContext,
+        comp_vec: list[int] = [],
+        acquisition_rate: float = 0.2,
+    ):
+        """Start a :class:`CPSimExec` that streams the stored CP for ``comp_vec``.
+
+        ``comp_vec`` is a body parameter, not a query one: FastAPI routes a
+        non-scalar annotation to the request body, so a query-string comp_vec
+        is dropped and the ``[]`` default is used instead.
+        """
+        active = await ctx.begin()
+        active.action.action_abbr = "CPSIM"
+        try:
+            executor = CPSimExec(
+                active=active,
+                oneoff=False,
+                poll_rate=active.action.action_params["acquisition_rate"],
+            )
+        except Exception as exc:
+            # The action is already registered in the endpoint's active_dict by
+            # setup_and_contain_action, so an executor that fails to construct
+            # leaves it there with nothing that will ever clear it: the
+            # endpoint reads as busy forever and every later request queues
+            # behind a measurement that is not running. Finish it here so a bad
+            # comp_vec costs one action rather than the server.
+            LOGGER.error(f"could not build CPSimExec: {exc}", exc_info=True)
+            active.action.error_code = ErrorCodes.critical
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
+
+    @app.action()
+    async def cancel_measure_cp(ctx: ActionContext):
+        """Stop any running ``measure_cp`` executor."""
+        active = await ctx.begin()
+        for exec_id, executor in app.base.executors.items():
+            if exec_id.split()[0] == "measure_cp":
+                executor.stop_action_task()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
+    @app.action()
+    async def get_loaded_plate(ctx: ActionContext):
+        """Return the loaded plate id plus the requesting orchestrator's coords."""
+        active = await ctx.begin()
+        plate_id = app.driver.loaded_plate
+        data_dict = {
+            "loaded_plate_id": plate_id,
+            "orch_key": app.base.orch_key,
+            "orch_host": app.base.orch_host,
+            "orch_port": app.base.orch_port,
+        }
+        active.action.action_params.update({f"_{k}": v for k, v in data_dict.items()})
+        await active.enqueue_data_dflt(datadict=data_dict)
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
+    @app.action()
+    async def change_plate(
+        ctx: ActionContext,
+        plate_id: int = 0,
+    ):
+        """Switch the simulator to a different plate."""
+        active = await ctx.begin()
+        app.driver.change_plate(active.action.action_params["plate_id"])
+        loaded_plate_id = app.driver.loaded_plate
+        active.action.action_params["_loaded_plate_id"] = loaded_plate_id
+        await active.enqueue_data_dflt(datadict={"loaded_plate_id": loaded_plate_id})
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
+    @app.post("/list_plates", tags=["private"])
+    def list_plates():
+        return app.driver.list_plates()
+
+    @app.post("/list_addressable", tags=["private"])
+    def list_addressable(limit: int = 10, by_el: bool = False):
+        return app.driver.list_addressable(limit, by_el)
+
+    return app

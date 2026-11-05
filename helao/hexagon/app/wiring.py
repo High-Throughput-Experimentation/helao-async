@@ -11,23 +11,16 @@ P1b2/P2 and join the set then).
 from dataclasses import dataclass, fields
 from typing import Optional
 
-from helao.hexagon.adapters.errors import HexagonDeferred, UnwiredPortError
+from helao.hexagon.adapters.errors import UnwiredPortError
 from helao.hexagon.ports.artifact_store import ArtifactStorePort
 from helao.hexagon.ports.auxiliary import HealthPort, StatePersistencePort
 from helao.hexagon.ports.clock import ClockPort
 from helao.hexagon.ports.config import ConfigPort
-from helao.hexagon.ports.data_sink import DataSinkPort
-from helao.hexagon.ports.hardware import HardwarePort
 from helao.hexagon.ports.logging import LoggingPort
-from helao.hexagon.ports.sample_state import SampleStatePort
-from helao.hexagon.ports.status import StatusPort
 from helao.hexagon.ports.sync import SyncPort
-from helao.hexagon.ports.transport import TransportPort
-from helao.hexagon.ports.ui_host import UiHostPort
 
 __all__ = [
     "ACTION_REQUIRED",
-    "HexagonDeferred",
     "ORCH_REQUIRED",
     "PortWiring",
     "UnwiredPortError",
@@ -40,21 +33,16 @@ ORCH_REQUIRED = (
     "config",
     "logging",
     "clock",
-    "transport",
     "state_persistence",
-    "status",
     "health",  # P2a: HexHealthMonitor + driver-health gate consume it
 )
 ACTION_REQUIRED = (
     "config",
     "logging",
     "clock",
-    "transport",
-    "status",
     # P2b-1: the native write runtime carries all Active write traffic —
     # a missing adapter must abort startup, never fall through to legacy
     "artifact_store",
-    "data_sink",
 )
 
 
@@ -65,20 +53,10 @@ class PortWiring:
     config: Optional[ConfigPort] = None
     logging: Optional[LoggingPort] = None
     clock: Optional[ClockPort] = None
-    transport: Optional[TransportPort] = None
     state_persistence: Optional[StatePersistencePort] = None
     artifact_store: Optional[ArtifactStorePort] = None
-    data_sink: Optional[DataSinkPort] = None
     sync: Optional[SyncPort] = None
-    status: Optional[StatusPort] = None
-    hardware: Optional[HardwarePort] = None
-    sample_state: Optional[SampleStatePort] = None
     health: Optional[HealthPort] = None
-    # P7d: required only when a composition declares an aligner or is a UI
-    # host (a Bokeh or Reflex process) — never a blanket
-    # ACTION_REQUIRED/ORCH_REQUIRED member, enforced instead at the sites
-    # that actually need one via PortWiring.require("ui_host").
-    ui_host: Optional[UiHostPort] = None
 
     def require(self, *names: str) -> None:
         known = {f.name for f in fields(self)}

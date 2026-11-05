@@ -90,7 +90,6 @@ servers:
       galil_ip_str: 192.168.200.23
       def_speed_count_sec: 10000
       max_speed_count_sec: 25000
-      ipstr: 192.168.200.23
       axis_id:
         x: C
         y: B
@@ -134,10 +133,8 @@ servers:
       dev_gasvalve:
         inlet: PXI-6284/port1/line2  # V1 -- open gas valve
         O2N2toggle: PXI-6284/port2/line0  # 3-way valve for O2/N2 gas switching
-      dev_unassigned:
-        unassigned0: PXI-6284/port1/line7
-        unassigned1: PXI-6284/port2/line1
-        unassigned2: PXI-6284/port2/line2
+      # spare DO lines (not wired to any endpoint): PXI-6284/port1/line7,
+      # PXI-6284/port2/line1, PXI-6284/port2/line2
       dev_pump:
         peripump: PXI-6284/port0/line4
         direction: PXI-6284/port0/line0

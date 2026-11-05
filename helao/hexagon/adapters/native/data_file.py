@@ -1,10 +1,12 @@
 """Native data-file writer (hexagon P2b-1).
 
 Verbatim re-body of the CARDS-P6 ``DataFileWriter`` collaborator
-(``helao/core/servers/active_data_file.py``): action-meta refresh, HLO/aux
+(``helao/core/servers/active_data_file.py``): action-meta refresh, data/aux
 header + ``FileInfo`` builder, the streamed-file opener (``w+``
-truncate-on-create), the one-shot writers (``a+``, header + ``%%\\n`` +
-payload, FileInfo appended at write, ``save_data`` gate), the
+truncate-on-create; a ``helao_files`` header goes to ``X.meta.json``), the
+one-shot writers (``helao_files``: header file overwritten + rows appended to
+``X.jsonl``; ``aux_files``: ``a+``, header + ``%%\\n`` + payload), FileInfo
+appended at write, ``save_data`` gate, the
 nt/posix ``_resolve_output_path`` quirk (incl. ``.strip("\\\\")`` -- byte-copied,
 not "fixed"), and the aux-file trackers/relocators. Method bodies were
 byte-identical to the legacy engine (source-parity-pinned by
@@ -46,10 +48,35 @@ from helao.core.models.sample import (
 from helao.helpers import helao_logging as logging
 from helao.helpers.file_utils import _relative_file_name
 from helao.helpers.premodels import Action
-from helao.helpers.yml_tools import yml_dumps
+from helao.helpers.meta_io import write_meta
+from helao.helpers.yml_tools import yml_dumps, yml_load
+from helao.hexagon.domain.naming import HEADER_SUFFIX, data_sibling, is_nosync_file
 from helao.hexagon.ports.action_session import ActionSessionPort
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+
+def _header_dict(text: str) -> dict:
+    """A str data header as a dict: the YAML mapping it spells, else ``{"text": ...}``.
+
+    Pre-JSON callers handed a ``yml_dumps`` string; reading it back keeps the
+    S3 ``meta`` they produced unchanged.
+    """
+    if not text.strip():
+        return {}
+    try:
+        parsed = yml_load(text, fast=True)
+    except Exception:
+        parsed = None
+    return dict(parsed) if isinstance(parsed, dict) else {"text": text}
+
+
+def _rows(output_str: str) -> str:
+    """A one-shot body as ``.jsonl`` rows: newline-terminated, empty stays empty."""
+    return (
+        output_str if not output_str or output_str.endswith("\n") else output_str + "\n"
+    )
+
 
 __all__ = ["NativeDataFileWriter"]
 
@@ -96,12 +123,13 @@ class NativeDataFileWriter:
             json_data_keys: Column keys for the file's data payload.
             file_sample_label: Sample label(s) recorded on the ``FileInfo``.
             filename: Output filename; auto-generated if ``None``.
-            file_group: Selects ``.hlo`` (helao group) or ``.csv`` (aux group).
+            file_group: Selects ``.jsonl`` (helao group) or ``.csv`` (aux group).
             file_conn_key: File-connection key used for filename ordering.
             action: Action associated with the file (defaults to ``self.active.action``).
 
         Returns:
-            ``(header_str, FileInfo)`` ready for use by the data writer.
+            ``(header, FileInfo)``: a dict for ``helao_files`` (empty means no
+            header file), header text for ``aux_files``.
         """
         filenum = 0
         if action is None:
@@ -109,7 +137,15 @@ class NativeDataFileWriter:
         if action is not None:
             if file_conn_key in action.file_conn_keys:
                 filenum = action.file_conn_keys.index(file_conn_key)
-        if isinstance(header, dict):
+        if file_group == HloFileGroup.helao_files:
+            # A data header is always a dict, written as X.meta.json (spec §1).
+            if isinstance(header, list):
+                header = {"text": "\n".join(header)} if header else {}
+            elif isinstance(header, str):
+                header = _header_dict(header)
+            elif header is None:
+                header = {}
+        elif isinstance(header, dict):
             # {} is "{}\n" if not filtered
             if header:
                 header = yml_dumps(header)
@@ -128,7 +164,7 @@ class NativeDataFileWriter:
 
         # determine ending of file
         if file_group == HloFileGroup.helao_files:
-            file_ext = "hlo"
+            file_ext = "jsonl"
         else:  # aux_files
             file_ext = "csv"
 
@@ -147,14 +183,11 @@ class NativeDataFileWriter:
             sample=file_sample_label,
             action_uuid=action.action_uuid,
             run_use=action.run_use,
-            nosync=(
-                True if not action.sync_data and filename.endswith(".hlo") else False
-            ),
+            nosync=is_nosync_file(filename, action.sync_data),
         )
 
-        if header:
-            if not header.endswith("\n"):
-                header += "\n"
+        if isinstance(header, str) and header and not header.endswith("\n"):
+            header += "\n"
 
         return header, file_info
 
@@ -247,7 +280,6 @@ class NativeDataFileWriter:
             file_conn_key=file_conn_key,
             action=output_action,
         )
-        output_action.files.append(file_info)
         filename = file_info.file_name
         save_root = str(self.active.base.helaodirs.save_root)
         if self.active.action.manual_action:
@@ -256,17 +288,24 @@ class NativeDataFileWriter:
         output_file = os.path.join(output_path, filename)
 
         os.makedirs(output_path, exist_ok=True)
+        if isinstance(header, dict):
+            # helao_files: the header is its own file, X.meta.json, written
+            # atomically before the rows file exists. No header, no file.
+            if header:
+                write_meta(data_sibling(output_file, HEADER_SUFFIX), header)
+            header = ""
 
         LOGGER.info(f"writing data to: {output_file}")
         # create output file and set connection. Open with truncation ("w+")
         # rather than append: this is the one-time creation of a fresh log
         # file (filenames encode retry/split so there is no legitimate
         # same-path append), and appending to any stale bytes left by a crash
-        # or re-run would push a spurious separator/header ahead of the real
-        # header and corrupt the .hlo layout.
+        # or re-run would push stale bytes ahead of the first row.
         self.active.file_conn_dict[file_conn_key].file = await aiofiles.open(
             output_file, mode="w+", encoding="utf-8"
         )
+        # Register only once the header and the rows file exist (as write_file).
+        output_action.files.append(file_info)
 
         if header:
             LOGGER.debug("adding header to new file")
@@ -279,7 +318,7 @@ class NativeDataFileWriter:
         file_type: str,
         filename: Optional[str],
         file_group: HloFileGroup,
-        header: Optional[str],
+        header,
         file_sample_label,
         json_data_keys,
         action: Action,
@@ -325,7 +364,7 @@ class NativeDataFileWriter:
         file_type: str,
         filename: Optional[str] = None,
         file_group: HloFileGroup = HloFileGroup.aux_files,
-        header: Optional[str] = None,
+        header=None,
         sample_str: Optional[str] = None,
         file_sample_label: Optional[list[str] | str] = None,
         json_data_keys: Optional[list[str]] = None,
@@ -346,13 +385,20 @@ class NativeDataFileWriter:
         if result is None:
             return None
         header, file_info, output_path, output_file = result
-        action.files.append(file_info)
         LOGGER.info(f"writing non stream data to: {output_file}")
-        async with aiofiles.open(output_file, mode="a+", encoding="utf-8") as f:
+        if isinstance(header, dict):
+            # helao_files: header overwritten atomically, rows appended (spec §2).
             if header:
-                await f.write(header)
-            await f.write("%%\n")
-            await f.write(output_str)
+                write_meta(data_sibling(output_file, HEADER_SUFFIX), header)
+            async with aiofiles.open(output_file, mode="a+", encoding="utf-8") as f:
+                await f.write(_rows(output_str))
+        else:
+            async with aiofiles.open(output_file, mode="a+", encoding="utf-8") as f:
+                if header:
+                    await f.write(header)
+                await f.write("%%\n")
+                await f.write(output_str)
+        action.files.append(file_info)
         return output_file
 
     def write_file_nowait(
@@ -361,7 +407,7 @@ class NativeDataFileWriter:
         file_type: str,
         filename: Optional[str] = None,
         file_group: HloFileGroup = HloFileGroup.aux_files,
-        header: Optional[str] = None,
+        header=None,
         sample_str: Optional[str] = None,
         file_sample_label: Optional[list[str] | str] = None,
         json_data_keys: Optional[list[str]] = None,
@@ -383,11 +429,17 @@ class NativeDataFileWriter:
             return None
         header, file_info, output_path, output_file = result
         LOGGER.info(f"writing non stream data to: {output_file}")
-        with open(output_file, mode="a+", encoding="utf-8") as f:
+        if isinstance(header, dict):
             if header:
-                f.write(header)
-            f.write("%%\n")
-            f.write(output_str)
+                write_meta(data_sibling(output_file, HEADER_SUFFIX), header)
+            with open(output_file, mode="a+", encoding="utf-8") as f:
+                f.write(_rows(output_str))
+        else:
+            with open(output_file, mode="a+", encoding="utf-8") as f:
+                if header:
+                    f.write(header)
+                f.write("%%\n")
+                f.write(output_str)
         action.files.append(file_info)
         return output_file
 

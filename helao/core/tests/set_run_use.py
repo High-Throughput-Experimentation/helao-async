@@ -1,9 +1,18 @@
 """Rewrite the ``run_use`` tag on an already-synced sequence record.
 
 ```
-python -m helao.core.tests.set_run_use <RUNS_SYNCED/.../<sequence>.zip> \
+python -m helao.core.tests.set_run_use <RUNS_SYNCED/.../<sequence>.zip | RUNS/<year>/<day>/<sequence>> \
     [--run-use data] [--dry-run] [--no-reset] [--process-dir DIR]
 ```
+
+A sequence directory in the single ``RUNS`` tree is accepted as well as a
+legacy zip: its records (``.json`` or ``.yml``) are retagged in place in their
+own format, but only when every seq/exp/act record's ``.prg`` says
+``synced: true`` -- otherwise the tool refuses and writes nothing (a
+``--dry-run`` reports the refusal too). The hand-back there deletes every
+``.prg`` under the sequence, then prints the ``/finish_yml`` call -- unless
+there was nothing to change, when it exits 0 and deletes nothing. A zip
+holding no record yml at all exits 1.
 
 Retags a record whose ``run_use`` was wrong when it ran -- a plate measured as
 a reference and filed as ``data``, or the reverse. It touches the record's own
@@ -67,6 +76,7 @@ __all__ = [
     "finished_dir_for",
     "kind_for",
     "process_dir_for",
+    "reset_runs_dir",
     "reset_to_finished",
     "rewrite_processes",
     "rewrite_zip",
@@ -76,19 +86,26 @@ __all__ = [
 import argparse
 import os
 import sys
+import zipfile
 from pathlib import Path
 
 from helao.core.models.run_use import RunUse
 from helao.core.tests import _record_rewrite
+from helao.helpers.artifact_hash import use_root_logger
 from helao.core.tests._record_rewrite import (
     PROCESS_DIR_NAME,
     Edit,
     _report,
     finish_yml_hint,
     finished_dir_for,
+    is_runs_dir,
     kind_for,
     process_dir_for,
+    reset_runs_dir,
     reset_to_finished,
+    gate_message,
+    run_reset_only,
+    runs_gate,
 )
 
 #: Kinds whose model defines ``run_use`` (``helao.core.models``). A sequence is
@@ -154,7 +171,9 @@ def rewrite_zip(
         ``(edits, sequence_uuid)``; see
         :func:`~helao.core.tests._record_rewrite.rewrite_zip`.
     """
-    return _record_rewrite.rewrite_zip(zip_path, _retag(run_use), dry_run=dry_run)
+    return _record_rewrite.rewrite_zip(
+        zip_path, _retag(run_use), dry_run=dry_run, reason="set_run_use"
+    )
 
 
 def rewrite_processes(
@@ -170,8 +189,18 @@ def rewrite_processes(
     :func:`~helao.core.tests._record_rewrite.rewrite_processes`.
     """
     return _record_rewrite.rewrite_processes(
-        process_dir, sequence_uuid, _retag(run_use), dry_run=dry_run
+        process_dir,
+        sequence_uuid,
+        _retag(run_use),
+        dry_run=dry_run,
+        reason="set_run_use",
     )
+
+
+def _refuse_unsynced(problems: "list[str]") -> int:
+    print(f"REFUSED: {gate_message(problems)}", file=sys.stderr)
+    print("nothing was written.", file=sys.stderr)
+    return 1
 
 
 def main(argv=None) -> int:
@@ -179,7 +208,11 @@ def main(argv=None) -> int:
         description=("Rewrite run_use on a synced sequence zip and its process ymls.")
     )
     parser.add_argument(
-        "zip_path", help="the sequence zip, normally under a RUNS_SYNCED tree"
+        "zip_path",
+        help=(
+            "the sequence zip under a RUNS_SYNCED tree, or a fully synced "
+            "sequence directory under RUNS"
+        ),
     )
     parser.add_argument(
         "--run-use",
@@ -197,7 +230,7 @@ def main(argv=None) -> int:
         help=(
             "the PROCESSES directory for this sequence; derived from the zip's "
             "own path when omitted, and skipped entirely if that path has no "
-            "RUNS_* segment to mirror"
+            "RUNS or RUNS_* segment to mirror"
         ),
     )
     parser.add_argument(
@@ -205,11 +238,23 @@ def main(argv=None) -> int:
         action="store_true",
         help=(
             "leave the retagged zip in RUNS_SYNCED instead of extracting it "
-            "back to RUNS_FINISHED for a /finish_yml re-sync. The retag then "
-            "reaches nothing downstream: S3 keeps the old tag"
+            "back to RUNS_FINISHED (or keep a RUNS sequence's .prg files) for a "
+            "/finish_yml re-sync. The retag then reaches nothing downstream: S3 "
+            "keeps the old tag"
+        ),
+    )
+    parser.add_argument(
+        "--reset-only",
+        action="store_true",
+        help=(
+            "RUNS sequence directory only: edit nothing, delete the remaining "
+            ".prg files and print the /finish_yml call -- finishes a --no-reset "
+            "run or an interrupted reset"
         ),
     )
     args = parser.parse_args(argv)
+    if args.reset_only and args.no_reset:
+        parser.error("--reset-only and --no-reset contradict each other")
 
     try:
         run_use = RunUse(args.run_use).value
@@ -221,11 +266,34 @@ def main(argv=None) -> int:
         return 2  # unreachable: parser.error exits
 
     zip_path = Path(args.zip_path)
-    if not zip_path.is_file():
+    if args.reset_only:
+        return run_reset_only(zip_path, dry_run=args.dry_run)
+    runs = is_runs_dir(zip_path)
+    if not runs and not zip_path.is_file():
         print(f"not a file: {zip_path}", file=sys.stderr)
         return 1
+    if not runs:
+        with zipfile.ZipFile(zip_path) as zf:
+            if not any(kind_for(n) and n.endswith(".yml") for n in zf.namelist()):
+                # Not "nothing to change": nothing was recognised at all.
+                print(f"no record yml in {zip_path}", file=sys.stderr)
+                return 1
+    unsynced = runs_gate(zip_path) if runs else []
+    if unsynced and not args.dry_run:
+        return _refuse_unsynced(unsynced)
 
-    zip_edits, sequence_uuid = rewrite_zip(zip_path, run_use, dry_run=args.dry_run)
+    if not args.dry_run:
+        use_root_logger(zip_path, "set_run_use")
+    if runs:
+        zip_edits, sequence_uuid = _record_rewrite.rewrite_dir(
+            zip_path, _retag(run_use), dry_run=args.dry_run, reason="set_run_use"
+        )
+        # Processes colocated beside their experiments, in the same tree.
+        zip_edits += rewrite_processes(
+            zip_path, sequence_uuid, run_use, dry_run=args.dry_run
+        )
+    else:
+        zip_edits, sequence_uuid = rewrite_zip(zip_path, run_use, dry_run=args.dry_run)
     print(f"{zip_path}: sequence_uuid {sequence_uuid}")
     _report(zip_edits)
 
@@ -235,7 +303,7 @@ def main(argv=None) -> int:
     process_edits: list[Edit] = []
     if process_dir is None:
         print(
-            "  no RUNS_* segment in the path -- external process ymls not "
+            "  no RUNS or RUNS_* segment in the path -- external process ymls not "
             "searched (name one with --process-dir)"
         )
     elif not process_dir.is_dir():
@@ -256,8 +324,28 @@ def main(argv=None) -> int:
         f"{len([e for e in retagged if e.kind == 'process'])} process)"
     )
 
+    if unsynced:
+        return _refuse_unsynced(unsynced)
+    if not retagged and (args.no_reset or runs):
+        # Idempotent re-run: no hand-back, so a RUNS sequence keeps its .prg
+        # files and is not re-pushed for nothing. A zip without --no-reset is
+        # still handed back, as it always was.
+        print(f"nothing to change: every record already has run_use={run_use}")
+        if runs and not args.no_reset:
+            print(
+                "if an earlier --no-reset run made these edits, hand the "
+                "sequence back with --reset-only"
+            )
+        return 0
     if args.no_reset:
-        print("--no-reset: the record stays in RUNS_SYNCED and will not re-sync.")
+        print("--no-reset: the record stays where it is and will not re-sync.")
+    elif runs:
+        prgs = reset_runs_dir(zip_path, dry_run=args.dry_run)
+        print(
+            f"{'would delete' if args.dry_run else 'deleted'} {len(prgs)} .prg file(s)"
+        )
+        if not args.dry_run:
+            print(finish_yml_hint(zip_path))
     else:
         ok, dest, note = reset_to_finished(zip_path, dry_run=args.dry_run)
         print(f"{'would reset' if args.dry_run else 'reset'} -> {dest}: {note}")

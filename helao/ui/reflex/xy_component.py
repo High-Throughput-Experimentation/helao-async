@@ -350,6 +350,9 @@ export function createController(options) {
     // Version of the newest frame applied, so a late response cannot regress.
     appliedSeq: null,
     layout: null,
+    // Bumped on every layout change. A response issued under an older layout
+    // describes the torn-down view and must never mount the new one.
+    layoutGen: 0,
     handlers: {},
     module: null,
     el: null,
@@ -459,6 +462,7 @@ export function createController(options) {
     // Version of this request, used to reject only genuinely older frames.
     const seqForUrl =
       specForUrl && specForUrl.append ? specForUrl.append.seq : null;
+    const genForUrl = st.layoutGen;
     try {
       const resp = await fetch(url);
       if (st.disposed) return;
@@ -480,6 +484,13 @@ export function createController(options) {
       ) {
         return;
       }
+      // Issued before a layout change and landed after it. appliedSeq was
+      // reset for the rebuild, so the test above lets it through; mounted, it
+      // rebuilds the view from the OLD spec (a composition map's previous
+      // unit, colorbar and all), the new frame then lands on the in-place path
+      // that swaps columns only, and every later update stays in place on
+      // that stale view. The queued newest URL still drains in `finally`.
+      if (genForUrl !== st.layoutGen) return;
       // decodeFrame returns {message, buffers, version, byteLength}; the
       // renderer wants the buffer LIST, because a split-layout spec indexes
       // columns into it. Handing it the wrapper object fails the split check.
@@ -516,6 +527,7 @@ export function createController(options) {
     }
     if (st.layout === layout) return;
     st.layout = layout;
+    st.layoutGen += 1;
     st.teardown();
     // Cleared together with the buffers they describe. appliedSeq too, so the
     // rebuild can accept the next frame whatever its version.

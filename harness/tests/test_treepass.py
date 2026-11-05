@@ -159,3 +159,24 @@ def test_analysis_ordinals_follow_record_identity_not_uuid_order(tmp_path):
     ):
         assert ma.map(a_uuid) == mb.map(b_uuid)
     assert diff_member_sets(snapshot(ga, ma), snapshot(gb, mb)) == []
+
+
+def test_snapshot_pairs_json_era_names_with_legacy_members(tmp_path):
+    d = (
+        tmp_path
+        / "RUNS"
+        / "25.28"
+        / "0716"
+        / "131415__S__g"
+        / "250716.131420__E"
+        / "0__0__A"
+    )
+    d.mkdir(parents=True)
+    (d / "250716.131421123456-act.json").write_text('{"action_status": ["finished"]}')
+    (d / "W__0.jsonl").write_text('{"epoch_s": 1.0}\n')
+    (d / "W__0.meta.json").write_text('{"action_name": "W"}')
+    snap = snapshot(tmp_path, UuidMapper())
+    base = "RUNS/YY.WW/MMDD/TS__S__g/TS__E/0__0__A/"
+    assert snap.files[base + "TS-act.yml"][1] is ArtifactRow.ACT_YML
+    assert snap.files[base + "W__0.hlo"][1] is ArtifactRow.HLO
+    assert not any(k.endswith(".meta.json") for k in snap.files)

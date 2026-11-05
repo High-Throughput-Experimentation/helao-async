@@ -1,0 +1,34 @@
+# CAPTURE-ONLY THROWAWAY ROOT, NEVER PRODUCTION. Copy of gamry.yml used
+# solely by helao.deploy.hte.tests.smoke.golden_capture to
+# capture a runtime golden-master run_OCV tree. The ONLY change from
+# gamry.yml is `root:`, pointed at a dedicated throwaway path so the capture
+# rig's assert_fresh() has a clean tree to start from and production
+# C:\INST_hlo (real run data, DATABASE, USER_CONFIG calibration) is never
+# touched. This is a REAL-HARDWARE capture (see golden_capture.py docstring)
+# -- attach a dummy cell / calibration resistor before launching.
+dummy: true
+simulation: true
+run_type: gamry
+root: C:\INST_hlo_golden
+servers:
+  PSTAT:
+    host: 127.0.0.1
+    port: 8001
+    group: action
+    deployment: hte
+    fast: gamry_server2
+    action_vis: gamry_vis
+    params:
+      allow_no_sample: true
+      dev_id: 0
+      filterfreq_hz: 1000.0
+      grounded: true
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    deployment: hte
+    bokeh: action_visualizer
+    params:
+      doc_name: 'PSTAT Visualizer'
+      launch_browser: true

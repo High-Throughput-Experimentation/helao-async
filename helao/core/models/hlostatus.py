@@ -1,6 +1,6 @@
 """Enum describing the lifecycle status of HELAO actions, experiments, and sequences."""
 
-__all__ = ["HloStatus"]
+__all__ = ["HloStatus", "TERMINAL_STATUSES", "is_terminal"]
 
 from enum import Enum
 
@@ -29,3 +29,21 @@ class HloStatus(str, Enum):
     split = "split"
     busy = "busy"
     retired = "retired"
+
+
+#: Statuses after which a record is final on disk.
+TERMINAL_STATUSES = frozenset(
+    {
+        HloStatus.finished,
+        HloStatus.errored,
+        HloStatus.aborted,
+        HloStatus.skipped,
+        HloStatus.estopped,
+        HloStatus.retired,
+    }
+)
+
+
+def is_terminal(statuses) -> bool:
+    """True when any of ``statuses`` is terminal; ``None``/empty is not."""
+    return any(s in TERMINAL_STATUSES for s in (statuses or []))

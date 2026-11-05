@@ -1,13 +1,13 @@
 """Sequence-unpacking free functions + ``PLATE_API`` singleton extracted from
 ``Orch`` (CARDS P5, Stage S6).
 
-``Orch.unpack_sequence``/``get_sequence_codehash``/``seq_unpacker``/
-``verify_plate_in_params`` implement the orchestrator's sequence-unpacking
+``Orch.unpack_sequence``/``seq_unpacker``/``verify_plate_in_params``
+implement the orchestrator's sequence-unpacking
 "cluster": expanding a named sequence-library entry into its planned
-experiments, resolving a sequence's cached code hash, pushing planned
+experiments, pushing planned
 experiments from the active sequence onto the experiment deque, and
 confirming a plate-id parameter resolves to a valid platemap. Unlike the
-other P5 extractions, three of these four are near-pure/stateless enough to
+other P5 extractions, two of these three are near-pure/stateless enough to
 become plain module-level functions (taking the state they need as explicit
 params) rather than a stateful collaborator class; ``seq_unpacker`` alone
 takes the live ``orch`` handle since it reads/writes several ``Orch``
@@ -22,8 +22,7 @@ re-export it, so patching either of those names reaches nothing.
 
 Per the P5 constraints (:doc:`CARDS_REFACTOR_P5.md` sec 3.1 rule 5 "no
 behavior fixes ride along"): every body below is moved verbatim, with only
-``self.<x>`` accesses turned into explicit params (``unpack_sequence``/
-``get_sequence_codehash``) or ``orch.<x>`` (``seq_unpacker``).
+``self.<x>`` accesses turned into explicit params (``unpack_sequence``) or ``orch.<x>`` (``seq_unpacker``).
 ``verify_plate_in_params`` needed no ``self`` rewrite at all -- it only ever
 touched the module-level ``PLATE_API``/``LOGGER`` and its own ``paramd`` arg.
 
@@ -33,8 +32,6 @@ from unstable); that module is now a re-export B7b deletes. This module imports
 nothing from ``helao/core/servers/`` and must not start: the engine imports
 it (through its re-export and ``orch.py``), never the other way round.
 """
-
-from uuid import UUID
 
 from helao.core.models.orchstatus import LoopStatus
 from helao.helpers import helao_logging as logging
@@ -61,11 +58,6 @@ def unpack_sequence(
         return sequence_lib[sequence_name](**sequence_params)
     else:
         return []
-
-
-def get_sequence_codehash(sequence_name: str, sequence_codehash_lib) -> UUID:
-    """Return the cached code hash for the named sequence library entry."""
-    return sequence_codehash_lib[sequence_name]
 
 
 async def seq_unpacker(orch) -> None:

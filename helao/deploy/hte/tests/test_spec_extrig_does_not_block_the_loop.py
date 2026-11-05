@@ -20,9 +20,9 @@ import time
 
 import pytest
 
-from helao.deploy.hte.drivers.spec import spectral_products_driver as spec_driver
-from helao.deploy.hte.servers.action import spec_server
-from helao.deploy.hte.servers.action.spec_server import SM303Exec
+from helao.deploy.hte.servers.spec import spectral_products_driver as spec_driver
+from helao.deploy.hte.servers.spec import spec_server
+from helao.deploy.hte.servers.spec.spec_server import SM303Exec
 
 
 class _Spec:

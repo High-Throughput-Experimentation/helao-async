@@ -14,7 +14,7 @@ from helao.helpers.config_loader import read_config
 # into this centralized, hte-only directory; bare-prefix resolution (which
 # globs helao/deploy/*/configs/) no longer finds them, so they must be passed
 # by full path.
-SMOKE_CONFIGS = preflight.HTE_SMOKE_CONFIGS
+SMOKE_CONFIGS = preflight.REPO_ROOT / "helao/deploy/hte/tests/smoke/configs"
 
 
 def test_config_sanity_duplicate_hostport():
@@ -123,6 +123,15 @@ def test_aligner_implicit_default_bokeh_port_is_reserved():
     assert any("port + 1000" in i for i in issues), issues
 
 
+def test_aligner_null_bokeh_port_falls_back_to_port_plus_1000():
+    """`bokeh_port: null` is an unset key, not a crash."""
+    srv = {"port": 8001, "params": {"enable_aligner": True, "bokeh_port": None}}
+    assert preflight._aligner_port(srv) == 9001
+    srv["params"]["bokeh_port"] = 8123
+    assert preflight._aligner_port(srv) == 8123
+    assert preflight.aligner_bokeh_port({"port": 8001, "params": {}}) == 9001
+
+
 def test_aligner_without_enable_flag_claims_nothing():
     """`bokeh_port` sitting in `params` with no `enable_aligner: true` is not
     a live claim -- the aligner host is never constructed, so nothing binds
@@ -139,20 +148,39 @@ def test_aligner_without_enable_flag_claims_nothing():
     assert preflight._config_sanity(servers) == []
 
 
-def test_library_collision_detected():
-    cfg = {
-        "experiment_libraries": ["CCSI_exp", "CSIL_exp"],  # share CCSI_sub_* names
-    }
+def _twin_libraries(tmp_path):
+    """Two synthetic experiment libraries that define the same function name."""
+    paths = []
+    for mod in ("twin_a_exp", "twin_b_exp"):
+        p = tmp_path / f"{mod}.py"
+        p.write_text("def shared_sub_exp():\n    return []\n", encoding="utf-8")
+        paths.append(str(p))
+    return paths
+
+
+def test_library_collision_detected(tmp_path):
+    cfg = {"experiment_libraries": _twin_libraries(tmp_path)}
     issues = preflight._library_collisions(cfg)
-    assert any("collision" in i for i in issues)
+    assert any("collision" in i and "shared_sub_exp" in i for i in issues)
 
 
-def test_library_collision_overridable():
+def test_library_collision_overridable(tmp_path):
     cfg = {
-        "experiment_libraries": ["CCSI_exp", "CSIL_exp"],
+        "experiment_libraries": _twin_libraries(tmp_path),
         "allow_shadow": True,
     }
     assert preflight._library_collisions(cfg) == []
+
+
+def test_bare_library_in_several_other_deployments_is_an_issue(tmp_path, monkeypatch):
+    for dep in ("b", "c"):
+        d = tmp_path / "helao" / "deploy" / dep / "experiments"
+        d.mkdir(parents=True)
+        (d / "lib.py").write_text("def f():\n    return []\n", encoding="utf-8")
+    (tmp_path / "helao" / "deploy" / "a" / "experiments").mkdir(parents=True)
+    monkeypatch.setattr(preflight, "REPO_ROOT", tmp_path)
+    issues = preflight._library_collisions({"experiment_libraries": ["lib"]}, "a")
+    assert any("lib" in i and "several deployments" in i for i in issues)
 
 
 def _synthetic_tree(tmp_path, own_has_module=False):
@@ -257,6 +285,7 @@ def test_a_missing_checklist_is_reported_not_failed():
 
 def test_a_checklist_that_existed_at_b7c_and_is_gone_fails(tmp_path, monkeypatch):
     monkeypatch.setattr(preflight, "_checklist_dir", lambda dep: tmp_path)
+    (tmp_path / "_at_b7c.json").write_text('["gamry_server2"]', encoding="utf-8")
     servers = {"GAMRY": {"group": "action", "fast": "gamry_server2"}}
     issues, notes = preflight._checklist_presence(servers, {"GAMRY": "hte"})
     assert len(issues) == 1 and "gamry_server2" in issues[0] and notes == []
@@ -324,12 +353,11 @@ def _a_nested_deployment_with_checklists() -> str | None:
 
 
 def test_checklist_dir_prefers_private_in_repo_then_central():
-    """A nested deployment's checklists live in its own repo
-    (helao/deploy/<dep>/tests/checklists); hte/test use the central
-    helao/hexagon/tests/checklists/<dep>. Unknown/None -> None."""
+    """A deployment's checklists live in its own tree
+    (helao/deploy/<dep>/tests/checklists). Unknown/None -> None."""
     hte = preflight._checklist_dir("hte")
-    assert hte is not None and hte.parts[-3:] == ("tests", "checklists", "hte")
-    assert "hexagon" in hte.parts  # central location
+    assert hte is not None and hte.parts[-3:] == ("hte", "tests", "checklists")
+    assert "deploy" in hte.parts and "hexagon" not in hte.parts
 
     nested = _a_nested_deployment_with_checklists()
     if nested is not None:  # only when such a nested repo is checked out
@@ -363,8 +391,9 @@ def test_a_scratch_copy_of_a_config_still_exercises_the_checklist_gate(
     assert preflight.preflight_config(str(scratch)) == []
 
     empty = tmp_path / "checklists"
-    (empty / "hte").mkdir(parents=True)
-    monkeypatch.setattr(preflight, "CHECKLIST_ROOT", empty)
+    empty.mkdir()
+    (empty / "_at_b7c.json").write_text('["gamry_server2"]', encoding="utf-8")
+    monkeypatch.setattr(preflight, "_checklist_dir", lambda deployment: empty)
     for config in (src, scratch):
         found = preflight.preflight_config(str(config))
         assert len(found) == 1 and "frozen endpoint checklist" in found[0], found

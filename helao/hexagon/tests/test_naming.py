@@ -3,15 +3,17 @@
 from datetime import datetime
 from uuid import UUID
 
+import pytest
+
 from helao.hexagon.domain import naming
 from helao.hexagon.domain.models import Experiment, Sequence
 
 
 def test_meta_yml_filename_grammar():
     ts = datetime(2026, 7, 17, 13, 5, 9, 123456)
-    assert naming.meta_yml_filename(ts, "act") == "260717.130509123456-act.yml"
-    assert naming.meta_yml_filename(ts, "exp") == "260717.130509123456-exp.yml"
-    assert naming.meta_yml_filename(ts, "seq") == "260717.130509123456-seq.yml"
+    assert naming.meta_yml_filename(ts, "act") == "260717.130509123456-act.json"
+    assert naming.meta_yml_filename(ts, "exp") == "260717.130509123456-exp.json"
+    assert naming.meta_yml_filename(ts, "seq") == "260717.130509123456-seq.json"
 
 
 def test_meta_yml_filename_rejects_unknown_kind():
@@ -23,7 +25,7 @@ def test_meta_yml_filename_rejects_unknown_kind():
 
 def test_hlo_filename_grammar():
     # active_data_file.py:139 template, filenum = index in file_conn_keys
-    assert naming.hlo_filename("CA", 3, 0, 0, 1, 0) == "CA-3.0.0.1__0.hlo"
+    assert naming.hlo_filename("CA", 3, 0, 0, 1, 0) == "CA-3.0.0.1__0.jsonl"
     assert (
         naming.hlo_filename("OCV", 0, 2, 1, 0, 2, file_ext="csv")
         == "OCV-0.2.1.0__2.csv"
@@ -53,10 +55,57 @@ def test_redirect_manual_dir():
 
 
 def test_is_nosync_file():
-    # FileInfo.nosync=True for .hlo when action.sync_data is False
+    # FileInfo.nosync=True for data files when action.sync_data is False
     assert naming.is_nosync_file("a__0.hlo", sync_data=False) is True
+    assert naming.is_nosync_file("a__0.jsonl", sync_data=False) is True
+    assert naming.is_nosync_file("a__0.jsonl", sync_data=True) is False
     assert naming.is_nosync_file("a__0.hlo", sync_data=True) is False
     assert naming.is_nosync_file("notes.csv", sync_data=False) is False
+
+
+@pytest.mark.parametrize(
+    "path, kind",
+    [
+        ("260717.130509123456-act.json", "act"),
+        ("260717.130509123456-act.yml", "act"),
+        ("RUNS/x/260717.130509123456-seq.json", "seq"),
+        ("C:\\INST\\RUNS\\x\\260717.130509123456-exp.yml", "exp"),
+        ("0__0f1e__CV-prc.json", "prc"),
+        ("0__0f1e__CV-prc.yml", "prc"),
+        ("8a6f2c1e-1234-4abc-9def-0123456789ab-ana.json", "ana"),
+        ("CA-3.0.0.1__0.meta.json", None),
+        ("CA-3.0.0.1__0.jsonl", None),
+        ("8a6f2c1e-1234-4abc-9def-0123456789ab_output_xrfs.json", None),
+        ("act.json", None),
+        ("260717.130509123456-act.prg", None),
+        ("config.yml", None),
+    ],
+)
+def test_meta_kind(path, kind):
+    assert naming.meta_kind(path) == kind
+
+
+@pytest.mark.parametrize(
+    "path, stem",
+    [
+        ("CA-3.0.0.1__0.hlo", "CA-3.0.0.1__0"),
+        ("CA-3.0.0.1__0.jsonl", "CA-3.0.0.1__0"),
+        ("CA-3.0.0.1__0.meta.json", "CA-3.0.0.1__0"),
+        ("CA-3.0.0.1__0.hlo.json", "CA-3.0.0.1__0"),
+        ("sub/dir/ms_recording.jsonl", "ms_recording"),
+        ("notes.csv", "notes.csv"),
+        ("C:\\r\\X__0.jsonl", "X__0"),
+    ],
+)
+def test_data_stem(path, stem):
+    assert naming.data_stem(path) == stem
+
+
+def test_data_sibling_keeps_the_directory():
+    assert naming.data_sibling("a/b/X__0.jsonl", ".meta.json") == "a/b/X__0.meta.json"
+    assert naming.data_sibling("a/b/X__0.meta.json", ".jsonl") == "a/b/X__0.jsonl"
+    assert naming.data_sibling("X__0.hlo.json", ".jsonl") == "X__0.jsonl"
+    assert naming.data_sibling("C:\\r\\X__0.hlo", ".jsonl") == "C:\\r\\X__0.jsonl"
 
 
 def test_sequence_dir_grammar_reused_from_premodels():

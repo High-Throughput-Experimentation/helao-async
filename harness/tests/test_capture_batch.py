@@ -582,3 +582,15 @@ def test_a_prefix_matching_nothing_raises_rather_than_guessing():
 
     with pytest.raises(RuntimeError, match="cannot resolve config"):
         resolve_config_path("no_such_config_prefix_anywhere")
+
+
+def test_runs_active_empty_reads_json_act_records(tmp_path):
+    from harness.capture import runs_active_empty
+
+    act = tmp_path / "RUNS" / "25.28" / "0716" / "s" / "e" / "a"
+    act.mkdir(parents=True)
+    rec = act / "250716.131421123456-act.json"
+    rec.write_text('{"action_status": ["running"]}')
+    assert runs_active_empty(tmp_path) is False
+    rec.write_text('{"action_status": ["finished"]}')
+    assert runs_active_empty(tmp_path) is True

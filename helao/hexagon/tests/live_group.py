@@ -1,12 +1,12 @@
 """In-process REAL-transport hexagon group for §10.3 precise-interleaving
 items (P1b2b: items 1, 3, 5).
 
-Boots the REAL compositions under uvicorn inside the test's event loop: the
-OrchHost the hte orchestrator module builds, the SIM through its own makeApp, and the
+Boots the REAL compositions under uvicorn inside the test's event loop: an
+OrchHost built directly (the same construction the deployment's orchestrator
+module uses), the SIM through its own makeApp, and the
 test deployment's sim_db_server — real HTTP routes registered through the
 real registration code, and the co-located ZMQ RPC mirrors HelaoFastAPI
-auto-registers on http_port+10000 (§10.1 fixture-fidelity; boot pattern
-proven by test_adapter_transport.py). Race injection happens via the host's
+auto-registers on http_port+10000 (§10.1 fixture-fidelity). Race injection happens via the host's
 own reducer runtime, orch_app._hex_runtime.handle(event), from a concurrent
 task (DD-3).
 
@@ -17,11 +17,13 @@ process == shared CONFIG dict + logging singleton (a documented deviation
 from launched groups; items 2/4/6/7 run against a real launched group
 instead).
 
-Ports 8101/8102/8110 (RPC mirrors 18101/18102/18110) so a live goldenhex
-launch on 8001/8002/8010 never collides with pytest."""
+Ports are picked free at import time (RPC mirrors at port + 10000), so a live
+goldenhex launch on 8001/8002/8010 and parallel pytest workers never collide."""
 
 import asyncio
 import os
+import random
+import socket
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,6 +32,7 @@ from typing import Any
 import uvicorn
 
 from helao.core.error import ErrorCodes
+from helao.core.rpc.zmq_rpc import derive_rpc_port
 from helao.helpers import config_loader, helao_logging
 from helao.helpers.dispatcher import aclose_all_rpc_clients, async_private_dispatcher
 from helao.helpers.helao_logging import make_logger
@@ -37,9 +40,55 @@ from helao.helpers.premodels import ExperimentPlanMaker, Sequence
 from helao.helpers.time_utils import gen_uuid
 from helao.hexagon.domain.models import LoopStatus
 
-ORCH_HOST, ORCH_PORT = "127.0.0.1", 8101  # RPC mirror -> 18101
-SIM_HOST, SIM_PORT = "127.0.0.1", 8102  # RPC mirror -> 18102
-DB_HOST, DB_PORT = "127.0.0.1", 8110  # RPC mirror -> 18110
+
+def _bindable(port: int) -> bool:
+    with socket.socket() as s:  # SO_REUSEADDR left off
+        try:
+            s.bind(("127.0.0.1", port))
+        except OSError:
+            return False
+    return True
+
+
+def _worker_band() -> range:
+    """HTTP-port band private to this xdist worker (gwN), below the ephemeral
+    range (32768+) even with the +10000 RPC mirror. Import-time picks from the
+    ephemeral range collided across workers (birthday) and with outbound
+    sockets; disjoint bands cannot collide between workers.
+
+    Limit: bands are 150 wide from 10000 and the HTTP half must stay below
+    20000, where the RPC half starts, so at most 66 workers (gw0..gw65)."""
+    n = int(os.environ.get("PYTEST_XDIST_WORKER", "gw0").lstrip("gw") or 0)
+    lo, hi = 10000 + n * 150, 10000 + (n + 1) * 150
+    if hi > 20000:
+        raise RuntimeError(
+            f"xdist worker gw{n}: live_group port band {lo}-{hi} reaches 20000 "
+            "(RPC half); supports at most 66 workers"
+        )
+    return range(lo, hi)
+
+
+def _free_port_pair(taken: set = frozenset()) -> int:
+    """An HTTP port whose RPC mirror port is also bindable right now."""
+    band = _worker_band()
+    for p in random.sample(band, len(band)):
+        rpc = derive_rpc_port(p)
+        if rpc <= 65535 and not {p, rpc} & taken and _bindable(p) and _bindable(rpc):
+            return p
+    raise RuntimeError(
+        f"live_group: no free HTTP/RPC port pair in band {band.start}-{band.stop}"
+    )
+
+
+_ports: list = []
+for _ in range(3):
+    _taken = {q for p in _ports for q in (p, derive_rpc_port(p))}
+    _ports.append(_free_port_pair(_taken))
+_orch_p, _sim_p, _db_p = _ports
+
+ORCH_HOST, ORCH_PORT = "127.0.0.1", _orch_p  # RPC mirror -> port + 10000
+SIM_HOST, SIM_PORT = "127.0.0.1", _sim_p
+DB_HOST, DB_PORT = "127.0.0.1", _db_p
 
 _REPO_ROOT = str(Path(__file__).resolve().parents[3])
 
@@ -146,11 +195,9 @@ async def live_group(tmp_root: str, ntp_offset_s: float = 0.0):
     if helao_logging.LOGGER is None:
         helao_logging.LOGGER = make_logger("hexlive", log_dir=log_dir)
 
-    from helao.deploy.hte.servers.orchestrator.async_orch2 import (
-        makeApp as orch_makeApp,
-    )
+    from helao.hexagon.app.orch_host import OrchHost
     from helao.deploy.test.servers.action.sim_db_server import makeApp as db_makeApp
-    from helao.deploy.test.servers.action.ws_simulator import makeApp as sim_makeApp
+    from helao.deploy.test.servers.wssim.ws_simulator import makeApp as sim_makeApp
 
     sim_app = sim_makeApp("SIM")
     db_app = db_makeApp("SYNC")
@@ -161,7 +208,7 @@ async def live_group(tmp_root: str, ntp_offset_s: float = 0.0):
     # whatever actually drains -- and after the cut-over that is the host's
     # own reducer. Pointing it at the graft would leave the shipped loop
     # untested while reporting green.
-    orch_app = orch_makeApp("ORCH")
+    orch_app = OrchHost("ORCH", "ORCH", "Orchestrator", version=3.0)
     orch_server, orch_task = await _serve(orch_app, ORCH_HOST, ORCH_PORT)
     try:
         runtime = None

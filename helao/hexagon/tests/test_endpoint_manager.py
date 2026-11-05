@@ -48,12 +48,9 @@ def _host():
             config=_Stub(),
             logging=_Stub(),
             clock=_Clock(),
-            transport=_Stub(),
             state_persistence=_Stub(),
-            status=_Stub(),
             health=_Stub(),
             artifact_store=NativeArtifactStoreAdapter(config=_Stub(), clock=_Clock()),
-            data_sink=_Stub(),
         ),
         helao_cfg={
             "root": tempfile.mkdtemp(prefix="helao_ep_"),

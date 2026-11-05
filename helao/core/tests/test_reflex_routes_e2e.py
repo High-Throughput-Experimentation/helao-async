@@ -123,11 +123,10 @@ def test_every_server_in_this_config_can_actually_be_imported(reflex_cfg):
     ``validateConfig`` both pass for such a config -- only launching it fails --
     so nothing else in this suite would notice.
     """
-    import os
-    from glob import glob
     from importlib import import_module
 
-    root = os.getcwd()
+    from helao.helpers.server_modules import import_path, locate, module_file
+
     failures = []
     for key, server in reflex_cfg["servers"].items():
         for code in ("fast", "bokeh", "reflex"):
@@ -137,22 +136,9 @@ def test_every_server_in_this_config_can_actually_be_imported(reflex_cfg):
             if code == "reflex":
                 candidates = ["helao.ui.reflex.app"]
             else:
-                hits = glob(
-                    os.path.join(
-                        root,
-                        "helao",
-                        "deploy",
-                        "*",
-                        "servers",
-                        server["group"],
-                        f"{module}.py",
-                    )
-                )
-                candidates = [
-                    "helao.deploy."
-                    + h.split("/deploy/")[1].replace(".py", "").replace("/", ".")
-                    for h in hits
-                ]
+                _, found = locate(module, "app")  # as the launcher does
+                files = (module_file(d, module, "app") for d in found)
+                candidates = [import_path(f) for f in files if f is not None]
             assert candidates, f"{key}: no module found for {code}: {module}"
             last = None
             for candidate in candidates:
@@ -179,7 +165,7 @@ def test_calc_eta_does_not_drag_in_the_gp_stack():
     import ast
     import inspect
 
-    from helao.deploy.test.drivers.data import oer_metrics
+    from helao.deploy.test.servers.cpsim import oer_metrics
 
     def _imported_roots(module):
         """Module names actually imported, ignoring prose in docstrings."""
@@ -201,7 +187,7 @@ def test_calc_eta_does_not_drag_in_the_gp_stack():
         1.5 - 1.23
     )
 
-    cpsim = __import__("helao.deploy.test.drivers.pstat.cpsim_driver", fromlist=["x"])
+    cpsim = __import__("helao.deploy.test.servers.cpsim.cpsim_driver", fromlist=["x"])
     assert "gpsim_driver" not in inspect.getsource(cpsim).split('"""')[-1]
 
 

@@ -27,7 +27,7 @@ from helao.core.drivers.data.analysis_layout import (
 )
 from helao.hexagon.adapters.native.analysis_artifact import NativeAnalysisArtifact
 from helao.hexagon.ports.analysis import AnalysisArtifactPort, AnalysisRecord
-from helao.helpers.yml_tools import yml_load
+from helao.helpers.meta_io import read_meta
 
 BUCKET = "helao.data"
 REGION = "us-west-2"
@@ -231,11 +231,11 @@ def test_publish_writes_the_golden_layout(tmp_path):
         / "181340__XAFS_normalize_flatten__Zn-543215"
     )
     assert sorted(p.name for p in d.iterdir()) == [
-        f"{UUID_A}.yml",
+        f"{UUID_A}-ana.json",
         f"{UUID_A}_output_array.json",
         f"{UUID_A}_output_scalar.json",
     ]
-    assert yml_load(d / f"{UUID_A}.yml")["analysis_uuid"] == UUID_A
+    assert read_meta(d / f"{UUID_A}-ana.json")["analysis_uuid"] == UUID_A
     # each group's JSON carries that group's values, arrays included
     assert json.loads(
         (d / f"{UUID_A}_output_array.json").read_text(encoding="utf-8")
@@ -254,7 +254,7 @@ def test_publishing_the_same_record_twice_leaves_one_record(tmp_path):
     asyncio.run(art.publish(make_record()))
     files = sorted(p.name for p in (tmp_path / "ANALYSES").rglob("*") if p.is_file())
     assert files == [
-        f"{UUID_A}.yml",
+        f"{UUID_A}-ana.json",
         f"{UUID_A}_output_array.json",
         f"{UUID_A}_output_scalar.json",
     ]
@@ -265,7 +265,7 @@ def test_local_only_writes_the_tree_and_uploads_nothing(tmp_path):
     art = NativeAnalysisArtifact(str(tmp_path / "ANALYSES"), uploader=None)
     assert asyncio.run(art.publish(make_record())) is True
     assert up.calls == []
-    assert list((tmp_path / "ANALYSES").rglob("*.yml"))
+    assert list((tmp_path / "ANALYSES").rglob("*-ana.json"))
 
 
 def test_an_uploader_receives_the_model_and_every_group(tmp_path):

@@ -1,6 +1,4 @@
-"""Config surface of the finish hooks (spec §3): shapes, aliases, refusals."""
-
-import logging
+"""Config surface of the finish hooks (spec §3): shapes, refusals."""
 
 import pytest
 
@@ -50,74 +48,27 @@ def test_bad_shapes_raise_naming_the_key(raw):
     assert "SPEC_R.prefinish_hooks" in str(ei.value)
 
 
-def test_prefinish_alias_translates_and_warns(caplog):
-    caplog.set_level(logging.WARNING)
-    out = prefinish_config(
-        {"hlo_postprocess_libs": ["hlo_to_csv", "spec_melt_wls"]},
-        "prefinish_hooks",
-        "hlo_postprocess_libs",
-        "SPEC_R",
-    )
-    assert out == {"hlo_to_csv": {"*": None}, "spec_melt_wls": {"*": None}}
-    assert "hlo_postprocess_libs" in caplog.text and "deprecated" in caplog.text
-
-
-def test_prefinish_new_key_is_normalized_without_warning(caplog):
-    caplog.set_level(logging.WARNING)
+def test_prefinish_key_is_normalized():
     out = prefinish_config(
         {"prefinish_hooks": {"hlo_to_csv": ["acquire"]}},
         "prefinish_hooks",
-        "hlo_postprocess_libs",
         "SPEC_R",
     )
     assert out == {"hlo_to_csv": {"acquire": None}}
-    assert "deprecated" not in caplog.text
-
-
-def test_prefinish_old_and_new_together_refused_naming_both():
-    with pytest.raises(HookConfigError) as ei:
-        prefinish_config(
-            {"prefinish_hooks": {"a": ["*"]}, "hlo_postprocess_libs": ["a"]},
-            "prefinish_hooks",
-            "hlo_postprocess_libs",
-            "SPEC_R",
-        )
-    msg = str(ei.value)
-    assert (
-        "prefinish_hooks" in msg and "hlo_postprocess_libs" in msg and "SPEC_R" in msg
-    )
 
 
 def test_prefinish_absent_is_empty():
-    assert prefinish_config({}, "prefinish_hooks", "hlo_postprocess_libs", "X") == {}
+    assert prefinish_config({}, "prefinish_hooks", "X") == {}
 
 
 def test_postfinish_default_chain_without_analysis():
-    out = postfinish_config(None, None, "SYNC")
+    out = postfinish_config(None, "SYNC")
     assert tuple(out) == LEVELS
     assert out == {level: {"s3_upload": {"*": None}} for level in LEVELS}
 
 
-def test_postfinish_default_chain_adds_dispatch_analysis_alias(caplog):
-    caplog.set_level(logging.WARNING)
-    ana = {"server_key": "ANA", "endpoint": "e", "host": "h", "port": 1}
-    out = postfinish_config(None, {"my_seq": ana}, "SYNC")
-    assert out["sequence"] == {
-        "s3_upload": {"*": None},
-        "dispatch_analysis": {"my_seq": ana},
-    }
-    assert out["action"] == {"s3_upload": {"*": None}}
-    assert "auto_analyze_sequences" in caplog.text and "deprecated" in caplog.text
-
-
-def test_postfinish_empty_alias_is_ignored(caplog):
-    caplog.set_level(logging.WARNING)
-    assert postfinish_config(None, {}, "SYNC")["sequence"] == {"s3_upload": {"*": None}}
-    assert "deprecated" not in caplog.text
-
-
 def test_postfinish_explicit_owns_the_chain():
-    out = postfinish_config({"action": {"s3_upload": ["*"]}}, None, "SYNC")
+    out = postfinish_config({"action": {"s3_upload": ["*"]}}, "SYNC")
     assert out == {
         "action": {"s3_upload": {"*": None}},
         "experiment": {},
@@ -127,17 +78,8 @@ def test_postfinish_explicit_owns_the_chain():
 
 def test_postfinish_stray_level_refused():
     with pytest.raises(HookConfigError) as ei:
-        postfinish_config({"action": {}, "process": {"x": ["*"]}}, None, "SYNC")
+        postfinish_config({"action": {}, "process": {"x": ["*"]}}, "SYNC")
     assert "process" in str(ei.value)
-
-
-def test_postfinish_old_and_new_together_refused():
-    with pytest.raises(HookConfigError) as ei:
-        postfinish_config(
-            {"sequence": {"s3_upload": ["*"]}}, {"s": {"server_key": "A"}}, "SYNC"
-        )
-    msg = str(ei.value)
-    assert "auto_analyze_sequences" in msg and "postfinish_hooks" in msg
 
 
 def test_hookset_select_exact_then_star_in_config_order():
@@ -168,3 +110,30 @@ def test_find_orchestrator_entry():
     assert find_orchestrator_entry(world) == {"group": "orchestrator", "x": 1}
     assert find_orchestrator_entry({}) == {}
     assert find_orchestrator_entry(None) == {}
+
+
+@pytest.mark.parametrize(
+    "key,retired",
+    [
+        ("prefinish_hooks", "hlo_postprocess_libs"),
+        ("prefinish_experiment_hooks", "exp_postprocess_libs"),
+        ("prefinish_sequence_hooks", "seq_postprocess_libs"),
+    ],
+)
+def test_a_removed_prefinish_list_key_is_refused_not_ignored(key, retired):
+    with pytest.raises(HookConfigError, match=retired):
+        prefinish_config({retired: ["append_params"]}, key, "SRV")
+
+
+def test_removed_auto_analyze_sequences_is_refused_not_ignored():
+    with pytest.raises(HookConfigError, match="auto_analyze_sequences"):
+        postfinish_config(None, "SYNC", params={"auto_analyze_sequences": {}})
+    assert postfinish_config(None, "SYNC", params={"other": 1})  # default chain
+
+
+def test_a_dispatch_analysis_block_with_analysis_params_is_refused():
+    hooks = {"sequence": {"dispatch_analysis": {"SEQ": {"analysis_params": {}}}}}
+    with pytest.raises(HookConfigError, match="analysis_params"):
+        postfinish_config(hooks, "SYNC")
+    ok = {"sequence": {"dispatch_analysis": {"SEQ": {"params": {}}}}}
+    assert postfinish_config(ok, "SYNC")["sequence"]["dispatch_analysis"]

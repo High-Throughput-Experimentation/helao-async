@@ -44,10 +44,10 @@ stays ``none``); with C1 it PASSES.
 import asyncio
 
 from helao.core.error import ErrorCodes
-from helao.deploy.hte.drivers.robot.enum import Spacingmethod
-from helao.deploy.hte.drivers.robot.pal_driver import PAL, PALJob
-from helao.hexagon.adapters.shared.pal_transport import LegacyPalTransport
-from helao.hexagon.adapters.shared.pal_trigger import NullPalTrigger
+from helao.deploy.hte.servers.pal.enum import Spacingmethod
+from helao.deploy.hte.servers.pal.pal_driver import PAL, PALJob
+from helao.deploy.hte.servers.pal.pal_transport import LegacyPalTransport
+from helao.deploy.hte.servers.pal.pal_trigger import NullPalTrigger
 
 
 class _FakeAction:

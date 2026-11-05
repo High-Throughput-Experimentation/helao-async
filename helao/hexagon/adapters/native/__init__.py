@@ -7,7 +7,6 @@ never import ``helao.core.servers.*`` (boundary-enforced)."""
 from helao.hexagon.adapters.native.artifact_store import NativeArtifactStoreAdapter
 from helao.hexagon.adapters.native.csv_catalog import CsvTableCatalog
 from helao.hexagon.adapters.native.data_file import NativeDataFileWriter
-from helao.hexagon.adapters.native.data_sink import NativeDataSinkAdapter
 from helao.hexagon.adapters.native.data_stream import NativeDataStreamer
 from helao.hexagon.adapters.native.finalizer import NativeActionFinalizer
 from helao.hexagon.adapters.native.meta_writer import NativeMetaFileWriter
@@ -21,7 +20,6 @@ __all__ = [
     "NativeDataStreamer",
     "NativeActionFinalizer",
     "NativeArtifactStoreAdapter",
-    "NativeDataSinkAdapter",
     "NativeSyncer",
     "NativeSyncAdapter",
 ]

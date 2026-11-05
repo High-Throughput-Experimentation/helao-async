@@ -1,0 +1,5 @@
+{"scan": ["helao", "harness", "*.py"],
+ "moves": [
+  ["helao/hexagon/tests/test_andor_vendor_isolation.py", "helao/deploy/hte/servers/andor/tests/test_andor_vendor_isolation.py"],
+  ["helao/hexagon/tests/test_biologic_ole_vendor_isolation.py", "helao/deploy/hte/servers/biologic/tests/test_biologic_ole_vendor_isolation.py"]
+ ]}

@@ -1,6 +1,5 @@
 """HealthPort adapter: port-shape conversion of the legacy HEAD-probe
-helper, late-bound orch for ping/status_summary, fail-loud unbound access,
-and the ORCH_REQUIRED/wiring growth (P2a Task 1)."""
+helper and the ORCH_REQUIRED/wiring growth (P2a Task 1)."""
 
 import pytest
 
@@ -21,12 +20,6 @@ def test_orch_required_includes_health_and_wiring_has_slot():
         w.require("health")
 
 
-def test_unbound_ping_and_summary_fail_loud():
-    ad = LegacyHealthAdapter()
-    with pytest.raises(RuntimeError, match="not bound"):
-        ad.status_summary()
-
-
 @pytest.mark.asyncio
 async def test_endpoints_available_converts_to_port_shape(monkeypatch):
     async def fake_probe(req_list):
@@ -40,12 +33,3 @@ async def test_endpoints_available_converts_to_port_shape(monkeypatch):
     ad = LegacyHealthAdapter()
     out = await ad.endpoints_available(["http://h:1/S/ok", "http://h:1/S/bad"])
     assert out == [("http://h:1/S/ok", True), ("http://h:1/S/bad", False)]
-
-
-def test_status_summary_extracts_driver_status_from_bound_orch():
-    class _O:
-        status_summary = {"SIM": ("idle", "ok"), "MOTOR": ("idle", "unknown")}
-
-    ad = LegacyHealthAdapter()
-    ad.bind_orch(_O())
-    assert ad.status_summary() == {"SIM": "ok", "MOTOR": "unknown"}

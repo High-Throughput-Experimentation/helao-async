@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 from helao.core.error import ErrorCodes
 from helao.core.models.sample import LiquidSample, NoneSample, SampleStatus
-from helao.deploy.hte.drivers.data.archive_driver import Archive
+from helao.deploy.hte.servers.sample.archive_driver import Archive
 from helao.helpers.sample_positions import Custom, CustomTypes
 
 

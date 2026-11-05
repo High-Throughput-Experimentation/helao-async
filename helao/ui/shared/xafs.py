@@ -175,7 +175,7 @@ async def _plates_of(client, sequence_uuid: str) -> frozenset:
     if plate is not None:
         plates = frozenset({int(plate)})
     else:
-        processes = await client.read_processes_by_sequence(sequence_uuid=sequence_uuid)
+        processes = await spectra.read_processes_by_sequence(client, sequence_uuid)
         plates = frozenset(
             int(s["plate_id"])
             for p in processes or []
@@ -238,8 +238,8 @@ async def records_for_plate(client, plate_id: int) -> list:
 
     async def _one(sequence):
         async with semaphore:
-            processes = await client.read_processes_by_sequence(
-                sequence_uuid=sequence["sequence_uuid"]
+            processes = await spectra.read_processes_by_sequence(
+                client, sequence["sequence_uuid"]
             )
         return records_from_processes(
             processes, plate_id, sequence.get("sequence_timestamp")

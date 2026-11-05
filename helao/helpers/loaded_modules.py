@@ -29,11 +29,11 @@ import helao
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(helao.__file__)))
 
 
-def _hash_file(path: str):
+def sha1_file(path: str):
     """Return the SHA-1 hex digest of the file at ``path``, or None if unreadable."""
     try:
         with open(path, "rb") as f:
-            return hashlib.sha1(f.read()).hexdigest()
+            return hashlib.file_digest(f, "sha1").hexdigest()
     except OSError:
         return None
 
@@ -61,7 +61,7 @@ def loaded_repo_modules(repo_root: Optional[str] = None) -> dict:
         af = os.path.abspath(f)
         if not af.startswith(prefix) or not af.endswith(".py"):
             continue
-        digest = _hash_file(af)
+        digest = sha1_file(af)
         if digest is not None:
             out[af] = digest
     return out

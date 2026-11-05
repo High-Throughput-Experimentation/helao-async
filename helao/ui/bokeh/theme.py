@@ -300,9 +300,9 @@ def apply_theme(doc) -> None:
 
     Called once from ``HelaoVis.__init__``, which is the single seam that
     reaches every HELAO Bokeh document — including the aligner served by
-    ``helao/hexagon/adapters/vis/galil_aligner_host.py``, whose ``Server`` is
-    built inside an action-server process and never passes through
-    ``bokeh_launcher.py``.
+    the deployment's galil_motion server folder (``galil_aligner_host.py``),
+    whose ``Server`` is built inside an action-server process and never passes
+    through ``bokeh_launcher.py``.
 
     Idempotent: a second call on the same document is a no-op, detected by
     scanning existing roots for :data:`CARRIER_TAG` rather than by a flag on

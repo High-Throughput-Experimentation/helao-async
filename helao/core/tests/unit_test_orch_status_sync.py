@@ -1,10 +1,10 @@
 """Unit tests for the ``StatusIngester`` collaborator extracted from ``Orch``
 (CARDS P5, Stage S4): the status-ingestion cluster.
 
-``update_status``/``update_nonblocking`` are already exercised (byte-for-byte,
-via the fake-dispatcher status-ping mechanism) by
-``test_orch_dispatch_golden_master.py --check``, so this module covers the
-cluster-C member that harness does *not* drive:
+``StatusIngester`` now holds only ``clear_nonblocking``; the
+``update_status``/``update_nonblocking`` bodies live in
+``HexStatusIngestion`` (``test_ingestion.py``). This module covers the
+cluster-C member that the dispatch golden master does *not* drive:
 
   1. ``clear_nonblocking`` sends ``stop_executor`` to every tracked
      non-blocking executor (in order) and returns the collected

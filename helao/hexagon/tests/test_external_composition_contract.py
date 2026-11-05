@@ -93,6 +93,16 @@ def _imports(path: Path) -> set[str]:
     return found
 
 
+def _action_modules(deployment: Path) -> list[Path]:
+    """Modules directly in a server folder: ``servers/<instrument>/*.py`` (and the
+    older ``servers/action/*.py``), not the visualizer/panel stacks or tests."""
+    return sorted(
+        m
+        for m in deployment.glob("servers/*/*.py")
+        if m.name != "__init__.py" and m.parent.name not in ("reflex", "visualizer")
+    )
+
+
 def test_external_deployments_do_not_gain_engine_coupling() -> None:
     """The B4/B5 ratchet, generalised past the repo boundary.
 
@@ -102,11 +112,8 @@ def test_external_deployments_do_not_gain_engine_coupling() -> None:
     """
     offenders = []
     for deployment in _external_deployments():
-        action_dir = deployment / "servers/action"
-        if not action_dir.is_dir():
-            continue
-        for module in sorted(action_dir.glob("*.py")):
-            if module.name == "__init__.py" or "notes" in module.parts:
+        for module in _action_modules(deployment):
+            if "notes" in module.parts:
                 continue
             if any(m.startswith(FORBIDDEN) for m in _imports(module)):
                 offenders.append(str(module.relative_to(REPO_ROOT)))
@@ -138,10 +145,7 @@ def test_the_sweep_is_not_vacuous() -> None:
 
     modules = 0
     for deployment in deployments:
-        action_dir = deployment / "servers/action"
-        if not action_dir.is_dir():
-            continue
-        modules += sum(1 for m in action_dir.glob("*.py") if m.name != "__init__.py")
+        modules += len(_action_modules(deployment))
 
     assert modules > 0, (
         f"{len(deployments)} external deployment(s) present but the sweep found "
@@ -174,8 +178,14 @@ REGISTRAR_CONTRACT: Final[dict[str, set[str]]] = {
 }
 
 
+def _hte_module(stem: str) -> Path:
+    return next(
+        (REPO_ROOT / "helao/deploy/hte/servers").glob(f"*/{stem}.py"), Path(stem)
+    )
+
+
 def _registrar_reads(module_stem: str) -> set[str]:
-    path = REPO_ROOT / f"helao/deploy/hte/servers/action/{module_stem}.py"
+    path = _hte_module(module_stem)
     tree = ast.parse(path.read_text(encoding="utf-8"))
     fn = next(
         (
@@ -211,7 +221,5 @@ def test_registrar_reads_exactly_the_pinned_attributes(module_stem: str) -> None
 def test_the_contract_probe_is_not_vacuous() -> None:
     """A typo'd module stem would make the pin above assert over nothing."""
     for stem in REGISTRAR_CONTRACT:
-        assert (
-            REPO_ROOT / f"helao/deploy/hte/servers/action/{stem}.py"
-        ).exists(), f"{stem} is pinned but has no module"
+        assert (_hte_module(stem)).exists(), f"{stem} is pinned but has no module"
         assert _registrar_reads(stem), f"{stem}'s registrar reads no app attributes"

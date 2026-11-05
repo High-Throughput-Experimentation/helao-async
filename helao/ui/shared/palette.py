@@ -84,6 +84,7 @@ TW: Final[Mapping[str, str]] = {
     "blue-100": "#dbeafe",
     "blue-600": "#2563eb",
     "blue-700": "#1d4ed8",
+    "indigo-50": "#eef2ff",
     "violet-50": "#f5f3ff",
     "violet-100": "#ede9fe",
     "violet-600": "#7c3aed",
@@ -201,6 +202,7 @@ REFLEX_PAGE_TINTS: Final[Mapping[str, str]] = {
     "/xrds": "yellow-50",
     "/retire": "orange-50",
     "/quarantine": "red-50",
+    "/logs": "indigo-50",
 }
 """One page canvas per Reflex route — the functional-section signal.
 
@@ -249,8 +251,8 @@ against it. Zebra striping, if any is ever added, stays ``slate-50``.
 
 Each header text clears the 4.5 body floor on its own header background
 (4.79–9.45). Each 600-level border clears the 3.0 non-text floor against every
-entry in :data:`REFLEX_PAGE_TINTS`, worst case ``cyan-600`` at 3.36 on
-``violet-50``.
+entry in :data:`REFLEX_PAGE_TINTS`, worst case ``cyan-600`` at 3.29 on
+``indigo-50``.
 """
 
 REFLEX_MUTED_TEXT: Final[str] = "slate-600"
@@ -778,6 +780,16 @@ BROWSER_HEADER_TEXT: Final[str] = TW["sky-700"]
 
 BROWSER_FAILURE_TEXT: Final[str] = TW["red-700"]
 """Data-browser scan-failure span. Replaces ``#c0392b``."""
+
+#: Row text colour per log level on the Reflex /logs page.
+LOG_LEVEL_TEXT: Final[dict[str, str]] = {
+    "DEBUG": TW[REFLEX_MUTED_TEXT],
+    "INFO": TW["slate-900"],
+    "WARNING": TW["amber-700"],
+    "ERROR": TW["red-700"],
+    "CRITICAL": TW["red-700"],
+    "ALERT": TW["red-700"],
+}
 
 # ---------------------------------------------------------------------------
 # Controls

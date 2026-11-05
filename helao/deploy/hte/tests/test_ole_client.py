@@ -10,7 +10,7 @@ The COM object is injected, so these tests run on Linux with no comtypes.
 
 import pytest
 
-from helao.deploy.hte.drivers.pstat.biologic_ole.olecom_client import (
+from helao.deploy.hte.servers.biologic.biologic_ole.olecom_client import (
     HINTS,
     OleComClient,
     OleComError,

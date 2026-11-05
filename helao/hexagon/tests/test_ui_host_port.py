@@ -30,9 +30,6 @@ class _FakeUiHost:
     def stop(self, handle):
         self.stopped.append(handle)
 
-    def build_ui_app(self, config):
-        return object()
-
 
 def test_fake_satisfies_ui_host_port():
     assert isinstance(_FakeUiHost(), UiHostPort)
@@ -54,12 +51,6 @@ def test_start_and_stop_round_trip_an_opaque_handle():
     )
 
 
-def test_build_ui_app_returns_an_opaque_object():
-    host = _FakeUiHost()
-    result = host.build_ui_app({"some": "config"})
-    assert result is not None
-
-
 def test_port_module_has_no_vendor_imports():
     """Ports import ban (test_boundaries.py:78-82): no import statement in
     this module may name bokeh or reflex."""
@@ -79,6 +70,6 @@ def test_port_annotations_return_object_not_a_vendor_type():
     """Every UiHostPort member returns `object` -- an opaque handle, not a
     bokeh.server.server.Server or a Reflex App -- so the port seam never
     leaks a vendor type into ports/ or domain/."""
-    for name in ("start_document_host", "build_ui_app"):
+    for name in ("start_document_host",):
         method = getattr(UiHostPort, name)
         assert method.__annotations__.get("return") is object, name

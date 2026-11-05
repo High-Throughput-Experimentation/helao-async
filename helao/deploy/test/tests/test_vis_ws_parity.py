@@ -31,6 +31,8 @@ from bokeh.document import Document
 
 from harness import ws_frames as wf
 
+VIS_SIM = {"wssim_live_vis": "wssim", "gpsim_live_vis": "gpsim", "oersim_vis": "cpsim"}
+
 SERV_KEY = "SIM"
 SERVERS = {SERV_KEY: {"host": "127.0.0.1", "port": 8010}}
 
@@ -78,14 +80,16 @@ def test_families_covered_are_non_empty():
     deployment add_points implementations found on disk."""
     modnames = ["wssim_live_vis", "gpsim_live_vis", "oersim_vis"]
     for name in modnames:
-        mod = importlib.import_module(f"helao.deploy.test.servers.visualizer.{name}")
+        mod = importlib.import_module(
+            f"helao.deploy.test.servers.{VIS_SIM[name]}.bokeh.{name}"
+        )
         assert hasattr(mod.C_vis, "add_points"), name
     assert len(modnames) == 3
 
 
 def test_wssim_live_vis_ingests_recognized_numeric_series():
     module = importlib.import_module(
-        "helao.deploy.test.servers.visualizer.wssim_live_vis"
+        "helao.deploy.test.servers.wssim.bokeh.wssim_live_vis"
     )
 
     async def _run():
@@ -109,7 +113,7 @@ def test_wssim_live_vis_raises_on_unrecognized_datalab():
     'never raises' assumption for the ws_live family): this panel's
     add_points has no guard for a datalab outside data_dict_keys."""
     module = importlib.import_module(
-        "helao.deploy.test.servers.visualizer.wssim_live_vis"
+        "helao.deploy.test.servers.wssim.bokeh.wssim_live_vis"
     )
 
     async def _run():
@@ -127,7 +131,7 @@ def test_gpsim_live_vis_tolerates_unrecognized_datalab():
     unrecognized key is silently ignored rather than raising -- the opposite
     behavior from wssim_live_vis above, for the same wire shape."""
     module = importlib.import_module(
-        "helao.deploy.test.servers.visualizer.gpsim_live_vis"
+        "helao.deploy.test.servers.gpsim.bokeh.gpsim_live_vis"
     )
 
     async def _run():
@@ -146,7 +150,7 @@ def test_gpsim_live_vis_ingests_recognized_numeric_row():
     circuits and the table stream never runs -- a genuinely different
     'numeric row increases' contract from every other panel in this file."""
     module = importlib.import_module(
-        "helao.deploy.test.servers.visualizer.gpsim_live_vis"
+        "helao.deploy.test.servers.gpsim.bokeh.gpsim_live_vis"
     )
 
     async def _run():
@@ -178,7 +182,7 @@ def test_oersim_vis_ingests_recognized_numeric_columns_and_drops_string():
     so a non-numeric column outside that set (here: `composition`-shaped, via
     STRING_COLUMN) is silently dropped rather than raising -- matching the
     ws_data-family finding across all 4 hte ws_data panels too."""
-    module = importlib.import_module("helao.deploy.test.servers.visualizer.oersim_vis")
+    module = importlib.import_module("helao.deploy.test.servers.cpsim.bokeh.oersim_vis")
 
     async def _run():
         vis = _build(module)
@@ -201,7 +205,7 @@ def test_oersim_vis_ignores_unrecognized_action_name():
     """The VALID_ACTION_NAME guard is real: an action_name outside
     ("measure_cp",) is filtered before any column is touched, so no row is
     added and nothing raises."""
-    module = importlib.import_module("helao.deploy.test.servers.visualizer.oersim_vis")
+    module = importlib.import_module("helao.deploy.test.servers.cpsim.bokeh.oersim_vis")
 
     async def _run():
         vis = _build(module)

@@ -240,3 +240,16 @@ def test_deterministic_file_names_pass_through_unchanged():
     m = UuidMapper()
     out = normalize_meta({"file_name": "WsSim-0.0.0.0__0.hlo"}, m)
     assert out == {"file_name": "WsSim-0.0.0.0__0.hlo"}
+
+
+def test_load_yml_plain_reads_json_and_names_normalize(tmp_path):
+    from harness.uuidmap import UuidMapper
+    from harness.yaml_pass import load_yml_plain, normalize_meta
+    from helao.helpers.meta_io import write_meta
+
+    y = tmp_path / "1-act.yml"
+    y.write_text("files:\n  - file_name: X__0.hlo\n", encoding="utf-8")
+    j = write_meta(tmp_path / "2-act.json", {"files": [{"file_name": "X__0.jsonl"}]})
+    assert normalize_meta(load_yml_plain(y), UuidMapper()) == normalize_meta(
+        load_yml_plain(j), UuidMapper()
+    )

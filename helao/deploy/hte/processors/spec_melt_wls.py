@@ -4,7 +4,7 @@ For each ``spec_r_helao__file`` / ``spec_t_helao__file`` HLO output,
 reads the data, renames per-channel columns to their wavelengths,
 melts the dataframe into ``(t_s, wl_nm, intensity)`` long form, sorts
 by time and wavelength, writes a parquet file (optionally suffixed
-with the action's ``comment``) and removes the original ``.hlo`` file.
+with the action's ``comment``) and removes the original ``.hlo`` file (or ``.jsonl`` plus its ``.meta.json``).
 """
 
 import os
@@ -14,6 +14,7 @@ from pathlib import Path
 import pandas as pd
 
 from helao.core.models.file import FileInfo
+from helao.hexagon.domain.naming import data_sibling
 from helao.helpers import helao_logging as logging
 from helao.helpers.hlo_data import read_hlo
 from helao.helpers.processors import HloPostProcessor
@@ -41,7 +42,7 @@ class PostProcess(HloPostProcessor):
                     df = pd.DataFrame(data)
 
                     action_comment = self.action.action_params.get("comment", "")
-                    new_file_path = file_path.replace(".hlo", ".parquet")
+                    new_file_path = data_sibling(file_path, ".parquet")
                     if action_comment:
                         new_file_path = new_file_path.replace(
                             ".parquet", f"_{action_comment}.parquet"
@@ -87,6 +88,11 @@ class PostProcess(HloPostProcessor):
                     processed_file_list.append(new_file)
 
                     Path(file_path).unlink()
+                    if file_path.endswith(".jsonl"):
+                        # the header lived inside a legacy .hlo; drop it with the rows
+                        Path(data_sibling(file_path, ".meta.json")).unlink(
+                            missing_ok=True
+                        )
                 else:
                     processed_file_list.append(act_file)
 
