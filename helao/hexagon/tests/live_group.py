@@ -197,7 +197,7 @@ async def live_group(tmp_root: str, ntp_offset_s: float = 0.0):
 
     from helao.hexagon.app.orch_host import OrchHost
     from helao.deploy.test.servers.action.sim_db_server import makeApp as db_makeApp
-    from helao.deploy.test.servers.action.ws_simulator import makeApp as sim_makeApp
+    from helao.deploy.test.servers.wssim.ws_simulator import makeApp as sim_makeApp
 
     sim_app = sim_makeApp("SIM")
     db_app = db_makeApp("SYNC")

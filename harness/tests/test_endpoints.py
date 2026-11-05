@@ -4,7 +4,7 @@ from pathlib import Path
 
 from harness.endpoints import diff_route_sets, extract_routes
 
-WS_SIM = Path("helao/deploy/test/servers/action/ws_simulator.py")
+WS_SIM = Path("helao/deploy/test/servers/wssim/ws_simulator.py")
 
 
 def test_extracts_action_routes_with_server_key_substitution():

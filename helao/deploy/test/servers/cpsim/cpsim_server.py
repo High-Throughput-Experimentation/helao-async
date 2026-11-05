@@ -15,7 +15,7 @@ from helao.hexagon.app.action_context import ActionContext
 from helao.hexagon.app.action_host import ActionHost
 from helao.helpers import helao_logging as logging
 
-from ...drivers.pstat.cpsim_driver import CPSim, CPSimExec
+from helao.deploy.test.servers.cpsim.cpsim_driver import CPSim, CPSimExec
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 

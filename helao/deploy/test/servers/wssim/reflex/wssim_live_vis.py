@@ -13,7 +13,7 @@ It re-exports rather than re-implements, so there is nothing here to drift from
 ``wssim_panel``.
 """
 
-from helao.deploy.test.servers.reflex.wssim_panel import (
+from helao.deploy.test.servers.wssim.reflex.wssim_panel import (
     STATE_BASE,
     WS_PATH,
     build,

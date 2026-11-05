@@ -9,7 +9,7 @@ are optimizer-dependent and would make the suite a change detector.
 import numpy as np
 import pytest
 
-from helao.deploy.test.drivers.data.gp_backend import GPRegressor
+from helao.deploy.test.servers.gpsim.gp_backend import GPRegressor
 
 #: Small, so the suite stays fast. Enough to fit a smooth 2-D function.
 FIT_ITERS = 60

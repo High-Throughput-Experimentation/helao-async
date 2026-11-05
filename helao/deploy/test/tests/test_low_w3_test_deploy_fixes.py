@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 from bokeh.document import Document
 
+VIS_SIM = {"wssim_live_vis": "wssim", "gpsim_live_vis": "gpsim", "oersim_vis": "cpsim"}
+
 SERV_KEY = "SIM"
 
 
@@ -20,7 +22,9 @@ class _FakeVis:
 
 
 def _build(modname):
-    module = importlib.import_module(f"helao.deploy.test.servers.visualizer.{modname}")
+    module = importlib.import_module(
+        f"helao.deploy.test.servers.{VIS_SIM[modname]}.bokeh.{modname}"
+    )
     vis = module.C_vis(_FakeVis(Document()), SERV_KEY)
     vis.IOloop_data_run = False
     vis.IOtask.cancel()

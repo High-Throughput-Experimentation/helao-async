@@ -31,7 +31,7 @@ cfg = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))
 cfg["root"] = tempfile.mkdtemp(prefix="b7a_ratchet_")
 config_loader.CONFIG = cfg
 from helao.hexagon.app.action_host import ActionHost
-from helao.deploy.test.servers.action.ws_simulator import makeApp
+from helao.deploy.test.servers.wssim.ws_simulator import makeApp
 from helao.hexagon.app.orch_host import OrchHost
 
 hosts = {

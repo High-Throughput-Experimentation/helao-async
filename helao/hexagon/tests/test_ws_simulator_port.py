@@ -13,7 +13,7 @@ import pytest
 
 
 def _app():
-    from helao.deploy.test.servers.action.ws_simulator import makeApp
+    from helao.deploy.test.servers.wssim.ws_simulator import makeApp
     from helao.helpers import config_loader
 
     config_loader.CONFIG = {
@@ -35,7 +35,7 @@ def test_the_module_constructs_no_baseapi() -> None:
     """The point of the port: no legacy engine object is built."""
     import inspect
 
-    from helao.deploy.test.servers.action import ws_simulator
+    from helao.deploy.test.servers.wssim import ws_simulator
 
     src = inspect.getsource(ws_simulator)
     assert "BaseAPI" not in src

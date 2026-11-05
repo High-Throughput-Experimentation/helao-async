@@ -18,8 +18,8 @@ import numpy as np
 from scipy.stats import norm
 from sklearn.metrics import mean_absolute_error
 
-from helao.deploy.test.drivers.data.gp_backend import GPRegressor
-from helao.deploy.test.drivers.data.oer_metrics import calc_eta  # noqa: F401
+from helao.deploy.test.servers.gpsim.gp_backend import GPRegressor
+from helao.deploy.test.servers.cpsim.oer_metrics import calc_eta  # noqa: F401
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 from typing import TYPE_CHECKING
@@ -62,7 +62,7 @@ class GPSim:
         g_acq: Set of compositions acquired across all plates.
         g_avl: Set of all known compositions.
         invfeats: Mapping of composition tuple to ``(plate_id, idx)`` entries.
-        models: Per-plate :class:`~helao.deploy.test.drivers.data.gp_backend.GPRegressor`
+        models: Per-plate :class:`~helao.deploy.test.servers.gpsim.gp_backend.GPRegressor`
             instances, ``None`` until the plate's first fit.
         progress: Latest acquisition record per plate.
         initialized: Per-plate flag set after prior initialization.

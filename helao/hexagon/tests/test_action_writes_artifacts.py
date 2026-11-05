@@ -31,7 +31,7 @@ def _app(
     root: str,
     prefinish_hooks: dict | None = None,
 ):
-    from helao.deploy.test.servers.action.ws_simulator import makeApp
+    from helao.deploy.test.servers.wssim.ws_simulator import makeApp
     from helao.helpers import config_loader
 
     server: dict = {

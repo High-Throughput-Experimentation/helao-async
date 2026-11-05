@@ -15,7 +15,7 @@ from helao.hexagon.app.action_context import ActionContext
 from helao.hexagon.app.action_host import ActionHost
 from helao.helpers import helao_logging as logging
 
-from ...drivers.data.gpsim_driver import GPSim, GPSimExec
+from helao.deploy.test.servers.gpsim.gpsim_driver import GPSim, GPSimExec
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 

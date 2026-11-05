@@ -124,8 +124,9 @@ def test_every_server_in_this_config_can_actually_be_imported(reflex_cfg):
     so nothing else in this suite would notice.
     """
     import os
-    from glob import glob
     from importlib import import_module
+
+    from helao.helpers.server_modules import import_path, locate, module_file
 
     root = os.getcwd()
     failures = []
@@ -137,22 +138,9 @@ def test_every_server_in_this_config_can_actually_be_imported(reflex_cfg):
             if code == "reflex":
                 candidates = ["helao.ui.reflex.app"]
             else:
-                hits = glob(
-                    os.path.join(
-                        root,
-                        "helao",
-                        "deploy",
-                        "*",
-                        "servers",
-                        server["group"],
-                        f"{module}.py",
-                    )
-                )
-                candidates = [
-                    "helao.deploy."
-                    + h.split("/deploy/")[1].replace(".py", "").replace("/", ".")
-                    for h in hits
-                ]
+                stack = "bokeh" if server["group"] == "visualizer" else "app"
+                _, found = locate(module, stack)
+                candidates = [import_path(module_file(d, module, stack)) for d in found]  # type: ignore
             assert candidates, f"{key}: no module found for {code}: {module}"
             last = None
             for candidate in candidates:
@@ -179,7 +167,7 @@ def test_calc_eta_does_not_drag_in_the_gp_stack():
     import ast
     import inspect
 
-    from helao.deploy.test.drivers.data import oer_metrics
+    from helao.deploy.test.servers.cpsim import oer_metrics
 
     def _imported_roots(module):
         """Module names actually imported, ignoring prose in docstrings."""
@@ -201,7 +189,7 @@ def test_calc_eta_does_not_drag_in_the_gp_stack():
         1.5 - 1.23
     )
 
-    cpsim = __import__("helao.deploy.test.drivers.pstat.cpsim_driver", fromlist=["x"])
+    cpsim = __import__("helao.deploy.test.servers.cpsim.cpsim_driver", fromlist=["x"])
     assert "gpsim_driver" not in inspect.getsource(cpsim).split('"""')[-1]
 
 

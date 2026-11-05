@@ -24,7 +24,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 from helao.helpers.executor import Executor
 from helao.helpers.file_utils import unzpickle
 
-from ...drivers.data.oer_metrics import calc_eta
+from helao.deploy.test.servers.cpsim.oer_metrics import calc_eta
 
 
 class CPSim:
