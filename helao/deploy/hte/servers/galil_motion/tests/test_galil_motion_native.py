@@ -32,6 +32,7 @@ class FakeChannel:
     def __init__(self, responses: Optional[dict] = None):
         self.commands: list = []
         self.opened: Optional[str] = None
+        self.programs: list = []
         self.closed = False
         self._responses = responses or {}
 
@@ -44,6 +45,9 @@ class FakeChannel:
         if isinstance(r, list):
             return r.pop(0)
         return r
+
+    def download_program(self, program: str) -> None:
+        self.programs.append(program)
 
     def info(self) -> str:
         return "fake-info"

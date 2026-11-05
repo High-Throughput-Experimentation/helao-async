@@ -1,6 +1,6 @@
 """gclib-backed GalilCommandChannel (P3a galil-3 native deepening).
 
-The at-station adapter: wraps the Windows-only ``gclib`` runtime behind the
+The at-station adapter: wraps the ``gclib`` runtime (wrapper 1.0, ``gclib.py()``; Windows or Linux) behind the
 :class:`~helao.deploy.hte.servers.galil_motion.galil_command_channel_port.GalilCommandChannel` port.
 ``import gclib`` is lazy (inside ``open``), so this module and the native motion
 driver import and construct on Linux without gclib; only ``open()`` (and the
@@ -25,8 +25,14 @@ class GclibCommandChannel:
         self._command: Optional[Any] = None
 
     def open(self, connection_string: str) -> None:
-        import gclib  # lazy: Windows/at-station only
+        import gclib  # lazy: vendor package, at-station only
 
+        if not hasattr(gclib, "py"):
+            raise GalilChannelError(
+                "gclib_api '1' needs the 1.0 wrapper (gclib.py); the installed "
+                "gclib has Controller (wrapper 2.x) - set gclib_api: '2' or "
+                "install wrapper 1.0.1"
+            )
         try:
             g = gclib.py()
             g.GOpen(connection_string)
@@ -44,6 +50,16 @@ class GclibCommandChannel:
             return self._command(cmd)
         except gclib.GclibError as exc:
             raise GalilChannelError(f"command {cmd!r} failed: {exc}") from exc
+
+    def download_program(self, program: str) -> None:
+        if self._g is None:
+            raise GalilChannelError("channel not open")
+        import gclib
+
+        try:
+            self._g.GProgramDownload(program)
+        except gclib.GclibError as exc:
+            raise GalilChannelError(f"program download failed: {exc}") from exc
 
     def info(self) -> str:
         if self._g is None:

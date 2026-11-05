@@ -33,6 +33,10 @@ class GalilCommandChannel(Protocol):
         """Send one command and return its raw string response (``g.GCommand``)."""
         ...
 
+    def download_program(self, program: str) -> None:
+        """Download a DMC program (legacy ``g.GProgramDownload(program)``)."""
+        ...
+
     def info(self) -> str:
         """Controller info string (legacy ``g.GInfo()``)."""
         ...
