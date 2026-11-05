@@ -137,6 +137,9 @@ class RunStateJournal:
         self.states_root = Path(states_root)
         self.server_key = server_key
         self.path = self.states_root / f"runstate_{server_key}.jsonl"
+        # (file size, line count, live uuids) as of our last look; lets append
+        # skip re-parsing the whole file. Valid only while the size still matches.
+        self._tally: Optional[tuple] = None
 
     def append(
         self,
@@ -167,9 +170,51 @@ class RunStateJournal:
             "parent": str(parent) if parent else None,
         }
         self.states_root.mkdir(parents=True, exist_ok=True)
+        size_before = self.path.stat().st_size if self.path.exists() else 0
+        tally_ok = self._tally is not None and self._tally[0] == size_before
+        if not tally_ok and size_before:
+            self._terminate_tail(size_before)
         with self.path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(record, separators=(",", ":")) + "\n")
+        tally = self._tally
+        if tally is not None and tally[0] == size_before:
+            _, lines, live = tally
+            (live.discard if state == DONE else live.add)(record["uuid"])
+            self._tally = (self.path.stat().st_size, lines + 1, live)
+        else:
+            self._tally = None
         self._maybe_compact()
+
+    def _terminate_tail(self, size: int) -> None:
+        """Make the file end in a newline before an append.
+
+        A crash can leave an unterminated last line. If it parses it is a whole
+        record that only lost its newline: keep it. If not it is torn (replay
+        would discard it): truncate it so the append neither merges into it nor
+        buries it mid-file as corruption. Reads only the tail line.
+        """
+        with self.path.open("r+b") as f:
+            f.seek(size - 1)
+            if f.read(1) == b"\n":
+                return
+            start, chunk = size, 4096
+            while start > 0:
+                start = max(0, start - chunk)
+                f.seek(start)
+                buf = f.read(size - start)
+                nl = buf.rfind(b"\n")
+                if nl >= 0:
+                    start += nl + 1
+                    break
+            f.seek(start)
+            tail = f.read()
+            try:
+                json.loads(tail)
+            except ValueError:
+                f.truncate(start)
+            else:
+                f.seek(0, os.SEEK_END)
+                f.write(b"\n")
 
     def working_set(self) -> dict:
         """Records that are not done, keyed by uuid, newest state per uuid.
@@ -178,7 +223,10 @@ class RunStateJournal:
             ValueError: A line other than the last one does not parse, which
                 is real corruption rather than a torn write.
         """
-        return self._replay()[0]
+        size = self.path.stat().st_size if self.path.exists() else 0
+        records, lines = self._replay()
+        self._tally = (size, lines, set(records))
+        return records
 
     def compact(self) -> None:
         """Rewrite the file as one line per surviving record.
@@ -231,16 +279,24 @@ class RunStateJournal:
     def _maybe_compact(self) -> None:
         if not self.path.exists():
             return
-        survivors, line_count = self._replay()
+        # Every append used to re-read and re-parse the whole file here, which
+        # at a 23 MB journal pinned the event loop. Replay only when the
+        # cached tally is missing or the file changed behind our back.
+        size = self.path.stat().st_size
+        if self._tally is None or self._tally[0] != size:
+            survivors, line_count = self._replay()
+            self._tally = (size, line_count, set(survivors))
+        _, line_count, live = self._tally
         if line_count < COMPACT_MIN_LINES:
             return
-        if line_count < COMPACT_RATIO * max(len(survivors), 1):
+        if line_count < COMPACT_RATIO * max(len(live), 1):
             return
         _log().debug(
             f"Compacting {self.path.name}: {line_count} lines, "
-            f"{len(survivors)} live records."
+            f"{len(live)} live records."
         )
         self.compact()
+        self._tally = None
 
 
 _KIND_BY_SUFFIX = {"-seq": "sequence", "-exp": "experiment", "-act": "action"}

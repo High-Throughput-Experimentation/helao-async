@@ -442,3 +442,49 @@ def test_prg_with_cp1252_bytes_is_still_classified(tmp_path: Path):
     q = tmp_path / "c.prg"
     q.write_bytes(junk + b"quarantine:\n  quarantined_at: 2026-10-26\n")
     assert _prg_is_quarantined(q)
+
+
+def test_append_does_not_reread_the_journal(tmp_path: Path):
+    # Every append used to replay the whole file to decide on compaction; at a
+    # 23 MB journal that pinned SYNC's event loop at 100% CPU.
+    j = RunStateJournal(tmp_path, "SIM")
+    j.append(UUID_A, "action", ACTIVE, "p")
+    calls = []
+    orig = j._replay
+    j._replay = lambda: (calls.append(1), orig())[1]
+    for i in range(50):
+        j.append(str(uuid5(NAMESPACE_URL, str(i))), "action", UNSYNCED, "p")
+    assert len(calls) <= 1
+    assert len(j.working_set()) == 51
+
+
+def test_incremental_tally_still_compacts_and_notices_outside_writes(tmp_path: Path):
+    j = RunStateJournal(tmp_path, "SIM")
+    for _ in range(1100):
+        j.append(UUID_A, "action", UNSYNCED, "p")
+    assert len(j.path.read_text().splitlines()) < 1100  # compacted
+    with j.path.open("a") as f:  # another writer
+        f.write(json.dumps({"uuid": UUID_B, "state": UNSYNCED}) + "\n")
+    j.append(UUID_A, "action", DONE, "p")
+    assert set(j.working_set()) == {UUID_B}
+    assert j._tally[2] == {UUID_B}
+
+
+def test_append_after_a_torn_tail_does_not_merge_lines(tmp_path: Path):
+    j = RunStateJournal(tmp_path, "SIM")
+    j.append(UUID_A, "action", UNSYNCED, "p")
+    with j.path.open("a") as f:
+        f.write('{"uuid": "torn')  # crash mid-append, no newline
+    j = RunStateJournal(tmp_path, "SIM")  # restart
+    j.append(UUID_B, "action", UNSYNCED, "p")
+    j.append(UUID_A, "action", ACTIVE, "p")
+    assert set(j.working_set()) == {UUID_A, UUID_B}
+
+
+def test_append_after_an_unterminated_complete_record_keeps_it(tmp_path: Path):
+    j = RunStateJournal(tmp_path, "SIM")
+    j.append(UUID_A, "action", UNSYNCED, "p")
+    j.path.write_bytes(j.path.read_bytes().rstrip(b"\n"))  # lost only the newline
+    j = RunStateJournal(tmp_path, "SIM")
+    j.append(UUID_B, "action", UNSYNCED, "p")
+    assert set(j.working_set()) == {UUID_A, UUID_B}
