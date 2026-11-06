@@ -38,7 +38,7 @@ from helao.helpers.import_autolibs import import_autolibs
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.server_keys import resolve_sync_server_key
-from helao.helpers.ws_utils import WsPublisher
+from helao.helpers.ws_utils import WsPublisher, wire_dumps
 from helao.helpers.zdeque import zdeque
 from helao.hexagon.adapters.native.native_syncer import NativeSyncer
 from helao.hexagon.adapters.native.sync_adapter import NativeSyncAdapter
@@ -47,6 +47,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from helao.hexagon.app.action_session import ActionSession
 from helao.hexagon.app import orch_unpack
 from helao.hexagon.app.action_host import ActionHost
+from helao.hexagon.app.orch_graph_feed import OrchGraphFeed
 from helao.hexagon.app.wiring import ORCH_REQUIRED, PortWiring
 from helao.hexagon.domain.orchestration import (
     ClearErrorRequested,
@@ -209,6 +210,11 @@ class OrchHost(ActionHost):
         self.step_thru_sequences = False
         self.status_summary = {}
         self.global_params = {}
+        # /ws_orch: the read-only group-graph feed (orch_graph_feed.py). Built
+        # here, started in _orch_startup, cancelled in orch_shutdown.
+        self.orch_graph_q = MultisubscriberQueue()
+        self.graph_feed = OrchGraphFeed(self, self.orch_graph_q)
+        self.graph_feed_task = None
 
         # Experiment/sequence pre-finish hooks (finish-hooks spec §3, §5.1).
         label = self.server_key
@@ -600,6 +606,7 @@ class OrchHost(ActionHost):
         from helao.hexagon.app.orch_payloads import (
             _histories_payload,
             _history_page_payload,
+            _object_payload,
             _queue_object_payload,
         )
 
@@ -626,6 +633,11 @@ class OrchHost(ActionHost):
             only the rendered page, so adding an offset indexes past its end.
             """
             return _history_page_payload(self, kind, limit, offset)
+
+        @self.post("/get_object", tags=["private"])
+        def get_object(kind: str, uuid: str):
+            """One experiment or action by uuid, or null. Read-only, no lock."""
+            return _object_payload(self, kind, uuid)
 
         @self.post("/latest_action_uuids", tags=["private"])
         def latest_action_uuids():
@@ -1381,6 +1393,21 @@ class OrchHost(ActionHost):
             """Stream live-buffer updates, which are dict-native already."""
             await _stream(self.live_publisher, websocket)
 
+        # /ws_orch is new, not inherited, so there is nothing to replace. Its
+        # frames are plain dicts already (GroupSnapshot): identity xform.
+        self.orch_graph_publisher = WsPublisher(self.orch_graph_q)
+
+        @self.websocket("/ws_orch")
+        async def websocket_orch(websocket: WebSocket):
+            """Stream group snapshots; the cached latest one goes first."""
+            await self.orch_graph_publisher.connect(websocket)
+            try:
+                if self.graph_feed.latest is not None:
+                    await websocket.send_bytes(wire_dumps(self.graph_feed.latest))
+                await self.orch_graph_publisher.broadcast(websocket)
+            except (WebSocketDisconnect, ConnectionClosedOK):
+                self.orch_graph_publisher.disconnect(websocket)
+
     # -- the reducer (D-B3.2: driven natively, not grafted) --------------
 
     def _build_reducer(self) -> None:
@@ -1431,6 +1458,7 @@ class OrchHost(ActionHost):
                 )
             self.status_subscriber = asyncio.create_task(self.subscribe_all())
             self.driver_monitor = asyncio.create_task(self.action_server_monitor())
+            self.graph_feed_task = asyncio.create_task(self.graph_feed.run())
             # health is in ORCH_REQUIRED and wiring.require() runs in
             # __init__, so an unwired health port cannot reach here -- a
             # legacy-heartbeat fallback would be unreachable code pretending
@@ -1481,9 +1509,11 @@ class OrchHost(ActionHost):
             self.status_subscriber,
             self.driver_monitor,
             self.heartbeat_monitor,
+            self.graph_feed_task,
         ):
             if task is not None:
                 task.cancel()
+        await self.orch_graph_q.close()
         if getattr(self, "_hex_health", None) is not None:
             await self._hex_health.close()
         if self.parked_head_action is not None or any(

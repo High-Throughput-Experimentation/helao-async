@@ -819,6 +819,27 @@
   },
   {
    "method": "post",
+   "params": [
+    {
+     "in": "query",
+     "name": "kind",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "in": "query",
+     "name": "uuid",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "path": "/get_object",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
    "params": [],
    "path": "/get_orch_state",
    "tags": [
