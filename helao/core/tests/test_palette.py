@@ -2040,3 +2040,51 @@ def test_the_ramps_light_end_is_the_newest_trace_and_is_visible() -> None:
     # And the ramp must still span enough luminance to read as recency at all.
     spread = _luminance(palette.RAMP_START) / _luminance(palette.RAMP_END)
     assert spread > 4.0, f"ramp spread collapsed to {spread:.1f}x; recency unreadable"
+
+
+# --- /group page ------------------------------------------------------------
+GROUP_STATES = {
+    "idle",
+    "busy",
+    "active",
+    "done",
+    "error",
+    "estop",
+    "unreachable",
+    "queued",
+}
+
+
+def test_group_state_maps_cover_exactly_the_states() -> None:
+    assert set(palette.GROUP_SHADES) == GROUP_STATES
+    assert set(palette.GROUP_STATE_COLORS) == GROUP_STATES
+    assert set(palette.GROUP_LABEL_COLORS) == GROUP_STATES
+    assert set(palette.GROUP_BADGE_CLASSES) == GROUP_STATES
+
+
+def test_group_state_colours_are_tw_shades() -> None:
+    for state, name in palette.GROUP_SHADES.items():
+        assert palette.GROUP_STATE_COLORS[state] == TW[name]
+
+
+def test_group_labels_clear_the_body_floor_on_their_fills() -> None:
+    for state, fill in palette.GROUP_STATE_COLORS.items():
+        label = palette.GROUP_LABEL_COLORS[state]
+        measured = contrast_ratio(label, fill)
+        assert measured >= FLOOR_BODY_TEXT, f"{state}: {measured:.2f}"
+
+
+def test_group_badges_use_their_state_shade() -> None:
+    for state, classes in palette.GROUP_BADGE_CLASSES.items():
+        assert f"bg-{palette.GROUP_SHADES[state]}" in classes.split()
+
+
+def test_group_named_constants_follow_the_map() -> None:
+    assert palette.GROUP_IDLE == palette.GROUP_STATE_COLORS["idle"]
+    assert palette.GROUP_BUSY == palette.GROUP_STATE_COLORS["busy"]
+    assert palette.GROUP_DONE == palette.GROUP_STATE_COLORS["done"]
+    assert palette.GROUP_ERROR == palette.GROUP_STATE_COLORS["error"]
+    assert palette.GROUP_ESTOP == palette.GROUP_STATE_COLORS["estop"]
+    assert palette.GROUP_UNREACHABLE == palette.GROUP_STATE_COLORS["unreachable"]
+    assert palette.GROUP_QUEUED == palette.GROUP_STATE_COLORS["queued"]
+    assert palette.GROUP_PULSE_DISPATCH == TW["violet-600"]
