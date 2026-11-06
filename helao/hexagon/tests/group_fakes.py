@@ -1,11 +1,12 @@
 """Read-only fakes shaped like OrchHost, for the /ws_orch snapshot and feed tests.
 
-Attribute names are pinned against the real models by
+Every fake act/exp/seq attribute must be a field of the real model, pinned by
 ``test_fakes_use_real_model_field_names`` in test_group_snapshot.py.
 """
 
 from collections import deque
 from datetime import datetime
+from typing import Optional
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -19,8 +20,8 @@ def fake_act(
     server="SIM",
     name="acquire",
     exp_uuid=None,
-    ts=T0,
-    fin=None,
+    ts: Optional[datetime] = T0,
+    fin: Optional[datetime] = None,
     status=(HloStatus.active,),
 ):
     return SimpleNamespace(
@@ -34,7 +35,13 @@ def fake_act(
     )
 
 
-def fake_exp(name="exp", with_uuid=True, ts=None, fin=None, status=()):
+def fake_exp(
+    name="exp",
+    with_uuid=True,
+    ts: Optional[datetime] = None,
+    fin: Optional[datetime] = None,
+    status=(),
+):
     return SimpleNamespace(
         experiment_uuid=uuid4() if with_uuid else None,
         experiment_name=name,
@@ -45,7 +52,7 @@ def fake_exp(name="exp", with_uuid=True, ts=None, fin=None, status=()):
     )
 
 
-def fake_seq(name="seq", ts=T0):
+def fake_seq(name="seq", ts: Optional[datetime] = T0):
     return SimpleNamespace(
         sequence_uuid=uuid4(),
         sequence_name=name,
@@ -82,4 +89,5 @@ def fake_orch(servers=("SIM", "PSTAT")):
         sequence_dq=deque(),
         experiment_dq=deque(),
         action_dq=deque(),
+        parked_head_action=None,
     )

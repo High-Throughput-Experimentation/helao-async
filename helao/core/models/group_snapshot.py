@@ -17,6 +17,7 @@ ERROR_STATUSES = frozenset({"errored", "aborted", "estopped"})
 TERMINAL_OK = frozenset({"finished", "skipped", "split", "retired"})
 EXP_DONE_WINDOW = 20
 EXP_QUEUED_WINDOW = 50
+ACT_QUEUED_WINDOW = 200
 
 
 def _v(value) -> str:
@@ -130,11 +131,24 @@ def action_rows(orch, first_seen: dict) -> list:
     if exp is None:
         return []
     gsm = orch.globalstatusmodel
-    active = {str(u): a for u, a in gsm.active_dict.items()}
+    # Only this experiment's actions matter; nonactive_dict grows all run long.
+    wanted = {str(a.action_uuid) for a in exp.dispatched_actions or []}
+    active = {}
+    for u, a in gsm.active_dict.items():
+        if str(u) in wanted or a.experiment_uuid == exp.experiment_uuid:
+            active[str(u)] = a
+    wanted |= set(active)
+    # sort_status files a finished action under `finished` AND its sub-status, so
+    # an error status must win whatever the dict order.
     finished = {}
     for status, bucket in gsm.nonactive_dict.items():
+        name = _v(status)
         for u, a in bucket.items():
-            finished[str(u)] = (_v(status), a)
+            uid = str(u)
+            if uid in wanted and not (
+                uid in finished and finished[uid][0] in ERROR_STATUSES
+            ):
+                finished[uid] = (name, a)
     rows, seen = [], set()
 
     def add(uid, model, state, t_end):
@@ -168,8 +182,15 @@ def action_rows(orch, first_seen: dict) -> list:
     for uid, a in active.items():
         if uid not in seen and a.experiment_uuid == exp.experiment_uuid:
             add(uid, a, "active", None)
-    for a in orch.action_dq:
+    # The head action is popped before its start condition is waited on and is
+    # held only here meanwhile (helao/hexagon/app/CLAUDE.md).
+    parked = getattr(orch, "parked_head_action", None)
+    queued = [] if parked is None else [parked]
+    queued += itertools.islice(orch.action_dq, ACT_QUEUED_WINDOW)
+    for a in queued:
         uid = str(a.action_uuid) if a.action_uuid else None
+        if uid in seen:
+            continue
         rows.append(
             {
                 "uuid": uid,

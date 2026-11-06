@@ -21,6 +21,10 @@ def test_fakes_use_real_model_field_names():
     from helao.core.models.server import ActionServerModel, GlobalStatusModel
     from helao.helpers.premodels import Action, Experiment, Sequence
 
+    assert vars(fake_act()).keys() <= set(Action.model_fields)
+    assert vars(fake_exp()).keys() <= set(Experiment.model_fields)
+    assert vars(fake_seq()).keys() <= set(Sequence.model_fields)
+
     for name in (
         "action_uuid",
         "action_name",
@@ -222,3 +226,58 @@ def test_experiment_rows_reads_only_the_queued_window():
     rows, _, n_queued = experiment_rows(orch)
     assert CountingDeque.pulled <= EXP_QUEUED_WINDOW
     assert n_queued == 5000 - EXP_QUEUED_WINDOW
+
+
+def test_error_wins_when_finished_and_errored_buckets_both_hold_the_action():
+    from helao.core.models.group_snapshot import action_rows
+
+    for order in (
+        (HloStatus.finished, HloStatus.errored),
+        (HloStatus.errored, HloStatus.finished),
+    ):
+        orch = fake_orch()
+        exp = fake_exp("e", ts=T0)
+        orch.active_experiment = exp
+        failed = fake_act(name="bad", exp_uuid=exp.experiment_uuid, fin=T0)
+        exp.dispatched_actions = [failed]
+        orch.globalstatusmodel.nonactive_dict = {
+            s: {failed.action_uuid: failed} for s in order
+        }
+        assert [r["state"] for r in action_rows(orch, first_seen={})] == [
+            "error"
+        ], order
+
+
+def test_parked_head_action_is_listed_as_queued_before_action_dq():
+    from helao.core.models.group_snapshot import action_rows
+
+    orch = fake_orch()
+    exp = fake_exp("e", ts=T0)
+    orch.active_experiment = exp
+    parked = fake_act(name="parked", ts=None)
+    nxt = fake_act(name="next", ts=None)
+    orch.parked_head_action = parked
+    orch.action_dq.append(nxt)
+    rows = action_rows(orch, first_seen={})
+    assert [(r["name"], r["state"]) for r in rows] == [
+        ("parked", "queued"),
+        ("next", "queued"),
+    ]
+
+
+def test_action_rows_caps_queue_and_ignores_other_experiments_history():
+    from helao.core.models.group_snapshot import ACT_QUEUED_WINDOW, action_rows
+
+    orch = fake_orch()
+    exp = fake_exp("e", ts=T0)
+    orch.active_experiment = exp
+    stale = fake_act(name="stale", exp_uuid=None, fin=T0)
+    orch.globalstatusmodel.nonactive_dict = {
+        HloStatus.finished: {stale.action_uuid: stale}
+    }
+    orch.action_dq.extend(
+        fake_act(name=f"q{i}", ts=None) for i in range(ACT_QUEUED_WINDOW + 100)
+    )
+    rows = action_rows(orch, first_seen={})
+    assert len(rows) == ACT_QUEUED_WINDOW
+    assert all(r["state"] == "queued" for r in rows)
