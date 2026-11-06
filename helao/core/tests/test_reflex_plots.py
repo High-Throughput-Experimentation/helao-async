@@ -14,6 +14,11 @@ import xy.channel
 
 from helao.core.tests._plate_photo_fakes import EXTENT, top_row_red
 from helao.ui.reflex import plots
+from helao.ui.shared.palette import (
+    GROUP_PULSE_DISPATCH,
+    GROUP_STATE_COLORS,
+    WHITE,
+)
 
 
 def test_time_series_returns_a_chart_payload():
@@ -595,3 +600,88 @@ def test_underlay_rejects_an_image_that_is_not_rgba():
         plots.scatter_map(
             [0.0], [0.0], underlay=(np.zeros((4, 4, 3), dtype=np.uint8), EXTENT)
         )
+
+
+def _marks(color=GROUP_STATE_COLORS["idle"], text="ORCH", pulse_x=None):
+    empty = pulse_x is None
+    return [
+        {
+            "kind": "line",
+            "name": "edge:A",
+            "x": [0.0, 0.0],
+            "y": [0.0, 0.7],
+            "color": color,
+            "width": 2.0,
+        },
+        {
+            "kind": "scatter",
+            "name": "pulse:triangle",
+            "x": [] if empty else [pulse_x],
+            "y": [] if empty else [0.3],
+            "colors": [] if empty else [GROUP_PULSE_DISPATCH],
+            "size": 12.0,
+            "symbol": "triangle",
+            "opacity": 1.0,
+        },
+        {
+            "kind": "text",
+            "x": 0.0,
+            "y": 0.0,
+            "value": text,
+            "dx": 0.0,
+            "dy": 4.0,
+            "color": WHITE,
+            "anchor": "middle",
+        },
+    ]
+
+
+def _mc(marks, **kw):
+    return plots.marks_chart(
+        marks,
+        x_domain=(-1.0, 1.0),
+        y_domain=(-1.0, 1.0),
+        panel_id="t-marks",
+        version=1,
+        **kw,
+    )
+
+
+def test_marks_chart_maps_kinds_to_traces_and_annotations():
+    p = _mc(_marks())
+    assert [t["kind"] for t in p.spec["traces"]] == ["line", "scatter"]
+    assert [a["kind"] for a in p.spec["annotations"]] == ["text"]
+    assert (
+        p.spec["interaction"]["pan"] is False and p.spec["interaction"]["zoom"] is False
+    )
+
+
+def test_marks_chart_hides_both_axes_down_to_the_tick_labels():
+    p = _mc(_marks())
+    assert set(p.spec["axes"]) == {"x", "y"}
+    for axis in p.spec["axes"].values():
+        assert axis["tick_label_strategy"] == "none"
+    assert p.spec["padding"] == [plots.CHART_PADDING_PX] * 4
+
+
+def test_marks_chart_pads_an_empty_scatter_so_its_colour_stays_direct():
+    p = _mc(_marks())
+    assert p.spec["traces"][1]["color"]["mode"] == "direct_rgba"
+    assert p.spec["traces"][1]["n_points"] == 1
+
+
+def test_a_moving_pulse_keeps_the_layout_but_a_new_colour_rebuilds():
+    base = _mc(_marks(pulse_x=0.1)).layout
+    assert _mc(_marks(pulse_x=0.5)).layout == base
+    assert _mc(_marks(pulse_x=None)).layout == base
+    assert _mc(_marks(color=GROUP_STATE_COLORS["error"], pulse_x=0.1)).layout != base
+
+
+def test_changed_annotation_text_rebuilds_while_annotations_are_in_the_token():
+    assert plots.ANNOTATIONS_IN_TOKEN is True
+    assert _mc(_marks(text="A")).layout != _mc(_marks(text="B")).layout
+
+
+def test_marks_chart_rejects_an_unknown_kind():
+    with pytest.raises(ValueError, match="unknown mark kind"):
+        _mc([{"kind": "spiral"}])

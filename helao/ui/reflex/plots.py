@@ -23,6 +23,7 @@ __all__ = [
     "scatter_map",
     "histogram",
     "ternary",
+    "marks_chart",
 ]
 
 import hashlib
@@ -38,6 +39,7 @@ from helao.ui.shared.palette import (
     CHART_CHROME,
     SERIES,
     TRANSPARENT,
+    WHITE,
     WINDOW_BAND,
 )
 from helao.ui.reflex.xy_component import (
@@ -940,4 +942,127 @@ def ternary(
         version,
         show_bar,
         size,
+    )
+
+
+#: Off-domain stand-in for an empty scatter/line. xy encodes an EMPTY colour list
+#: as a continuous colormap rather than direct RGBA, so a trace that empties
+#: would change its column layout under an unchanged layout token.
+PLACEHOLDER_XY = 1e6
+
+#: Annotations (text, bands, rules) are spec, not columns. Until a browser check
+#: shows xy's append path applies a changed annotation in place, their content
+#: joins the layout token and a changed label rebuilds the chart.
+ANNOTATIONS_IN_TOKEN = True
+
+#: Plot padding on every side, in px. netgraph's px <-> data scale assumes it.
+CHART_PADDING_PX = 8
+
+
+def marks_chart(
+    marks, *, x_domain, y_domain, panel_id, version, click=False
+) -> ChartPayload:
+    """Render plain mark dicts (see ``netgraph``/``timeline_strip``) on a fixed view.
+
+    Axes and grid hidden (``tick_label_strategy="none"`` too, else xy still
+    reserves tick-label room and the plot rect is not the padding), pan/zoom
+    off, domain fixed. Column data (x, y, per-point colours) updates in place;
+    anything that is spec -- line colour and width, scatter symbol/size/opacity,
+    and annotations while :data:`ANNOTATIONS_IN_TOKEN` -- joins the layout token.
+    """
+    children, style, notes = [], [], []
+    for m in marks:
+        kind = m.get("kind")
+        if kind == "line":
+            xs, ys = list(m["x"]), list(m["y"])
+            if not xs:
+                xs, ys = [PLACEHOLDER_XY] * 2, [PLACEHOLDER_XY] * 2
+            children.append(
+                xy.line(
+                    x=np.asarray(xs, float),
+                    y=np.asarray(ys, float),
+                    name=m["name"],
+                    color=m["color"],
+                    width=float(m["width"]),
+                )
+            )
+            style.append(f"{m['name']}:{m['color']}:{m['width']}")
+        elif kind == "scatter":
+            xs, ys, cs = list(m["x"]), list(m["y"]), list(m["colors"])
+            if not xs:
+                xs, ys, cs = [PLACEHOLDER_XY], [PLACEHOLDER_XY], [WHITE]
+            opacity = float(m.get("opacity", 1.0))
+            children.append(
+                xy.scatter(
+                    x=np.asarray(xs, float),
+                    y=np.asarray(ys, float),
+                    color=cs,
+                    size=float(m["size"]),
+                    symbol=m["symbol"],
+                    opacity=opacity,
+                    name=m["name"],
+                )
+            )
+            style.append(f"{m['name']}:{m['symbol']}:{m['size']}:{opacity}")
+        elif kind == "text":
+            children.append(
+                xy.text(
+                    float(m["x"]),
+                    float(m["y"]),
+                    str(m["value"]),
+                    dx=float(m.get("dx", 0.0)),
+                    dy=float(m.get("dy", 0.0)),
+                    color=m["color"],
+                    anchor=m.get("anchor", "middle"),
+                )
+            )
+            notes.append(repr(sorted(m.items())))
+        elif kind == "band":
+            children.append(
+                xy.x_band(
+                    float(m["x0"]),
+                    float(m["x1"]),
+                    color=m["color"],
+                    opacity=float(m.get("opacity", 1.0)),
+                )
+            )
+            notes.append(repr(sorted(m.items())))
+        elif kind == "vline":
+            children.append(
+                xy.vline(
+                    float(m["x"]),
+                    color=m["color"],
+                    width=float(m.get("width", 1.0)),
+                )
+            )
+            notes.append(repr(sorted(m.items())))
+        else:
+            raise ValueError(f"unknown mark kind {kind!r}")
+    axes = [
+        xy.x_axis(
+            show=False, grid=False, tick_label_strategy="none", domain=tuple(x_domain)
+        ),
+        xy.y_axis(
+            show=False, grid=False, tick_label_strategy="none", domain=tuple(y_domain)
+        ),
+        xy.legend(show=False),
+    ]
+    pad = CHART_PADDING_PX
+    figure = xy.chart(
+        *children,
+        *axes,
+        width="100%",
+        height="100%",
+        padding=[pad, pad, pad, pad],
+        pan=False,
+        zoom=False,
+        click=click,
+    )
+    parts = style + (notes if ANNOTATIONS_IN_TOKEN else [])
+    digest = hashlib.blake2b("|".join(parts).encode(), digest_size=8).hexdigest()
+    return _publish(
+        figure,
+        panel_id,
+        version,
+        layout_extra=f"marks={digest}{tuple(x_domain)}{tuple(y_domain)}{click}",
     )
