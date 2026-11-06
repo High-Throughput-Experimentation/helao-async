@@ -75,7 +75,13 @@ def test_each_menu_hides_exactly_its_gated_links(menu):
 
 def test_nav_renders_every_menu_and_top_level_link():
     nav = str(app._nav())
-    for route in ("/live", "/action", "/operator"):
+    labels = [t for t, _ in app.NAV_LINKS] + [m[0] for m in app.NAV_MENUS]
+    assert labels == ["Operator", "Action", "Live", "Data", "Admin"]
+    entries = {t for _, i, g in app.NAV_MENUS for t, _ in (*i, *g)}
+    assert set(app.NAV_ICONS) == set(labels) | entries
+    positions = [nav.index(f'"{label}"') for label in labels]
+    assert positions == sorted(positions)
+    for _, route in app.NAV_LINKS:
         assert f'"{route}"' in nav, route
     for _, items, gated in app.NAV_MENUS:
         for _, href in (*items, *gated):

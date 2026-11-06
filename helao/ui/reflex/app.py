@@ -400,7 +400,12 @@ def _render_panel(target: PanelTarget):
 
 def _menu_item(text: str, href: str):
     """One navigation entry inside a dropdown group."""
-    return rx.menu.item(text, on_click=rx.redirect(href))
+    return rx.menu.item(_icon_label(NAV_ICONS[text], text), on_click=rx.redirect(href))
+
+
+def _icon_label(icon: str, text: str):
+    """A Lucide icon beside its label, so nav entries read at a glance."""
+    return rx.hstack(rx.icon(icon, size=16), rx.text(text), spacing="1", align="center")
 
 
 def _nav_menu(label: str, items: tuple, gated: tuple):
@@ -411,7 +416,11 @@ def _nav_menu(label: str, items: tuple, gated: tuple):
     """
     return rx.menu.root(
         rx.menu.trigger(
-            rx.button(label, rx.icon("chevron-down", size=14), variant="ghost")
+            rx.button(
+                _icon_label(NAV_ICONS[label], label),
+                rx.icon("chevron-down", size=14),
+                variant="ghost",
+            )
         ),
         rx.menu.content(
             *[_menu_item(text, href) for text, href in items],
@@ -444,14 +453,41 @@ NAV_MENUS = (
 )
 
 
+#: Top-level nav links, in display order: ``(text, href)``.
+NAV_LINKS = (
+    ("Operator", "/operator"),
+    ("Action", "/action"),
+    ("Live", "/live"),
+)
+
+#: Lucide icon per nav entry (top-level and menu items), keyed by its label.
+NAV_ICONS = {
+    "Operator": "list-checks",
+    "Action": "zap",
+    "Live": "activity",
+    "Data": "database",
+    "Browser": "folder-open",
+    "Composition": "flask-conical",
+    "UV-Vis": "sun",
+    "XAFS": "atom",
+    "XRD": "radar",
+    "Admin": "settings",
+    "Control": "sliders-horizontal",
+    "Quarantine": "shield-alert",
+    "Logs": "scroll-text",
+    "Retire": "archive",
+}
+
+
 def _nav():
     """Render the shared navigation bar."""
     return rx.hstack(
         rx.heading("HELAO", size="4"),
         rx.spacer(),
-        rx.link("Live", href="/live"),
-        rx.link("Action", href="/action"),
-        rx.link("Operator", href="/operator"),
+        *[
+            rx.link(_icon_label(NAV_ICONS[text], text), href=href)
+            for text, href in NAV_LINKS
+        ],
         *[_nav_menu(label, items, gated) for label, items, gated in NAV_MENUS],
         width="100%",
         padding="0.75em 1em",
