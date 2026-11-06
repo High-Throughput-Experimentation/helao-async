@@ -398,6 +398,52 @@ def _render_panel(target: PanelTarget):
         )
 
 
+def _menu_item(text: str, href: str):
+    """One navigation entry inside a dropdown group."""
+    return rx.menu.item(text, on_click=rx.redirect(href))
+
+
+def _nav_menu(label: str, items: tuple, gated: tuple):
+    """A navigation button that drops down its pages.
+
+    ``items`` are always shown; ``gated`` only when credentials are available
+    (see :data:`CREDENTIAL_ROUTES`). Each is a ``(text, href)`` pair.
+    """
+    return rx.menu.root(
+        rx.menu.trigger(
+            rx.button(label, rx.icon("chevron-down", size=14), variant="ghost")
+        ),
+        rx.menu.content(
+            *[_menu_item(text, href) for text, href in items],
+            rx.cond(
+                CredentialsState.has_credentials,
+                rx.fragment(*[_menu_item(text, href) for text, href in gated]),
+            ),
+        ),
+    )
+
+
+#: Dropdown groups in the nav: ``(label, always shown, credential-gated)``.
+#: The gated entries together must be exactly :data:`CREDENTIAL_ROUTES`.
+NAV_MENUS = (
+    (
+        "Data",
+        (("Browser", "/browser"),),
+        (
+            ("Composition", "/composition"),
+            ("UV-Vis", "/uvvis"),
+            ("XAFS", "/xafs"),
+            ("XRD", "/xrds"),
+        ),
+    ),
+    (
+        "Admin",
+        (("Control", "/control"), ("Quarantine", "/quarantine"), ("Logs", "/logs")),
+        (("Retire", "/retire"),),
+    ),
+)
+
+
 def _nav():
     """Render the shared navigation bar."""
     return rx.hstack(
@@ -406,21 +452,7 @@ def _nav():
         rx.link("Live", href="/live"),
         rx.link("Action", href="/action"),
         rx.link("Operator", href="/operator"),
-        rx.link("Browser", href="/browser"),
-        rx.link("Control", href="/control"),
-        rx.cond(
-            CredentialsState.has_credentials,
-            rx.hstack(
-                rx.link("Composition", href="/composition"),
-                rx.link("UV-Vis", href="/uvvis"),
-                rx.link("XAFS", href="/xafs"),
-                rx.link("XRD", href="/xrds"),
-                rx.link("Retire", href="/retire"),
-                spacing="4",
-            ),
-        ),
-        rx.link("Quarantine", href="/quarantine"),
-        rx.link("Logs", href="/logs"),
+        *[_nav_menu(label, items, gated) for label, items, gated in NAV_MENUS],
         width="100%",
         padding="0.75em 1em",
         align="center",
