@@ -470,7 +470,7 @@ NAV_ICONS = {
     "Composition": "flask-conical",
     "UV-Vis": "sun",
     "XAFS": "atom",
-    "XRD": "radar",
+    "XRD": "gem",
     "Admin": "settings",
     "Control": "sliders-horizontal",
     "Quarantine": "shield-alert",
