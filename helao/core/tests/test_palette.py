@@ -2076,7 +2076,25 @@ def test_group_labels_clear_the_body_floor_on_their_fills() -> None:
 
 def test_group_badges_use_their_state_shade() -> None:
     for state, classes in palette.GROUP_BADGE_CLASSES.items():
-        assert f"bg-{palette.GROUP_SHADES[state]}" in classes.split()
+        parts = classes.split()
+        bg = palette.GROUP_SHADES[state]
+        assert f"bg-{bg}" in parts
+        (text,) = [c[len("text-") :] for c in parts if c.startswith("text-")]
+        fg = palette.WHITE if text == "white" else TW[text]
+        assert fg == palette.GROUP_LABEL_COLORS[state]
+        measured = contrast_ratio(fg, TW[bg])
+        assert measured >= FLOOR_BODY_TEXT, f"{state}: {measured:.2f}"
+
+
+def test_group_standalone_roles_clear_their_floors() -> None:
+    white = palette.SURFACE_WHITE
+    assert contrast_ratio(palette.GROUP_EDGE_TEXT, white) >= FLOOR_BODY_TEXT
+    assert contrast_ratio(palette.GROUP_SELECTED_OUTLINE, white) >= FLOOR_CONTROL
+    assert contrast_ratio(palette.GROUP_PULSE_DISPATCH, white) >= FLOOR_CONTROL
+    busy = palette.GROUP_STATE_COLORS["busy"]
+    assert contrast_ratio(palette.GROUP_PROGRESS, busy) >= FLOOR_CONTROL
+    shade = palette.GROUP_ERROR_TEXT_CLASS.removeprefix("text-")
+    assert contrast_ratio(TW[shade], white) >= FLOOR_BODY_TEXT
 
 
 def test_group_named_constants_follow_the_map() -> None:

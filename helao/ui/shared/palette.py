@@ -984,6 +984,7 @@ GROUP_LABEL_COLORS: Final[Mapping[str, str]] = {
     state: (TW["slate-900"] if state == "queued" else WHITE) for state in GROUP_SHADES
 }
 GROUP_SELECTED_OUTLINE: Final[str] = TW["slate-900"]
+#: Drawn as a bar under the segment label, never behind label text.
 GROUP_PROGRESS: Final[str] = TW["sky-200"]
 GROUP_EDGE_TEXT: Final[str] = TW["slate-700"]
 #: Literal class strings, not built at runtime: Tailwind only emits utilities it
@@ -998,6 +999,7 @@ GROUP_BADGE_CLASSES: Final[Mapping[str, str]] = {
     "unreachable": "bg-amber-700 text-white",
     "queued": "bg-slate-300 text-slate-900",
 }
+#: Text on the page/card white (SURFACE_WHITE).
 GROUP_ERROR_TEXT_CLASS: Final[str] = "text-red-700"
 
 
