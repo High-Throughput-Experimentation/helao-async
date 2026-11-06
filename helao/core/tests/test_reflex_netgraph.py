@@ -141,3 +141,12 @@ def test_arc_table_measures_in_pixels_not_data_units():
     # 1 data unit is 2 px along x (sx=0.5) and 4 px along y (sy=0.25)
     assert arc_table([(0.0, 0.0), (1.0, 0.0)], 0.5, 0.25) == pytest.approx([0.0, 2.0])
     assert arc_table([(0.0, 0.0), (0.0, 1.0)], 0.5, 0.25) == pytest.approx([0.0, 4.0])
+
+
+def test_default_padding_is_the_charts_padding():
+    from helao.ui.reflex import plots
+    from helao.ui.reflex.netgraph import NetGraph
+
+    g = NetGraph(height_px=360, width_px=720)
+    assert g.sx == pytest.approx(2.0 / (720 - 2 * plots.CHART_PADDING_PX))
+    assert g.sy == pytest.approx(2.0 / (360 - 2 * plots.CHART_PADDING_PX))

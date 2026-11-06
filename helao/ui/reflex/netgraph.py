@@ -13,6 +13,7 @@ import bisect
 import math
 from dataclasses import dataclass, field
 
+from helao.ui.reflex import plots
 from helao.ui.shared.palette import GROUP_EDGE_TEXT
 
 CURVE_SAMPLES = 24
@@ -127,10 +128,12 @@ class NetGraph:
         height_px=360,
         width_px=720,
         domain=((-1.0, 1.0), (-1.0, 1.0)),
-        padding_px=8,
+        padding_px=None,
     ):
         (x0, x1), (y0, y1) = domain
         self.domain = domain
+        if padding_px is None:
+            padding_px = plots.CHART_PADDING_PX
         self.sx = (x1 - x0) / (width_px - 2 * padding_px)
         self.sy = (y1 - y0) / (height_px - 2 * padding_px)
         self.nodes: dict = {}

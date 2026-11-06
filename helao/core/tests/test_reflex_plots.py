@@ -664,13 +664,25 @@ def test_marks_chart_hides_both_axes_down_to_the_tick_labels():
     assert p.spec["padding"] == [plots.CHART_PADDING_PX] * 4
 
 
+def test_marks_chart_fixes_the_domains_and_hides_the_axes():
+    p = plots.marks_chart(
+        _marks(), x_domain=(-2.0, 3.0), y_domain=(-4.0, 5.0), panel_id="t-d", version=1
+    )
+    assert p.spec["axes"]["x"]["domain"] == [-2.0, 3.0]
+    assert p.spec["axes"]["y"]["domain"] == [-4.0, 5.0]
+    for axis in p.spec["axes"].values():
+        assert axis["style"]["axis_width"] == 0.0  # painted out, as built
+        assert axis["style"]["tick_length"] == 0.0
+        assert axis["style"]["grid_opacity"] == 0.0
+
+
 def test_marks_chart_pads_an_empty_scatter_so_its_colour_stays_direct():
     p = _mc(_marks())
     assert p.spec["traces"][1]["color"]["mode"] == "direct_rgba"
     assert p.spec["traces"][1]["n_points"] == 1
 
 
-def test_a_moving_pulse_keeps_the_layout_but_a_new_colour_rebuilds():
+def test_a_moving_pulse_keeps_the_layout_but_a_new_edge_colour_rebuilds():
     base = _mc(_marks(pulse_x=0.1)).layout
     assert _mc(_marks(pulse_x=0.5)).layout == base
     assert _mc(_marks(pulse_x=None)).layout == base
