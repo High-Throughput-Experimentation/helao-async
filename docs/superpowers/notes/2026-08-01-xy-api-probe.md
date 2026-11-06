@@ -181,3 +181,23 @@ key, not `traces`. A diagram with 3 vertex labels and a populated point cloud
 therefore publishes 4 `traces` (1 scatter + 3 edge lines) and 3
 `annotations` — not 7 traces, which is what you'd expect from treating
 `xy.text` as a mark.
+
+## Verified for the /group page (2026-11-06, xy 0.0.8)
+
+Probe: a scratch script asserting each fact below (run with the helao env python).
+
+| Fact | Consequence |
+|---|---|
+| `xy.scatter(symbol=...)` takes `"triangle"` and `"triangle_down"`; `"triangle-down"` raises `ValueError` from `build_payload_split`, not at construction | arrowheads and pulses use the underscore names |
+| a per-point `color=[hex, ...]` list encodes as `direct_rgba` column data | node, arrow and pulse colours update in place, no rebuild |
+| an **empty** `color=[]` encodes as `continuous` (viridis), not `direct_rgba` | `plots.marks_chart` pads an empty trace with one off-domain point so its column layout never changes |
+| a `size` array is a mapped channel (`range_px (2, 18)`), not pixels | one scalar size per trace |
+| `x_axis(show=False, grid=False, domain=...)` paints the axis transparent | graph and strips hide axes this way |
+| `xy.chart(..., pan=False, zoom=False, click=True)` lands in `spec["interaction"]` | fixed view; clicks still reach `on_select` |
+| `xy.text(..., anchor="middle")`, `x_band` (`band`) and `vline` (`rule`) are annotations, not traces | they are spec, so `plots.ANNOTATIONS_IN_TOKEN` decides whether a changed label rebuilds the chart |
+| a chart of annotations only has zero traces | each strip carries an invisible `hit` scatter |
+| `xy.chart(padding=[top, right, bottom, left])` is the plot-rect inset in px (`spec["padding"]`; `_layout` in `static/index.js` uses it as the margin) | netgraph takes the gap between host edge and plot rect from its `padding` argument (probe used 8 px on each side) |
+
+Plot-area inset (host edge to plot rect, axes hidden): equals the explicit `padding` values, with two client-side clamps when the host is fluid (`width="100%"`) and narrower than 520 px: right is `min(padding[1], 8)` and left is `min(padding[3], 46)`. Without `padding` the margin is label-aware (`un.t/r/b/l` defaults) and not determinable headless. Extra room for title, tick labels or colorbar is added on top and was not measured with hidden axes.
+
+Still unverified from Python alone: whether xy's append path applies a changed annotation without a rebuild, and whether text draws above WebGL markers. Task 9 of the /group plan checks both in a browser.
