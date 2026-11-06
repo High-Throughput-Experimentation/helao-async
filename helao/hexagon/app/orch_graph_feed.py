@@ -13,7 +13,13 @@ import asyncio
 import time
 from typing import Optional
 
-from helao.core.models.group_snapshot import ERROR_STATUSES, build_snapshot
+from helao.core.models.group_snapshot import (
+    ERROR_STATUSES,
+    _item_state,
+    _names,
+    _v,
+    build_snapshot,
+)
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -64,26 +70,42 @@ class OrchGraphFeed:
         self._last_sent = float("-inf")
         self._primed = False
         self._prev_active: dict = {}
+        self._prev_models: dict = {}
         self._prev_nonactive: set = set()
         self._finish_errors: dict = {}
         self._first_seen: dict = {}
         self._pending: list = []
 
+    @staticmethod
+    def _finish_status(names: set, first: str) -> str:
+        errors = sorted(names & ERROR_STATUSES)
+        return errors[0] if errors else first
+
     def diff_events(self, now: float) -> list:
         """dispatch/finish events since the previous tick."""
         gsm = self.orch.globalstatusmodel
+        active_models = {str(u): a for u, a in gsm.active_dict.items()}
         active = {
-            str(u): (a.action_server.server_name, a.action_name)
-            for u, a in gsm.active_dict.items()
+            u: (a.action_server.server_name, a.action_name)
+            for u, a in active_models.items()
         }
-        nonactive = {}
+        # sort_status files a finished action under `finished` as well as its
+        # sub-status, and estopped/aborted only there: the status comes from the
+        # action's own statuses plus every bucket it sits in, error winning
+        # whatever the dict order.
+        nonactive: dict = {}
         for status, bucket in gsm.nonactive_dict.items():
             for u, a in bucket.items():
-                nonactive[str(u)] = (
-                    a.action_server.server_name,
-                    a.action_name,
-                    str(getattr(status, "value", status)),
+                server, name, names, first = nonactive.get(
+                    str(u),
+                    (a.action_server.server_name, a.action_name, set(), _v(status)),
                 )
+                names = names | {_v(status)} | _names(a.action_status)
+                nonactive[str(u)] = (server, name, names, first)
+        nonactive = {
+            u: (server, name, self._finish_status(names, first))
+            for u, (server, name, names, first) in nonactive.items()
+        }
         events = []
         if self._primed:
 
@@ -112,7 +134,16 @@ class OrchGraphFeed:
                 ev("finish", uid, server, name, status)
             for uid, (server, name) in self._prev_active.items():
                 if uid not in active and uid not in nonactive:
-                    ev("finish", uid, server, name, "finished")
+                    # left active_dict with no bucket entry (nonactive_dict was
+                    # reset in the same tick): judge by the remembered model
+                    state = _item_state(self._prev_models[uid].action_status)
+                    ev(
+                        "finish",
+                        uid,
+                        server,
+                        name,
+                        "errored" if state == "error" else "finished",
+                    )
             for e in events:
                 if e["kind"] == "finish":
                     self._finish_errors[e["server"]] = e["status"] in ERROR_STATUSES
@@ -121,6 +152,7 @@ class OrchGraphFeed:
                 self._first_seen.setdefault(uid, now)
             self._primed = True
         self._prev_active = active
+        self._prev_models = active_models
         self._prev_nonactive = set(nonactive)
         live = set(active) | set(nonactive)
         self._first_seen = {u: t for u, t in self._first_seen.items() if u in live}

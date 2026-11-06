@@ -236,6 +236,8 @@ def test_get_object_finds_each_tier_and_misses_with_null():
     assert get("experiment", exp_queued.experiment_uuid) is None
     assert get("action", act_queued.action_uuid) is None
     assert get("sequence", seq.sequence_uuid) is None
+    host.action_history[seq.sequence_uuid] = {"action_name": "decoy"}
+    assert get("sequence", seq.sequence_uuid) is None  # unknown kind never searches
 
 
 def test_get_object_never_iterates_a_queue():
@@ -273,3 +275,89 @@ async def test_shutdown_cancels_the_feed_task_and_closes_its_queue():
     await asyncio.sleep(0)
     assert host.graph_feed_task.cancelled()
     assert closed == [True]
+
+
+def _finish_of(orch, feed, a, buckets):
+    feed.step(0.0)
+    orch.globalstatusmodel.active_dict = {a.action_uuid: a}
+    feed.step(0.1)
+    orch.globalstatusmodel.active_dict = {}
+    orch.globalstatusmodel.nonactive_dict = {s: {a.action_uuid: a} for s in buckets}
+    return feed.step(0.2)
+
+
+def test_estopped_action_filed_only_under_finished_is_an_error_finish():
+    orch = fake_orch()
+    a = fake_act(server="SIM", status=(HloStatus.estopped,))
+    frame = _finish_of(orch, _feed(orch), a, [HloStatus.finished])
+    assert [(e["kind"], e["status"]) for e in frame["events"]][-1] == (
+        "finish",
+        "estopped",
+    )
+    assert {s["key"]: s["status"] for s in frame["servers"]}["SIM"] == "error"
+
+
+@pytest.mark.parametrize(
+    "buckets",
+    [[HloStatus.errored, HloStatus.finished], [HloStatus.finished, HloStatus.errored]],
+)
+def test_error_wins_across_buckets_in_either_order(buckets):
+    orch = fake_orch()
+    a = fake_act(server="SIM")
+    frame = _finish_of(orch, _feed(orch), a, buckets)
+    assert frame["events"][-1]["status"] == "errored"
+    assert {s["key"]: s["status"] for s in frame["servers"]}["SIM"] == "error"
+
+
+def test_an_errored_action_that_vanishes_still_finishes_as_error():
+    orch = fake_orch()
+    feed = _feed(orch)
+    feed.step(0.0)
+    a = fake_act(server="SIM")
+    orch.globalstatusmodel.active_dict = {a.action_uuid: a}
+    feed.step(0.1)
+    a.action_status = [HloStatus.errored]
+    orch.globalstatusmodel.active_dict = {}
+    frame = feed.step(0.2)
+    assert frame["events"][-1]["status"] == "errored"
+    assert {s["key"]: s["status"] for s in frame["servers"]}["SIM"] == "error"
+
+
+def test_startup_creates_and_runs_the_feed_task_and_shutdown_stops_it():
+    from fastapi.testclient import TestClient
+
+    host = _host()
+    with TestClient(host):
+        task = host.graph_feed_task
+        assert task is not None and not task.done()
+    assert task.cancelled() or task.done()
+
+
+def test_ws_orch_sends_the_cached_latest_frame_first():
+    import threading
+
+    from fastapi.testclient import TestClient
+
+    from helao.helpers.ws_utils import wire_loads
+
+    host = _host()
+    host.graph_feed.latest = {"seq_no": 777, "events": []}
+    got: list = []
+    with TestClient(host) as client:
+        host.graph_feed_task.cancel()  # freeze the cache
+        host.graph_feed.latest = {"seq_no": 777, "events": []}
+        with client.websocket_connect("/ws_orch") as ws:
+            t = threading.Thread(
+                target=lambda: got.append(ws.receive_bytes()), daemon=True
+            )
+            t.start()
+            t.join(3)
+            assert got, "no cached frame arrived"
+            assert wire_loads(got[0])["seq_no"] == 777
+
+
+def test_get_object_runs_on_the_event_loop_not_the_threadpool():
+    import inspect
+
+    (route,) = [r for r in _host().routes if getattr(r, "path", "") == "/get_object"]
+    assert inspect.iscoroutinefunction(route.endpoint)

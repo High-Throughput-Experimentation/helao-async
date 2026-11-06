@@ -38,7 +38,7 @@ from helao.helpers.import_autolibs import import_autolibs
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.server_keys import resolve_sync_server_key
-from helao.helpers.ws_utils import WsPublisher, wire_dumps
+from helao.helpers.ws_utils import WsPublisher
 from helao.helpers.zdeque import zdeque
 from helao.hexagon.adapters.native.native_syncer import NativeSyncer
 from helao.hexagon.adapters.native.sync_adapter import NativeSyncAdapter
@@ -635,7 +635,7 @@ class OrchHost(ActionHost):
             return _history_page_payload(self, kind, limit, offset)
 
         @self.post("/get_object", tags=["private"])
-        def get_object(kind: str, uuid: str):
+        async def get_object(kind: str, uuid: str):
             """One experiment or action by uuid, or null. Read-only, no lock."""
             return _object_payload(self, kind, uuid)
 
@@ -1402,8 +1402,10 @@ class OrchHost(ActionHost):
             """Stream group snapshots; the cached latest one goes first."""
             await self.orch_graph_publisher.connect(websocket)
             try:
-                if self.graph_feed.latest is not None:
-                    await websocket.send_bytes(wire_dumps(self.graph_feed.latest))
+                latest = self.graph_feed.latest
+                frame = self.orch_graph_publisher._frame(latest) if latest else None
+                if frame is not None:
+                    await websocket.send_bytes(frame)
                 await self.orch_graph_publisher.broadcast(websocket)
             except (WebSocketDisconnect, ConnectionClosedOK):
                 self.orch_graph_publisher.disconnect(websocket)
