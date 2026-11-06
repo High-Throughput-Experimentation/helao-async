@@ -165,6 +165,11 @@ def with_values(record: CompositionRecord, quant: Optional[dict]) -> Composition
             continue
         if not isinstance(series, list) or len(series) != len(transitions):
             continue
+        # A per-row label column (nmol_predictor "nnls_area", atomic_fraction_line
+        # "Fe.K", added 2026-11-03) is not a value: skip any column holding a
+        # string, so a new label column cannot take the page down again.
+        if any(isinstance(value, str) for value in series):
+            continue
         for name, value in zip(transitions, series):
             values[name][column] = None if value is None else float(value)
     if record.sample_no is not None:

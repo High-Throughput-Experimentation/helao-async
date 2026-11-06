@@ -186,3 +186,21 @@ def test_unit_and_transition_names_are_the_union_sorted() -> None:
         "Y.L",
     ]
     assert model.unit_names([a, b]) == ["atomic_fraction", "nanomoles", "net_counts"]
+
+
+def test_with_values_skips_per_row_label_columns() -> None:
+    """Quant arrays since 2026-11-03 carry string columns per transition
+    (``nmol_predictor``, ``atomic_fraction_line``). float("nnls_area") took the
+    whole plate down (6546); the numeric columns beside them must still load."""
+    n = len(QUANT["transition"])
+    quant = {
+        **QUANT,
+        "nmol_predictor": ["nnls_area"] + [""] * (n - 1),
+        "atomic_fraction_line": ["Co.K"] + [""] * (n - 1),
+    }
+    record = model.with_values(
+        model.record_from_process(PROCESS_ITEM, SEQUENCES), quant
+    )
+    assert record.values["Co.K"]["net_counts"] == pytest.approx(271.2)
+    assert "nmol_predictor" not in record.values["Co.K"]
+    assert "atomic_fraction_line" not in record.values["Co.K"]
