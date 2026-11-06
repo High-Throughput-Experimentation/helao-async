@@ -57,29 +57,12 @@ from helao.deploy.hte.servers.nidaqmx.nidaqmx_driver import (
     CellIVExec,
     DevMonExec,
     TTLExec,
+    DO_GROUPS,
     cNIMAX,
     cNIMAXPoller,
 )
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-
-
-#: Config groups whose entries are digital outputs, i.e. every group that gets
-#: an endpoint taking ``on: bool`` (or, for ``dev_ttl``, ``duration``). Order
-#: fixes which group's port wins if two ever claim a name, but a collision is
-#: refused rather than resolved — see :func:`build_do_port_map`.
-DO_GROUPS = (
-    "dev_mastercell",
-    "dev_activecell",
-    "dev_pump",
-    "dev_gasvalve",
-    "dev_liquidvalve",
-    "dev_multivalve",
-    "dev_led",
-    "dev_fswbcd",
-    "dev_heat",
-    "dev_ttl",
-)
 
 
 def _do_readback_to_bool(value):
@@ -850,7 +833,7 @@ def makeApp(server_key) -> ActionHost:
 
             Args:
                 do_name: Name from any of the server's ``dev_*`` config groups.
-                on: ``True`` to drive the line high, ``False`` for low.
+                on: logical state; ``True`` is ON (LOW on ``do_active_low`` lines).
 
             Returns:
                 ``(error_code, {do_name: bool | None})`` carrying the state now

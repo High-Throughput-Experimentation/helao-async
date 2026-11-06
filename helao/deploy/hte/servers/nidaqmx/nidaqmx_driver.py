@@ -51,12 +51,14 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 # a vendor-less Linux box (§11.1). connect() calls this before any device use.
 def _load_nidaqmx():
     global nidaqmx, LineGrouping, Edge, AcquisitionType, TerminalConfiguration
+    global DigitalDriveType
     global VoltageUnits, TemperatureUnits, ThermocoupleType
     global CurrentShuntResistorLocation, UnitsPreScaled, TriggerType
     import nidaqmx as _nidaqmx
     from nidaqmx.constants import (
         AcquisitionType,
         CurrentShuntResistorLocation,
+        DigitalDriveType,
         Edge,
         LineGrouping,
         TemperatureUnits,
@@ -68,6 +70,31 @@ def _load_nidaqmx():
     )
 
     nidaqmx = _nidaqmx
+
+
+#: Config groups whose entries are digital outputs, i.e. every group that gets
+#: an endpoint taking ``on: bool`` (or, for ``dev_ttl``, ``duration``). Order
+#: fixes which group's port wins if two ever claim a name, but the server
+#: refuses a collision -- see ``build_do_port_map``.
+DO_GROUPS = (
+    "dev_mastercell",
+    "dev_activecell",
+    "dev_pump",
+    "dev_gasvalve",
+    "dev_liquidvalve",
+    "dev_multivalve",
+    "dev_led",
+    "dev_fswbcd",
+    "dev_heat",
+    "dev_ttl",
+)
+
+
+def _invert(value):
+    """Logically invert a DO readback of any nesting (lists of bools); None stays."""
+    if isinstance(value, (list, tuple)):
+        return [_invert(v) for v in value]
+    return None if value is None else not value
 
 
 class cNIMAX(HelaoDriver):
@@ -98,6 +125,20 @@ class cNIMAX(HelaoDriver):
     connect_on_startup = (
         True  # the host connects after _base_hook, before dyn_endpoints
     )
+
+    _active_low_ports: frozenset = frozenset()
+    _open_collector_ports: frozenset = frozenset()
+    shutdown_to_off = False
+
+    def _do_ports_for(self, key: str) -> frozenset:
+        """Map a config list of DO names to their port strings (ValueError if bad)."""
+        names = self.config_dict.get(key) or []
+        if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
+            raise ValueError(f"{key} must be a list of DO names, got {names!r}")
+        unknown = [n for n in names if n not in self._all_do]
+        if unknown:
+            raise ValueError(f"{key} names not configured as DO lines: {unknown}")
+        return frozenset(self._all_do[n] for n in names)
 
     def __init__(self, config: dict = {}):
         """Store config and build the dynamic IO enums; no device I/O here.
@@ -139,6 +180,21 @@ class cNIMAX(HelaoDriver):
         self.dev_leditems = make_str_enum("dev_led", {key: key for key in self.dev_led})
 
         self.dev_ttl = self.config_dict.get("dev_ttl", {})
+
+        # Opt-in DO options, resolved to sets of hardware port strings so they
+        # apply however a caller addresses the line (name or bare do_port).
+        self._all_do: dict[str, str] = {}
+        for group in DO_GROUPS:
+            for n, p in (self.config_dict.get(group) or {}).items():
+                self._all_do.setdefault(n, p)
+        self._active_low_ports = self._do_ports_for("do_active_low")
+        oc = self.config_dict.get("do_open_collector", False)
+        self._open_collector_ports = (
+            frozenset(self._all_do.values())
+            if oc is True
+            else self._do_ports_for("do_open_collector")
+        )
+        self.shutdown_to_off = bool(self.config_dict.get("shutdown_to_off", False))
 
         self.allow_no_sample = self.config_dict.get("allow_no_sample", False)
 
@@ -302,7 +358,21 @@ class cNIMAX(HelaoDriver):
         return response
 
     async def async_shutdown(self) -> DriverResponse:
-        """Close the monitor task on server shutdown (sync ``shutdown`` is omitted)."""
+        """Close the monitor task on server shutdown (sync ``shutdown`` is omitted).
+
+        With ``shutdown_to_off`` every configured DO line is first written to
+        logical OFF (best effort: a failing line is logged and skipped).
+        """
+        if self.shutdown_to_off:
+            for do_name, do_port in self._all_do.items():
+                try:
+                    await self.set_digital_out(
+                        do_port=do_port, do_name=do_name, on=False
+                    )
+                except Exception:
+                    LOGGER.error(
+                        f"shutdown_to_off failed for '{do_name}'", exc_info=True
+                    )
         return self.disconnect()
 
     def _get_lbuf(self, key: str):
@@ -690,7 +760,7 @@ class cNIMAX(HelaoDriver):
         Args:
             do_port: NI-DAQ channel string (e.g. "PXI-6284/port0/line0").
             do_name: Friendly name for the channel.
-            on: True for high, False for low.
+            on: Logical state; True is ON (LOW on ``do_active_low`` lines).
 
         Returns:
             Dict with `error_code`, `port`, `name`, `type` ("digital_out"),
@@ -698,15 +768,18 @@ class cNIMAX(HelaoDriver):
         """
         LOGGER.info(f"do_port '{do_name}': {do_port} is {on}")
         on = bool(on)
+        wire = (not on) if do_port in self._active_low_ports else on
         cmds = []
         err_code = ErrorCodes.none
         if do_port is not None:
             with nidaqmx.Task() as task_do_port:
-                task_do_port.do_channels.add_do_chan(
+                ch = task_do_port.do_channels.add_do_chan(
                     do_port,
                     line_grouping=LineGrouping.CHAN_PER_LINE,
                 )
-                cmds.append(on)
+                if do_port in self._open_collector_ports:
+                    ch.do_output_drive_type = DigitalDriveType.OPEN_COLLECTOR
+                cmds.append(wire)
                 if cmds:
                     task_do_port.write(cmds)
                     err_code = ErrorCodes.none
@@ -767,11 +840,15 @@ class cNIMAX(HelaoDriver):
             }
         try:
             with nidaqmx.Task() as task_do_port:
-                task_do_port.do_channels.add_do_chan(
+                ch = task_do_port.do_channels.add_do_chan(
                     do_port,
                     line_grouping=LineGrouping.CHAN_PER_LINE,
                 )
+                if do_port in self._open_collector_ports:
+                    ch.do_output_drive_type = DigitalDriveType.OPEN_COLLECTOR
                 value = task_do_port.read(number_of_samples_per_channel=1)
+                if do_port in self._active_low_ports:
+                    value = _invert(value)
         except Exception:
             # Not every DO module supports readback. Warning, not error: the
             # caller has a mirror to fall back on and the panel stays truthful

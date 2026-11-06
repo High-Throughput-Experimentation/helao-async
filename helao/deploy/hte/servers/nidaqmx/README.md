@@ -37,6 +37,9 @@ Port strings are NI-DAQmx physical channel names, e.g. `cDAQ1Mod1/port0/line9` o
 | `dev_cellcurrent_trigger` | no | str | `""` | Digital-edge start-trigger terminal (e.g. `PFI1`) for the current task. Used only when `TTLwait` is not `-1` and both trigger keys are non-empty; otherwise a warning is logged and the measurement starts without a trigger wait. | `nidaqmx_driver.py:384`, `nidaqmx_driver.py:408` |
 | `dev_cellvoltage_trigger` | no | str | `""` | Same, for the voltage task. | `nidaqmx_driver.py:383`, `nidaqmx_driver.py:400` |
 | `allow_no_sample` | no | bool | `False` | `True` permits a `cellIV` run with no validated samples. | `nidaqmx_driver.py:143`, `nidaqmx_server.py:504` |
+| `do_active_low` | no | list of DO names | `[]` | Names from any DO group (`dev_mastercell`, `dev_activecell`, `dev_pump`, `dev_gasvalve`, `dev_liquidvalve`, `dev_multivalve`, `dev_led`, `dev_fswbcd`, `dev_heat`, `dev_ttl`) wired active-low: logical ON writes LOW, OFF writes HIGH, and readback and `/get_digital_outs` report the logical state. E-STOP still writes OFF, so these lines go HIGH. An unknown name or a non-list raises `ValueError` at start. | `nidaqmx_driver.py:set_digital_out` |
+| `do_open_collector` | no | list of DO names, or `true` | `[]` | Lines whose output drive type is set to open collector each time a write or readback task opens them. `true` means every configured DO line. Same validation as `do_active_low`. Some DO modules reject `do_output_drive_type`, so writes to listed lines would then raise; bench-check set OC, write and read on the target module before enabling it on a station. | `nidaqmx_driver.py:set_digital_out` |
+| `shutdown_to_off` | no | bool | `False` | `True` writes logical OFF (per-line polarity) to every configured DO line on server shutdown, best effort, before disconnecting. | `nidaqmx_driver.py:async_shutdown` |
 
 Example (digital I/O only, trimmed from a station config):
 ```yaml
