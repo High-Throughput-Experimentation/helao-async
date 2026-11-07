@@ -22,7 +22,7 @@ import pytest
 
 from helao.hexagon.app.action_host import ActionHost
 from helao.hexagon.app.ingestion import HexHealthMonitor
-from helao.hexagon.app.orch_host import OrchHost
+from helao.hexagon.app.orch_host import MultisubscriberQueue, OrchHost
 
 
 class _Probe(OrchHost):
@@ -37,6 +37,8 @@ class _Probe(OrchHost):
         self.status_subscriber = None
         self.driver_monitor = None
         self.heartbeat_monitor = None
+        self.graph_feed_task = None
+        self.orch_graph_q = MultisubscriberQueue()
 
     def export_queues(self, timestamp_pck=False):
         self.exports += 1

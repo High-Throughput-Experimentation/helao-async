@@ -128,7 +128,8 @@ def test_the_orchestrator_builds_a_native_OrchHost() -> None:
     assert isinstance(app, OrchHost), f"orchestrator built a {type(app).__name__}"
     assert app.title == "ORCH"
     # The surface B3a froze against the live legacy orchestrator.
-    assert len(app.routes) == 84, f"orchestrator has {len(app.routes)} routes"
+    # 84 frozen routes + /ws_orch and /get_object (the group-graph feed).
+    assert len(app.routes) == 86, f"orchestrator has {len(app.routes)} routes"
 
 
 def test_the_probe_covers_every_station_live_module() -> None:
