@@ -928,9 +928,8 @@ console.log(JSON.stringify(out));
 def test_the_shim_opts_the_overlay_in_only_when_pulses_is_passed():
     js = xc._SHIM_COMPONENT_JS
     assert "setPulses(pulses, performance.now())" in js
-    assert (
-        'pulses !== undefined || nodes !== undefined ? { position: "relative" }' in js
-    )
+    assert "pulses !== undefined || nodes !== undefined || progress !== undefined" in js
+    assert "setProgress(progress)" in js and "progress" in xc.XYChart.get_props()
     from helao.ui.reflex import plots
 
     plain = plots.chart(rx_var("s"), rx_var("u"), rx_var("l"))
@@ -1275,3 +1274,141 @@ console.log(JSON.stringify({ sticky: h(65, "A"), plain: h(65, undefined), far: h
 """)
     assert out["sticky"] == "A" and out["plain"] is None and out["far"] is None
     assert out["held"] == "A" and out["gone"] is None and out["again"] is None
+
+
+# ---- progress bars: swept in the browser from the animation-frame clock --------
+
+_JS_PROG_ENV = """
+let T = 0;
+Object.defineProperty(globalThis, "performance", { value: { now: () => T }, configurable: true });
+const rec = { raf: 0, canvases: 0, removed: 0, listeners: 0, lines: [], clears: 0, caps: [] };
+let queue = new Map(), nextId = 1, cur = null;
+globalThis.requestAnimationFrame = (cb) => { rec.raf += 1; queue.set(nextId, cb); return nextId++; };
+globalThis.cancelAnimationFrame = (id) => queue.delete(id);
+const ctx = { setTransform() {}, beginPath() {}, clearRect() { rec.clears += 1; },
+  moveTo(x, y) { cur = [[x, y]]; }, lineTo(x, y) { cur.push([x, y]); },
+  stroke() { rec.lines.push({ pts: cur, w: ctx.lineWidth, c: ctx.strokeStyle, cap: ctx.lineCap }); } };
+globalThis.document = { visibilityState: "visible", addEventListener() { rec.listeners += 1; },
+  removeEventListener() {},
+  createElement: () => { rec.canvases += 1; return { style: {}, dataset: {}, width: 0, height: 0,
+    isConnected: false, getContext: () => ctx, remove() { rec.removed += 1; } }; } };
+const host = { clientWidth: 100, clientHeight: 100, appendChild(c) { c.isConnected = true; },
+  addEventListener() { rec.listeners += 1; }, removeEventListener() {} };
+// pad 8, plot 84 px: data x -1..1 -> 8..92, data y 0 -> 50
+const view = { x: [-1, 1], y: [-1, 1], pad: 8 };
+const bar = (x0 = -1, x1 = 1) => ({ x0, x1, y: 0, color: "#abcdef", width: 4, hz: 2 });
+const make = () => {
+  const st = createController({ spec: {} });
+  st.attach({ decodeFrame: () => ({ buffers: [] }), render: () => () => {} }, host);
+  return st;
+};
+const frame = (t) => { const cbs = [...queue.values()]; queue = new Map(); T = t; cbs.forEach((cb) => cb(t)); };
+"""
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_the_progress_bar_length_follows_the_sweep_fraction():
+    out = _run_js(_JS_PROG_ENV + """
+const st = make();
+st.setProgress({ view, items: [bar()] });
+const got = [];
+for (const t of [125, 375, 500, 625]) { rec.lines = []; frame(t); got.push(rec.lines.slice()); }
+console.log(JSON.stringify(got));
+""")
+    # frac = (t/1000 * 2 Hz) % 1: .25, .75, 0 (wraps), .25 of an 84 px plot from x 8
+    ends = [(g[0]["pts"][1][0] if g else None) for g in out]
+    assert ends == [29, 71, 8, 29]
+    first = out[0][0]
+    assert first["pts"][0] == [8, 50] and first["pts"][1] == [29, 50]
+    assert first["w"] == 4 and first["c"] == "#abcdef" and first["cap"] == "butt"
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_each_progress_item_is_drawn_inside_its_own_slot():
+    out = _run_js(_JS_PROG_ENV + """
+const st = make();
+st.setProgress({ view, items: [bar(-1, 0), bar(0, 1)] });
+frame(250);                                // frac .5
+console.log(JSON.stringify(rec.lines.map((l) => l.pts)));
+""")
+    assert out == [[[8, 50], [29, 50]], [[50, 50], [71, 50]]]
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_nothing_is_drawn_or_listened_for_without_the_progress_prop():
+    out = _run_js(_JS_PROG_ENV + """
+const st = make();
+const base = rec.listeners;                 // xy:click / xy:hover / xy:leave
+frame(100); frame(200);
+st.setProgress(undefined);
+frame(300);
+console.log(JSON.stringify({ rec: { ...rec, lines: rec.lines.length, base }, queued: queue.size }));
+""")
+    assert out["rec"]["canvases"] == 0 and out["rec"]["lines"] == 0
+    assert out["rec"]["listeners"] == out["rec"]["base"]  # none added
+    assert out["queued"] == 0
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_the_frame_loop_runs_while_a_bar_exists_and_stops_when_it_is_cleared():
+    out = _run_js(_JS_PROG_ENV + """
+const st = make();
+st.setProgress({ view, items: [bar()] });
+const sizes = [];
+for (const t of [16, 33, 50, 66]) { frame(t); sizes.push(queue.size); }  // re-arms every frame
+const strokes = rec.lines.length;
+st.setProgress({ view, items: [] });       // the active slot went away
+frame(83);                                  // one frame clears the last bar and stops
+const afterClear = { queued: queue.size, strokes: rec.lines.length, clears: rec.clears };
+frame(100);
+st.setProgress({ view, items: [bar()] });
+frame(116);
+st.setProgress(null);                       // the prop was removed
+frame(133);
+console.log(JSON.stringify({ sizes, strokes, afterClear, end: queue.size, raf: rec.raf }));
+""")
+    assert out["sizes"] == [1, 1, 1, 1]  # exactly one loop, alive while a bar exists
+    assert out["afterClear"]["queued"] == 0
+    assert (
+        out["afterClear"]["strokes"] == out["strokes"]
+    )  # the clearing frame draws nothing
+    assert out["afterClear"]["clears"] >= 5 and out["end"] == 0
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_progress_bars_and_pulses_share_the_canvas_and_the_loop():
+    out = _run_js(_JS_PROG_ENV + """
+const st = make();
+st.setPulses({ view, items: [{ id: "a", dir: "fwd", color: "#111", path: [[0, 0], [1, 1]], start_in: 0, dur: 1 }] }, 0);
+st.setProgress({ view, items: [bar()] });
+frame(100);
+const during = rec.lines.map((l) => l.c);
+st.setProgress({ view, items: [] });
+rec.lines = [];
+frame(200);                                 // the pulse keeps going without bars
+console.log(JSON.stringify({ during, after: rec.lines.map((l) => l.c), canvases: rec.canvases }));
+""")
+    assert sorted(out["during"]) == ["#111", "#abcdef"] and out["after"] == ["#111"]
+    assert out["canvases"] == 1
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_dispose_cancels_the_progress_loop_and_removes_the_canvas():
+    out = _run_js(_JS_PROG_ENV + """
+const st = make();
+st.setProgress({ view, items: [bar()] });
+frame(16);
+const queuedBefore = queue.size;
+st.dispose();
+console.log(JSON.stringify({ queuedBefore, queued: queue.size, removed: rec.removed, raf: st.raf }));
+""")
+    assert out == {"queuedBefore": 1, "queued": 0, "removed": 1, "raf": None}
+
+
+def test_plots_chart_opts_progress_in_only_when_passed():
+    from helao.ui.reflex import plots
+
+    assert "progress" not in str(plots.chart(rx_var("s"), rx_var("u"), rx_var("l")))
+    assert "progress" in str(
+        plots.chart(rx_var("s"), rx_var("u"), rx_var("l"), progress=rx_var("p"))
+    )

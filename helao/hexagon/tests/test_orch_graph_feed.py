@@ -219,10 +219,14 @@ def test_get_object_finds_each_tier_and_misses_with_null():
     host.active_experiment = exp_active
     host.parked_head_action = act_parked
     host.globalstatusmodel.active_dict[act_live.action_uuid] = act_live
-    # queued items hold no uuid until activation and the zdeque unpickles every
-    # item on iteration: the endpoint must never touch them
-    host.experiment_dq.append(exp_queued)
-    host.action_dq.append(act_queued)
+    # queued items hold a uuid from enqueue/unpack: a click on any queued row
+    # (not just the next one) must open it
+    exp_q0 = Experiment(experiment_name="e_q0", experiment_uuid=uuid4())
+    act_q0 = Action(action_name="a_q0", action_server=sim, action_uuid=uuid4())
+    for e in (exp_q0, exp_queued):
+        host.experiment_dq.append(e)
+    for a in (act_q0, act_queued):
+        host.action_dq.append(a)
     hist_uuid = uuid4()
     host.action_history[hist_uuid] = {"action_name": "a_hist"}
     ehist_uuid = uuid4()
@@ -246,31 +250,44 @@ def test_get_object_finds_each_tier_and_misses_with_null():
     assert get("action", act_live.action_uuid)["action_name"] == "a_live"
     assert get("action", hist_uuid)["action_name"] == "a_hist"
     assert get("action", uuid4()) is None
-    assert get("experiment", exp_queued.experiment_uuid) is None
-    assert get("action", act_queued.action_uuid) is None
+    assert get("experiment", exp_queued.experiment_uuid)["experiment_name"] == (
+        "e_queued"
+    )
+    assert get("action", act_queued.action_uuid)["action_name"] == "a_queued"
     assert get("sequence", seq.sequence_uuid) is None
     host.action_history[seq.sequence_uuid] = {"action_name": "decoy"}
     assert get("sequence", seq.sequence_uuid) is None  # unknown kind never searches
 
 
-def test_get_object_never_iterates_a_queue():
+def test_get_object_reads_only_the_queued_window():
+    """The deques unpickle each item they yield: a miss reads the page's window, no more."""
+    from types import SimpleNamespace
     from uuid import uuid4
 
+    from helao.core.models.group_snapshot import ACT_QUEUED_WINDOW, EXP_QUEUED_WINDOW
     from helao.hexagon.app.orch_payloads import _object_payload
 
-    class Boom:
+    class Counted:
+        def __init__(self, n, field):
+            self.n, self.field, self.read = n, field, 0
+
         def __iter__(self):
-            raise AssertionError("queue iterated")
+            for _ in range(self.n):
+                self.read += 1
+                yield SimpleNamespace(**{self.field: uuid4()})
 
         def __len__(self):
             raise AssertionError("queue measured")
 
     orch = fake_orch()
-    orch.experiment_dq = orch.action_dq = Boom()
+    orch.experiment_dq = Counted(10 * EXP_QUEUED_WINDOW, "experiment_uuid")
+    orch.action_dq = Counted(10 * ACT_QUEUED_WINDOW, "action_uuid")
     orch.action_history = {}
     orch.experiment_history = {}
     assert _object_payload(orch, "experiment", str(uuid4())) is None
     assert _object_payload(orch, "action", str(uuid4())) is None
+    assert orch.experiment_dq.read == EXP_QUEUED_WINDOW
+    assert orch.action_dq.read == ACT_QUEUED_WINDOW
 
 
 @pytest.mark.asyncio

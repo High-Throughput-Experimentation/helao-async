@@ -129,9 +129,10 @@ def _of_seq(exp, seq_uuid) -> bool:
 def experiment_rows(orch, cache=None) -> tuple:
     """Windowed experiments of the active sequence: ``(rows, n_done, n_queued)``.
 
-    Queued experiments have no uuid until ``init_exp`` runs at activation, so a
-    queued row carries ``qidx``, its ABSOLUTE index in ``experiment_dq``. The
-    deque unpickles each item on access, so only the queued window is read.
+    Queued experiments get a uuid at enqueue (queued actions at unpack), so a
+    queued row carries one; ``qidx`` is its ABSOLUTE index in
+    ``experiment_dq``. The deque unpickles each item on access, so only the
+    queued window is read.
     """
     seq = orch.active_sequence or getattr(orch, "last_sequence", None)
     finished = orch.active_sequence is None and seq is not None

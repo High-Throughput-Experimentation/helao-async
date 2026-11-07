@@ -51,15 +51,19 @@ def state():
         _version=0,
         _exp_slots=(),
         _act_slots=(),
+        _exp_edges=(),
+        _act_edges=(),
         _selected=(),
         _exp_ords=(),
         _act_ords=(),
         _scopes=(),
         _first_at=0.0,
-        _hover_slot=(-1, -1),
+        _hover_col=(-1, -1),
         _pulse_seq=0,
         graph_pulses={},
         graph_nodes={"items": []},
+        exp_progress={},
+        act_progress={},
         exp_hover="",
         act_hover="",
         tree_header="select a row",
@@ -201,9 +205,11 @@ def test_backend_vars_touched_each_tick_are_tuples(group):
     feed = Feed()
     feed.push(frame(1))
     group.apply_tick(s, feed, 100.0, "t")
-    for name in ("_snap", "_pulses", "_exp_slots", "_act_slots", "_selected"):
+    names = ("_snap", "_pulses", "_exp_slots", "_act_slots", "_selected")
+    names += ("_exp_edges", "_act_edges")
+    for name in names:
         assert isinstance(getattr(s, name), tuple), name
-    for name in ("_snap", "_pulses", "_exp_slots", "_act_slots", "_selected"):
+    for name in names:
         assert vars(group.GroupState)[name].annotated_type is tuple, name
 
 
@@ -1374,21 +1380,28 @@ def test_hit_grid_answers_every_segment_and_maps_back_to_its_slot():
         items = [
             {"name": f"e{i}", "state": "done", "uuid": f"u{i}"} for i in range(n_items)
         ]
-        marks, slots = strip_marks(items, n_before=0, n_after=0, now=1.0, width_px=720)
+        marks, slots, edges = strip_marks(
+            items, n_before=0, n_after=0, now=1.0, width_px=720
+        )
         hit = next(m for m in marks if m.get("name") == "hit")
         assert len(hit["x"]) == HIT_COLS * HIT_ROWS == len(hit["y"])
         # each grid point sits in the slot hit_slot names for it
         for idx, x in enumerate(hit["x"]):
-            assert hit_slot(idx, len(slots)) == int(x)
+            assert hit_slot(idx, edges) == next(
+                i for i in range(len(slots)) if edges[i] <= x < edges[i + 1]
+            )
         # every slot has a point, and the points are never further apart than xy's
         # 12 px pick radius allows (720 px / HIT_COLS columns)
-        assert {hit_slot(i, len(slots)) for i in range(HIT_COLS * HIT_ROWS)} == set(
-            range(len(slots))
-        )
+        reach = {hit_slot(i, edges) for i in range(HIT_COLS * HIT_ROWS)}
+        wide = {
+            i for i in range(len(slots)) if edges[i + 1] - edges[i] >= 720 / HIT_COLS
+        }
+        assert wide <= reach
         # xy picks pixel-exact on a drawn marker, so the squares must tile the plot
         assert hit["size"] == HIT_PX and hit["symbol"] == "square"
         assert HIT_PX >= 704 / HIT_COLS and HIT_PX >= (STRIP_H - 16) / HIT_ROWS
-    assert hit_slot(-1, 3) is None and hit_slot(HIT_COLS * HIT_ROWS, 3) is None
+    assert hit_slot(-1, edges) is None
+    assert hit_slot(HIT_COLS * HIT_ROWS, edges) is None
 
 
 def test_item_tooltip_formats(group):
@@ -1461,14 +1474,12 @@ def test_strips_ask_for_hover_events_and_clicks(group):
         assert spec.get("show_modebar") is False
 
 
-def test_every_slot_of_the_largest_exp_strip_is_reachable():
-    from helao.core.models.group_snapshot import EXP_DONE_WINDOW, EXP_QUEUED_WINDOW
+def test_every_slot_of_the_largest_unsqueezed_exp_strip_is_reachable():
     from helao.ui.reflex.timeline_strip import HIT_COLS, HIT_ROWS, hit_slot
 
-    n_max = EXP_DONE_WINDOW + 1 + EXP_QUEUED_WINDOW + 2  # + both ellipses
-    assert n_max == 73
-    for n in (n_max - 1, n_max):
-        hit = {hit_slot(i, n) for i in range(HIT_COLS * HIT_ROWS)}
+    for n in (5, 6):  # up to PLOT_W / MIN_KEY_PX equal slots
+        edges = tuple(i * 704.0 / n for i in range(n)) + (704.0,)
+        hit = {hit_slot(i, edges) for i in range(HIT_COLS * HIT_ROWS)}
         assert hit == set(range(n)), sorted(set(range(n)) - hit)
 
 
@@ -1548,3 +1559,60 @@ def test_fetched_info_never_shows_a_shifted_queue_item(group):
         act,
         "",
     )
+
+
+def test_the_hover_follows_the_item_under_a_still_pointer_when_the_edges_move(group):
+    def exp(*states):
+        return [
+            {"name": n, "state": st, "uuid": f"u{n}", "t_start": 1.0, "t_end": 2.0}
+            for n, st in zip("abcd", states)
+        ]
+
+    s = state()
+    snap = frame(1, seq={"uuid": "S"}, experiments=exp("done", "active", "queued"))
+    group._render_strips(s, snap, 100.0, "t")
+    group.GroupState._hover_strip(s, 0, {"trace": "hit", "index": 40})
+    assert s.exp_hover.startswith("b:")  # x 356 px: slot 1 of 3
+    # the active item advances; four slots now, the pointer has not moved
+    snap = frame(
+        2, seq={"uuid": "S"}, experiments=exp("done", "done", "active", "queued")
+    )
+    group._render_strips(s, snap, 101.0, "t")
+    assert s.exp_hover.startswith("c:")  # the same x is slot 2 of 4
+    group.GroupState._hover_strip(s, 0, {"trace": "hit", "index": 40 + 80})  # row 1
+    assert s.exp_hover.startswith("c:")
+    group.GroupState._hover_strip(s, 0, {"trace": "", "index": -1})
+    assert s.exp_hover == ""
+    group._render_strips(s, snap, 102.0, "t")
+    assert s.exp_hover == ""
+
+
+def test_progress_descriptors_appear_with_an_active_slot_and_only_change_with_it(group):
+    s = state()
+    run = [
+        {"name": "a", "state": "done", "uuid": "ua", "t_start": 1.0, "t_end": 2.0},
+        {"name": "b", "state": "active", "uuid": "ub", "t_start": 2.0},
+        {"name": "c", "state": "queued", "uuid": "uc", "qidx": 0},
+    ]
+    idle = [dict(r, state="done", t_end=3.0) for r in run[:2]]
+    group._render_strips(s, frame(1, seq={"uuid": "S"}, experiments=idle), 100.0, "t")
+    assert s.exp_progress == {"view": group.STRIP_VIEW, "items": []}
+    snap = frame(2, seq={"uuid": "S"}, experiments=run)
+    group._render_strips(s, snap, 100.0, "t")
+    first = s.exp_progress
+    assert [(i["x0"], i["x1"]) for i in first["items"]] == [
+        (s._exp_edges[1], s._exp_edges[2])
+    ]
+    assert first["view"] == {"x": [0.0, float(group.PLOT_W)], "y": [0.0, 1.0], "pad": 8}
+    for now in (100.5, 101.0, 107.3):  # ticks with the same active item: no new value
+        group._render_strips(s, frame(3, seq={"uuid": "S"}, experiments=run), now, "t")
+        assert s.exp_progress is first
+    # the active item advances: edges move, so the descriptor changes
+    run2 = [
+        dict(run[0]),
+        dict(run[1], state="done", t_end=4.0),
+        dict(run[2], state="active"),
+    ]
+    group._render_strips(s, frame(4, seq={"uuid": "S"}, experiments=run2), 108.0, "t")
+    assert s.exp_progress is not first
+    assert s.act_progress["items"] == [] and "progress" not in str(s.exp_spec).lower()

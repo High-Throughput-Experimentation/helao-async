@@ -6,7 +6,10 @@ orchestrator (``OrchHost``) and reads its queues, histories,
 the Bokeh and Reflex operators parse, so there is one implementation, here.
 """
 
+import itertools
 from typing import Optional
+
+from helao.core.models.group_snapshot import ACT_QUEUED_WINDOW, EXP_QUEUED_WINDOW
 
 
 def _histories_payload(orch) -> dict:
@@ -119,13 +122,17 @@ def _queue_object_payload(orch, kind: str, idx: int) -> dict:
 def _object_payload(orch, kind: str, uuid: str) -> Optional[dict]:
     """The experiment or action with ``uuid`` as a dict, or ``None``.
 
-    Read-only and lock-free. Never iterates a queue: queued experiments and
-    actions hold no uuid until activation, and the deques unpickle every item.
-    The page fetches queued rows with ``get_queue_object``. Search order: the
-    active run (active experiment, its dispatched actions, the active
-    sequence's finished experiments, the last sequence's experiments, the
-    parked head action, ``active_dict``), then the history containers (meta
+    Read-only and lock-free. Search order: the active run (active experiment,
+    its dispatched actions, the active sequence's finished experiments, the
+    last sequence's experiments, the parked head action, ``active_dict``), then
+    the queued window the /group page shows, then the history containers (meta
     dicts, returned as they are).
+
+    Queued items already hold a uuid (an experiment gets one at enqueue, an
+    action when its experiment is unpacked), so the page fetches them by uuid.
+    The deques unpickle every item they yield, so only the first
+    ``EXP_QUEUED_WINDOW`` / ``ACT_QUEUED_WINDOW`` items are read, the same
+    window the page draws.
     """
     target = str(uuid)
     seq = getattr(orch, "active_sequence", None)
@@ -137,6 +144,9 @@ def _object_payload(orch, kind: str, uuid: str) -> Optional[dict]:
         # shows its experiments and must be able to open them
         last_seq = getattr(orch, "last_sequence", None)
         candidates += list(getattr(last_seq, "dispatched_experiments", None) or [])
+        candidates = itertools.chain(
+            candidates, itertools.islice(orch.experiment_dq, EXP_QUEUED_WINDOW)
+        )
         for e in candidates:
             if str(e.experiment_uuid) == target:
                 return e.as_dict()
@@ -146,6 +156,9 @@ def _object_payload(orch, kind: str, uuid: str) -> Optional[dict]:
         if orch.parked_head_action is not None:
             candidates.append(orch.parked_head_action)
         candidates += list(orch.globalstatusmodel.active_dict.values())
+        candidates = itertools.chain(
+            candidates, itertools.islice(orch.action_dq, ACT_QUEUED_WINDOW)
+        )
         for a in candidates:
             if str(a.action_uuid) == target:
                 return a.as_dict()

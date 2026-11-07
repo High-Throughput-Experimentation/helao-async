@@ -217,6 +217,7 @@ def chart(
     on_hover=None,
     pulses=None,
     nodes=None,
+    progress=None,
 ):
     """Bind a chart component to three Reflex state vars.
 
@@ -243,6 +244,9 @@ def chart(
         pulses: Optional Reflex var of pulse descriptors; passing it opts the
             chart into the shim's browser-side pulse overlay (see
             ``xy_component``). Charts that omit it get no overlay.
+        progress: Optional Reflex var of progress-bar descriptors (the /group
+            strips'); passing it opts the chart into the browser-animated bars
+            on the overlay canvas. Without it nothing is created or run.
         nodes: Optional Reflex var of node descriptors; passing it opts the
             chart into the shim's browser-side hover overlay (same canvas as
             the pulses): the node under the pointer is drawn enlarged, with no
@@ -260,6 +264,8 @@ def chart(
     extra = {} if pulses is None else {"pulses": pulses}
     if nodes is not None:
         extra["nodes"] = nodes
+    if progress is not None:
+        extra["progress"] = progress
     return xy_chart(
         spec=spec_var,
         buffer_url=url_var,

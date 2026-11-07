@@ -34,11 +34,14 @@ from helao.ui.reflex.ingest import WsIngest
 from helao.ui.reflex.netgraph import NetGraph, group_layout
 from helao.ui.reflex.operator import TREE_EMPTY_HEADER, session_backend, tree_for
 from helao.ui.reflex.timeline_strip import (
+    HIT_COLS,
+    HIT_ROWS,
     HIT_TRACE,
     click_item,
     hit_slot,
     item_key,
     item_tooltip,
+    progress_items,
     strip_marks,
 )
 from helao.ui.reflex.tree_pane import tree_pane
@@ -61,6 +64,13 @@ GRAPH_H, GRAPH_W = 360, 720
 STRIP_H, STRIP_W = 60, 720
 #: What a strip's segments divide: the host width less xy's padding both sides.
 PLOT_W = STRIP_W - 2 * plots.CHART_PADDING_PX
+#: The strips' pixel axes for the browser-drawn progress bars (same mapping as the
+#: pulses: data -> host px through the fixed domain and the chart padding).
+STRIP_VIEW = {
+    "x": [0.0, float(PLOT_W)],
+    "y": [0.0, 1.0],
+    "pad": plots.CHART_PADDING_PX,
+}
 #: Wide enough that a short server key (5-6 characters) sits inside its node.
 NODE_PX = 44.0
 #: The browser draws the node under the pointer this large, in its own colour.
@@ -266,11 +276,14 @@ def object_request(kind: str, item: dict):
 def fetched_info(kind: str, item: dict, obj) -> tuple:
     """``(obj to show, note)`` for a clicked item's fetch result.
 
-    ``qidx`` is absolute and comes from the last drawn snapshot; a head pop
-    before the click shifts every index, so a queue-index fetch can return the
-    neighbour. The name is the only identity a queued item has, so a name
-    mismatch is never shown; a same-named neighbour cannot be told apart. An
-    empty result (out of range, unreachable, failed) stays "not found".
+    Queued experiments and actions carry uuids (from enqueue / unpack) and are
+    fetched by uuid; only a row without one falls back to a queue-index fetch,
+    which is what the rest of this applies to. ``qidx`` is absolute and comes
+    from the last drawn snapshot; a head pop before the click shifts every
+    index, so such a fetch can return the neighbour. The name is then the only
+    identity the row has, so a name mismatch is never shown; a same-named
+    neighbour cannot be told apart. An empty result (out of range,
+    unreachable, failed) stays "not found".
     """
     if not obj:
         return None, NOT_FOUND
@@ -570,11 +583,28 @@ def _hover_line(slots, slot: int, now: float) -> str:
     return item_tooltip(slots[slot], now) if 0 <= slot < len(slots) else ""
 
 
+def _set_progress(s, name: str, slots, edges) -> None:
+    """Assign a strip's progress descriptor only when it actually changed.
+
+    The bar sweeps in the browser, so a tick with the same active slot and
+    edges sends nothing.
+    """
+    batch = {"view": STRIP_VIEW, "items": progress_items(slots, edges)}
+    if getattr(s, name) != batch:
+        setattr(s, name, batch)
+
+
+def _col_slot(col: int, edges) -> int:
+    """Slot under hit-grid column ``col`` with the current edges, -1 for none."""
+    slot = hit_slot(col, edges) if col >= 0 else None
+    return -1 if slot is None else slot
+
+
 def _render_strips(s, snap: dict, now: float, token: str) -> None:
     v = s._version
     exp_key = selected_key(s._selected, snap, "experiment")
     act_key = selected_key(s._selected, snap, "action")
-    em, exp_slots = strip_marks(
+    em, exp_slots, exp_edges = strip_marks(
         snap.get("experiments", []),
         n_before=snap.get("n_done", 0),
         n_after=snap.get("n_queued", 0),
@@ -583,11 +613,13 @@ def _render_strips(s, snap: dict, now: float, token: str) -> None:
         selected=exp_key,
     )
     s._exp_slots = tuple(exp_slots)
+    s._exp_edges = exp_edges
+    _set_progress(s, "exp_progress", exp_slots, exp_edges)
     s._exp_ords = _slot_ordinals(snap, "experiment")
     s._scopes = (selection_scope(snap, "experiment"), selection_scope(snap, "action"))
     p = plots.marks_chart(
         em,
-        x_domain=(0.0, float(max(len(exp_slots), 1))),
+        x_domain=(0.0, float(PLOT_W)),
         y_domain=(0.0, 1.0),
         panel_id=f"group-exp-{token}",
         version=v,
@@ -596,7 +628,7 @@ def _render_strips(s, snap: dict, now: float, token: str) -> None:
         height_px=STRIP_H,
     )
     s.exp_spec, s.exp_url, s.exp_layout = p.spec, p.buffer_url, p.layout
-    am, act_slots = strip_marks(
+    am, act_slots, act_edges = strip_marks(
         snap.get("actions", []),
         n_before=0,
         n_after=0,
@@ -605,10 +637,12 @@ def _render_strips(s, snap: dict, now: float, token: str) -> None:
         selected=act_key,
     )
     s._act_slots = tuple(act_slots)
+    s._act_edges = act_edges
+    _set_progress(s, "act_progress", act_slots, act_edges)
     s._act_ords = _slot_ordinals(snap, "action")
     p = plots.marks_chart(
         am,
-        x_domain=(0.0, float(max(len(act_slots), 1))),
+        x_domain=(0.0, float(PLOT_W)),
         y_domain=(0.0, 1.0),
         panel_id=f"group-act-{token}",
         version=v,
@@ -618,8 +652,12 @@ def _render_strips(s, snap: dict, now: float, token: str) -> None:
     )
     s.act_spec, s.act_url, s.act_layout = p.spec, p.buffer_url, p.layout
     # the hover line keeps following its slot: the elapsed time ticks
-    s.exp_hover = _hover_line(s._exp_slots, s._hover_slot[0], now)
-    s.act_hover = _hover_line(s._act_slots, s._hover_slot[1], now)
+    s.exp_hover = _hover_line(
+        s._exp_slots, _col_slot(s._hover_col[0], s._exp_edges), now
+    )
+    s.act_hover = _hover_line(
+        s._act_slots, _col_slot(s._hover_col[1], s._act_edges), now
+    )
     if s._selected and (exp_key if s._selected[0] == "experiment" else act_key) is None:
         s._selected = ()
         s.info_note = SELECTION_GONE
@@ -636,7 +674,7 @@ def reset_for_mount(s) -> None:
     s._old_orch = False
     s._first_at = 0.0
     s._full_at = 0.0
-    s._hover_slot = (-1, -1)
+    s._hover_col = (-1, -1)
     s.graph_pulses = {"view": PULSE_VIEW, "seq": s._pulse_seq, "items": []}
 
 
@@ -758,6 +796,8 @@ class GroupState(rx.State):
     graph_spec: dict = {}
     graph_url: str = ""
     graph_layout: str = ""
+    exp_progress: dict = {"view": STRIP_VIEW, "items": []}
+    act_progress: dict = {"view": STRIP_VIEW, "items": []}
     exp_spec: dict = {}
     exp_url: str = ""
     exp_layout: str = ""
@@ -776,6 +816,8 @@ class GroupState(rx.State):
     _version: int = 0
     _exp_slots: tuple = ()
     _act_slots: tuple = ()
+    _exp_edges: tuple = (0.0, float(PLOT_W))
+    _act_edges: tuple = (0.0, float(PLOT_W))
     _exp_ords: tuple = ()
     _act_ords: tuple = ()
     _scopes: tuple = ()  # (experiment scope, action scope)
@@ -787,7 +829,9 @@ class GroupState(rx.State):
     _probe_at: float = 0.0
     _first_at: float = 0.0
     _pulse_seq: int = 0
-    _hover_slot: tuple = (-1, -1)  # hovered (EXP, ACT) slot, -1 for none
+    # hovered (EXP, ACT) hit-grid column, -1 for none: a slot index would go
+    # stale when the edges move under a still pointer
+    _hover_col: tuple = (-1, -1)
     _old_orch: bool = False
 
     @rx.event
@@ -847,19 +891,22 @@ class GroupState(rx.State):
         re-uploads a strip.
         """
         slots = self._exp_slots if which == 0 else self._act_slots
-        trace = (payload or {}).get("trace")
-        slot = (
-            hit_slot((payload or {}).get("index", -1), len(slots))
-            if trace == HIT_TRACE
-            else -1  # the pointer left the strip's points
-        )
-        if slot is None:
-            slot = -1
-        cur = list(self._hover_slot)
-        if cur[which] == slot:
+        edges = self._exp_edges if which == 0 else self._act_edges
+        index = (payload or {}).get("index", -1)
+        col = -1  # the pointer left the strip's points
+        if (payload or {}).get("trace") == HIT_TRACE:
+            try:
+                n = int(index)
+            except (TypeError, ValueError):
+                n = -1
+            if 0 <= n < HIT_COLS * HIT_ROWS:
+                col = n % HIT_COLS
+        slot = _col_slot(col, edges)
+        cur = list(self._hover_col)
+        if cur[which] == col:
             return
-        cur[which] = slot
-        self._hover_slot = tuple(cur)
+        cur[which] = col
+        self._hover_col = tuple(cur)
         line = _hover_line(slots, slot, time.time())
         if which == 0:
             self.exp_hover = line
@@ -879,8 +926,9 @@ class GroupState(rx.State):
             token = self.router.session.client_token
             exp = kind == "experiment"
             slots = self._exp_slots if exp else self._act_slots
+            edges = self._exp_edges if exp else self._act_edges
             ords = self._exp_ords if exp else self._act_ords
-            item = click_item(slots, (payload or {}).get("x"))
+            item = click_item(slots, edges, (payload or {}).get("x"))
             if item is None or len(self._scopes) != 2:
                 return
             at = next(i for i, it in enumerate(slots) if it is item)
@@ -1083,6 +1131,7 @@ def group_page() -> rx.Component:
                 width=STRIP_W,
                 on_select=S.select_exp,
                 on_hover=S.hover_exp,
+                progress=S.exp_progress,
             ),
         ),
         _strip_card(
@@ -1096,6 +1145,7 @@ def group_page() -> rx.Component:
                 width=STRIP_W,
                 on_select=S.select_act,
                 on_hover=S.hover_act,
+                progress=S.act_progress,
             ),
         ),
     )
