@@ -139,6 +139,13 @@ from helao.ui.reflex.sync_quarantine import (
     sync_quarantine_page,
 )
 from helao.ui.reflex.logs import LogsState, configure_logs, logs_page
+from helao.ui.reflex.group import (
+    GroupState,
+    configure_group,
+    group_page,
+    start_feed,
+    stop_feed,
+)
 from helao.ui.reflex.state import make_panel_state
 from helao.ui.reflex.xy_component import make_buffer_router
 
@@ -151,6 +158,7 @@ SHELL_ROUTES = (
     "/live",
     "/action",
     "/operator",
+    "/group",
     "/browser",
     "/control",
     "/composition",
@@ -455,6 +463,7 @@ NAV_MENUS = (
 
 #: Top-level nav links, in display order: ``(text, href)``.
 NAV_LINKS = (
+    ("Group", "/group"),
     ("Operator", "/operator"),
     ("Action", "/action"),
     ("Live", "/live"),
@@ -462,6 +471,7 @@ NAV_LINKS = (
 
 #: Lucide icon per nav entry (top-level and menu items), keyed by its label.
 NAV_ICONS = {
+    "Group": "network",
     "Operator": "list-checks",
     "Action": "zap",
     "Live": "activity",
@@ -656,6 +666,8 @@ def build_app(world_cfg: dict, server_key: str):
     assert RetireState is not None
     assert QuarantineState is not None
     assert LogsState is not None
+    # And the /group page's state: created at import, before add_page.
+    assert GroupState is not None
     # The operator's backend is built per session from this config; without
     # this the page renders but can never reach an orchestrator.
     configure_operator(world_cfg, server_key)
@@ -669,6 +681,7 @@ def build_app(world_cfg: dict, server_key: str):
     # And the sync-quarantine page, off unless this server opts in.
     configure_quarantine(world_cfg, server_key)
     configure_logs(world_cfg, server_key)
+    configure_group(world_cfg)
 
     # The buffer route carries bulk column data out-of-band, so megabyte float
     # arrays never traverse Reflex's JSON state channel. `api_transformer` is
@@ -737,6 +750,11 @@ def build_app(world_cfg: dict, server_key: str):
         title="HELAO operator",
     )
     application.add_page(
+        lambda: _page("Server group", group_page(), "/group"),
+        route="/group",
+        title="HELAO group",
+    )
+    application.add_page(
         lambda: _page("Data browser", browser_page(), "/browser"),
         route="/browser",
         title="HELAO browser",
@@ -794,10 +812,12 @@ def build_app(world_cfg: dict, server_key: str):
         loop would outlive the app.
         """
         registry.start()
+        start_feed()
         LOGGER.info(f"reflex ingest started for targets: {registry.targets()}")
         try:
             yield
         finally:
+            await stop_feed()
             await registry.stop()
             LOGGER.info("reflex ingest stopped")
 

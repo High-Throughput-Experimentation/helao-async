@@ -123,6 +123,7 @@ CANONICAL_TAILWIND: Final[dict[str, str]] = {
     "purple-800": "#6b21a8",
     "fuchsia-600": "#c026d3",
     "fuchsia-700": "#a21caf",
+    "pink-50": "#fdf2f8",
     "pink-400": "#f472b6",
     "pink-500": "#ec4899",
     "rose-50": "#fff1f2",
@@ -596,6 +597,8 @@ PAGE_TINT_TEXT_ROWS: Final[dict[tuple[str, str], float]] = {
     ("slate-600", "red-50"): 6.93,
     ("slate-900", "indigo-50"): 15.97,  # /logs
     ("slate-600", "indigo-50"): 6.78,
+    ("slate-900", "pink-50"): 16.35,  # /group
+    ("slate-600", "pink-50"): 6.94,
 }
 
 # The shade slate-600 replaced, kept as a measurement rather than a comment.
@@ -616,6 +619,7 @@ SLATE_500_ON_TINT_ROWS: Final[dict[tuple[str, str], float]] = {
     ("slate-500", "cyan-50"): 4.57,
     ("slate-500", "teal-50"): 4.56,
     ("slate-500", "yellow-50"): 4.60,
+    ("slate-500", "pink-50"): 4.36,  # /group
 }
 
 # Each table's header text on its own header background. Body-floor rows: a
@@ -900,7 +904,7 @@ def test_page_tint_rows_cover_every_route_twice() -> None:
 def test_slate_500_is_measured_on_every_tint(pair: tuple[str, str]) -> None:
     """The shade the Reflex stack moved *away* from, pinned as a measurement.
 
-    Six of the thirteen tints put ``slate-500`` under the 4.5 body floor, which
+    Seven of the fourteen tints put ``slate-500`` under the 4.5 body floor, which
     is why ``REFLEX_MUTED_TEXT`` is ``slate-600``.
     Asserting the numbers here means a future edit that reintroduces
     ``slate-500`` cannot claim it was fine, and a Tailwind revision that changed
@@ -911,8 +915,8 @@ def test_slate_500_is_measured_on_every_tint(pair: tuple[str, str]) -> None:
     assert measured == pytest.approx(SLATE_500_ON_TINT_ROWS[pair], abs=0.01)
 
 
-def test_slate_500_fails_the_body_floor_on_six_of_the_thirteen_tints() -> None:
-    """Exactly six, and named -- not "at least one".
+def test_slate_500_fails_the_body_floor_on_seven_of_the_fourteen_tints() -> None:
+    """Exactly seven, and named -- not "at least one".
 
     A count would pass if the failing set moved to four different tints, and
     the point of the row block above is that *which* surfaces fail is not
@@ -922,7 +926,7 @@ def test_slate_500_fails_the_body_floor_on_six_of_the_thirteen_tints() -> None:
     ``/composition`` at 4.60 and did not join them, which is the other half of
     the same point -- the set is measured, not predicted. ``orange-50`` joined
     them with ``/retire``, at 4.48, ``red-50`` with ``/quarantine``, at 4.35, and
-    ``indigo-50`` with ``/logs``, at 4.26.
+    ``indigo-50`` with ``/logs``, at 4.26. ``pink-50`` joined them with ``/group``, at 4.36.
     """
     failing = {
         bg
@@ -936,6 +940,7 @@ def test_slate_500_fails_the_body_floor_on_six_of_the_thirteen_tints() -> None:
         "orange-50",
         "red-50",
         "indigo-50",
+        "pink-50",
     }
 
 
