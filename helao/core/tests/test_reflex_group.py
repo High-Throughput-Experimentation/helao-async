@@ -56,10 +56,10 @@ def state():
         _act_ords=(),
         _scopes=(),
         _first_at=0.0,
-        _hovered="",
         _hover_slot=(-1, -1),
         _pulse_seq=0,
         graph_pulses={},
+        graph_nodes={"items": []},
         exp_hover="",
         act_hover="",
         tree_header="select a row",
@@ -1018,46 +1018,63 @@ def _two_server_frame(seq, status):
     return f
 
 
-def _hover(group, s, payload):
-    s.router = SimpleNamespace(session=SimpleNamespace(client_token="t"))
-    group.GroupState.hover_node.fn(s, payload)
+def _items(s):
+    return {it["key"]: it for it in s.graph_nodes["items"]}
 
 
-def test_hovering_a_node_redraws_it_larger_in_its_own_colour_then_clears(
-    group, monkeypatch
-):
+def test_node_descriptors_carry_key_position_fill_and_radius(group, monkeypatch):
     monkeypatch.setattr(group, "stream_lost", lambda feed, now: False)
     feed = Feed()
     feed.push(_two_server_frame(1, "busy"))
     s = state()
     group.apply_tick(s, feed, 100.0, "t")
-    layout, v = s.graph_layout, s._version
-    busy = group.GROUP_STATE_COLORS["busy"]
-    idle = group.GROUP_STATE_COLORS["idle"]
-    _hover(group, s, {"trace": f"nodes:SIM:{busy}", "index": 0})  # SIM, busy
-    assert s._hovered == "SIM"
-    _hover(group, s, {"trace": f"nodes:CPSIM:{idle}", "index": 0})  # CPSIM
-    assert s._hovered == "CPSIM"
-    _hover(group, s, {"trace": f"nodes:SIM:{busy}", "index": 0})
-    assert s._hovered == "SIM" and s._version == v + 3  # one redraw per change
-    assert s.graph_layout == layout  # point columns only: no chart rebuild
-    marks = group.graph_marks(s._snap[0], "ORCH", False, "SIM")
-    hov = next(m for m in marks if m.get("name") == f"hovered:{busy}")
-    assert hov["colors"] == [busy]
-    assert hov["size"] == group.HOVER_PX > group.NODE_PX
-    _hover(group, s, {"trace": "", "index": -1})  # pointer left
-    assert s._hovered == "" and s.graph_layout == layout
+    got = _items(s)
+    assert set(got) == {"ORCH", "SIM", "CPSIM"}
+    pos = group.group_layout("ORCH", ["SIM", "CPSIM"])
+    for key, it in got.items():
+        assert (it["x"], it["y"]) == pytest.approx(pos[key], abs=1e-5)
+        assert it["r"] == group.NODE_PX / 2
+    assert got["SIM"]["color"] == group.GROUP_STATE_COLORS["busy"]
+    assert got["CPSIM"]["color"] == group.GROUP_STATE_COLORS["idle"]
+    assert s.graph_nodes["hover_r"] == group.HOVER_PX / 2 > group.NODE_PX / 2
+    assert s.graph_nodes["view"] == group.PULSE_VIEW
 
-    _hover(group, s, {"trace": f"nodes:SIM:{busy}", "index": 0})
-    assert s._hovered == "SIM"
-    # The disc over the node's ring and a crossing pulse are picked by xy too,
-    # but neither is a change of node: the hover must hold (no flicker).
-    _hover(group, s, {"trace": f"hovered:{busy}", "index": 0})
-    _hover(group, s, {"trace": "pulse:triangle", "index": 0})
-    _hover(group, s, {"trace": "edges:x:2", "index": 5})
-    assert s._hovered == "SIM"
-    _hover(group, s, {"trace": "", "index": -1})
-    assert s._hovered == ""
+
+def test_descriptors_change_with_a_status_colour_and_not_otherwise(group, monkeypatch):
+    monkeypatch.setattr(group, "stream_lost", lambda feed, now: False)
+    feed = Feed()
+    feed.push(_two_server_frame(1, "idle"))
+    s = state()
+    group.apply_tick(s, feed, 100.0, "t")
+    first = s.graph_nodes
+    feed.push(_two_server_frame(2, "idle"))  # a new frame, nothing changed
+    group.apply_tick(s, feed, 101.0, "t")
+    assert s.graph_nodes is first  # the very same value: nothing is re-sent
+    group.apply_tick(s, feed, 102.0, "t")  # a slow tick with no frame
+    assert s.graph_nodes is first
+    feed.push(_two_server_frame(3, "busy"))
+    group.apply_tick(s, feed, 103.0, "t")
+    assert s.graph_nodes is not first
+    assert _items(s)["SIM"]["color"] == group.GROUP_STATE_COLORS["busy"]
+    assert _items(s)["CPSIM"] == {it["key"]: it for it in first["items"]}["CPSIM"]
+
+
+def test_the_graph_has_no_hovered_traces_and_no_server_hover_path(group):
+    marks = group.graph_marks(_two_server_frame(1, "busy"), "ORCH", False)
+    assert not any(m.get("name", "").startswith("hovered") for m in marks)
+    assert not hasattr(group.GroupState, "hover_node")
+    assert "_hovered" not in vars(group.GroupState)
+    s = state()
+    group._render_graph(s, _two_server_frame(1, "busy"), False, "t")
+    assert "hover" not in s.graph_spec["interaction"]  # xy reports nothing on hover
+    assert "mark_style" not in s.graph_spec
+
+
+def test_the_graph_chart_is_opted_in_to_nodes_and_not_to_server_hover(group):
+    import inspect
+
+    src = inspect.getsource(group)
+    assert "nodes=S.graph_nodes" in src and "on_hover=S.hover_node" not in src
 
 
 def test_a_status_change_leaves_the_graph_layout_token_unchanged(group):

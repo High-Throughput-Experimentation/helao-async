@@ -666,6 +666,10 @@ def test_marks_chart_hover_events_silence_xys_own_feedback():
     assert p.spec["dom"]["styles"]["tooltip"]["opacity"] == "0"
     plain = _mc(_marks())
     assert "mark_style" not in plain.spec and "hover" not in plain.spec["interaction"]
+    # no hover events and no click: xy takes no pointer input at all
+    assert plain.spec["dom"]["style"]["pointer_events"] == "none"
+    assert "pointer_events" not in p.spec["dom"]["style"]
+    assert "pointer_events" not in _mc(_marks(), click=True).spec["dom"]["style"]
     assert p.layout != plain.layout  # spec, so it must rebuild the chart
 
 

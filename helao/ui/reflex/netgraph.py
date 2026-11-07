@@ -116,10 +116,9 @@ class NetGraph:
         #: is either the node or the off-domain placeholder, and a node
         #: changing colour swaps two traces' offsets, which xy rebuilds.
         self.node_colors = tuple(node_colors)
-        #: Size of the hover disc (one fixed size: a size change is spec too).
+        #: Size of the disc the browser draws over a hovered node. Only the
+        #: subtext offset needs it here, to clear that disc.
         self.hover_px = float(hover_px)
-        #: Key of the node under the pointer, drawn enlarged in its own colour.
-        self.hovered = None
 
     def add_node(
         self, key, x, y, *, color, label_color, text="", subtext="", size_px=28.0
@@ -148,9 +147,20 @@ class NetGraph:
         pa, pb = self.ports()[edge_id]
         return bezier(pa, pb)
 
-    def node_traces(self) -> dict:
-        """Trace name -> the node it draws (one node per trace)."""
-        return {f"nodes:{n.key}:{n.color}": [n.key] for n in self.nodes.values()}
+    def node_descriptors(self) -> list:
+        """One dict per node for the browser's hover overlay: key, data x/y,
+        current fill colour and radius in px. Sorted by key, so equal graphs
+        give equal lists."""
+        return [
+            {
+                "key": n.key,
+                "x": round(n.x, 5),
+                "y": round(n.y, 5),
+                "color": n.color,
+                "r": n.size_px / 2,
+            }
+            for n in sorted(self.nodes.values(), key=lambda n: n.key)
+        ]
 
     def ports(self):
         """edge_id -> (src port, dst port), fanned out where ends share a side."""
@@ -180,10 +190,10 @@ class NetGraph:
         """Mark dicts for ``plots.marks_chart``.
 
         Pure state, no time: nothing here moves, so the chart changes only when
-        a status, a hover or the topology does. Every scatter trace is always
+        a status or the topology does. Every scatter trace is always
         present (possibly empty), so the layout token does not change.
-        A segments (edge) trace exists per declared style; the ``hovered`` disc
-        sits just under the nodes.
+        A segments (edge) trace exists per declared style. Hover is not drawn
+        here: the chart shim draws it in the browser from :meth:`node_descriptors`.
         """
         ports = self.ports()
         texts = []
@@ -276,17 +286,6 @@ class NetGraph:
             }
             for color, width in sorted(by_style)
         ]
-        hov = self.nodes.get(self.hovered)
-        for color in sorted({c for _, c in by_node}):
-            on = hov is not None and hov.color == color
-            out.append(
-                scatter(
-                    f"hovered:{color}",
-                    ([hov.x], [hov.y], [color]) if on and hov else ([], [], []),
-                    self.hover_px,
-                    "circle",
-                )
-            )
         out += [
             scatter(
                 f"nodes:{key}:{color}",

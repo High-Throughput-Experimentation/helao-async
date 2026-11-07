@@ -216,6 +216,7 @@ def chart(
     on_select=None,
     on_hover=None,
     pulses=None,
+    nodes=None,
 ):
     """Bind a chart component to three Reflex state vars.
 
@@ -242,6 +243,10 @@ def chart(
         pulses: Optional Reflex var of pulse descriptors; passing it opts the
             chart into the shim's browser-side pulse overlay (see
             ``xy_component``). Charts that omit it get no overlay.
+        nodes: Optional Reflex var of node descriptors; passing it opts the
+            chart into the shim's browser-side hover overlay (same canvas as
+            the pulses): the node under the pointer is drawn enlarged, with no
+            server event. Charts that omit it add no listener.
 
     Returns:
         An ``rx.Component``.
@@ -253,6 +258,8 @@ def chart(
     # flex-shrink: 0 in the shim's JSX), which is both the element that
     # collapsed and the element xy draws into.
     extra = {} if pulses is None else {"pulses": pulses}
+    if nodes is not None:
+        extra["nodes"] = nodes
     return xy_chart(
         spec=spec_var,
         buffer_url=url_var,
@@ -996,7 +1003,10 @@ def marks_chart(
     :func:`chart`'s ``on_hover``) and silences xy's own hover feedback: the
     highlight is made fully transparent and the tooltip invisible (kept, not
     ``show_tooltip=False``: the shim reads its hiding as "pointer left every
-    point"). The page draws any hover effect itself, from the event.
+    point"). The page draws any hover effect itself, from the event. A chart
+    with neither ``hover_events`` nor ``click`` takes no pointer input at all
+    (``pointer-events: none``), so a page that draws its own hover on the host
+    element (the /group graph) gets no xy tooltip or highlight under it.
 
     ``height_px`` fixes the chart's height. Without it the chart is fluid
     (``height="100%"``), and xy then floors it at 120 px; a fixed height is
@@ -1113,6 +1123,12 @@ def marks_chart(
     ]
     if hover_events:
         axes.append(xy.tooltip(style={"opacity": "0", "pointer_events": "none"}))
+    # A chart that reports neither hover nor clicks gets no pointer at all: xy
+    # keeps hover state even with hover off (tooltip hidden, highlight clear),
+    # and drawing it threw (null buffer) when a node's trace was swapped under
+    # the pointer, which reloads the page. The host element still sees the
+    # pointer, which is where the /group graph's own hover listens.
+    inert = {} if hover_events or click else {"pointer_events": "none"}
     pad = CHART_PADDING_PX
     figure = xy.chart(
         *children,
@@ -1126,7 +1142,7 @@ def marks_chart(
         hover=True if hover_events else None,
         # The /group card behind the chart paints the surface; xy reads
         # ``--chart-bg`` from the chart root's computed style.
-        style={"--chart-bg": TRANSPARENT},
+        style={"--chart-bg": TRANSPARENT, **inert},
     )
     if hover_events:
         figure.figure().set_mark_style(hover={"opacity": 0.0})

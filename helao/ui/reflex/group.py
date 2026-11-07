@@ -63,7 +63,7 @@ STRIP_H, STRIP_W = 60, 720
 PLOT_W = STRIP_W - 2 * plots.CHART_PADDING_PX
 #: Wide enough that a short server key (5-6 characters) sits inside its node.
 NODE_PX = 44.0
-#: The node under the pointer is redrawn this much larger, in its own colour.
+#: The browser draws the node under the pointer this large, in its own colour.
 HOVER_PX = round(NODE_PX * 1.3)
 #: Every (colour, width) a server edge can take; a busy edge is thicker. Each
 #: is a fixed trace of the graph, so a status change is column data, not a
@@ -355,7 +355,7 @@ def _color_key(status: str) -> str:
     return status if status in GROUP_STATE_COLORS else "idle"
 
 
-def build_graph(snap: dict, orch_key: str, lost: bool, hovered=None) -> NetGraph:
+def build_graph(snap: dict, orch_key: str, lost: bool) -> NetGraph:
     """The network graph for one snapshot: nodes and edges."""
     servers = snap.get("servers", [])
     pos = group_layout(orch_key, [s["key"] for s in servers])
@@ -366,7 +366,6 @@ def build_graph(snap: dict, orch_key: str, lost: bool, hovered=None) -> NetGraph
         node_colors=NODE_COLORS,
         hover_px=HOVER_PX,
     )
-    g.hovered = hovered
     orch_status = (
         "unreachable"
         if lost
@@ -404,9 +403,17 @@ def build_graph(snap: dict, orch_key: str, lost: bool, hovered=None) -> NetGraph
     return g
 
 
-def graph_marks(snap: dict, orch_key: str, lost: bool, hovered=None):
-    """Marks for the network graph: a pure function of the snapshot and hover."""
-    return build_graph(snap, orch_key, lost, hovered).marks()
+def graph_marks(snap: dict, orch_key: str, lost: bool):
+    """Marks for the network graph: a pure function of the snapshot."""
+    return build_graph(snap, orch_key, lost).marks()
+
+
+def node_batch(g: NetGraph) -> dict:
+    """The graph's node descriptors for the shim's hover overlay (``nodes`` prop).
+
+    ``hover_r`` is the radius, in px, of the enlarged circle the browser draws.
+    """
+    return {"view": PULSE_VIEW, "hover_r": HOVER_PX / 2, "items": g.node_descriptors()}
 
 
 def pulse_items(snap: dict, fresh, now: float, orch_key: str, lost: bool) -> list:
@@ -544,14 +551,17 @@ def _backend(token: str):
 
 def _render_graph(s, snap: dict, lost: bool, token: str) -> None:
     s._version += 1
-    marks = graph_marks(snap, _CFG["orch_key"], lost, s._hovered or None)
+    g = build_graph(snap, _CFG["orch_key"], lost)
+    # Sent only on a real change (topology or a status colour), never per hover.
+    batch = node_batch(g)
+    if batch != s.graph_nodes:
+        s.graph_nodes = batch
     p = plots.marks_chart(
-        marks,
+        g.marks(),
         x_domain=(-1.0, 1.0),
         y_domain=(-1.0, 1.0),
         panel_id=f"group-graph-{token}",
         version=s._version,
-        hover_events=True,
     )
     s.graph_spec, s.graph_url, s.graph_layout = p.spec, p.buffer_url, p.layout
 
@@ -626,7 +636,6 @@ def reset_for_mount(s) -> None:
     s._old_orch = False
     s._first_at = 0.0
     s._full_at = 0.0
-    s._hovered = ""
     s._hover_slot = (-1, -1)
     s.graph_pulses = {"view": PULSE_VIEW, "seq": s._pulse_seq, "items": []}
 
@@ -745,6 +754,7 @@ class GroupState(rx.State):
     action_error: str = ""
     banner: str = ""
     graph_pulses: dict = {"view": PULSE_VIEW, "seq": 0, "items": []}
+    graph_nodes: dict = {"view": PULSE_VIEW, "hover_r": HOVER_PX / 2, "items": []}
     graph_spec: dict = {}
     graph_url: str = ""
     graph_layout: str = ""
@@ -777,7 +787,6 @@ class GroupState(rx.State):
     _probe_at: float = 0.0
     _first_at: float = 0.0
     _pulse_seq: int = 0
-    _hovered: str = ""  # key of the hovered node, or ""
     _hover_slot: tuple = (-1, -1)  # hovered (EXP, ACT) slot, -1 for none
     _old_orch: bool = False
 
@@ -830,35 +839,6 @@ class GroupState(rx.State):
             self.action_error = err
             if err:
                 self.pending = ""
-
-    @rx.event
-    def hover_node(self, payload: dict):
-        """Pointer over (or off) a node: redraw the graph now, not at the next tick.
-
-        Only the graph's point columns change, so xy updates in place; the
-        2 Hz idle tick would otherwise lag the pointer by up to 500 ms.
-        """
-        trace = (payload or {}).get("trace")
-        idx = (payload or {}).get("index", -1)
-        if not self._snap:
-            return
-        now = time.time()
-        lost = stream_lost(_FEED, now)
-        g = build_graph(self._snap[0], _CFG["orch_key"], lost)
-        keys = g.node_traces().get(trace)
-        if keys is not None and 0 <= idx < len(keys):
-            key = keys[idx]
-        elif not trace or idx < 0:
-            key = ""  # the pointer left every point (or the chart)
-        else:
-            # The hover disc sits over the node's ring and pulses cross it: xy
-            # picks them, but they are not a change of node (clearing here
-            # flickers the disc on and off).
-            return
-        if key == self._hovered:
-            return
-        self._hovered = key
-        _render_graph(self, self._snap[0], lost, self.router.session.client_token)
 
     def _hover_strip(self, which: int, payload: dict) -> None:
         """Pointer over (or off) a strip segment: set only the hover line.
@@ -1087,8 +1067,8 @@ def group_page() -> rx.Component:
                 S.graph_layout,
                 height=GRAPH_H,
                 width=GRAPH_W,
-                on_hover=S.hover_node,
                 pulses=S.graph_pulses,
+                nodes=S.graph_nodes,
             ),
             size="1",
         ),
