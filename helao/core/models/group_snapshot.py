@@ -114,7 +114,7 @@ def server_rows(orch, finish_errors: dict) -> list:
     return rows
 
 
-def _of_seq(exp, seq) -> bool:
+def _of_seq(exp, seq_uuid) -> bool:
     """Whether ``exp`` belongs to ``seq`` (an experiment with no recorded parent does).
 
     The orchestrator activates the next sequence while the previous one's last
@@ -123,7 +123,7 @@ def _of_seq(exp, seq) -> bool:
     sequence's strip kept the first one's last experiment as a done row.
     """
     u = getattr(exp, "sequence_uuid", None)
-    return u is None or seq is None or str(u) == str(seq.sequence_uuid)
+    return u is None or seq_uuid is None or str(u) == seq_uuid
 
 
 def experiment_rows(orch, cache=None) -> tuple:
@@ -135,10 +135,11 @@ def experiment_rows(orch, cache=None) -> tuple:
     """
     seq = orch.active_sequence or getattr(orch, "last_sequence", None)
     finished = orch.active_sequence is None and seq is not None
+    seq_uuid = str(seq.sequence_uuid) if seq is not None else None
     done_all = [
         e
         for e in (getattr(seq, "dispatched_experiments", None) or [] if seq else [])
-        if _of_seq(e, seq)
+        if _of_seq(e, seq_uuid)
     ]
     done = done_all[-EXP_DONE_WINDOW:]
     rows = [
@@ -155,7 +156,7 @@ def experiment_rows(orch, cache=None) -> tuple:
     exp = orch.active_experiment
     if (
         exp is not None
-        and _of_seq(exp, seq)
+        and _of_seq(exp, seq_uuid)
         and str(exp.experiment_uuid) not in {r["uuid"] for r in rows}
     ):
         rows.append(

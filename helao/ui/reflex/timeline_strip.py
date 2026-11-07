@@ -21,11 +21,13 @@ SAWTOOTH_HZ = 2.0
 #: The invisible ``hit`` trace is a fixed grid of squares tiling the whole
 #: strip. xy's pick is pixel-exact on a point's drawn marker (measured: with
 #: 4 px circles a hover registered only on a marker and "left" a frame later),
-#: so the markers must touch: 60 columns over ~700 px (11.7 px) and 7 rows over
-#: ~100 px (14.9 px) with 16 px squares leave no gap. One point per segment
-#: centre answered only a hover on that centre. The count never depends on the
-#: slot count, only the x positions do.
-HIT_COLS = 60
+#: so the markers must touch: 80 columns over ~700 px (8.75 px) and 7 rows over
+#: ~100 px (14.9 px); 16 px squares still overlap. 80 > 73, the EXP strip's
+#: maximum slot count (20 done + active + 50 queued + two ellipses), so every
+#: slot owns a column. One point per segment centre answered only a hover on
+#: that centre. The count never depends on the slot count, only the x
+#: positions do.
+HIT_COLS = 80
 HIT_ROWS = 7
 HIT_TRACE = "hit"
 HIT_PX = 16.0

@@ -528,6 +528,8 @@ export function createController(options) {
   // (seconds from when the server built it), converted to a local start at
   // RECEIPT, so a page/server clock difference cannot skip or delay a pulse.
   st.setPulses = (batch, nowMs) => {
+    // A hidden tab never runs rAF, so nothing else prunes while batches arrive.
+    st.pulses = st.pulses.filter((p) => p.end > nowMs);
     st.pulsesOn = batch !== undefined && batch !== null;
     if (!st.pulsesOn) {
       st.pulses = [];

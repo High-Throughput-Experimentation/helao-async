@@ -941,3 +941,113 @@ def rx_var(name):
     import reflex as rx
 
     return rx.Var(name)
+
+
+_JS_ENV = """
+let T = 0;
+Object.defineProperty(globalThis, "performance", { value: { now: () => T }, configurable: true });
+const calls = { raf: 0, cancelled: [], removed: 0, strokes: 0, clears: 0, listeners: [], unlistened: [] };
+let queue = new Map(), nextId = 1;
+globalThis.requestAnimationFrame = (cb) => { calls.raf += 1; queue.set(nextId, cb); return nextId++; };
+globalThis.cancelAnimationFrame = (id) => { calls.cancelled.push(id); queue.delete(id); };
+const ctx = { setTransform() {}, beginPath() {}, moveTo() {}, lineTo() {},
+  clearRect() { calls.clears += 1; }, stroke() { calls.strokes += 1; } };
+globalThis.document = {
+  visibilityState: "visible",
+  addEventListener: (n, cb) => calls.listeners.push(n),
+  removeEventListener: (n, cb) => calls.unlistened.push(n),
+  createElement: () => ({ style: {}, dataset: {}, width: 0, height: 0, isConnected: false,
+    getContext: () => ctx, remove() { calls.removed += 1; } }),
+};
+const host = { clientWidth: 100, clientHeight: 100, addEventListener() {},
+  appendChild(c) { c.isConnected = true; } };
+const view = { x: [-1, 1], y: [-1, 1], pad: 8 };
+const item = (id, start_in = 0, dur = 1) =>
+  ({ id, dir: "fwd", color: "#111", path: [[0, 0], [1, 1]], start_in, dur });
+const make = () => {
+  const st = createController({ spec: {} });
+  st.attach({ decodeFrame: () => ({ buffers: [] }), render: () => () => {} }, host);
+  return st;
+};
+// run the pending animation frame callbacks once, at time t
+const runFrames = (t) => { const cbs = [...queue.values()]; queue = new Map(); T = t; cbs.forEach((cb) => cb(t)); };
+"""
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_a_hidden_tab_does_not_accumulate_pulses():
+    """rAF never fires while hidden, so setPulses itself must drop ended pulses."""
+    out = _run_js(_JS_ENV + """
+document.visibilityState = "hidden";
+const st = make();
+let worst = 0;
+for (let i = 0; i < 60; i++) {
+  T = i * 1000;                          // a batch every second, each pulse lasts 1 s
+  st.setPulses({ view, items: [item("p" + i)] }, T);
+  worst = Math.max(worst, st.pulses.length);
+}
+console.log(JSON.stringify({ worst, final: st.pulses.length, drawn: calls.strokes }));
+""")
+    assert out["worst"] <= 2 and out["final"] <= 2
+    assert out["drawn"] == 0  # nothing ran, nothing was drawn
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_dispose_cancels_the_frame_removes_the_canvas_and_the_listener():
+    out = _run_js(_JS_ENV + """
+const st = make();
+st.setPulses({ view, items: [item("a", 0, 5)] }, 0);
+runFrames(100);                           // draws: creates + attaches the canvas, re-arms rAF
+const armed = st.raf;
+st.dispose();
+console.log(JSON.stringify({ armed, cancelled: calls.cancelled, removed: calls.removed,
+  listened: calls.listeners, unlistened: calls.unlistened, rafAfter: st.raf,
+  pending: queue.size }));
+""")
+    assert out["armed"] is not None
+    assert out["cancelled"] == [out["armed"]] and out["pending"] == 0
+    assert out["rafAfter"] is None
+    assert out["removed"] == 1
+    assert out["listened"] == ["visibilitychange"]
+    assert out["unlistened"] == ["visibilitychange"]
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_returning_to_a_visible_tab_drops_ended_pulses_and_a_hidden_one_does_not():
+    out = _run_js(_JS_ENV + """
+const st = make();
+st.setPulses({ view, items: [item("a", 0, 1), item("b", 0, 1)] }, 0);
+T = 60000;                                // a minute passed in the background
+document.visibilityState = "hidden";
+st.onVisible();                           // still hidden: nothing happens
+const whileHidden = st.pulses.length;
+document.visibilityState = "visible";
+st.onVisible();
+console.log(JSON.stringify({ whileHidden, after: st.pulses.length, strokes: calls.strokes }));
+""")
+    assert out["whileHidden"] == 2
+    assert out["after"] == 0 and out["strokes"] == 0  # nothing replayed
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_the_frame_loop_stops_after_the_last_pulse_and_the_last_frame_clears():
+    out = _run_js(_JS_ENV + """
+const st = make();
+st.setPulses({ view, items: [item("a", 0, 1)] }, 0);
+const log = [];
+for (const t of [100, 500, 900]) { runFrames(t); log.push([t, calls.strokes, calls.clears, queue.size]); }
+const before = { strokes: calls.strokes, clears: calls.clears, raf: calls.raf };
+runFrames(1500);                          // the pulse ended: this frame clears and stops
+const after = { strokes: calls.strokes, clears: calls.clears, raf: calls.raf, queued: queue.size, id: st.raf };
+runFrames(1600);                          // nothing is pending any more
+console.log(JSON.stringify({ log, before, after, rafLater: calls.raf }));
+""")
+    assert [row[3] for row in out["log"]] == [1, 1, 1]  # exactly one loop while moving
+    assert out["after"]["queued"] == 0 and out["after"]["id"] is None
+    assert (
+        out["after"]["strokes"] == out["before"]["strokes"]
+    )  # final frame draws nothing
+    assert (
+        out["after"]["clears"] == out["before"]["clears"] + 1
+    )  # but wipes the last one
+    assert out["rafLater"] == out["after"]["raf"]  # and never re-arms

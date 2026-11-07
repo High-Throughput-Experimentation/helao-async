@@ -1355,7 +1355,7 @@ def test_hit_grid_answers_every_segment_and_maps_back_to_its_slot():
         # 12 px pick radius allows (720 px / HIT_COLS columns)
         assert {hit_slot(i, len(slots)) for i in range(HIT_COLS * HIT_ROWS)} == set(
             range(len(slots))
-        ) or len(slots) > HIT_COLS
+        )
         # xy picks pixel-exact on a drawn marker, so the squares must tile the plot
         assert hit["size"] == HIT_PX and hit["symbol"] == "square"
         assert HIT_PX >= 704 / HIT_COLS and HIT_PX >= 104 / HIT_ROWS
@@ -1430,3 +1430,14 @@ def test_strips_ask_for_hover_events_and_clicks(group):
         assert spec["interaction"].get("hover") and spec["interaction"].get("click")
         # xy's invisible toolbar would swallow the pointer over a strip's corner
         assert spec.get("show_modebar") is False
+
+
+def test_every_slot_of_the_largest_exp_strip_is_reachable():
+    from helao.core.models.group_snapshot import EXP_DONE_WINDOW, EXP_QUEUED_WINDOW
+    from helao.ui.reflex.timeline_strip import HIT_COLS, HIT_ROWS, hit_slot
+
+    n_max = EXP_DONE_WINDOW + 1 + EXP_QUEUED_WINDOW + 2  # + both ellipses
+    assert n_max == 73
+    for n in (n_max - 1, n_max):
+        hit = {hit_slot(i, n) for i in range(HIT_COLS * HIT_ROWS)}
+        assert hit == set(range(n)), sorted(set(range(n)) - hit)
