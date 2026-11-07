@@ -361,13 +361,16 @@ export function pulsePixelPath(path, view, w, h) {
 }
 
 // The node under host-pixel point (x, y): distance to its centre <= its radius
-// in px, nearest wins. Items carry data x/y and r in px; null when none.
-export function hitNode(items, view, w, h, x, y) {
+// in px, nearest wins. Items carry data x/y and r in px; null when none. The
+// node already hovered (`stickyKey`) is held out to `stickyR`, the radius its
+// enlarged circle is drawn at, so moving outward over the circle does not clear it.
+export function hitNode(items, view, w, h, x, y, stickyKey, stickyR) {
   let best = null, bestD = Infinity;
   for (const it of items || []) {
     const c = pulsePixelPath([[it.x, it.y]], view, w, h)[0];
     const d = Math.hypot(x - c[0], y - c[1]);
-    if (d <= it.r && d < bestD) { best = it; bestD = d; }
+    const r = it.key === stickyKey ? Math.max(it.r, stickyR) : it.r;
+    if (d <= r && d < bestD) { best = it; bestD = d; }
   }
   return best;
 }
@@ -612,7 +615,8 @@ export function createController(options) {
     const el = st.el;
     let hit = null;
     if (st.nodesOn && st.pointer && el && st.pulseView) {
-      hit = hitNode(st.nodes.items, st.pulseView, el.clientWidth, el.clientHeight, st.pointer[0], st.pointer[1]);
+      hit = hitNode(st.nodes.items, st.pulseView, el.clientWidth, el.clientHeight, st.pointer[0], st.pointer[1],
+        st.hoverNode && st.hoverNode.key, st.nodes.hover_r);
     }
     const id = (n) => n && n.key + n.color;  // a new fill redraws too
     if (id(hit) === id(st.hoverNode)) return;

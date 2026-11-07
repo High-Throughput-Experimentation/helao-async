@@ -1237,3 +1237,41 @@ console.log(JSON.stringify({ sent, placed, drew: arcs.length }));
     assert out["sent"] == []  # hover never reaches the server
     assert out["placed"] == [["pulses", True]]  # inserted before xy's label layer
     assert out["drew"] >= 1
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_nodes_set_before_the_host_attaches_still_listen_and_hover():
+    """React runs the `nodes` effect before the xy import resolves: no host yet."""
+    out = _run_js(_JS_HOVER_ENV + """
+const st = createController({ spec: {} });
+st.setNodes(batch([node("A", 0, 0, "#112233")]));       // el is still null
+const before = Object.keys(listeners).filter((n) => n.startsWith("pointer"));
+st.attach({ decodeFrame: () => ({ buffers: [] }), render: () => () => {} }, host);
+const after = Object.keys(listeners).filter((n) => n.startsWith("pointer")).sort();
+move(50, 50);
+frame();
+console.log(JSON.stringify({ before, after, arcs: arcs.length, fill: fills[0] }));
+""")
+    assert out["before"] == []
+    assert out["after"] == ["pointerleave", "pointermove"]
+    assert out["arcs"] == 1 and out["fill"] == "#112233"
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_the_hovered_node_holds_out_to_the_drawn_radius_but_a_new_one_does_not():
+    out = _run_js(_JS_HOVER_ENV + """
+const view2 = { x: [-1, 1], y: [-1, 1], pad: 8 };
+const items = [{ key: "A", x: 0, y: 0, color: "#a", r: 10 }];
+const h = (x, k) => { const r = hitNode(items, view2, 100, 100, x, 50, k, 18); return r && r.key; };
+const st = make();
+st.setNodes(batch([node("A", 0, 0, "#112233")]));       // r 10, hover_r 18
+move(55, 50); frame();                                  // on the node: hovered
+move(65, 50); frame();                                  // 15 px out: on the drawn circle, still hovered
+const held = st.hoverNode && st.hoverNode.key;
+move(75, 50); frame();                                  // 25 px out: past the circle
+const gone = st.hoverNode;
+move(65, 50); frame();                                  // 15 px again, not hovered now: no new hover
+console.log(JSON.stringify({ sticky: h(65, "A"), plain: h(65, undefined), far: h(75, "A"), held, gone, again: st.hoverNode }));
+""")
+    assert out["sticky"] == "A" and out["plain"] is None and out["far"] is None
+    assert out["held"] == "A" and out["gone"] is None and out["again"] is None
