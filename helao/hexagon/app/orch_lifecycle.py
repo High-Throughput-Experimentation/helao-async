@@ -30,8 +30,10 @@ public surface).
 experiment/sequence, so each runs its mutation under ``orch.finalize_lock``
 (one ``asyncio.Lock`` per orchestrator, created beside the collaborators) on a
 local reference, and a caller that finds the record already gone or closed out
-returns without writing. The lock is not reentrant: none of the three calls
-another, and ``write_active_sequence_seq`` (which they do call) does not take it.
+returns without writing. The lock is not reentrant: ``finish_active_sequence``
+calls ``finish_active_experiment`` OUTSIDE ``finalize_lock`` and must stay
+outside it; neither the finalizers nor ``write_active_sequence_seq`` (which they
+do call) may take the lock while holding it.
 
 PATCH-SEAM NOTE (B7a, D-B7a.2): ``move_dir`` is read at call time as
 ``yml_tools.move_dir`` inside ``finish_active_sequence``/
@@ -73,6 +75,12 @@ class RunLifecycle:
     async def finish_active_sequence(self):
         """Finalize the active sequence: mark finished, run postprocessors, persist, and roll over."""
         orch = self.orch
+
+        # The dispatch ladder rolls straight to the next sequence once its
+        # queues drain, with the last experiment still active. File it under
+        # this sequence now: finished later it would land in the next one.
+        if orch.active_experiment is not None and orch.active_sequence is not None:
+            await self.finish_active_experiment()
 
         # Waiting is outside ``finalize_lock``: an E-STOP exists to finalize
         # while actions are stuck, and must not queue behind this wait.
