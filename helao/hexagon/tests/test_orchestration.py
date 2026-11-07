@@ -37,7 +37,7 @@ def kinds(cmds):
 def test_t1_start_with_queued_work_starts_loop():
     s, cmds = fsm.step(st(n_seqs=1), fsm.StartRequested())
     assert s.loop_state == LoopStatus.started
-    assert kinds(cmds) == [fsm.CreateDispatchLoopTask]
+    assert kinds(cmds) == [fsm.DropStaleEstopped, fsm.CreateDispatchLoopTask]
 
 
 def test_t1_start_with_active_sequence_only():
@@ -116,16 +116,53 @@ def test_estopped_uuid_when_loop_not_started_is_noop():
     assert s == s0 and cmds == ()
 
 
-def test_estop_requested_when_loop_stopped_still_estops():
+@pytest.mark.parametrize("flag", ["any_active", "active_experiment_present"])
+def test_estop_requested_when_loop_stopped_but_work_active_still_estops(flag):
     """After Stop the loop reads ``stopped`` while the final experiment closes
-    out with actions running; the route decides whether anything is running,
-    so the reducer must accept the event from ``stopped``."""
+    out with actions running; the reducer must accept the event from there."""
     s, cmds = fsm.step(
-        st(loop_state=LoopStatus.stopped, active_experiment_present=True),
+        st(loop_state=LoopStatus.stopped, **{flag: True}),
         fsm.EstopRequested(reason="ui"),
     )
     assert s.loop_state == LoopStatus.estopped
     assert fsm.EstopFanout in kinds(cmds) and fsm.FinishActiveEstopped in kinds(cmds)
+
+
+@pytest.mark.parametrize(
+    "state_kw",
+    [
+        dict(loop_state=LoopStatus.stopped),
+        dict(loop_state=LoopStatus.error),
+        dict(loop_state=LoopStatus.stopped, active_experiment_present=True),
+    ],
+)
+def test_operator_estop_latches_from_any_non_estopped_state(state_kw):
+    """User ruling: the operator's E-STOP always fans out to every server."""
+    s, cmds = fsm.step(st(**state_kw), fsm.EstopRequested(reason="ui", operator=True))
+    assert s.loop_state == LoopStatus.estopped
+    fanout = [c for c in cmds if isinstance(c, fsm.EstopFanout)]
+    assert fanout and fanout[0].switch is True
+
+
+def test_operator_estop_when_already_estopped_is_noop():
+    s0 = st(loop_state=LoopStatus.estopped)
+    s, cmds = fsm.step(s0, fsm.EstopRequested(reason="ui", operator=True))
+    assert s == s0 and cmds == ()
+
+
+def test_clear_estop_after_an_idle_operator_estop_releases_servers():
+    s, _ = fsm.step(st(), fsm.EstopRequested(reason="ui", operator=True))
+    s2, cmds = fsm.step(s, fsm.ClearEstopRequested())
+    assert s2.loop_state == LoopStatus.stopped
+    assert fsm.ReleaseServersEstop in kinds(cmds)
+
+
+def test_estop_requested_when_stopped_and_nothing_active_is_noop():
+    """A stale NON-operator request (e.g. a dispatch error result landing after
+    E-STOP and Clear) must not re-latch an idle orchestrator."""
+    s0 = st(loop_state=LoopStatus.stopped)
+    s, cmds = fsm.step(s0, fsm.EstopRequested(reason="stale dispatch error"))
+    assert s == s0 and cmds == ()
 
 
 def test_estop_requested_when_already_estopped_is_noop():

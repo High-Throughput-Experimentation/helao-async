@@ -11,6 +11,7 @@ import asyncio
 
 import pytest
 
+from helao.core.models.hlostatus import HloStatus
 from helao.hexagon.domain.models import LoopStatus
 from helao.hexagon.tests.live_group import build_ws_sequence, live_group, orch_call
 
@@ -66,12 +67,53 @@ async def test_estop_orch_with_active_experiment_only_estops(tmp_path, monkeypat
 
 
 @pytest.mark.asyncio
-async def test_estop_orch_with_nothing_running_is_a_noop(tmp_path, monkeypatch):
-    sent = _spy_estop_sends(monkeypatch)
+async def test_operator_estop_with_nothing_running_still_latches_and_fans_out(
+    tmp_path, monkeypatch
+):
+    """User ruling: the operator's E-STOP always latches and fans out, even
+    when the orchestrator believes nothing runs (hardware moved by a manual
+    or other-UI action must stop). Clear then releases the servers."""
+    real_sent = _spy_estop_sends(monkeypatch)
+    async with live_group(str(tmp_path)) as g:
+        gsm = g.orch.globalstatusmodel
+        assert gsm.loop_state == LoopStatus.stopped and not gsm.active_dict
+        assert g.orch.active_experiment is None
+        await orch_call("estop_orch")
+        assert gsm.loop_state == LoopStatus.estopped
+        assert real_sent and all(sw is True for sw in real_sent), real_sent
+        n = len(real_sent)
+        await orch_call("clear_estop")
+        assert gsm.loop_state == LoopStatus.stopped
+        assert len(real_sent) > n and all(sw is False for sw in real_sent[n:])
+
+
+@pytest.mark.asyncio
+async def test_operator_estop_latches_the_real_server_and_clear_releases_it(tmp_path):
     async with live_group(str(tmp_path)) as g:
         await orch_call("estop_orch")
+        assert g.orch.globalstatusmodel.loop_state == LoopStatus.estopped
+        assert g.sim_app.actionservermodel.estop is True
+        await orch_call("clear_estop")
         assert g.orch.globalstatusmodel.loop_state == LoopStatus.stopped
-        assert sent == []
+        assert g.sim_app.actionservermodel.estop is False
+
+
+@pytest.mark.asyncio
+async def test_stale_dispatch_error_after_clear_does_not_relatch(tmp_path, monkeypatch):
+    """orch_dispatch's error path calls ``orch.estop_loop``; arriving after
+    E-STOP + Clear with nothing running it must not re-latch."""
+    from helao.helpers.premodels import Experiment
+
+    sent = _spy_estop_sends(monkeypatch)
+    async with live_group(str(tmp_path)) as g:
+        g.orch.active_experiment = Experiment(experiment_name="closing_out")
+        await orch_call("estop_orch")
+        await orch_call("clear_estop")
+        assert g.orch.active_experiment is None
+        n = len(sent)
+        await g.orch.estop_loop("stale error result")
+        assert g.orch.globalstatusmodel.loop_state == LoopStatus.stopped
+        assert len(sent) == n
 
 
 @pytest.mark.asyncio
@@ -128,3 +170,16 @@ async def test_estop_while_final_action_runs_after_loop_stopped(tmp_path):
             )
             await asyncio.sleep(0.1)
         assert orch.active_experiment is None
+        # the latch survives the drain, the action ended estopped, and Clear works
+        await asyncio.sleep(2.0)
+        assert gsm.loop_state == LoopStatus.estopped
+        estopped = {
+            str(u) for u in gsm.find_hlostatus_in_finished(HloStatus.estopped)
+        } | {
+            str(u)
+            for u, m in orch.action_history.items()
+            if HloStatus.estopped in (m.get("action_status") or [])
+        }
+        assert estopped, "the SIM action never reported estopped"
+        await orch_call("clear_estop")
+        assert gsm.loop_state == LoopStatus.stopped

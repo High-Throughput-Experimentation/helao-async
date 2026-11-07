@@ -60,6 +60,8 @@ class OrchestrationState:
     n_exps: int = 0
     n_acts: int = 0
     active_experiment_present: bool = False
+    # any action active in ``globalstatusmodel.active_dict`` (E-STOP guard)
+    any_active: bool = False
     active_sequence_present: bool = False
     na_drivers: tuple[str, ...] = ()
     step_thru_actions: bool = False
@@ -106,9 +108,16 @@ class SkipRequested:
 
 @dataclass(frozen=True)
 class EstopRequested:
-    """POST /estop_orch (T9)."""
+    """POST /estop_orch (T9).
+
+    ``operator`` is True only for the operator's own request (the route): it
+    latches from any non-estopped state, because hardware moved by a manual or
+    other-UI action must stop too. Internal producers leave it False and are
+    guarded on there being something to stop.
+    """
 
     reason: str = ""
+    operator: bool = False
 
 
 @dataclass(frozen=True)
@@ -338,6 +347,12 @@ class ClearEstoppedFromFinished:
 
 
 @dataclass(frozen=True)
+class DropStaleEstopped:
+    """Start (T1): an estopped uuid present while the loop is not estopped is
+    stale (a slow server finished past the E-STOP send timeout, after Clear)."""
+
+
+@dataclass(frozen=True)
 class ClearErroredFromFinished:
     """clear_in_finished(errored) (T11)."""
 
@@ -363,6 +378,7 @@ class PruneDeadActions:
 
 
 Command = Union[
+    DropStaleEstopped,
     CreateDispatchLoopTask,
     RefuseStart,
     DispatchHeadAction,
@@ -402,11 +418,11 @@ def _estop_transition(state: OrchestrationState, reason: str) -> StepResult:
     ``UncaughtLoopException`` escalate to estop unconditionally (no
     started-only guard, unlike ``EstoppedUuidIngested`` — both must stay
     reachable so an escalation landing mid-finalization can still be
-    observed; ``EstopRequested`` is unguarded too since the close-out fix). A second escalation racing in while already estopped
-    (e.g. a stale in-flight dispatch effect that crashes against
-    post-finalize state) must therefore no-op here instead of re-running the
-    cascade: ``FinishActiveEstopped`` is the SOLE finalizer and must never
-    fire twice."""
+    observed; ``EstopRequested`` is guarded on started OR active work). A
+    second escalation racing in while already estopped (e.g. a stale in-flight
+    dispatch effect that crashes against post-finalize state) must therefore
+    no-op here instead of re-running the cascade: ``FinishActiveEstopped`` is
+    the SOLE finalizer and must never fire twice."""
     if state.loop_state == LoopStatus.estopped:
         return state, ()
     new = replace(
@@ -505,7 +521,7 @@ def step(state: OrchestrationState, event: Event) -> StepResult:
             return state, (RefuseStart(reason="experiment list is empty"),)
         return (  # T1
             replace(state, loop_state=LoopStatus.started),
-            (CreateDispatchLoopTask(),),
+            (DropStaleEstopped(), CreateDispatchLoopTask()),
         )
 
     if isinstance(event, StopRequested):
@@ -515,9 +531,17 @@ def step(state: OrchestrationState, event: Event) -> StepResult:
         return replace(state, loop_intent=LoopIntent.skip), ()
 
     if isinstance(event, EstopRequested):  # T9 (API source)
-        # Not started-only: after Stop the loop is ``stopped`` while the final
-        # experiment closes out with actions running. The route decides whether
-        # anything is running; an already-estopped loop no-ops in the transition.
+        # After Stop the loop is ``stopped`` while the final experiment closes
+        # out with actions running, so "something to stop" is not only a started
+        # loop. A stale request with nothing running (e.g. an error result that
+        # lands after E-STOP + Clear) must not re-latch.
+        if not (
+            event.operator
+            or state.loop_state == LoopStatus.started
+            or state.any_active
+            or state.active_experiment_present
+        ):
+            return state, ()
         return _estop_transition(state, event.reason)
 
     if isinstance(event, ActionResultErrored):  # T9 (result escalation)
@@ -619,6 +643,7 @@ __all__ = [
     "LoopIterate",
     "Event",
     "CreateDispatchLoopTask",
+    "DropStaleEstopped",
     "RefuseStart",
     "DispatchHeadAction",
     "FinishThenDispatchExperimentCmd",

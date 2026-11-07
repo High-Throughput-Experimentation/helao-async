@@ -36,6 +36,7 @@ from helao.hexagon.domain.orchestration import (
     Command,
     CreateDispatchLoopTask,
     DispatchHeadAction,
+    DropStaleEstopped,
     EstopFanout,
     ExportQueuesCmd,
     FinishActiveEstopped,
@@ -100,6 +101,7 @@ def derive_state(orch) -> OrchestrationState:
         n_exps=len(orch.experiment_dq),
         n_acts=len(orch.action_dq),
         active_experiment_present=orch.active_experiment is not None,
+        any_active=bool(gsm.active_dict),
         active_sequence_present=orch.active_sequence is not None,
         na_drivers=tuple(
             k for k, (_, v) in orch.status_summary.items() if v == "unknown"
@@ -255,8 +257,11 @@ class OrchCommandRunner:
         if isinstance(cmd, WaitAllActionsIdle):
             # verbatim DrainForStop body — OWNS the stopped write (DD-2 T5)
             LOGGER.info("stopping orchestrator")
-            while gsm.loop_state != LoopStatus.stopped:
+            # An E-STOP latched meanwhile ends the drain and is never overwritten.
+            while gsm.loop_state not in (LoopStatus.stopped, LoopStatus.estopped):
                 await orch.orch_wait_for_all_actions()
+                if gsm.loop_state == LoopStatus.estopped:
+                    break
                 if gsm.orch_state == OrchStatus.idle:
                     await orch.intend_none()
                     LOGGER.info("got stop")
@@ -330,6 +335,10 @@ class OrchCommandRunner:
                 for x in (orch.sequence_dq, orch.experiment_dq, orch.action_dq)
             ):
                 orch.export_queues(timestamp_pck=cmd.timestamped)
+            return None
+
+        if isinstance(cmd, DropStaleEstopped):
+            gsm.drop_estopped_in_finished()
             return None
 
         if isinstance(cmd, ClearEstoppedFromFinished):

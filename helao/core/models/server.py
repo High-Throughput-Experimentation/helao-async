@@ -327,10 +327,31 @@ class GlobalStatusModel(BaseModel, HelaoDict):
             # was non-empty — a live RuntimeError on the clear_estop path.)
             cleared.update(self.nonactive_dict[HloStatus.finished])
             self.nonactive_dict[HloStatus.finished] = {}
+        # ponytail: this wipes the cleared uuids from every endpoint store for
+        # good. Safe because the only consumers are clear_estop/clear_error (the
+        # run was already finalized by estop_finish_active) and finish_experiment,
+        # which empties these buckets itself; nothing re-reads a cleared action.
+        self._drop_finished(cleared)
+
+    def drop_estopped_in_finished(self):
+        """Drop only the estopped actions from every finished store.
+
+        An estopped status that lands after the E-STOP was cleared is stale: it
+        must not re-latch on the next Start. Unlike `clear_in_finished` this
+        leaves unrelated finished actions (an experiment still being closed
+        out reads them) alone.
+        """
+        self._drop_finished(set(self.find_hlostatus_in_finished(HloStatus.estopped)))
+
+    def _drop_finished(self, uuids: set):
+        """Remove `uuids` from this model's and every endpoint's finished buckets."""
+        for bucket in self.nonactive_dict.values():
+            for uuid in uuids & bucket.keys():
+                del bucket[uuid]
         for server in self.server_dict.values():
             for endpoint in server.endpoints.values():
                 for bucket in endpoint.nonactive_dict.values():
-                    for uuid in cleared & bucket.keys():
+                    for uuid in uuids & bucket.keys():
                         del bucket[uuid]
 
     def new_experiment(self, exp_uuid: UUID):

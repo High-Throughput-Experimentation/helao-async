@@ -123,3 +123,15 @@ async def test_a_new_estopped_uuid_after_the_clear_still_restops():
     assert len(spy.events) == 1 and isinstance(spy.events[0], EstoppedUuidIngested)
     assert str(new_u) in spy.events[0].reason
     assert str(old.action_uuid) not in spy.events[0].reason
+
+
+def test_drop_estopped_keeps_unrelated_finished_actions():
+    gsm = GlobalStatusModel(orchestrator=ORCH)
+    ok = _act_on(SIM, "other", [HloStatus.active, HloStatus.finished])
+    _fold(gsm, SIM, "other", ok)
+    bad = _act_on(SIM, "acquire_data", [HloStatus.estopped, HloStatus.finished])
+    _fold(gsm, SIM, "acquire_data", bad)
+    gsm.drop_estopped_in_finished()
+    _fold(gsm, ORCH, "wait", _act_on(ORCH, "wait", [HloStatus.active]))
+    assert not gsm.find_hlostatus_in_finished(HloStatus.estopped)
+    assert ok.action_uuid in gsm.nonactive_dict[HloStatus.finished]

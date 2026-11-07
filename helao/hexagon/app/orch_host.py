@@ -1094,7 +1094,7 @@ class OrchHost(ActionHost):
 
     # -- E-STOP (delegations to EstopController) -------------------------
 
-    async def estop_loop(self, reason: str = "") -> None:
+    async def estop_loop(self, reason: str = "", operator: bool = False) -> None:
         """Latch E-STOP through the reducer, then WAKE the interrupt queue.
 
         The wake is not optional (DD-5 item 6). Legacy's estop_loop calls
@@ -1105,7 +1105,7 @@ class OrchHost(ActionHost):
         stopped.
         """
         msg = f"E-STOP{' ' + reason if reason else ''}"
-        await self._hex_runtime.handle(EstopRequested(reason=msg))
+        await self._hex_runtime.handle(EstopRequested(reason=msg, operator=operator))
         await self.interrupt_q.put("estop")
 
     async def estop_actions(self, switch: bool) -> None:
@@ -1172,23 +1172,16 @@ class OrchHost(ActionHost):
 
         @self.post("/estop_orch", tags=["private"])
         async def estop_orch():
-            """Latch E-STOP if anything is running; otherwise log and return.
+            """Latch E-STOP and fan it out to every action server, always.
 
-            "Running" is not only a started loop: after Stop the loop reads
-            ``stopped`` while the experiment closes out with actions still
-            active on hardware, and that is exactly when E-STOP is needed.
+            The operator's E-STOP must also stop hardware moved by a manual or
+            other-UI action, so it does not depend on the orchestrator believing
+            anything is running. Only an already-latched orchestrator logs.
             """
-            gsm = self.globalstatusmodel
-            if gsm.loop_state == LoopStatus.estopped:
+            if self.globalstatusmodel.loop_state == LoopStatus.estopped:
                 LOGGER.info("orchestrator E-STOP flag already raised")
-            elif (
-                gsm.loop_state == LoopStatus.started
-                or gsm.active_dict
-                or self.active_experiment is not None
-            ):
-                await self.estop_loop()
             else:
-                LOGGER.info("orchestrator is not running")
+                await self.estop_loop(operator=True)
             return {}
 
         @self.post("/clear_estop", tags=["private"])

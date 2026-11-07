@@ -155,9 +155,15 @@ class DispatchRunner:
         if isinstance(step, DrainForStop):  # :813-824
             LOGGER.info("stopping orchestrator")
             # monitor status of running action_dq, then end loop
-            while orch.globalstatusmodel.loop_state != LoopStatus.stopped:
+            # An E-STOP latched meanwhile ends the drain and is never overwritten.
+            while orch.globalstatusmodel.loop_state not in (
+                LoopStatus.stopped,
+                LoopStatus.estopped,
+            ):
                 # wait for all orch actions to finish first
                 await orch.orch_wait_for_all_actions()
+                if orch.globalstatusmodel.loop_state == LoopStatus.estopped:
+                    break
                 if orch.globalstatusmodel.orch_state == OrchStatus.idle:
                     await orch.intend_none()
                     LOGGER.info("got stop")

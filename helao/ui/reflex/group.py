@@ -342,12 +342,6 @@ CONTROL_CALLS = {
     "estop": ("estop_orch", {}),
     "clear_estop": ("clear_estop", {}),
 }
-#: The orchestrator answers an ignored call like an accepted one, so a button
-#: its snapshots never confirm is named to the operator.
-NOT_CONFIRMED = {
-    "estop": " (the orchestrator latches E-STOP only while its loop is started"
-    " or an action is running)",
-}
 
 
 async def _control_call(name: str) -> None:
@@ -508,10 +502,7 @@ def apply_tick(s, feed, now: float, token: str) -> bool:
         if s.pending and pending_done(s.pending, snap):
             s.pending = ""
         elif s.pending and now - s._pending_at > PENDING_TIMEOUT_S:
-            s.action_error = (
-                f"{s.pending} not confirmed by the orchestrator"
-                + NOT_CONFIRMED.get(s.pending, "")
-            )
+            s.action_error = f"{s.pending} not confirmed by the orchestrator"
             s._unconfirmed = s.pending
             s.pending = ""
         # a late snapshot that does show the effect retires that message only
@@ -547,7 +538,8 @@ class GroupState(rx.State):
     closing_out: bool = False
     can_start: bool = False
     can_stop: bool = False
-    can_estop: bool = False
+    # on before the first frame: the operator can always E-STOP (HTTP, no stream)
+    can_estop: bool = True
     can_clear_estop: bool = False
     estopped: bool = False
     lost: bool = True

@@ -800,7 +800,6 @@ def test_an_unconfirmed_button_names_itself_after_the_timeout(group):
     group.apply_tick(s, feed, 100.0 + group.PENDING_TIMEOUT_S + 1, "t")
     assert s.pending == ""
     assert s.action_error.startswith("estop not confirmed by the orchestrator")
-    assert "only while its loop is started" in s.action_error
     s.pending, s._pending_at, s.action_error = "start", 200.0, ""
     group.apply_tick(s, feed, 200.0 + group.PENDING_TIMEOUT_S + 1, "t")
     assert s.action_error == "start not confirmed by the orchestrator"
@@ -860,3 +859,24 @@ def test_ingest_lifespan_always_stops_the_registry():
     assert "await stop_feed()" in src
     tail = src[src.index("await stop_feed()") :]
     assert tail.index("finally") < tail.index("await registry.stop()")
+
+
+def test_a_fresh_group_state_has_estop_enabled(group):
+    """The operator can E-STOP before any frame has arrived."""
+    assert group.GroupState.__fields__["can_estop"].default is True
+
+
+def test_estop_flag_is_available_in_every_state_but_estopped(group):
+    flags = group.button_flags
+    for snap in (
+        {},
+        {"loop_state": "stopped", "orch_state": "idle"},
+        {"loop_state": "started", "orch_state": "busy"},
+        {"loop_state": "error", "orch_state": "error"},
+        {"loop_state": "stopped", "closing_out": True},
+    ):
+        assert flags(snap, lost=False)["can_estop"] is True, snap
+        assert flags(snap, lost=True)["can_estop"] is True, snap  # stream lost
+    est = {"loop_state": "estopped", "orch_state": "estopped"}
+    assert flags(est, lost=False)["can_estop"] is False
+    assert flags(est, lost=False)["can_clear_estop"] is True

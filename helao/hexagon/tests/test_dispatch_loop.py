@@ -126,7 +126,7 @@ async def test_estop_funnel_race_seed_single_finalizer():
     # trigger-site estop while the loop is stalled mid-effect
     from helao.hexagon.domain.orchestration import EstopRequested
 
-    await runtime.handle(EstopRequested(reason="race seed"))
+    await runtime.handle(EstopRequested(reason="race seed", operator=True))
     assert orch.globalstatusmodel.loop_state == LoopStatus.estopped
     assert orch.calls.count("estop_finish_active") == 1
     assert orch.block_dispatch is not None
@@ -161,7 +161,7 @@ async def test_stale_loop_exception_after_estop_and_clear_does_not_relatch():
         if "loop_task_dispatch_action" in orch.calls:
             break
         await asyncio.sleep(0.01)
-    await runtime.handle(EstopRequested(reason="stale step"))
+    await runtime.handle(EstopRequested(reason="stale step", operator=True))
     await runtime.handle(ClearEstopRequested())
     assert orch.globalstatusmodel.loop_state == LoopStatus.stopped
     assert orch.calls.count("estop_finish_active") == 1
@@ -184,7 +184,7 @@ async def test_estop_generation_bumps_on_latch_and_on_clear():
     runtime, _ = _make(orch)
     orch.globalstatusmodel.loop_state = LoopStatus.started
     assert runtime.estop_gen == 0
-    await runtime.handle(EstopRequested(reason="x"))
+    await runtime.handle(EstopRequested(reason="x", operator=True))
     assert runtime.estop_gen == 1
     await runtime.handle(ClearEstopRequested())
     assert runtime.estop_gen == 2
@@ -202,7 +202,7 @@ async def test_loop_exception_in_a_step_started_after_the_clear_still_escalates(
     orch.fail_after_block = True
     runtime, loop = _make(orch)
     await runtime.handle(StartRequested())  # parks nothing: loop not started
-    await runtime.handle(EstopRequested(reason="first"))
+    await runtime.handle(EstopRequested(reason="first", operator=True))
     await runtime.handle(ClearEstopRequested())
     loop.start()
     orch.globalstatusmodel.loop_state = LoopStatus.started  # fresh run

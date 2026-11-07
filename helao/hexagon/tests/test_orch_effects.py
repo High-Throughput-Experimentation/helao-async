@@ -45,6 +45,9 @@ class _GSM:
     def clear_in_finished(self, hlostatus):
         self.cleared.append(hlostatus)
 
+    def drop_estopped_in_finished(self):
+        self.cleared.append("stale-estopped")
+
 
 class _StubOrch:
     """Records every effect; async methods mirror the legacy Orch surface."""
