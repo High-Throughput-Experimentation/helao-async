@@ -74,6 +74,12 @@ class RunLifecycle:
         """Finalize the active sequence: mark finished, run postprocessors, persist, and roll over."""
         orch = self.orch
 
+        # The dispatch ladder rolls straight to the next sequence once its
+        # queues drain, with the last experiment still active. File it under
+        # this sequence now: finished later it would land in the next one.
+        if orch.active_experiment is not None:
+            await self.finish_active_experiment()
+
         # Waiting is outside ``finalize_lock``: an E-STOP exists to finalize
         # while actions are stuck, and must not queue behind this wait.
         await orch.orch_wait_for_all_actions()
