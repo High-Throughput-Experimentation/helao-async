@@ -55,9 +55,12 @@ from helao.ui.shared.palette import (
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 GRAPH_H, GRAPH_W = 360, 720
-#: xy lays a chart out at least 120 px tall whatever its host reserves, so a
-#: shorter host lets the strip spill over the label and chart below it.
-STRIP_H, STRIP_W = 120, 720
+#: A strip is a fixed-height chart (``marks_chart(height_px=...)``): xy floors a
+#: fixed height at 48 px, but a fluid (``"100%"``) one at 120 px, which would
+#: spill out of a shorter card.
+STRIP_H, STRIP_W = 60, 720
+#: What a strip's segments divide: the host width less xy's padding both sides.
+PLOT_W = STRIP_W - 2 * plots.CHART_PADDING_PX
 #: Wide enough that a short server key (5-6 characters) sits inside its node.
 NODE_PX = 44.0
 #: The node under the pointer is redrawn this much larger, in its own colour.
@@ -86,6 +89,7 @@ LOST_BANNER = "orchestrator unreachable"
 OLD_ORCH_BANNER = "orchestrator lacks /ws_orch — update the orchestrator"
 SELECTION_GONE = "selection no longer in view"
 NOT_FOUND = "not found on the orchestrator"
+QUEUE_MOVED = "the queue moved since this was drawn; click again"
 LOOP_TO_GROUP = {
     "started": "busy",
     "stopped": "idle",
@@ -257,6 +261,24 @@ def object_request(kind: str, item: dict):
     if item.get("qidx") is not None:
         return ("get_queue_object", kind, item["qidx"])
     return None
+
+
+def fetched_info(kind: str, item: dict, obj) -> tuple:
+    """``(obj to show, note)`` for a clicked item's fetch result.
+
+    ``qidx`` is absolute and comes from the last drawn snapshot; a head pop
+    before the click shifts every index, so a queue-index fetch can return the
+    neighbour. The name is the only identity a queued item has, so a name
+    mismatch is never shown; a same-named neighbour cannot be told apart. An
+    empty result (out of range, unreachable, failed) stays "not found".
+    """
+    if not obj:
+        return None, NOT_FOUND
+    if item.get("uuid") or item.get("qidx") is None:
+        return obj, ""
+    if obj.get(f"{kind}_name") != item.get("name"):
+        return None, QUEUE_MOVED
+    return obj, ""
 
 
 def exp_row_ordinals(snap: dict) -> list:
@@ -547,7 +569,7 @@ def _render_strips(s, snap: dict, now: float, token: str) -> None:
         n_before=snap.get("n_done", 0),
         n_after=snap.get("n_queued", 0),
         now=now,
-        width_px=STRIP_W,
+        width_px=PLOT_W,
         selected=exp_key,
     )
     s._exp_slots = tuple(exp_slots)
@@ -561,6 +583,7 @@ def _render_strips(s, snap: dict, now: float, token: str) -> None:
         version=v,
         click=True,
         hover_events=True,
+        height_px=STRIP_H,
     )
     s.exp_spec, s.exp_url, s.exp_layout = p.spec, p.buffer_url, p.layout
     am, act_slots = strip_marks(
@@ -568,7 +591,7 @@ def _render_strips(s, snap: dict, now: float, token: str) -> None:
         n_before=0,
         n_after=0,
         now=now,
-        width_px=STRIP_W,
+        width_px=PLOT_W,
         selected=act_key,
     )
     s._act_slots = tuple(act_slots)
@@ -581,6 +604,7 @@ def _render_strips(s, snap: dict, now: float, token: str) -> None:
         version=v,
         click=True,
         hover_events=True,
+        height_px=STRIP_H,
     )
     s.act_spec, s.act_url, s.act_layout = p.spec, p.buffer_url, p.layout
     # the hover line keeps following its slot: the elapsed time ticks
@@ -891,10 +915,11 @@ class GroupState(rx.State):
                 obj = await getattr(backend, method)(k, ident)
             except Exception as exc:
                 LOGGER.warning(f"/group could not fetch {kind} {ident}: {exc}")
+        obj, note = fetched_info(kind, item, obj)
         async with self:
             self.tree_header, self.tree_html = tree_for(kind, obj)
-            if not obj:
-                self.info_note = NOT_FOUND
+            if note:
+                self.info_note = note
 
     @rx.event(background=True)
     async def select_exp(self, payload: dict):
@@ -946,14 +971,18 @@ def _uuid_row(label: str, name, state, started, uuid, short) -> rx.Component:
     """One header row under the sequence line; "—" while there is none."""
     return rx.cond(
         name == "",
-        rx.hstack(rx.text(label, weight="bold"), rx.text("—"), spacing="2"),
         rx.hstack(
-            rx.text(label, weight="bold"),
-            rx.text(name),
+            rx.text(label, weight="bold", size="2"), rx.text("—", size="2"), spacing="2"
+        ),
+        rx.hstack(
+            rx.text(label, weight="bold", size="2"),
+            rx.text(name, size="2"),
             rx.text("(", state, ")", size="1"),
-            rx.cond(started != "", rx.text("started ", started)),
-            rx.text("uuid"),
-            rx.tooltip(rx.text(short, "…", font_family="monospace"), content=uuid),
+            rx.cond(started != "", rx.text("started ", started, size="2")),
+            rx.text("uuid", size="2"),
+            rx.tooltip(
+                rx.text(short, "…", font_family="monospace", size="2"), content=uuid
+            ),
             rx.button(
                 "copy", size="1", variant="soft", on_click=rx.set_clipboard(uuid)
             ),
@@ -963,24 +992,41 @@ def _uuid_row(label: str, name, state, started, uuid, short) -> rx.Component:
     )
 
 
+def _strip_card(label: str, hover_var, chart) -> rx.Component:
+    """A strip's card: the ``EXP``/``ACT`` header line, hover text beside it, the chart."""
+    return rx.card(
+        rx.vstack(
+            rx.hstack(
+                rx.text(label, size="1", weight="bold"),
+                rx.text(hover_var, size="1"),
+                align="center",
+                spacing="2",
+            ),
+            chart,
+            spacing="1",
+        ),
+        size="1",
+    )
+
+
 def group_page() -> rx.Component:
     if not _CFG:
         return rx.text(NO_ORCH_NOTE, padding_x="1em")
     S = GroupState
     seq_row = rx.cond(
         S.seq_name == "",
-        rx.text("idle — no active sequence"),
+        rx.text("idle — no active sequence", size="2"),
         rx.hstack(
-            rx.text("SEQ", weight="bold"),
-            rx.text(S.seq_name),
+            rx.text("SEQ", weight="bold", size="2"),
+            rx.text(S.seq_name, size="2"),
             rx.cond(
                 S.seq_finished,
                 _seq_ended_badge(S.seq_ended),
             ),
-            rx.text("started ", S.seq_started),
-            rx.text("uuid"),
+            rx.text("started ", S.seq_started, size="2"),
+            rx.text("uuid", size="2"),
             rx.tooltip(
-                rx.text(S.seq_uuid_short, "…", font_family="monospace"),
+                rx.text(S.seq_uuid_short, "…", font_family="monospace", size="2"),
                 content=S.seq_uuid,
             ),
             rx.button(
@@ -1030,41 +1076,51 @@ def group_page() -> rx.Component:
         rx.cond(S.banner != "", rx.callout(S.banner, icon="triangle_alert")),
         width="100%",
     )
+    # One card per chart, the same Radix card as INFO; a strip's header line
+    # (with its hover text) is inside its card. The card paints the surface and
+    # border, so the charts draw on a transparent background.
     charts = rx.vstack(
-        plots.chart(
-            S.graph_spec,
-            S.graph_url,
-            S.graph_layout,
-            height=GRAPH_H,
-            width=GRAPH_W,
-            on_hover=S.hover_node,
-            pulses=S.graph_pulses,
+        rx.card(
+            plots.chart(
+                S.graph_spec,
+                S.graph_url,
+                S.graph_layout,
+                height=GRAPH_H,
+                width=GRAPH_W,
+                on_hover=S.hover_node,
+                pulses=S.graph_pulses,
+            ),
+            size="1",
         ),
-        rx.text("EXP", size="1", weight="bold"),
-        plots.chart(
-            S.exp_spec,
-            S.exp_url,
-            S.exp_layout,
-            height=STRIP_H,
-            width=STRIP_W,
-            on_select=S.select_exp,
-            on_hover=S.hover_exp,
+        _strip_card(
+            "EXP",
+            S.exp_hover,
+            plots.chart(
+                S.exp_spec,
+                S.exp_url,
+                S.exp_layout,
+                height=STRIP_H,
+                width=STRIP_W,
+                on_select=S.select_exp,
+                on_hover=S.hover_exp,
+            ),
         ),
-        rx.text(S.exp_hover, size="1", min_height="1.4em"),
-        rx.text("ACT", size="1", weight="bold"),
-        plots.chart(
-            S.act_spec,
-            S.act_url,
-            S.act_layout,
-            height=STRIP_H,
-            width=STRIP_W,
-            on_select=S.select_act,
-            on_hover=S.hover_act,
+        _strip_card(
+            "ACT",
+            S.act_hover,
+            plots.chart(
+                S.act_spec,
+                S.act_url,
+                S.act_layout,
+                height=STRIP_H,
+                width=STRIP_W,
+                on_select=S.select_act,
+                on_hover=S.hover_act,
+            ),
         ),
-        rx.text(S.act_hover, size="1", min_height="1.4em"),
     )
     # Stretches to the chart column's height (graph + both strips), so the
-    # box ends at the ACT strip's bottom edge. Its content is absolutely
+    # box ends at the ACT card's bottom edge. Its content is absolutely
     # positioned: a tall tree must scroll inside the box, not stretch the row.
     info = rx.card(
         rx.vstack(

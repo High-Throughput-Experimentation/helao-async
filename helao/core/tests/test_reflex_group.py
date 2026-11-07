@@ -329,10 +329,21 @@ def test_exp_row_ordinals_are_sequence_positions():
     assert exp_row_ordinals({"experiments": [_exp("q", "queued", qidx=2)]}) == [2]
 
 
-def test_strip_height_keeps_progress_bar_and_labels_apart():
-    from helao.ui.reflex import group
+def test_strips_are_60_px_tall_and_ask_xy_for_a_fixed_height(group, monkeypatch):
+    assert group.STRIP_H == 60
+    seen = []
+    real = group.plots.marks_chart
 
-    assert group.STRIP_H == 120  # xy's minimum chart height, and a bar + 2 labels fit
+    def spy(*a, **kw):
+        seen.append((kw["panel_id"], kw.get("height_px")))
+        return real(*a, **kw)
+
+    monkeypatch.setattr(group.plots, "marks_chart", spy)
+    s = state()
+    group._render_strips(s, {}, 100.0, "tok")
+    assert seen == [("group-exp-tok", 60), ("group-act-tok", 60)]
+    html = str(group.group_page())
+    assert html.count('height:"60px"') == 2 and 'height:"120px"' not in html
 
 
 # ---- S10: same orchestrator for stream and buttons ---------------------------
@@ -1333,6 +1344,7 @@ def _hover_state():
 
 
 def test_hit_grid_answers_every_segment_and_maps_back_to_its_slot():
+    from helao.ui.reflex.group import STRIP_H
     from helao.ui.reflex.timeline_strip import (
         HIT_COLS,
         HIT_PX,
@@ -1358,7 +1370,7 @@ def test_hit_grid_answers_every_segment_and_maps_back_to_its_slot():
         )
         # xy picks pixel-exact on a drawn marker, so the squares must tile the plot
         assert hit["size"] == HIT_PX and hit["symbol"] == "square"
-        assert HIT_PX >= 704 / HIT_COLS and HIT_PX >= 104 / HIT_ROWS
+        assert HIT_PX >= 704 / HIT_COLS and HIT_PX >= (STRIP_H - 16) / HIT_ROWS
     assert hit_slot(-1, 3) is None and hit_slot(HIT_COLS * HIT_ROWS, 3) is None
 
 
@@ -1441,3 +1453,81 @@ def test_every_slot_of_the_largest_exp_strip_is_reachable():
     for n in (n_max - 1, n_max):
         hit = {hit_slot(i, n) for i in range(HIT_COLS * HIT_ROWS)}
         assert hit == set(range(n)), sorted(set(range(n)) - hit)
+
+
+def test_strip_labels_are_boxed_for_the_plot_width_not_the_host_width(group):
+    s = state()
+    exp = [
+        {"uuid": str(i), "name": "n", "state": "done", "t_start": 1.0, "t_end": 2.0}
+        for i in range(4)
+    ]
+    marks = []
+    real = group.plots.marks_chart
+    group.plots.marks_chart = lambda m, **kw: marks.append(m) or real(m, **kw)
+    try:
+        group._render_strips(s, {"experiments": exp, "actions": exp}, 100.0, "tok")
+    finally:
+        group.plots.marks_chart = real
+    for strip in marks:  # EXP and ACT both box for the plot width
+        boxes = {m["max_px"] for m in strip if m["kind"] == "text"}
+        assert boxes == {704 / 4 - 8}
+
+
+def test_strip_hover_text_sits_beside_its_header_and_nothing_follows_the_act_strip(
+    group,
+):
+    html = str(group.group_page())
+    for tag, var in (("EXP", "exp"), ("ACT", "act")):
+        head = html.index(f'size:"1",weight:"bold"}},"{tag}")')
+        between = html[head : html.index("XYChart", head)]
+        assert f"{var}_hover_rx_state_" in between
+    tail = html[html.rindex("act_spec_rx_state_") :]
+    assert "act_hover" not in tail[: tail.index("RadixThemesCard")]
+    assert tail[: tail.index("RadixThemesCard")].count("RadixThemesText") == 0
+
+
+def test_header_rows_are_one_size_smaller_and_buttons_stay_small(group):
+    html = str(group.group_page())
+    head = html[: html.index("XYChart")]
+    for label in ('"SEQ"', '"EXP"', '"ACT"'):
+        at = head.index(label)
+        assert 'size:"2"' in head[head.rindex("RadixThemesText", 0, at) : at]
+    assert 'size:"2"},"idle' in head or "idle — no active sequence" in head
+    rows = head[head.index("no active sequence") - 300 : head.index("loop: ")]
+    # 22 texts: 20 at size 2, plus the two "(state)" texts that stay at size 1
+    assert rows.count("RadixThemesText") == 22 and rows.count('size:"2"') == 20
+
+
+def test_graph_and_each_strip_sit_in_their_own_card_beside_info(group):
+    import re
+
+    html = str(group.group_page())
+    cards = [m.start() for m in re.finditer(r"jsx\(RadixThemesCard", html)]
+    assert len(cards) == 4  # graph, EXP, ACT, INFO
+    at = lambda s, start=0: html.index(s, start)
+    assert cards[0] < at("graph_spec_rx") < cards[1]
+    # the strip's header line is inside its card, ahead of its chart
+    assert cards[1] < at('"EXP")', cards[1]) < at("exp_spec_rx") < cards[2]
+    assert cards[2] < at('"ACT")', cards[2]) < at("act_spec_rx") < cards[3]
+    assert at('"INFO")') > cards[3]
+
+
+def test_fetched_info_never_shows_a_shifted_queue_item(group):
+    """A stale qidx returns the neighbour: never show it as the click."""
+    clicked = {"uuid": None, "qidx": 3, "name": "exp_b"}
+    moved = group.fetched_info("experiment", clicked, {"experiment_name": "exp_c"})
+    assert moved == (None, group.QUEUE_MOVED)
+    ok = {"experiment_name": "exp_b"}
+    assert group.fetched_info("experiment", clicked, ok) == (ok, "")
+    # empty (out of range, unreachable, raised) is "not found", never "moved"
+    for empty in ({}, None):
+        assert group.fetched_info("experiment", clicked, empty) == (
+            None,
+            group.NOT_FOUND,
+        )
+    # by-uuid fetches are exact
+    act = {"action_name": "other"}
+    assert group.fetched_info("action", {"uuid": "u1", "qidx": None}, act) == (
+        act,
+        "",
+    )
