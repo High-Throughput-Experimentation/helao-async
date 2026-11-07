@@ -57,7 +57,7 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 GRAPH_H, GRAPH_W = 360, 720
 #: A strip is a fixed-height chart (``marks_chart(height_px=...)``): xy floors a
 #: fixed height at 48 px, but a fluid (``"100%"``) one at 120 px, which would
-#: spill over the label and chart below a shorter host.
+#: spill out of a shorter card.
 STRIP_H, STRIP_W = 60, 720
 #: What a strip's segments divide: the host width less xy's padding both sides.
 PLOT_W = STRIP_W - 2 * plots.CHART_PADDING_PX
@@ -263,17 +263,22 @@ def object_request(kind: str, item: dict):
     return None
 
 
-def queue_fetch_stale(kind: str, item: dict, obj) -> bool:
-    """Whether a queue-index fetch returned a different item (or none).
+def fetched_info(kind: str, item: dict, obj) -> tuple:
+    """``(obj to show, note)`` for a clicked item's fetch result.
 
     ``qidx`` is absolute and comes from the last drawn snapshot; a head pop
-    before the click shifts every index, so the fetch returns the neighbour
-    (or nothing for the last slot). The name is the only identity a queued
-    item has.
+    before the click shifts every index, so a queue-index fetch can return the
+    neighbour. The name is the only identity a queued item has, so a name
+    mismatch is never shown; a same-named neighbour cannot be told apart. An
+    empty result (out of range, unreachable, failed) stays "not found".
     """
+    if not obj:
+        return None, NOT_FOUND
     if item.get("uuid") or item.get("qidx") is None:
-        return False
-    return not obj or obj.get(f"{kind}_name") != item.get("name")
+        return obj, ""
+    if obj.get(f"{kind}_name") != item.get("name"):
+        return None, QUEUE_MOVED
+    return obj, ""
 
 
 def exp_row_ordinals(snap: dict) -> list:
@@ -910,15 +915,11 @@ class GroupState(rx.State):
                 obj = await getattr(backend, method)(k, ident)
             except Exception as exc:
                 LOGGER.warning(f"/group could not fetch {kind} {ident}: {exc}")
-        stale = queue_fetch_stale(kind, item, obj)
+        obj, note = fetched_info(kind, item, obj)
         async with self:
-            if stale:
-                obj = None
             self.tree_header, self.tree_html = tree_for(kind, obj)
-            if stale:
-                self.info_note = QUEUE_MOVED
-            elif not obj:
-                self.info_note = NOT_FOUND
+            if note:
+                self.info_note = note
 
     @rx.event(background=True)
     async def select_exp(self, payload: dict):

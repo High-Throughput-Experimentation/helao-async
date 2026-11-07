@@ -1465,11 +1465,12 @@ def test_strip_labels_are_boxed_for_the_plot_width_not_the_host_width(group):
     real = group.plots.marks_chart
     group.plots.marks_chart = lambda m, **kw: marks.append(m) or real(m, **kw)
     try:
-        group._render_strips(s, {"experiments": exp}, 100.0, "tok")
+        group._render_strips(s, {"experiments": exp, "actions": exp}, 100.0, "tok")
     finally:
         group.plots.marks_chart = real
-    boxes = {m["max_px"] for m in marks[0] if m["kind"] == "text"}
-    assert boxes == {704 / 4 - 8}
+    for strip in marks:  # EXP and ACT both box for the plot width
+        boxes = {m["max_px"] for m in strip if m["kind"] == "text"}
+        assert boxes == {704 / 4 - 8}
 
 
 def test_strip_hover_text_sits_beside_its_header_and_nothing_follows_the_act_strip(
@@ -1511,13 +1512,22 @@ def test_graph_and_each_strip_sit_in_their_own_card_beside_info(group):
     assert at('"INFO")') > cards[3]
 
 
-def test_queue_fetch_after_a_head_pop_is_rejected_not_shown(group):
-    """A stale qidx returns the neighbour (or nothing): never show it as the click."""
+def test_fetched_info_never_shows_a_shifted_queue_item(group):
+    """A stale qidx returns the neighbour: never show it as the click."""
     clicked = {"uuid": None, "qidx": 3, "name": "exp_b"}
-    assert group.queue_fetch_stale("experiment", clicked, {"experiment_name": "exp_c"})
-    assert group.queue_fetch_stale("experiment", clicked, {})
-    assert not group.queue_fetch_stale(
-        "experiment", clicked, {"experiment_name": "exp_b"}
+    moved = group.fetched_info("experiment", clicked, {"experiment_name": "exp_c"})
+    assert moved == (None, group.QUEUE_MOVED)
+    ok = {"experiment_name": "exp_b"}
+    assert group.fetched_info("experiment", clicked, ok) == (ok, "")
+    # empty (out of range, unreachable, raised) is "not found", never "moved"
+    for empty in ({}, None):
+        assert group.fetched_info("experiment", clicked, empty) == (
+            None,
+            group.NOT_FOUND,
+        )
+    # by-uuid fetches are exact
+    act = {"action_name": "other"}
+    assert group.fetched_info("action", {"uuid": "u1", "qidx": None}, act) == (
+        act,
+        "",
     )
-    # by-uuid fetches are exact: an empty result is "not found", not "moved"
-    assert not group.queue_fetch_stale("action", {"uuid": "u1", "qidx": None}, None)

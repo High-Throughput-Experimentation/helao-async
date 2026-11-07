@@ -27,9 +27,9 @@ SAWTOOTH_HZ = 2.0
 #: The invisible ``hit`` trace is a fixed grid of squares tiling the whole
 #: strip. xy's pick is pixel-exact on a point's drawn marker (measured: with
 #: 4 px circles a hover registered only on a marker and "left" a frame later),
-#: so the markers must touch: 80 columns over ~700 px (8.75 px) and 3 rows over
-#: ~44 px (14.7 px, a 60 px strip less its padding); 16 px squares still overlap. 80 > 73, the EXP strip's
-#: maximum slot count (20 done + active + 50 queued + two ellipses), so every
+#: so the markers must touch: 80 columns over ~700 px (8.75 px) and 3 rows
+#: over ~44 px (14.7 px, a 60 px strip less its padding); 16 px squares still
+#: overlap. 80 > 73, the EXP strip's maximum slot count (20 done + active + 50 queued + two ellipses), so every
 #: slot owns a column. One point per segment centre answered only a hover on
 #: that centre. The count never depends on the slot count, only the x
 #: positions do.
@@ -82,14 +82,17 @@ def fmt_elapsed(sec):
 
 
 def segment_label(item, now, narrow, today):
-    """``(line 1, line 2)``: name, then times. Narrow: start time only."""
+    """``(line 1, line 2)``: name, then times. Narrow: start time only.
+
+    The name stays in narrow mode: the label box clips it with an ellipsis.
+    """
     t0, t1 = item.get("t_start"), item.get("t_end")
     state = item.get("state")
     if state == "queued":
         t0 = None  # not started: no time, whatever a stale t_start says
-    if narrow:
-        return "", (fmt_hms(t0, today) if t0 is not None else "")
     name = item.get("name") or ""
+    if narrow:
+        return name, (fmt_hms(t0, today) if t0 is not None else "")
     if t0 is None:
         return name, ""
     if state == "active":

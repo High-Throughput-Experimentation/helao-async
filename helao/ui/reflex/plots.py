@@ -985,7 +985,8 @@ def marks_chart(
 ) -> ChartPayload:
     """Render plain mark dicts (see ``netgraph``/``timeline_strip``) on a fixed view.
 
-    Axes and grid hidden (``tick_label_strategy="none"`` too, else xy still
+    The chart background is transparent (``--chart-bg``): the caller puts it on
+    a card. Axes and grid hidden (``tick_label_strategy="none"`` too, else xy still
     reserves tick-label room and the plot rect is not the padding), pan/zoom
     off, domain fixed. Column data (x, y, per-point colours) updates in place;
     anything that is spec -- line colour and width, scatter symbol/size/opacity,

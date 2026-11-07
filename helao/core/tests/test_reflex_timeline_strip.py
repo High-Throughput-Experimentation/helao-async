@@ -56,7 +56,7 @@ def test_narrow_label_is_start_time_only():
     from helao.ui.reflex.timeline_strip import segment_label
 
     assert segment_label(_item("done", t1=T0 + 5), T0 + 9, True, TODAY) == (
-        "",
+        "exp",
         "10:00:00",
     )
 
@@ -146,14 +146,16 @@ def test_progress_bar_sits_below_every_text_annotation():
     assert text_ys and max(progress["y"]) < min(text_ys)
 
 
-def test_narrow_strip_drops_names_and_progress_follows_the_sawtooth():
+def test_narrow_strip_keeps_names_and_progress_follows_the_sawtooth():
     from helao.ui.reflex.timeline_strip import strip_marks
 
-    items = [_item("active", uuid=str(i)) for i in range(9)]
+    # 8 queued at 704 px is 88 px a segment: narrow, yet every name stays
+    items = [_item("queued", uuid=str(i), t0=None) for i in range(8)]
     marks, _ = strip_marks(
-        items, n_before=0, n_after=0, now=T0, width_px=720, today=TODAY
+        items, n_before=0, n_after=0, now=T0, width_px=704, today=TODAY
     )
-    assert "exp" not in [m["value"] for m in marks if m["kind"] == "text"]
+    assert [m["value"] for m in marks if m["kind"] == "text"] == ["exp"] * 8
+    items = [_item("active", uuid=str(i)) for i in range(9)]
     marks, _ = strip_marks(
         items[:1], n_before=0, n_after=0, now=T0, width_px=720, today=TODAY
     )
@@ -179,7 +181,7 @@ def test_only_an_active_row_counts_elapsed_time():
     assert active.endswith("(2:05)")
     # a queued row shows no time even when a stale t_start is set
     assert segment_label(_item("queued", t0=T0), T0, False, TODAY) == ("exp", "")
-    assert segment_label(_item("queued", t0=T0), T0, True, TODAY) == ("", "")
+    assert segment_label(_item("queued", t0=T0), T0, True, TODAY) == ("exp", "")
 
 
 def _texts(marks):
