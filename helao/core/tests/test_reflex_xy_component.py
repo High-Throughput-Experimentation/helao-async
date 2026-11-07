@@ -928,7 +928,9 @@ console.log(JSON.stringify(out));
 def test_the_shim_opts_the_overlay_in_only_when_pulses_is_passed():
     js = xc._SHIM_COMPONENT_JS
     assert "setPulses(pulses, performance.now())" in js
-    assert 'pulses !== undefined ? { position: "relative" } : {}' in js
+    assert (
+        'pulses !== undefined || nodes !== undefined ? { position: "relative" }' in js
+    )
     from helao.ui.reflex import plots
 
     plain = plots.chart(rx_var("s"), rx_var("u"), rx_var("l"))
@@ -1051,3 +1053,187 @@ console.log(JSON.stringify({ log, before, after, rafLater: calls.raf }));
         out["after"]["clears"] == out["before"]["clears"] + 1
     )  # but wipes the last one
     assert out["rafLater"] == out["after"]["raf"]  # and never re-arms
+
+
+# ---- node hover overlay: hit-tested and drawn in the browser -----------------
+
+_JS_HOVER_ENV = """
+let T = 0;
+Object.defineProperty(globalThis, "performance", { value: { now: () => T }, configurable: true });
+const arcs = [], fills = [], listeners = {}, removed = [];
+let queue = new Map(), nextId = 1, canvases = 0;
+globalThis.requestAnimationFrame = (cb) => { queue.set(nextId, cb); return nextId++; };
+globalThis.cancelAnimationFrame = (id) => queue.delete(id);
+const ctx = { setTransform() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {},
+  clearRect() {}, arc(x, y, r) { arcs.push([x, y, r]); },
+  fill() { fills.push(ctx.fillStyle); } };
+globalThis.document = { visibilityState: "visible", addEventListener() {}, removeEventListener() {},
+  createElement: () => { canvases += 1; return { style: {}, dataset: {}, width: 0, height: 0,
+    isConnected: false, getContext: () => ctx, remove() {} }; } };
+const host = { clientWidth: 100, clientHeight: 100, getBoundingClientRect: () => ({ left: 10, top: 20 }),
+  appendChild(c) { c.isConnected = true; },
+  addEventListener(n, cb) { (listeners[n] = listeners[n] || []).push(cb); },
+  removeEventListener(n, cb) { removed.push(n); listeners[n] = (listeners[n] || []).filter((f) => f !== cb); } };
+// pad 8, plot 84 px: data (0,0) -> px (50, 50); one data unit = 42 px
+const view = { x: [-1, 1], y: [-1, 1], pad: 8 };
+const batch = (items) => ({ view, hover_r: 18, items });
+const node = (key, x, y, color, r = 10) => ({ key, x, y, color, r });
+const make = () => {
+  const st = createController({ spec: {} });
+  st.attach({ decodeFrame: () => ({ buffers: [] }), render: () => () => {} }, host);
+  return st;
+};
+// pointer given in host px; the listener reads client coords (host is at 10,20)
+const move = (x, y) => (listeners.pointermove || []).forEach((cb) => cb({ clientX: x + 10, clientY: y + 20 }));
+const frame = (t = 1) => { const cbs = [...queue.values()]; queue = new Map(); T = t; cbs.forEach((cb) => cb(t)); };
+"""
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_hit_test_returns_the_node_inside_its_radius_and_none_outside():
+    out = _run_js("""
+const view = { x: [-1, 1], y: [-1, 1], pad: 8 };
+const items = [{ key: "A", x: 0, y: 0, color: "#a", r: 10 }, { key: "B", x: 0.5, y: 0.5, color: "#b", r: 10 }];
+const h = (x, y) => { const r = hitNode(items, view, 100, 100, x, y); return r && r.key; };
+console.log(JSON.stringify({
+  inside: h(55, 50), edge: h(60, 50), outside: h(61, 50), far: h(5, 5),
+  // B: data (0.5, 0.5) -> px (71, 29): y is flipped
+  b: h(71, 29), flipped: h(71, 71),
+  empty: hitNode([], view, 100, 100, 50, 50),
+}));
+""")
+    assert out["inside"] == "A" and out["edge"] == "A"  # distance <= radius
+    assert out["outside"] is None and out["far"] is None
+    assert out["b"] == "B" and out["flipped"] is None
+    assert out["empty"] is None
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_overlapping_nodes_hit_the_nearest_centre():
+    out = _run_js("""
+const view = { x: [-1, 1], y: [-1, 1], pad: 8 };
+// centres at px (50,50) and (62,50), both radius 10: x=58 is inside both
+const items = [{ key: "A", x: 0, y: 0, color: "#a", r: 10 }, { key: "B", x: 12 / 42, y: 0, color: "#b", r: 10 }];
+const h = (x) => hitNode(items, view, 100, 100, x, 50).key;
+console.log(JSON.stringify({ nearA: h(55), nearB: h(58), reversed: hitNode([...items].reverse(), view, 100, 100, 55, 50).key }));
+""")
+    assert out == {"nearA": "A", "nearB": "B", "reversed": "A"}
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_hover_draws_the_enlarged_circle_in_the_nodes_colour_and_leave_clears():
+    out = _run_js(_JS_HOVER_ENV + """
+const st = make();
+st.setNodes(batch([node("A", 0, 0, "#112233"), node("B", 0.5, 0.5, "#445566")]));
+move(50, 50);
+const beforeFrame = { arcs: arcs.length, canvases };
+frame();
+const on = { arcs: arcs.slice(), fills: fills.slice() };
+move(52, 50);                             // same node: no new frame is wanted
+const queuedSame = queue.size;
+move(71, 29);                             // onto B
+frame();
+const onB = { arcs: arcs.slice(), fills: fills.slice() };
+move(5, 5);                               // off every node
+frame();
+const off = { arcs: arcs.length, fills: fills.length };
+move(50, 50); frame();
+(listeners.pointerleave || []).forEach((cb) => cb());
+const rafOnLeave = queue.size;
+frame();
+console.log(JSON.stringify({ beforeFrame, on, queuedSame, onB, off, rafOnLeave, afterLeave: arcs.length, hover: st.hoverNode }));
+""")
+    assert out["beforeFrame"] == {
+        "arcs": 0,
+        "canvases": 0,
+    }  # drawn in a frame, not inline
+    assert out["on"] == {
+        "arcs": [[50, 50, 18]],
+        "fills": ["#112233"],
+    }  # hover_r, exact colour
+    assert out["queuedSame"] == 0
+    assert (
+        out["onB"]["arcs"][-1] == [71, 29, 18] and out["onB"]["fills"][-1] == "#445566"
+    )
+    assert out["off"] == {"arcs": 2, "fills": 2}  # leaving every node draws nothing
+    assert out["rafOnLeave"] == 1  # a frame is queued to clear
+    assert out["afterLeave"] == 3  # the move back onto A drew one more, the leave none
+    assert out["hover"] is None
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_a_new_fill_under_a_still_pointer_redraws_and_pulses_keep_animating():
+    out = _run_js(_JS_HOVER_ENV + """
+const st = make();
+st.setNodes(batch([node("A", 0, 0, "#111111")]));
+st.setPulses({ view, items: [{ id: "p", dir: "fwd", color: "#222222", path: [[-1, -1], [1, 1]], start_in: 0, dur: 5 }] }, 0);
+move(50, 50);
+frame(100); frame(200);
+const hoverWhilePulsing = fills.slice();
+st.setNodes(batch([node("A", 0, 0, "#333333")]));   // status colour changed, pointer did not move
+frame(300);
+const loops = queue.size;                           // exactly one loop, still running
+frame(400);
+console.log(JSON.stringify({ hoverWhilePulsing, fills, loops, pulsesLeft: st.pulses.length, canvases }));
+""")
+    assert out["hoverWhilePulsing"] == [
+        "#111111",
+        "#111111",
+    ]  # redrawn with every pulse frame
+    assert out["fills"][-1] == "#333333"
+    assert out["loops"] == 1 and out["pulsesLeft"] == 1 and out["canvases"] == 1
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_no_listener_without_the_prop_and_dispose_removes_it():
+    out = _run_js(_JS_HOVER_ENV + """
+const plain = make();
+plain.setNodes(undefined);
+const none = Object.keys(listeners).filter((n) => n.startsWith("pointer"));
+move(50, 50);
+const drawnPlain = { raf: queue.size, canvases, hover: plain.hoverNode };
+const st = make();
+st.setNodes(batch([node("A", 0, 0, "#111111")]));
+const moveL = (listeners.pointermove || []).length, leaveL = (listeners.pointerleave || []).length;
+st.dispose();
+console.log(JSON.stringify({ none, drawnPlain, moveL, leaveL, removed,
+  left: (listeners.pointermove || []).length + (listeners.pointerleave || []).length }));
+""")
+    assert out["none"] == []
+    assert out["drawnPlain"] == {"raf": 0, "canvases": 0, "hover": None}
+    assert out["moveL"] == 1 and out["leaveL"] == 1
+    assert (
+        sorted(out["removed"]) == ["pointerleave", "pointermove"] and out["left"] == 0
+    )
+
+
+def test_the_shim_opts_hover_in_only_when_nodes_is_passed():
+    js = xc._SHIM_COMPONENT_JS
+    assert "setNodes(nodes)" in js
+    assert "pulses !== undefined || nodes !== undefined" in js
+    assert "nodes" in xc.XYChart.get_props()
+    from helao.ui.reflex import plots
+
+    assert "nodes" not in str(plots.chart(rx_var("s"), rx_var("u"), rx_var("l")))
+    assert "nodes" in str(
+        plots.chart(rx_var("s"), rx_var("u"), rx_var("l"), nodes=rx_var("n"))
+    )
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_hover_sends_no_server_event_and_the_canvas_sits_under_xys_label_layer():
+    out = _run_js(_JS_HOVER_ENV + """
+const sent = [], placed = [];
+const labels = { parentElement: { insertBefore(c, l) { placed.push([c.dataset.helaoSlot, l === labels]); c.isConnected = true; c.nextSibling = l; c.parentElement = labels.parentElement; } } };
+host.querySelector = (sel) => (sel === '[data-xy-slot="labels"]' ? labels : null);
+const st = createController({ spec: {}, onHover: (m) => sent.push(m) });
+st.attach({ decodeFrame: () => ({ buffers: [] }), render: () => () => {} }, host);
+st.setNodes(batch([node("A", 0, 0, "#112233")]));
+for (const x of [50, 51, 52, 5, 50]) { move(x, 50); frame(); }
+(listeners.pointerleave || []).forEach((cb) => cb());
+frame();
+console.log(JSON.stringify({ sent, placed, drew: arcs.length }));
+""")
+    assert out["sent"] == []  # hover never reaches the server
+    assert out["placed"] == [["pulses", True]]  # inserted before xy's label layer
+    assert out["drew"] >= 1

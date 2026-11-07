@@ -360,6 +360,18 @@ export function pulsePixelPath(path, view, w, h) {
   return path.map((p) => [pad + ((p[0] - x0) / (x1 - x0)) * pw, pad + ((y1 - p[1]) / (y1 - y0)) * ph]);
 }
 
+// The node under host-pixel point (x, y): distance to its centre <= its radius
+// in px, nearest wins. Items carry data x/y and r in px; null when none.
+export function hitNode(items, view, w, h, x, y) {
+  let best = null, bestD = Infinity;
+  for (const it of items || []) {
+    const c = pulsePixelPath([[it.x, it.y]], view, w, h)[0];
+    const d = Math.hypot(x - c[0], y - c[1]);
+    if (d <= it.r && d < bestD) { best = it; bestD = d; }
+  }
+  return best;
+}
+
 function pulseCumulative(px) {
   const cum = [0];
   for (let i = 1; i < px.length; i++) {
@@ -441,6 +453,12 @@ export function createController(options) {
     pulseSeen: new Map(),
     pulseView: null,
     pulseCanvas: null,
+    // Node hover overlay. Opt-in like the pulses: no `nodes` prop, no listener.
+    nodesOn: false,
+    nodes: null,
+    nodeListening: false,
+    pointer: null,
+    hoverNode: null,
     raf: null,
     visHandler: null,
   };
@@ -561,20 +579,87 @@ export function createController(options) {
       .map((p) => ({ ...p, s: (nowMs - p.start) / (p.end - p.start) }));
   };
 
+  // ---- node hover overlay ----
+  // Descriptors arrive once per real change. The pointer is hit-tested here, in
+  // the browser, and the circle is drawn on the pulses' canvas: no server event.
+  st.setNodes = (batch) => {
+    st.nodesOn = batch !== undefined && batch !== null;
+    st.nodes = st.nodesOn ? batch : null;
+    if (st.nodesOn && batch.view) st.pulseView = batch.view;
+    if (st.nodesOn) st.listenNodes();
+    else st.unlistenNodes();
+    st.rehover();
+  };
+
+  st.listenNodes = () => {
+    if (st.nodeListening || !st.el || !st.nodesOn) return;
+    st.nodeListening = true;
+    st.el.addEventListener("pointermove", st.onPointerMove);
+    st.el.addEventListener("pointerleave", st.onPointerLeave);
+  };
+
+  st.unlistenNodes = () => {
+    if (!st.nodeListening) return;
+    st.nodeListening = false;
+    st.el.removeEventListener("pointermove", st.onPointerMove);
+    st.el.removeEventListener("pointerleave", st.onPointerLeave);
+    st.pointer = null;
+  };
+
+  // Hit-test the stored pointer; one redraw frame only when the node changes
+  // (or its fill did while the pointer stayed).
+  st.rehover = () => {
+    const el = st.el;
+    let hit = null;
+    if (st.nodesOn && st.pointer && el && st.pulseView) {
+      hit = hitNode(st.nodes.items, st.pulseView, el.clientWidth, el.clientHeight, st.pointer[0], st.pointer[1]);
+    }
+    const id = (n) => n && n.key + n.color;  // a new fill redraws too
+    if (id(hit) === id(st.hoverNode)) return;
+    st.hoverNode = hit;
+    st.requestDraw();
+  };
+
+  st.onPointerMove = (e) => {
+    if (!st.el) return;
+    const r = st.el.getBoundingClientRect();
+    st.pointer = [e.clientX - r.left, e.clientY - r.top];
+    st.rehover();
+  };
+
+  st.onPointerLeave = () => {
+    st.pointer = null;
+    st.rehover();
+  };
+
+  // One frame now, whether or not a pulse is moving.
+  st.requestDraw = () => {
+    if (st.raf !== null || st.disposed || !st.el || typeof requestAnimationFrame !== "function") return;
+    st.raf = requestAnimationFrame(st.pulseFrame);
+  };
+
   st.drawPulses = (nowMs) => {
     const el = st.el;
     const active = st.activePulses(nowMs);
     if (!el || !st.pulseView || typeof document === "undefined") return;
     if (!st.pulseCanvas) {
-      if (!active.length) return;
+      if (!active.length && !st.hoverNode) return;
       const c = document.createElement("canvas");
       c.dataset.helaoSlot = "pulses";
       c.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none";
       st.pulseCanvas = c;
     }
     const c = st.pulseCanvas;
-    // xy may rebuild its DOM on a layout change; keep the overlay attached.
-    if (!c.isConnected) el.appendChild(c);
+    // Sit directly under xy's label layer, so a node's name stays on top of the
+    // enlarged hover circle (measured: appended after xy's root, the circle
+    // covered the label). xy may rebuild its DOM on a layout change, so this is
+    // re-checked on every draw; with no label layer yet it is appended to the host.
+    const labels = typeof el.querySelector === "function" ? el.querySelector('[data-xy-slot="labels"]') : null;
+    if (labels && labels.parentElement) {
+      if (c.nextSibling !== labels || c.parentElement !== labels.parentElement) labels.parentElement.insertBefore(c, labels);
+    } else if (!c.isConnected) {
+      el.appendChild(c);
+    }
     const w = el.clientWidth, h = el.clientHeight;
     const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
     if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {
@@ -584,6 +669,15 @@ export function createController(options) {
     const g = c.getContext("2d");
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, w, h);
+    // hover circle first, so a pulse crossing it stays on top
+    const hn = st.hoverNode;
+    if (hn && st.nodes) {
+      const c0 = pulsePixelPath([[hn.x, hn.y]], st.pulseView, w, h)[0];
+      g.fillStyle = hn.color;
+      g.beginPath();
+      g.arc(c0[0], c0[1], st.nodes.hover_r, 0, 2 * Math.PI);
+      g.fill();
+    }
     g.lineCap = "round";
     g.lineJoin = "round";
     g.lineWidth = PULSE_WIDTH_PX;
@@ -600,7 +694,7 @@ export function createController(options) {
 
   st.pulseFrame = (t) => {
     st.raf = null;
-    if (st.disposed || !st.pulsesOn) return;
+    if (st.disposed || (!st.pulsesOn && !st.nodesOn)) return;
     st.drawPulses(t);
     st.kickPulses();
   };
@@ -623,6 +717,7 @@ export function createController(options) {
     st.module = mod;
     st.el = el;
     st.kickPulses();
+    st.listenNodes();
     el.addEventListener("xy:click", st.onClick);
     el.addEventListener("xy:hover", st.onHoverEvent);
     el.addEventListener("xy:leave", st.onLeave);
@@ -749,6 +844,7 @@ export function createController(options) {
     if (st.raf !== null && typeof cancelAnimationFrame === "function") cancelAnimationFrame(st.raf);
     st.raf = null;
     if (st.visHandler) document.removeEventListener("visibilitychange", st.visHandler);
+    st.unlistenNodes();
     if (st.pulseCanvas && st.pulseCanvas.remove) st.pulseCanvas.remove();
     if (st.observer) st.observer.disconnect();
     st.teardown();
@@ -761,7 +857,7 @@ export function createController(options) {
 #: The React wrapper. Deliberately thin — it wires props and lifecycle to the
 #: controller above and holds no logic of its own.
 _SHIM_COMPONENT_JS = """
-export function XYChart({ spec, bufferUrl, layout, height, width, onSelect, onHover, pulses }) {
+export function XYChart({ spec, bufferUrl, layout, height, width, onSelect, onHover, pulses, nodes }) {
   const hostRef = useRef(null);
   const ctrlRef = useRef(null);
   if (ctrlRef.current === null) {
@@ -788,6 +884,11 @@ export function XYChart({ spec, bufferUrl, layout, height, width, onSelect, onHo
     ctrlRef.current.setPulses(pulses, performance.now());
   }, [pulses]);
 
+  // Node descriptors arrive once per real change; hover is hit-tested in the browser.
+  useEffect(() => {
+    ctrlRef.current.setNodes(nodes);
+  }, [nodes]);
+
   // Data updates take the bundle's in-place append path, not a remount. The
   // URL is passed as an argument so this always fetches the current version.
   useEffect(() => {
@@ -813,8 +914,8 @@ export function XYChart({ spec, bufferUrl, layout, height, width, onSelect, onHo
         height: height,
         minHeight: height,
         flexShrink: 0,
-        // the pulse overlay is absolutely positioned inside this element
-        ...(pulses !== undefined ? { position: "relative" } : {}),
+        // the overlay canvas is absolutely positioned inside this element
+        ...(pulses !== undefined || nodes !== undefined ? { position: "relative" } : {}),
       }}
     />
   );
@@ -857,6 +958,7 @@ class XYChart(rx.Component):
     on_select: rx.EventHandler[lambda payload: [payload]]
     on_hover: rx.EventHandler[lambda payload: [payload]]
     pulses: rx.Var[dict]
+    nodes: rx.Var[dict]
 
     def add_imports(self):
         """Declare the React hooks the shim uses.

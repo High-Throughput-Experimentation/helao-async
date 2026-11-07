@@ -47,30 +47,31 @@ def test_bezier_end_tangents_are_vertical():
     )
 
 
-def test_no_arrowheads_and_the_hover_disc_sits_under_the_nodes():
+def test_no_arrowheads_and_no_hovered_traces():
     g = _g()
     g.add_node("UP", 0.0, 0.7, color=GROUP_IDLE, label_color=WHITE)
     g.add_edge("UP", "ORCH", "UP", color=GROUP_IDLE)
     marks = g.marks()
     assert not any(m.get("name", "").startswith("arrow") for m in marks)
-    names = [m["name"] for m in marks if m["kind"] == "scatter"]
-    assert names.index(f"hovered:{GROUP_IDLE}") < names.index(f"nodes:UP:{GROUP_IDLE}")
+    assert not any(m.get("name", "").startswith("hovered") for m in marks)
 
 
-def test_hovered_node_is_a_larger_disc_in_its_own_colour_and_clears():
-    g = NetGraphWith(hover_px=40.0)
-    g.add_node("UP", 0.2, 0.7, color=GROUP_PULSE_DISPATCH, label_color=WHITE)
-    g.hovered = "UP"
-    on = _trace(g.marks(), f"hovered:{GROUP_PULSE_DISPATCH}")
-    assert (on["x"], on["y"], on["colors"]) == ([0.2], [0.7], [GROUP_PULSE_DISPATCH])
-    assert (
-        on["size"]
-        == 40.0
-        > _trace(g.marks(), f"nodes:UP:{GROUP_PULSE_DISPATCH}")["size"]
+def test_node_descriptors_give_position_current_colour_and_px_radius():
+    g = NetGraphWith()
+    g.add_node(
+        "UP", 0.2, 0.7, color=GROUP_PULSE_DISPATCH, label_color=WHITE, size_px=44.0
     )
-    g.hovered = None
-    off = _trace(g.marks(), f"hovered:{GROUP_PULSE_DISPATCH}")
-    assert off["x"] == [] and off["size"] == 40.0  # same trace, same style
+    d = {x["key"]: x for x in g.node_descriptors()}
+    assert d["UP"] == {
+        "key": "UP",
+        "x": 0.2,
+        "y": 0.7,
+        "color": GROUP_PULSE_DISPATCH,
+        "r": 22.0,
+    }
+    g.set_node_color("UP", GROUP_IDLE)
+    assert {x["key"]: x for x in g.node_descriptors()}["UP"]["color"] == GROUP_IDLE
+    assert g.node_descriptors() == sorted(g.node_descriptors(), key=lambda x: x["key"])
 
 
 def NetGraphWith(**kw):
