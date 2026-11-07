@@ -131,7 +131,8 @@ def test_drop_estopped_keeps_unrelated_finished_actions():
     _fold(gsm, SIM, "other", ok)
     bad = _act_on(SIM, "acquire_data", [HloStatus.estopped, HloStatus.finished])
     _fold(gsm, SIM, "acquire_data", bad)
-    gsm.drop_estopped_in_finished()
+    assert gsm.drop_estopped_in_finished() == {bad.action_uuid}
+    assert gsm.drop_estopped_in_finished() == set()
     _fold(gsm, ORCH, "wait", _act_on(ORCH, "wait", [HloStatus.active]))
     assert not gsm.find_hlostatus_in_finished(HloStatus.estopped)
     assert ok.action_uuid in gsm.nonactive_dict[HloStatus.finished]

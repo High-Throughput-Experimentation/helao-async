@@ -3,6 +3,7 @@ rules, DD-3 live re-checks. Uses a recording stub orch (app-layer unit
 tests; the launched smoke exercises the real Orch)."""
 
 import asyncio
+from types import SimpleNamespace
 
 import pytest
 
@@ -47,6 +48,9 @@ class _GSM:
 
     def drop_estopped_in_finished(self):
         self.cleared.append("stale-estopped")
+        return set(self.stale)
+
+    stale: tuple = ()
 
 
 class _StubOrch:
@@ -396,3 +400,73 @@ async def test_dispatch_head_action_dead_target_parks_stopped():
     assert orch.current_stop_message == "SIM/acquire_data endpoints are unavailable"
     assert orch.globalstatusmodel.loop_intent == LoopIntent.stop
     assert "intend_stop" in orch.calls
+
+
+class _RestartedWhileDraining(_StubOrch):
+    """A drain parked on a stranded action through E-STOP + Clear + Start: the
+    wait returns when the NEW run is already ``started`` and idle."""
+
+    def __init__(self):
+        super().__init__()
+        self._hex_runtime = SimpleNamespace(estop_gen=0)
+
+    async def orch_wait_for_all_actions(self):
+        self._hex_runtime.estop_gen += 2  # estopped, then cleared
+        self.globalstatusmodel.loop_state = LoopStatus.started  # new Start
+        self.globalstatusmodel.orch_state = OrchStatus.idle
+
+
+@pytest.mark.asyncio
+async def test_drain_does_not_overwrite_a_later_runs_started_state():
+    orch = _RestartedWhileDraining()
+    orch.globalstatusmodel.loop_state = LoopStatus.started
+    runner, _ = _runner(orch)
+    await runner.execute(WaitAllActionsIdle())
+    assert orch.globalstatusmodel.loop_state == LoopStatus.started
+    assert "intend_none" not in orch.calls
+
+
+@pytest.mark.asyncio
+async def test_dispatch_runner_drain_does_not_overwrite_a_later_runs_started_state():
+    from helao.hexagon.app.orch_dispatch import DispatchRunner
+    from helao.hexagon.domain.dispatch_policy import DrainForStop
+
+    orch = _RestartedWhileDraining()
+    orch.globalstatusmodel.loop_state = LoopStatus.started
+    await DispatchRunner(orch)._exec_pre_dispatch_intent(DrainForStop())
+    assert orch.globalstatusmodel.loop_state == LoopStatus.started
+    assert "intend_none" not in orch.calls
+
+
+@pytest.mark.asyncio
+async def test_start_logs_the_stale_estopped_uuids_it_drops():
+    from helao.hexagon.domain.orchestration import DropStaleEstopped
+    from helao.helpers import helao_logging
+
+    orch = _StubOrch()
+    orch.globalstatusmodel.stale = ("uuid-stale-1",)
+    runner, _ = _runner(orch)
+    seen = []
+
+    class _L:
+        def __getattr__(self, name):
+            return lambda msg, *a, **k: seen.append((name, str(msg)))
+
+    prev = helao_logging.LOGGER
+    helao_logging.LOGGER = _L()  # the runner resolves the logger at call time
+    try:
+        await runner.execute(DropStaleEstopped())
+    finally:
+        helao_logging.LOGGER = prev
+    assert any(
+        n == "warning" and "stale E-STOPPED" in m and "uuid-stale-1" in m
+        for n, m in seen
+    ), seen
+    seen.clear()
+    orch.globalstatusmodel.stale = ()
+    helao_logging.LOGGER = _L()
+    try:
+        await runner.execute(DropStaleEstopped())
+    finally:
+        helao_logging.LOGGER = prev
+    assert not seen  # nothing dropped, nothing said

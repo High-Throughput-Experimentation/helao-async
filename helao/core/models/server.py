@@ -333,15 +333,19 @@ class GlobalStatusModel(BaseModel, HelaoDict):
         # which empties these buckets itself; nothing re-reads a cleared action.
         self._drop_finished(cleared)
 
-    def drop_estopped_in_finished(self):
+    def drop_estopped_in_finished(self) -> set:
         """Drop only the estopped actions from every finished store.
+
+        Returns the uuids dropped.
 
         An estopped status that lands after the E-STOP was cleared is stale: it
         must not re-latch on the next Start. Unlike `clear_in_finished` this
         leaves unrelated finished actions (an experiment still being closed
         out reads them) alone.
         """
-        self._drop_finished(set(self.find_hlostatus_in_finished(HloStatus.estopped)))
+        dropped = set(self.find_hlostatus_in_finished(HloStatus.estopped))
+        self._drop_finished(dropped)
+        return dropped
 
     def _drop_finished(self, uuids: set):
         """Remove `uuids` from this model's and every endpoint's finished buckets."""

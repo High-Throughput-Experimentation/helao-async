@@ -257,10 +257,16 @@ class OrchCommandRunner:
         if isinstance(cmd, WaitAllActionsIdle):
             # verbatim DrainForStop body — OWNS the stopped write (DD-2 T5)
             LOGGER.info("stopping orchestrator")
-            # An E-STOP latched meanwhile ends the drain and is never overwritten.
+            # An E-STOP latched meanwhile ends the drain and is never
+            # overwritten; neither is a later run's state: a drain parked
+            # through E-STOP + Clear + Start (stranded active_dict entry) sees
+            # the E-STOP generation move and leaves loop_state alone.
+            gen = getattr(getattr(orch, "_hex_runtime", None), "estop_gen", 0)
             while gsm.loop_state not in (LoopStatus.stopped, LoopStatus.estopped):
                 await orch.orch_wait_for_all_actions()
-                if gsm.loop_state == LoopStatus.estopped:
+                if gsm.loop_state == LoopStatus.estopped or gen != getattr(
+                    getattr(orch, "_hex_runtime", None), "estop_gen", 0
+                ):
                     break
                 if gsm.orch_state == OrchStatus.idle:
                     await orch.intend_none()
@@ -338,7 +344,12 @@ class OrchCommandRunner:
             return None
 
         if isinstance(cmd, DropStaleEstopped):
-            gsm.drop_estopped_in_finished()
+            dropped = gsm.drop_estopped_in_finished()
+            if dropped:
+                LOGGER.warning(
+                    "Start dropped stale E-STOPPED action(s) reported after the "
+                    f"E-STOP was cleared: {sorted(str(u) for u in dropped)}"
+                )
             return None
 
         if isinstance(cmd, ClearEstoppedFromFinished):
