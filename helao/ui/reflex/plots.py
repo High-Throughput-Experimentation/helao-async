@@ -973,7 +973,15 @@ CHART_PADDING_PX = 8
 
 
 def marks_chart(
-    marks, *, x_domain, y_domain, panel_id, version, click=False, hover_events=False
+    marks,
+    *,
+    x_domain,
+    y_domain,
+    panel_id,
+    version,
+    click=False,
+    hover_events=False,
+    height_px: int | None = None,
 ) -> ChartPayload:
     """Render plain mark dicts (see ``netgraph``/``timeline_strip``) on a fixed view.
 
@@ -988,6 +996,13 @@ def marks_chart(
     highlight is made fully transparent and the tooltip invisible (kept, not
     ``show_tooltip=False``: the shim reads its hiding as "pointer left every
     point"). The page draws any hover effect itself, from the event.
+
+    ``height_px`` fixes the chart's height. Without it the chart is fluid
+    (``height="100%"``), and xy then floors it at 120 px; a fixed height is
+    floored at 48 px only (measured in ``standalone.js``).
+
+    A text mark with ``max_px`` is boxed to that width: xy draws annotations as
+    DOM labels, so the browser cuts an overlong one with an ellipsis.
     """
     children, style, notes = [], [], []
     for m in marks:
@@ -1037,6 +1052,7 @@ def marks_chart(
             )
             style.append(f"{m['name']}:{m['symbol']}:{m['size']}:{opacity}")
         elif kind == "text":
+            box = m.get("max_px")
             children.append(
                 xy.text(
                     float(m["x"]),
@@ -1046,6 +1062,16 @@ def marks_chart(
                     dy=float(m.get("dy", 0.0)),
                     color=m["color"],
                     anchor=m.get("anchor", "middle"),
+                    style=(
+                        None
+                        if box is None
+                        else {
+                            "max_width": f"{box}px",
+                            "overflow": "hidden",
+                            "text_overflow": "ellipsis",
+                            "white_space": "nowrap",
+                        }
+                    ),
                 )
             )
             notes.append(repr(sorted(m.items())))
@@ -1091,12 +1117,15 @@ def marks_chart(
         *children,
         *axes,
         width="100%",
-        height="100%",
+        height="100%" if height_px is None else height_px,
         padding=[pad, pad, pad, pad],
         pan=False,
         zoom=False,
         click=click,
         hover=True if hover_events else None,
+        # The /group card behind the chart paints the surface; xy reads
+        # ``--chart-bg`` from the chart root's computed style.
+        style={"--chart-bg": TRANSPARENT},
     )
     if hover_events:
         figure.figure().set_mark_style(hover={"opacity": 0.0})
@@ -1107,5 +1136,5 @@ def marks_chart(
         figure,
         panel_id,
         version,
-        layout_extra=f"marks={digest}{tuple(x_domain)}{tuple(y_domain)}{click}",
+        layout_extra=f"marks={digest}{tuple(x_domain)}{tuple(y_domain)}{click}{height_px}",
     )

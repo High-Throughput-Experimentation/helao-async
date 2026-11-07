@@ -724,6 +724,30 @@ def test_changed_annotation_text_updates_in_place():
     assert _mc(_marks(text="A")).layout == _mc(_marks(text="B")).layout
 
 
+def test_marks_chart_is_fluid_unless_given_a_pixel_height():
+    assert _mc(_marks()).spec["height"] == "100%"
+    fixed = _mc(_marks(), height_px=60)
+    assert fixed.spec["height"] == 60 and fixed.spec["width"] == "100%"
+    assert fixed.layout != _mc(_marks()).layout  # spec, so it must rebuild
+
+
+def test_marks_chart_paints_no_background_of_its_own():
+    # the card behind it supplies the surface; xy reads --chart-bg off the root
+    from helao.ui.shared.palette import TRANSPARENT
+
+    assert _mc(_marks()).spec["dom"]["style"]["--chart-bg"] == TRANSPARENT
+
+
+def test_a_text_mark_with_max_px_truncates_with_an_ellipsis_in_the_browser():
+    marks = _marks()
+    marks[-1]["max_px"] = 80.5
+    style = _mc(marks).spec["annotations"][0]["style"]
+    assert style["max_width"] == "80.5px"
+    assert style["overflow"] == "hidden" and style["text_overflow"] == "ellipsis"
+    assert style["white_space"] == "nowrap"
+    assert "max_width" not in _mc(_marks()).spec["annotations"][0]["style"]
+
+
 def test_marks_chart_rejects_an_unknown_kind():
     with pytest.raises(ValueError, match="unknown mark kind"):
         _mc([{"kind": "spiral"}])
