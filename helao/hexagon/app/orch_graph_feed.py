@@ -48,6 +48,7 @@ def fingerprint(orch) -> tuple:
         str(getattr(seq, "sequence_uuid", None)),
         len(getattr(seq, "dispatched_experiments", None) or ()),
         str(getattr(orch.active_experiment, "experiment_uuid", None)),
+        str(getattr(getattr(orch, "last_experiment", None), "experiment_uuid", None)),
         len(orch.sequence_dq),
         len(orch.experiment_dq),
         len(orch.action_dq),

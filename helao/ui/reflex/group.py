@@ -2,8 +2,10 @@
 
 One process-wide ``WsIngest`` on the orchestrator's ``/ws_orch``; frames are
 whole snapshots, read from ``ingest.raw``. ``GroupState`` is a plain
-``rx.State`` (one page per orchestrator) ticked by ``rx.moment``: 60 Hz while
-a pulse is alive, 2 Hz otherwise. Never a server-side loop. Buttons and the
+``rx.State`` (one page per orchestrator) ticked by ``rx.moment`` at 2 Hz. Never
+a server-side loop. Pulses are not animated here: each is sent ONCE as a
+descriptor (:func:`pulse_items`) and the chart shim moves it at display
+refresh. Buttons and the
 info box go over HTTP: the four control buttons straight through
 ``async_private_dispatcher`` (building a ``RemoteBackend`` runs ``import_autolibs``
 on the Reflex loop, which would stall the first click), the info box through the
@@ -31,7 +33,14 @@ from helao.ui.reflex import plots
 from helao.ui.reflex.ingest import WsIngest
 from helao.ui.reflex.netgraph import NetGraph, group_layout
 from helao.ui.reflex.operator import TREE_EMPTY_HEADER, session_backend, tree_for
-from helao.ui.reflex.timeline_strip import click_item, item_key, strip_marks
+from helao.ui.reflex.timeline_strip import (
+    HIT_TRACE,
+    click_item,
+    hit_slot,
+    item_key,
+    item_tooltip,
+    strip_marks,
+)
 from helao.ui.reflex.tree_pane import tree_pane
 from helao.ui.shared.operator.object_tree import truncate_uuid
 from helao.ui.shared.palette import (
@@ -56,11 +65,15 @@ HOVER_PX = round(NODE_PX * 1.3)
 #: Every (colour, width) a server edge can take; a busy edge is thicker. Each
 #: is a fixed trace of the graph, so a status change is column data, not a
 #: chart rebuild.
-NODE_COLORS = tuple(sorted(set(GROUP_STATE_COLORS.values())))
+#: A node's colour is its status; the strips' done/queued colours never reach it.
+NODE_STATUSES = ("idle", "busy", "error", "estop", "unreachable")
+NODE_COLORS = tuple(sorted({GROUP_STATE_COLORS[k] for k in NODE_STATUSES}))
 EDGE_STYLES = tuple(
     sorted({(c, 4.0 if k == "busy" else 2.0) for k, c in GROUP_STATE_COLORS.items()})
 )
-FAST_MS, SLOW_MS = 16, 500
+SLOW_MS = 500
+#: The graph's fixed view, for the shim's pulse overlay: data domain and padding.
+PULSE_VIEW = {"x": [-1.0, 1.0], "y": [-1.0, 1.0], "pad": plots.CHART_PADDING_PX}
 STALE_S = 5.0
 #: Long enough that the one remaining chart rebuild (a strip whose slot count
 #: changed, ~150 ms of frozen main thread) cannot swallow a pulse.
@@ -272,10 +285,18 @@ def exp_row_ordinals(snap: dict) -> list:
 
 
 def selection_scope(snap: dict, kind: str):
-    """What an ordinal is relative to: the sequence, and for actions the experiment."""
+    """What an ordinal is relative to: the sequence, and for actions the experiment.
+
+    Both follow the strip: EXP clears when the sequence changes, ACT when the
+    experiment it shows does (``act_exp``: the active one, else the last
+    finished). Frames from an older orchestrator carry no ``act_exp`` and fall
+    back to the active experiment's ordinal.
+    """
     seq = (snap.get("seq") or {}).get("uuid")
     if kind == "experiment":
         return (seq,)
+    if "act_exp" in snap:  # the experiment whose actions the ACT strip shows
+        return (seq, snap["act_exp"])
     rows, ords = snap.get("experiments", []), exp_row_ordinals(snap)
     active = next((o for r, o in zip(rows, ords) if r.get("state") == "active"), None)
     return (seq, active)
@@ -312,10 +333,8 @@ def _color_key(status: str) -> str:
     return status if status in GROUP_STATE_COLORS else "idle"
 
 
-def build_graph(
-    snap: dict, pulses, orch_key: str, lost: bool, hovered=None
-) -> NetGraph:
-    """The network graph for one snapshot: nodes, edges, queued pulses."""
+def build_graph(snap: dict, orch_key: str, lost: bool, hovered=None) -> NetGraph:
+    """The network graph for one snapshot: nodes and edges."""
     servers = snap.get("servers", [])
     pos = group_layout(orch_key, [s["key"] for s in servers])
     g = NetGraph(
@@ -360,21 +379,75 @@ def build_graph(
             color=GROUP_STATE_COLORS[key],
             width=4.0 if status == "busy" else 2.0,
         )
-    for edge_id, direction, t0, duration, color in pulses:
-        if edge_id in g.edges:
-            g.pulse(edge_id, t0=t0, color=color, direction=direction, duration=duration)
     return g
 
 
-def graph_marks(
-    snap: dict, pulses, now: float, orch_key: str, lost: bool, hovered=None
-):
-    """``(marks, live pulses)`` for the network graph."""
-    g = build_graph(snap, pulses, orch_key, lost, hovered)
-    marks = g.marks(now)
-    return marks, [
-        [p.edge_id, p.direction, p.t0, p.duration, p.color] for p in g.pulses
-    ]
+def graph_marks(snap: dict, orch_key: str, lost: bool, hovered=None):
+    """Marks for the network graph: a pure function of the snapshot and hover."""
+    return build_graph(snap, orch_key, lost, hovered).marks()
+
+
+def pulse_items(snap: dict, fresh, now: float, orch_key: str, lost: bool) -> list:
+    """Descriptors for newly queued pulses, each sent to the browser once.
+
+    ``fresh`` holds ``(edge, direction, t0, duration, colour)``. ``start_in`` is
+    seconds from now, so the browser schedules from its own receipt time and a
+    page/server clock difference cannot skip or delay a pulse. ``path`` is the
+    edge's sampled curve in data units in TRAVEL order (reversed for ``rev``);
+    the shim offsets it to one side, so the two directions take opposite lanes.
+    """
+    g = build_graph(snap, orch_key, lost)
+    items = []
+    for edge, direction, t0, duration, color in fresh:
+        if edge not in g.edges:
+            continue
+        path = g.edge_path(edge)
+        if direction != "fwd":
+            path = path[::-1]
+        items.append(
+            {
+                "id": f"{edge}|{direction}|{t0:.3f}",
+                "dir": direction,
+                "start_in": round(t0 - now, 3),
+                "dur": duration,
+                "color": color,
+                "path": [[round(x, 5), round(y, 5)] for x, y in path],
+            }
+        )
+    return items
+
+
+def current_experiment(snap: dict):
+    """The EXP strip's current row: the active one, else the last finished."""
+    rows = snap.get("experiments", [])
+    active = [r for r in rows if r.get("state") == "active"]
+    done = [r for r in rows if r.get("state") in ("done", "error")]
+    return (active or done or [None])[-1]
+
+
+def current_action(snap: dict):
+    """The ACT strip's current row: the most recently STARTED active action,
+    else the last finished one (rows are in dispatch order)."""
+    rows = snap.get("actions", [])
+    active = [r for r in rows if r.get("state") == "active"]
+    if active:
+        return max(active, key=lambda r: r.get("t_start") or 0.0)
+    done = [r for r in rows if r.get("state") in ("done", "error")]
+    return done[-1] if done else None
+
+
+def _current_fields(prefix: str, row) -> dict:
+    t = (row or {}).get("t_start")
+    uuid = (row or {}).get("uuid") or ""
+    return {
+        f"{prefix}_name": (row or {}).get("name") or "",
+        f"{prefix}_started": (
+            datetime.fromtimestamp(t).strftime("%Y-%m-%d %H:%M:%S") if t else ""
+        ),
+        f"{prefix}_uuid": uuid,
+        f"{prefix}_uuid_short": truncate_uuid(uuid) if uuid else "",
+        f"{prefix}_state": (row or {}).get("state") or "",
+    }
 
 
 def header_fields(snap: dict) -> dict:
@@ -397,6 +470,8 @@ def header_fields(snap: dict) -> dict:
         "loop_group": LOOP_TO_GROUP.get(loop_state, "idle"),
         "orch_group": ORCH_TO_GROUP.get(orch_state, "idle"),
         "closing_out": bool(snap.get("closing_out")),
+        **_current_fields("exp", current_experiment(snap)),
+        **_current_fields("act", current_action(snap)),
     }
 
 
@@ -445,12 +520,9 @@ def _backend(token: str):
     return backend
 
 
-def _render_graph(s, snap: dict, now: float, lost: bool, token: str) -> None:
+def _render_graph(s, snap: dict, lost: bool, token: str) -> None:
     s._version += 1
-    marks, live = graph_marks(
-        snap, s._pulses, now, _CFG["orch_key"], lost, s._hovered or None
-    )
-    s._pulses = tuple(tuple(p) for p in live)
+    marks = graph_marks(snap, _CFG["orch_key"], lost, s._hovered or None)
     p = plots.marks_chart(
         marks,
         x_domain=(-1.0, 1.0),
@@ -460,6 +532,10 @@ def _render_graph(s, snap: dict, now: float, lost: bool, token: str) -> None:
         hover_events=True,
     )
     s.graph_spec, s.graph_url, s.graph_layout = p.spec, p.buffer_url, p.layout
+
+
+def _hover_line(slots, slot: int, now: float) -> str:
+    return item_tooltip(slots[slot], now) if 0 <= slot < len(slots) else ""
 
 
 def _render_strips(s, snap: dict, now: float, token: str) -> None:
@@ -484,6 +560,7 @@ def _render_strips(s, snap: dict, now: float, token: str) -> None:
         panel_id=f"group-exp-{token}",
         version=v,
         click=True,
+        hover_events=True,
     )
     s.exp_spec, s.exp_url, s.exp_layout = p.spec, p.buffer_url, p.layout
     am, act_slots = strip_marks(
@@ -503,8 +580,12 @@ def _render_strips(s, snap: dict, now: float, token: str) -> None:
         panel_id=f"group-act-{token}",
         version=v,
         click=True,
+        hover_events=True,
     )
     s.act_spec, s.act_url, s.act_layout = p.spec, p.buffer_url, p.layout
+    # the hover line keeps following its slot: the elapsed time ticks
+    s.exp_hover = _hover_line(s._exp_slots, s._hover_slot[0], now)
+    s.act_hover = _hover_line(s._act_slots, s._hover_slot[1], now)
     if s._selected and (exp_key if s._selected[0] == "experiment" else act_key) is None:
         s._selected = ()
         s.info_note = SELECTION_GONE
@@ -522,14 +603,17 @@ def reset_for_mount(s) -> None:
     s._first_at = 0.0
     s._full_at = 0.0
     s._hovered = ""
+    s._hover_slot = (-1, -1)
+    s.graph_pulses = {"view": PULSE_VIEW, "seq": s._pulse_seq, "items": []}
 
 
 def apply_tick(s, feed, now: float, token: str) -> bool:
     """One render of state-like ``s``. Returns True when an old-orch probe is due.
 
-    The graph is rebuilt every tick; the header, buttons and both strips only
-    when a frame arrived or ``SLOW_MS`` has passed, so the 60 Hz pulse ticks
-    cost one chart.
+    The graph, header, buttons and strips are redrawn only when a frame arrived
+    or ``SLOW_MS`` has passed: nothing in them moves with time, because pulses
+    travel in the browser. A pulse queued this tick is published once, in
+    ``graph_pulses``, and left alone until the next one.
     """
     if s._first_at <= 0:
         s._first_at = now
@@ -546,20 +630,30 @@ def apply_tick(s, feed, now: float, token: str) -> bool:
     else:
         frames, s._cursor = new_frames(feed, s._cursor)
         replay = True
-    pulses = list(s._pulses)
+    # Only bounding needs the pulses the browser is still animating.
+    pulses = [p for p in s._pulses if p[2] + p[3] > now]
+    kept = list(pulses)
     if replay:
         for ev in recent_events(frames):
             p = pulse_for(ev, now, _CFG["orch_key"])
             if p is not None:
                 pulses = queue_pulse(pulses, tuple(p))
     s._pulses = tuple(pulses)
+    fresh = [p for p in pulses if p not in kept]
     if frames:
         s._snap = (frames[-1],)
         s._old_orch = False
     snap = s._snap[0] if s._snap else {}
     lost = stream_lost(feed, now)
-    _render_graph(s, snap, now, lost, token)
+    if fresh:
+        s._pulse_seq += 1
+        s.graph_pulses = {
+            "view": PULSE_VIEW,
+            "seq": s._pulse_seq,
+            "items": pulse_items(snap, fresh, now, _CFG["orch_key"], lost),
+        }
     if frames or now - s._full_at >= SLOW_MS / 1000.0:
+        _render_graph(s, snap, lost, token)
         s._full_at = now
         for name, value in header_fields(snap).items():
             setattr(s, name, value)
@@ -582,7 +676,7 @@ def apply_tick(s, feed, now: float, token: str) -> bool:
             s.action_error = ""
             s._unconfirmed = ""
         _render_strips(s, snap, now, token)
-    s.tick_ms = FAST_MS if s._pulses else SLOW_MS
+    s.tick_ms = SLOW_MS
     never_live = feed is not None and feed.status.message_count == 0
     # The heartbeat is 2 s: a page that has only just opened has not waited
     # long enough to call the orchestrator old.
@@ -604,6 +698,18 @@ class GroupState(rx.State):
     loop_group: str = "idle"
     orch_group: str = "idle"
     closing_out: bool = False
+    exp_name: str = ""
+    exp_started: str = ""
+    exp_uuid: str = ""
+    exp_uuid_short: str = ""
+    exp_state: str = ""
+    act_name: str = ""
+    act_started: str = ""
+    act_uuid: str = ""
+    act_uuid_short: str = ""
+    act_state: str = ""
+    exp_hover: str = ""
+    act_hover: str = ""
     can_start: bool = False
     can_stop: bool = False
     # on before the first frame: the operator can always E-STOP (HTTP, no stream)
@@ -614,6 +720,7 @@ class GroupState(rx.State):
     pending: str = ""
     action_error: str = ""
     banner: str = ""
+    graph_pulses: dict = {"view": PULSE_VIEW, "seq": 0, "items": []}
     graph_spec: dict = {}
     graph_url: str = ""
     graph_layout: str = ""
@@ -645,7 +752,9 @@ class GroupState(rx.State):
     _unconfirmed: str = ""  # button whose "not confirmed" message is showing
     _probe_at: float = 0.0
     _first_at: float = 0.0
+    _pulse_seq: int = 0
     _hovered: str = ""  # key of the hovered node, or ""
+    _hover_slot: tuple = (-1, -1)  # hovered (EXP, ACT) slot, -1 for none
     _old_orch: bool = False
 
     @rx.event
@@ -711,7 +820,7 @@ class GroupState(rx.State):
             return
         now = time.time()
         lost = stream_lost(_FEED, now)
-        g = build_graph(self._snap[0], (), _CFG["orch_key"], lost)
+        g = build_graph(self._snap[0], _CFG["orch_key"], lost)
         keys = g.node_traces().get(trace)
         if keys is not None and 0 <= idx < len(keys):
             key = keys[idx]
@@ -725,7 +834,41 @@ class GroupState(rx.State):
         if key == self._hovered:
             return
         self._hovered = key
-        _render_graph(self, self._snap[0], now, lost, self.router.session.client_token)
+        _render_graph(self, self._snap[0], lost, self.router.session.client_token)
+
+    def _hover_strip(self, which: int, payload: dict) -> None:
+        """Pointer over (or off) a strip segment: set only the hover line.
+
+        No chart redraw: the line is plain text, so hovering never rebuilds or
+        re-uploads a strip.
+        """
+        slots = self._exp_slots if which == 0 else self._act_slots
+        trace = (payload or {}).get("trace")
+        slot = (
+            hit_slot((payload or {}).get("index", -1), len(slots))
+            if trace == HIT_TRACE
+            else -1  # the pointer left the strip's points
+        )
+        if slot is None:
+            slot = -1
+        cur = list(self._hover_slot)
+        if cur[which] == slot:
+            return
+        cur[which] = slot
+        self._hover_slot = tuple(cur)
+        line = _hover_line(slots, slot, time.time())
+        if which == 0:
+            self.exp_hover = line
+        else:
+            self.act_hover = line
+
+    @rx.event
+    def hover_exp(self, payload: dict):
+        self._hover_strip(0, payload)
+
+    @rx.event
+    def hover_act(self, payload: dict):
+        self._hover_strip(1, payload)
 
     async def _select(self, kind: str, payload: dict):
         async with self:
@@ -799,6 +942,27 @@ def _button(
     )
 
 
+def _uuid_row(label: str, name, state, started, uuid, short) -> rx.Component:
+    """One header row under the sequence line; "—" while there is none."""
+    return rx.cond(
+        name == "",
+        rx.hstack(rx.text(label, weight="bold"), rx.text("—"), spacing="2"),
+        rx.hstack(
+            rx.text(label, weight="bold"),
+            rx.text(name),
+            rx.text("(", state, ")", size="1"),
+            rx.cond(started != "", rx.text("started ", started)),
+            rx.text("uuid"),
+            rx.tooltip(rx.text(short, "…", font_family="monospace"), content=uuid),
+            rx.button(
+                "copy", size="1", variant="soft", on_click=rx.set_clipboard(uuid)
+            ),
+            align="center",
+            spacing="2",
+        ),
+    )
+
+
 def group_page() -> rx.Component:
     if not _CFG:
         return rx.text(NO_ORCH_NOTE, padding_x="1em")
@@ -852,6 +1016,12 @@ def group_page() -> rx.Component:
     )
     header = rx.vstack(
         seq_row,
+        _uuid_row(
+            "EXP", S.exp_name, S.exp_state, S.exp_started, S.exp_uuid, S.exp_uuid_short
+        ),
+        _uuid_row(
+            "ACT", S.act_name, S.act_state, S.act_started, S.act_uuid, S.act_uuid_short
+        ),
         controls,
         rx.cond(
             S.action_error != "",
@@ -868,6 +1038,7 @@ def group_page() -> rx.Component:
             height=GRAPH_H,
             width=GRAPH_W,
             on_hover=S.hover_node,
+            pulses=S.graph_pulses,
         ),
         rx.text("EXP", size="1", weight="bold"),
         plots.chart(
@@ -877,7 +1048,9 @@ def group_page() -> rx.Component:
             height=STRIP_H,
             width=STRIP_W,
             on_select=S.select_exp,
+            on_hover=S.hover_exp,
         ),
+        rx.text(S.exp_hover, size="1", min_height="1.4em"),
         rx.text("ACT", size="1", weight="bold"),
         plots.chart(
             S.act_spec,
@@ -886,7 +1059,9 @@ def group_page() -> rx.Component:
             height=STRIP_H,
             width=STRIP_W,
             on_select=S.select_act,
+            on_hover=S.hover_act,
         ),
+        rx.text(S.act_hover, size="1", min_height="1.4em"),
     )
     # Stretches to the chart column's height (graph + both strips), so the
     # box ends at the ACT strip's bottom edge. Its content is absolutely

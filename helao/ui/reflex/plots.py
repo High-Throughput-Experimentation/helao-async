@@ -215,6 +215,7 @@ def chart(
     width: int | None = None,
     on_select=None,
     on_hover=None,
+    pulses=None,
 ):
     """Bind a chart component to three Reflex state vars.
 
@@ -238,6 +239,9 @@ def chart(
             point under the pointer (``trace`` is the mark's name) and
             ``{trace: "", index: -1}`` when none. The figure must ask for it
             (``marks_chart(hover_events=True)``).
+        pulses: Optional Reflex var of pulse descriptors; passing it opts the
+            chart into the shim's browser-side pulse overlay (see
+            ``xy_component``). Charts that omit it get no overlay.
 
     Returns:
         An ``rx.Component``.
@@ -248,6 +252,7 @@ def chart(
     # reservation now lives on the host div itself (minHeight plus
     # flex-shrink: 0 in the shim's JSX), which is both the element that
     # collapsed and the element xy draws into.
+    extra = {} if pulses is None else {"pulses": pulses}
     return xy_chart(
         spec=spec_var,
         buffer_url=url_var,
@@ -256,6 +261,7 @@ def chart(
         width=f"{width}px" if width else "100%",
         on_select=on_select,
         on_hover=on_hover,
+        **extra,
     )
 
 
@@ -1072,6 +1078,11 @@ def marks_chart(
             show=False, grid=False, tick_label_strategy="none", domain=tuple(y_domain)
         ),
         xy.legend(show=False),
+        # Pan and zoom are off, so the toolbar has nothing to offer; its invisible
+        # buttons would also sit over the chart's top-left corner and swallow
+        # the pointer there (measured: no hover or click reached a strip's
+        # first slots).
+        xy.modebar(show=False),
     ]
     if hover_events:
         axes.append(xy.tooltip(style={"opacity": "0", "pointer_events": "none"}))

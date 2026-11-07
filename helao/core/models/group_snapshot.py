@@ -114,6 +114,18 @@ def server_rows(orch, finish_errors: dict) -> list:
     return rows
 
 
+def _of_seq(exp, seq_uuid) -> bool:
+    """Whether ``exp`` belongs to ``seq`` (an experiment with no recorded parent does).
+
+    The orchestrator activates the next sequence while the previous one's last
+    experiment is still closing out, and files that experiment under the NEW
+    sequence's ``dispatched_experiments``. Measured on goldenreflex: the second
+    sequence's strip kept the first one's last experiment as a done row.
+    """
+    u = getattr(exp, "sequence_uuid", None)
+    return u is None or seq_uuid is None or str(u) == seq_uuid
+
+
 def experiment_rows(orch, cache=None) -> tuple:
     """Windowed experiments of the active sequence: ``(rows, n_done, n_queued)``.
 
@@ -123,7 +135,12 @@ def experiment_rows(orch, cache=None) -> tuple:
     """
     seq = orch.active_sequence or getattr(orch, "last_sequence", None)
     finished = orch.active_sequence is None and seq is not None
-    done_all = list(getattr(seq, "dispatched_experiments", None) or []) if seq else []
+    seq_uuid = str(seq.sequence_uuid) if seq is not None else None
+    done_all = [
+        e
+        for e in (getattr(seq, "dispatched_experiments", None) or [] if seq else [])
+        if _of_seq(e, seq_uuid)
+    ]
     done = done_all[-EXP_DONE_WINDOW:]
     rows = [
         {
@@ -137,7 +154,11 @@ def experiment_rows(orch, cache=None) -> tuple:
         for e in done
     ]
     exp = orch.active_experiment
-    if exp is not None and str(exp.experiment_uuid) not in {r["uuid"] for r in rows}:
+    if (
+        exp is not None
+        and _of_seq(exp, seq_uuid)
+        and str(exp.experiment_uuid) not in {r["uuid"] for r in rows}
+    ):
         rows.append(
             {
                 "uuid": str(exp.experiment_uuid),
@@ -182,13 +203,34 @@ def _queued_action(_idx, a):
     }
 
 
+def act_experiment(orch) -> tuple:
+    """``(experiment, live)``: the experiment whose actions the ACT strip shows.
+
+    The active one; with none (between two experiments, or idle after a queue)
+    the last finished one, so the strip changes only when a NEW experiment
+    starts. ``last_experiment`` is set before ``active_experiment`` clears; a
+    fresh orchestrator falls back to the newest of the sequence's dispatched
+    experiments.
+    """
+    exp = orch.active_experiment
+    if exp is not None:
+        return exp, True
+    last = getattr(orch, "last_experiment", None)
+    if last is None:
+        seq = orch.active_sequence or getattr(orch, "last_sequence", None)
+        done = getattr(seq, "dispatched_experiments", None) or []
+        last = done[-1] if done else None
+    return last, False
+
+
 def action_rows(orch, first_seen: dict, cache=None) -> list:
-    """Actions of the active experiment: dispatched, then active-only, then queued.
+    """Actions of :func:`act_experiment`: dispatched, then active-only, then queued.
 
     Looks the experiment's own uuids up per bucket instead of scanning
     ``nonactive_dict``, which holds every finished action since orch start.
+    A finished experiment's actions are all done or error, and it has no queue.
     """
-    exp = orch.active_experiment
+    exp, live = act_experiment(orch)
     if exp is None:
         return []
     gsm = orch.globalstatusmodel
@@ -212,6 +254,8 @@ def action_rows(orch, first_seen: dict, cache=None) -> list:
     rows, seen = [], set()
 
     def add(u, model, state, t_end):
+        if not live and state == "active":
+            state = "done"  # nothing of a finished experiment is still running
         seen.add(u)
         uid = str(u)
         t_start = epoch(model.action_timestamp)
@@ -241,6 +285,8 @@ def action_rows(orch, first_seen: dict, cache=None) -> list:
     for u, a in active.items():
         if u not in seen and a.experiment_uuid == exp.experiment_uuid:
             add(u, a, "active", None)
+    if not live:
+        return rows
     # The head action is popped before its start condition is waited on and is
     # held only here meanwhile (helao/hexagon/app/CLAUDE.md).
     parked = getattr(orch, "parked_head_action", None)
@@ -265,6 +311,7 @@ def build_snapshot(
     loop_state = _v(gsm.loop_state)
     seq = orch.active_sequence or getattr(orch, "last_sequence", None)
     experiments, n_done, n_queued = experiment_rows(orch, queued_cache)
+    act_exp = act_experiment(orch)[0]
     orch_action = None
     for act in gsm.active_dict.values():
         if act.action_server.server_name == orch.server_key:
@@ -295,6 +342,7 @@ def build_snapshot(
         "experiments": experiments,
         "n_done": n_done,
         "n_queued": n_queued,
+        "act_exp": str(act_exp.experiment_uuid) if act_exp is not None else None,
         "actions": action_rows(orch, first_seen, queued_cache),
         "events": list(events),
     }

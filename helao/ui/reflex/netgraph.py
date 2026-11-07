@@ -5,12 +5,10 @@ dicts that :func:`helao.ui.reflex.plots.marks_chart` renders. Marker sizes are
 in px and ports in data units, so the chart has a fixed domain, a fixed pixel
 size and padding (``plots.CHART_PADDING_PX``); ``sx``/``sy`` convert between
 them. Markers cannot rotate, so every curve ends vertically: a cubic Bezier
-whose end tangents are vertical, which lets a ``triangle`` (up) or
-``triangle_down`` pulse sit flush at either end.
+whose end tangents are vertical. Pulses are not drawn here: the chart shim
+animates them in the browser from :meth:`NetGraph.edge_path`.
 """
 
-import bisect
-import math
 from dataclasses import dataclass
 
 from helao.ui.reflex import plots
@@ -18,8 +16,6 @@ from helao.ui.shared.palette import GROUP_EDGE_TEXT
 
 CURVE_SAMPLES = 24
 FANOUT = 0.7
-PULSE_PX = 12.0
-SYMBOLS = ("triangle", "triangle_down")
 
 
 @dataclass
@@ -42,15 +38,6 @@ class Edge:
     color: str
     text: str = ""
     width: float = 2.0
-
-
-@dataclass
-class Pulse:
-    edge_id: str
-    direction: str
-    t0: float
-    duration: float
-    color: str
 
 
 def control_points(pa, pb):
@@ -76,29 +63,6 @@ def bezier(pa, pb, n=CURVE_SAMPLES):
             )
         )
     return pts
-
-
-def arc_table(pts, sx, sy):
-    """Cumulative arc length in px, so a pulse moves at even screen speed."""
-    cum = [0.0]
-    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
-        cum.append(cum[-1] + math.hypot((x1 - x0) / sx, (y1 - y0) / sy))
-    return cum
-
-
-def point_at(pts, cum, s):
-    """The point at arc-length fraction ``s`` (clamped to [0, 1])."""
-    s = min(max(s, 0.0), 1.0)
-    target = s * cum[-1]
-    i = bisect.bisect_left(cum, target)
-    if i <= 0:
-        return pts[0]
-    if i >= len(cum):
-        return pts[-1]
-    seg = cum[i] - cum[i - 1]
-    f = 0.0 if seg == 0 else (target - cum[i - 1]) / seg
-    (x0, y0), (x1, y1) = pts[i - 1], pts[i]
-    return (x0 + f * (x1 - x0), y0 + f * (y1 - y0))
 
 
 def group_layout(orch_key, server_keys):
@@ -139,15 +103,18 @@ class NetGraph:
         self.sy = (y1 - y0) / (height_px - 2 * padding_px)
         self.nodes: dict = {}
         self.edges: dict = {}
-        self.pulses: list = []
         #: Every (colour, width) an edge may take. A line's style is spec, so a
         #: restyled edge rebuilds the chart; instead each style is its own
         #: always-present trace and an edge moves between them as column data.
         self.edge_styles = tuple(edge_styles)
-        #: Every colour a node may take. xy applies a column update in place only
-        #: when the point positions change too (measured: a colour-only change
-        #: leaves the old colour on screen), so a node trace exists per colour
-        #: and a node moves between them, exactly as edges do.
+        #: Every colour a node may take. xy applies a column update in place by
+        #: writing only the points past the old length, and only when the trace
+        #: keeps its length and column offsets (a colour-only change leaves the
+        #: old colour on screen; a node joining a colour trace ahead of its
+        #: existing points left a stale copy of them and no node: the orch
+        #: vanished). So every (node, colour) is its own trace of ONE point that
+        #: is either the node or the off-domain placeholder, and a node
+        #: changing colour swaps two traces' offsets, which xy rebuilds.
         self.node_colors = tuple(node_colors)
         #: Size of the hover disc (one fixed size: a size change is spec too).
         self.hover_px = float(hover_px)
@@ -176,15 +143,14 @@ class NetGraph:
     def set_edge_text(self, edge_id, s):
         self.edges[edge_id].text = s
 
-    def pulse(self, edge_id, *, t0, color, direction="fwd", duration=0.6):
-        self.pulses.append(Pulse(edge_id, direction, float(t0), float(duration), color))
+    def edge_path(self, edge_id):
+        """The edge's sampled curve in data units, from its ``src`` to its ``dst``."""
+        pa, pb = self.ports()[edge_id]
+        return bezier(pa, pb)
 
-    def node_traces(self):
-        """Trace name -> node keys in point order, as ``marks`` lays them out."""
-        out: dict = {}
-        for n in self.nodes.values():
-            out.setdefault(f"nodes:{n.size_px:g}:{n.color}", []).append(n.key)
-        return out
+    def node_traces(self) -> dict:
+        """Trace name -> the node it draws (one node per trace)."""
+        return {f"nodes:{n.key}:{n.color}": [n.key] for n in self.nodes.values()}
 
     def ports(self):
         """edge_id -> (src port, dst port), fanned out where ends share a side."""
@@ -210,25 +176,22 @@ class NetGraph:
                 out[eid][end] = (n.x + off, y)
         return {eid: (p[0], p[1]) for eid, p in out.items()}
 
-    def marks(self, now):
-        """Mark dicts for ``plots.marks_chart``. Drops pulses with s >= 1.
+    def marks(self):
+        """Mark dicts for ``plots.marks_chart``.
 
-        A pulse whose ``t0`` is still ahead of ``now`` is queued: kept, not drawn.
-
-        Every scatter trace is always present (possibly empty), so the trace
-        set -- and the layout token -- does not change as pulses come and go.
-        A segments (edge) trace exists per declared style; the ``hovered`` disc sits just under the nodes.
+        Pure state, no time: nothing here moves, so the chart changes only when
+        a status, a hover or the topology does. Every scatter trace is always
+        present (possibly empty), so the layout token does not change.
+        A segments (edge) trace exists per declared style; the ``hovered`` disc
+        sits just under the nodes.
         """
-        self.pulses = [p for p in self.pulses if (now - p.t0) / p.duration < 1.0]
         ports = self.ports()
-        texts, curves = [], {}
+        texts = []
         by_style = {st: ([], [], [], []) for st in self.edge_styles}
-        moving = {sym: ([], [], []) for sym in SYMBOLS}
         for eid in sorted(self.edges):
             e = self.edges[eid]
             pa, pb = ports[eid]
             pts = bezier(pa, pb)
-            curves[eid] = (pts, arc_table(pts, self.sx, self.sy))
             seg = by_style.setdefault((e.color, e.width), ([], [], [], []))
             for (xa, ya), (xb, yb) in zip(pts, pts[1:]):
                 for col, v in zip(seg, (xa, ya, xb, yb)):
@@ -247,24 +210,13 @@ class NetGraph:
                         "anchor": "start",
                     }
                 )
-        for p in self.pulses:
-            if p.edge_id not in curves or p.t0 > now:
-                continue
-            pts, cum = curves[p.edge_id]
-            s = max(0.0, (now - p.t0) / p.duration)
-            x, y = point_at(pts, cum, s if p.direction == "fwd" else 1.0 - s)
-            up = (pts[-1][1] > pts[0][1]) == (p.direction == "fwd")
-            xs, ys, cs = moving["triangle" if up else "triangle_down"]
-            xs.append(x)
-            ys.append(y)
-            cs.append(p.color)
         by_node = {
-            (n.size_px, c): ([], [])
+            (n.key, c): ([], [])
             for n in self.nodes.values()
-            for c in self.node_colors
+            for c in {*self.node_colors, n.color}
         }
         for n in self.nodes.values():
-            xs, ys = by_node.setdefault((n.size_px, n.color), ([], []))
+            xs, ys = by_node[(n.key, n.color)]
             xs.append(n.x)
             ys.append(n.y)
             if n.text:
@@ -324,7 +276,6 @@ class NetGraph:
             }
             for color, width in sorted(by_style)
         ]
-        out += [scatter(f"pulse:{s}", moving[s], PULSE_PX, s) for s in SYMBOLS]
         hov = self.nodes.get(self.hovered)
         for color in sorted({c for _, c in by_node}):
             on = hov is not None and hov.color == color
@@ -338,11 +289,11 @@ class NetGraph:
             )
         out += [
             scatter(
-                f"nodes:{size:g}:{color}",
-                (*by_node[(size, color)], [color] * len(by_node[(size, color)][0])),
-                size,
+                f"nodes:{key}:{color}",
+                (*by_node[(key, color)], [color] * len(by_node[(key, color)][0])),
+                self.nodes[key].size_px,
                 "circle",
             )
-            for size, color in sorted(by_node)
+            for key, color in sorted(by_node)
         ]
         return out + texts

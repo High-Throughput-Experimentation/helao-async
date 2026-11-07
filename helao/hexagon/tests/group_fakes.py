@@ -72,9 +72,11 @@ def fake_exp(
     ts: Optional[datetime] = None,
     fin: Optional[datetime] = None,
     status=(),
+    seq_uuid=None,
 ):
     return SimpleNamespace(
         experiment_uuid=uuid4() if with_uuid else None,
+        sequence_uuid=seq_uuid,
         experiment_name=name,
         experiment_timestamp=ts,
         experiment_finished_timestamp=fin,
