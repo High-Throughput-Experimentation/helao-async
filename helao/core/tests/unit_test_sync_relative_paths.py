@@ -126,9 +126,11 @@ def test_a_sidecar_written_under_an_old_root_is_reanchored_on_read(tmp_path):
     assert prog.dict["files_pending"] == ["asdep99.SPC"]
     assert prog.dict["files_s3"] == {"data-0.hlo": "raw_data/uuid/data-0.hlo.json"}
     # the yml pointer is restated against the root this Progress resolved
-    assert prog.dict["yml"] == str(yml)
+    assert prog.dict["yml"] == str(yml), (prog.dict["yml"], str(yml))
     # and the re-anchored entry now names a file that is really there
-    assert prog.abspath(prog.dict["files_pending"][0]).exists()
+    assert prog.abspath(prog.dict["files_pending"][0]).exists(), prog.dict[
+        "files_pending"
+    ]
 
 
 def test_the_reanchored_entry_no_longer_raises_relative_to(tmp_path):
@@ -181,9 +183,13 @@ def test_an_unplaceable_path_is_left_alone_rather_than_guessed(tmp_path):
     """
     yml = _build_record(tmp_path)
     prog = Progress(yml)
-    alien = "/somewhere/else/entirely/unrelated.SPC"
-    assert prog.relpath(alien) == alien
-    assert prog.abspath(alien) == Path(alien)
+    # Built from tmp_path so it is absolute on every OS: a drive-less
+    # "/somewhere/..." is *relative* on Windows, and abspath would then
+    # (correctly) join it under the record, failing this test on stations.
+    alien_path = tmp_path.parent / "somewhere_else" / "unrelated.SPC"
+    alien = str(alien_path)
+    assert prog.relpath(alien) == alien_path.as_posix(), prog.relpath(alien)
+    assert prog.abspath(prog.relpath(alien)) == alien_path, prog.abspath(alien)
 
 
 def test_reanchor_reports_whether_it_changed_anything(tmp_path):
