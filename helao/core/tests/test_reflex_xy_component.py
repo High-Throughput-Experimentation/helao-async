@@ -780,3 +780,164 @@ def test_the_component_declares_and_passes_on_hover():
         "onHover" in xc._SHIM_COMPONENT_JS
         and "st.onHover = onHover" in xc._SHIM_COMPONENT_JS
     )
+
+
+# ---- pulse overlay (browser-side animation) ----------------------------------
+
+
+def _run_js(body: str) -> dict:
+    """Run ``body`` after the controller source under Node; it prints one JSON line."""
+    assert _JS_RUNTIME is not None
+    script = xc._SHIM_CONTROLLER_JS + "\n" + body
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "p.mjs")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(script)
+        proc = subprocess.run(
+            [_JS_RUNTIME, path], capture_output=True, text=True, timeout=60
+        )
+    assert proc.returncode == 0, proc.stderr
+    return json.loads(proc.stdout.strip().splitlines()[-1])
+
+
+_JS_GEOM = """
+const dist = (p, a, b) => {  // distance from p to segment a-b
+  const dx = b[0]-a[0], dy = b[1]-a[1], L2 = dx*dx+dy*dy || 1;
+  const t = Math.max(0, Math.min(1, ((p[0]-a[0])*dx + (p[1]-a[1])*dy) / L2));
+  return Math.hypot(p[0]-(a[0]+t*dx), p[1]-(a[1]+t*dy));
+};
+const onPath = (p, px) => Math.min(...px.slice(1).map((q, i) => dist(p, px[i], q)));
+"""
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_pulse_lane_is_left_of_travel_so_directions_take_opposite_sides():
+    out = _run_js(_JS_GEOM + """
+// a vertical edge on screen: 200 px, going DOWN (y grows) for the outbound pulse
+const down = [[50, 10], [50, 110], [50, 210]];
+const up = down.slice().reverse();
+const out = {};
+const lastX = (px) => { const s = pulseSegment(px, 0.5, 22, 3.5); return s[s.length-1][0]; };
+out.downX = lastX(down);            // left of a downward travel on a y-down screen is +x
+out.upX = lastX(up);                // the return pulse rides the other side
+out.laneZero = pulseSegment(down, 0.5, 22, 0).every((p) => p[0] === 50);
+out.laneMag = Math.abs(out.downX - 50);
+// the opposite lanes hold on a curved path too: offsets flip sign pointwise
+const curve = [[10,10],[40,60],[90,100],[160,120]];
+const f = pulseSegment(curve, 0.5, 22, 3.5), r = pulseSegment(curve.slice().reverse(), 0.5, 22, 3.5);
+const gap = (s, px) => s.map((p) => onPath(p, px));
+out.curveOffsets = [gap(f, curve), gap(r, curve)].map((a) => a.every((d) => Math.abs(d - 3.5) < 0.6));
+console.log(JSON.stringify(out));
+""")
+    assert out["downX"] > 50 and out["upX"] < 50
+    assert out["laneZero"] is True and out["laneMag"] == pytest.approx(3.5)
+    assert out["curveOffsets"] == [True, True]
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_pulse_position_at_fraction_s_follows_the_path_and_the_view():
+    out = _run_js(_JS_GEOM + """
+const out = {};
+// straight 300 px path, lane 0: the head sits at s*(L+seg) along it
+const px = [[0, 0], [100, 0], [300, 0]];
+const seg = 20;
+const at = (s) => { const g = pulseSegment(px, s, seg, 0); return g[g.length-1]; };
+out.mid = at(150 / 320);                 // head at 150 px
+out.start = pulseSegment(px, 0, seg, 0); // nothing yet: head == tail == 0
+out.end = pulseSegment(px, 1, seg, 0);   // gone: tail reached the end
+out.tail = pulseSegment(px, 150 / 320, seg, 0)[0];
+// every vertex of a curved pulse lies on the curve at lane 0
+const curve = [[0,0],[30,40],[80,70],[150,75],[200,20]];
+out.onCurve = [0.1, 0.4, 0.8].every((s) => pulseSegment(curve, s, 22, 0).every((p) => onPath(p, curve) < 1e-6));
+// data -> pixels: fixed domain, fixed padding, y inverted; follows a resize
+const view = { x: [-1, 1], y: [-1, 1], pad: 8 };
+out.px = pulsePixelPath([[-1, 1], [0, 0], [1, -1]], view, 720, 360);
+out.px2 = pulsePixelPath([[-1, 1], [1, -1]], view, 400, 200);
+console.log(JSON.stringify(out));
+""")
+    assert out["mid"] == pytest.approx([150, 0])
+    assert out["tail"] == pytest.approx([130, 0])
+    assert out["start"] == [] and out["end"] == []
+    assert out["onCurve"] is True
+    assert out["px"] == [[8, 8], [360, 180], [712, 352]]
+    assert out["px2"] == [[8, 8], [392, 192]]  # recomputed from the new size
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_pulses_start_from_receipt_expire_and_are_never_replayed():
+    out = _run_js("""
+const st = createController({ spec: {} });
+const path = [[0, 0], [1, 1]];
+const item = (id, start_in, dur) => ({ id, dir: "fwd", color: "#111", path, start_in, dur });
+const view = { x: [-1, 1], y: [-1, 1], pad: 8 };
+const out = {};
+st.setPulses({ view, items: [item("a", 0, 1.0), item("b", 3.0, 1.0), item("late", -5, 1.0)] }, 1000);
+out.queued = st.pulses.map((p) => p.id);            // "late" was over on arrival
+out.startA = st.pulses[0].start;                    // receipt + start_in, no server clock
+out.startB = st.pulses[1].start;
+out.half = st.activePulses(1500).map((p) => [p.id, p.s]);
+// the tab was hidden: it returns long after both ended -> nothing to replay
+out.back = st.activePulses(60000).map((p) => p.id);
+out.left = st.pulses.length;
+// the same descriptor re-published is applied once
+st.setPulses({ view, items: [item("c", 0, 1.0)] }, 70000);
+st.setPulses({ view, items: [item("c", 0, 1.0)] }, 70100);
+out.once = st.pulses.filter((p) => p.id === "c").length;
+console.log(JSON.stringify(out));
+""")
+    assert out["queued"] == ["a", "b"]
+    assert out["startA"] == 1000 and out["startB"] == 4000
+    assert out["half"] == [["a", 0.5]]
+    assert out["back"] == [] and out["left"] == 0
+    assert out["once"] == 1
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_no_overlay_without_opt_in_and_one_loop_with_it():
+    out = _run_js("""
+let raf = 0, canvases = 0;
+globalThis.requestAnimationFrame = (cb) => { raf += 1; return raf; };
+globalThis.document = { createElement: () => { canvases += 1; return { style: {}, dataset: {} }; } };
+const view = { x: [-1, 1], y: [-1, 1], pad: 8 };
+const batch = { view, items: [{ id: "a", dir: "fwd", color: "#111", path: [[0,0],[1,1]], start_in: 0, dur: 1 }] };
+const host = { clientWidth: 100, clientHeight: 100, appendChild() {}, addEventListener() {} };
+const out = {};
+// a chart that never opted in: no prop -> setPulses(undefined), nothing scheduled or created
+const plain = createController({ spec: {} });
+plain.attach({ decodeFrame: () => ({ buffers: [] }), render: () => () => {} }, host);
+plain.setPulses(undefined, 0);
+out.plain = { raf, canvases, items: plain.pulses.length, on: plain.pulsesOn };
+// a batch handed to a chart that has not opted in is ignored too
+plain.pulsesOn = false;
+out.ignored = plain.pulses.length;
+// an opted-in chart: one rAF loop however many batches arrive, none while idle
+const on = createController({ spec: {} });
+on.attach({ decodeFrame: () => ({ buffers: [] }), render: () => () => {} }, host);
+on.setPulses({ view, items: [] }, 0);
+out.idleRaf = raf;
+on.setPulses(batch, 0);
+on.setPulses({ view, items: [{ ...batch.items[0], id: "b" }] }, 0);
+out.loopRaf = raf;
+console.log(JSON.stringify(out));
+""")
+    assert out["plain"] == {"raf": 0, "canvases": 0, "items": 0, "on": False}
+    assert out["ignored"] == 0
+    assert out["idleRaf"] == 0 and out["loopRaf"] == 1
+
+
+def test_the_shim_opts_the_overlay_in_only_when_pulses_is_passed():
+    js = xc._SHIM_COMPONENT_JS
+    assert "setPulses(pulses, performance.now())" in js
+    assert 'pulses !== undefined ? { position: "relative" } : {}' in js
+    from helao.ui.reflex import plots
+
+    plain = plots.chart(rx_var("s"), rx_var("u"), rx_var("l"))
+    assert "pulses" not in str(plain)
+    with_pulses = plots.chart(rx_var("s"), rx_var("u"), rx_var("l"), pulses=rx_var("p"))
+    assert "pulses" in str(with_pulses)
+
+
+def rx_var(name):
+    import reflex as rx
+
+    return rx.Var(name)

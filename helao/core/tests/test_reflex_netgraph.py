@@ -51,7 +51,7 @@ def test_no_arrowheads_and_the_hover_disc_sits_under_the_nodes():
     g = _g()
     g.add_node("UP", 0.0, 0.7, color=GROUP_IDLE, label_color=WHITE)
     g.add_edge("UP", "ORCH", "UP", color=GROUP_IDLE)
-    marks = g.marks(0.0)
+    marks = g.marks()
     assert not any(m.get("name", "").startswith("arrow") for m in marks)
     names = [m["name"] for m in marks if m["kind"] == "scatter"]
     assert names.index(f"hovered:{GROUP_IDLE}") < names.index(f"nodes:UP:{GROUP_IDLE}")
@@ -61,15 +61,15 @@ def test_hovered_node_is_a_larger_disc_in_its_own_colour_and_clears():
     g = NetGraphWith(hover_px=40.0)
     g.add_node("UP", 0.2, 0.7, color=GROUP_PULSE_DISPATCH, label_color=WHITE)
     g.hovered = "UP"
-    on = _trace(g.marks(0.0), f"hovered:{GROUP_PULSE_DISPATCH}")
+    on = _trace(g.marks(), f"hovered:{GROUP_PULSE_DISPATCH}")
     assert (on["x"], on["y"], on["colors"]) == ([0.2], [0.7], [GROUP_PULSE_DISPATCH])
     assert (
         on["size"]
         == 40.0
-        > _trace(g.marks(0.0), f"nodes:UP:{GROUP_PULSE_DISPATCH}")["size"]
+        > _trace(g.marks(), f"nodes:UP:{GROUP_PULSE_DISPATCH}")["size"]
     )
     g.hovered = None
-    off = _trace(g.marks(0.0), f"hovered:{GROUP_PULSE_DISPATCH}")
+    off = _trace(g.marks(), f"hovered:{GROUP_PULSE_DISPATCH}")
     assert off["x"] == [] and off["size"] == 40.0  # same trace, same style
 
 
@@ -88,10 +88,10 @@ def test_an_edge_changing_style_changes_only_column_data():
     g = NetGraphWith(edge_styles=styles)
     g.add_node("UP", 0.0, 0.7, color=GROUP_IDLE, label_color=WHITE)
     g.add_edge("UP", "ORCH", "UP", color=GROUP_IDLE, width=2.0)
-    before = [m for m in g.marks(0.0) if m["kind"] == "segments"]
+    before = [m for m in g.marks() if m["kind"] == "segments"]
     g.set_edge_color("UP", GROUP_PULSE_DISPATCH)
     g.edges["UP"].width = 4.0
-    after = [m for m in g.marks(0.0) if m["kind"] == "segments"]
+    after = [m for m in g.marks() if m["kind"] == "segments"]
     strip = lambda ms: [
         {k: v for k, v in m.items() if k not in ("x0", "y0", "x1", "y1")} for m in ms
     ]
@@ -100,44 +100,18 @@ def test_an_edge_changing_style_changes_only_column_data():
     assert [len(m["x0"]) > 0 for m in after] == [False, True]
 
 
-def test_a_queued_pulse_is_kept_but_not_drawn_until_its_start():
-    g = _g()
-    g.add_node("UP", 0.0, 0.7, color=GROUP_IDLE, label_color=WHITE)
-    g.add_edge("UP", "ORCH", "UP", color=GROUP_IDLE)
-    g.pulse("UP", t0=5.0, duration=1.0, color=GROUP_PULSE_DISPATCH, direction="rev")
-    assert _trace(g.marks(4.0), "pulse:triangle_down")["x"] == []
-    assert len(g.pulses) == 1
-    assert len(_trace(g.marks(5.5), "pulse:triangle_down")["x"]) == 1
-
-
-def test_pulse_positions_and_expiry():
-    from helao.ui.reflex.netgraph import arc_table, bezier, point_at
+def test_edge_path_runs_from_src_port_to_dst_port_and_marks_have_no_pulses():
+    from helao.ui.reflex.netgraph import bezier
 
     g = _g()
     g.add_node("UP", 0.4, 0.7, color=GROUP_IDLE, label_color=WHITE)
     g.add_edge("UP", "ORCH", "UP", color=GROUP_IDLE)
-    g.pulse("UP", t0=10.0, duration=1.0, color=GROUP_PULSE_DISPATCH)
     pa, pb = g.ports()["UP"]
-    pts = bezier(pa, pb)
-    cum = arc_table(pts, g.sx, g.sy)
-
-    at0 = _trace(g.marks(10.0), "pulse:triangle")
-    assert (at0["x"][0], at0["y"][0]) == pytest.approx(pa)
-    mid = _trace(g.marks(10.5), "pulse:triangle")
-    assert (mid["x"][0], mid["y"][0]) == pytest.approx(point_at(pts, cum, 0.5))
-    assert pa[1] < mid["y"][0] < pb[1]
-    gone = g.marks(11.0)
-    assert _trace(gone, "pulse:triangle")["x"] == [] and g.pulses == []
-
-
-def test_reverse_pulse_starts_at_the_destination_and_points_down():
-    g = _g()
-    g.add_node("UP", 0.0, 0.7, color=GROUP_IDLE, label_color=WHITE)
-    g.add_edge("UP", "ORCH", "UP", color=GROUP_IDLE)
-    g.pulse("UP", t0=0.0, duration=1.0, color=GROUP_PULSE_DISPATCH, direction="rev")
-    pa, pb = g.ports()["UP"]
-    down = _trace(g.marks(0.0), "pulse:triangle_down")
-    assert (down["x"][0], down["y"][0]) == pytest.approx(pb)
+    path = g.edge_path("UP")
+    assert path == bezier(pa, pb)
+    assert path[0] == pytest.approx(pa) and path[-1] == pytest.approx(pb)
+    assert not [m for m in g.marks() if m.get("name", "").startswith("pulse")]
+    assert not hasattr(g, "pulses") and not hasattr(g, "pulse")
 
 
 def test_fan_out_ports_are_distinct():
@@ -171,7 +145,7 @@ def test_node_label_is_centred_and_subtext_sits_away_from_the_orch():
     g.add_node(
         "UP", 0.0, 0.7, color=GROUP_IDLE, label_color=WHITE, text="UP", subtext="move"
     )
-    texts = {m["value"]: m for m in g.marks(0.0) if m["kind"] == "text"}
+    texts = {m["value"]: m for m in g.marks() if m["kind"] == "text"}
     assert texts["UP"]["anchor"] == "middle" and texts["UP"]["y"] == 0.7
     assert texts["move"]["y"] > 0.7  # above an upper node
 
@@ -180,14 +154,6 @@ def test_netgraph_does_not_import_xy():
     import helao.ui.reflex.netgraph as ng
 
     assert "xy" not in vars(ng)
-
-
-def test_arc_table_measures_in_pixels_not_data_units():
-    from helao.ui.reflex.netgraph import arc_table
-
-    # 1 data unit is 2 px along x (sx=0.5) and 4 px along y (sy=0.25)
-    assert arc_table([(0.0, 0.0), (1.0, 0.0)], 0.5, 0.25) == pytest.approx([0.0, 2.0])
-    assert arc_table([(0.0, 0.0), (0.0, 1.0)], 0.5, 0.25) == pytest.approx([0.0, 4.0])
 
 
 def test_default_padding_is_the_charts_padding():
@@ -203,7 +169,7 @@ def test_subtext_clears_the_enlarged_hover_disc():
     def dy(hover_px):
         g = NetGraphWith(hover_px=hover_px)
         g.add_node("UP", 0.0, 0.7, color=GROUP_IDLE, label_color=WHITE, subtext="move")
-        return next(m for m in g.marks(0.0) if m.get("value") == "move")["dy"]
+        return next(m for m in g.marks() if m.get("value") == "move")["dy"]
 
     assert dy(28.0) == -6.0  # no enlargement, no nudge
     assert dy(40.0) == -6.0 - 6.0  # pushed out by the disc's growth (12 px / 2)

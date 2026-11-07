@@ -341,6 +341,71 @@ def make_buffer_router(store: BufferStore) -> APIRouter:
 #: The bundle's ``render({model, el})`` only ever touches the six members
 #: assembled here, so this is a plain stub — not an anywidget dependency.
 _SHIM_CONTROLLER_JS = """
+// ---- pulse overlay: pure geometry, shared by the controller and the tests ----
+// A pulse is a short segment that follows an edge's curve and rides a lane a few
+// px to the LEFT of its travel direction (screen coordinates, y down). Outbound
+// and return pulses travel opposite ways along the same curve, so their lefts
+// are opposite sides and the two directions never overdraw each other.
+export const PULSE_LANE_PX = 3.5;
+export const PULSE_SEG_PX = 22;
+export const PULSE_WIDTH_PX = 4;
+
+// Data units -> host pixels. The graph has a fixed domain and a fixed inset
+// (tick labels off, so the plot rect is the padding), so a resize only changes w/h.
+export function pulsePixelPath(path, view, w, h) {
+  const pad = view.pad;
+  const pw = w - 2 * pad;
+  const ph = h - 2 * pad;
+  const x0 = view.x[0], x1 = view.x[1], y0 = view.y[0], y1 = view.y[1];
+  return path.map((p) => [pad + ((p[0] - x0) / (x1 - x0)) * pw, pad + ((y1 - p[1]) / (y1 - y0)) * ph]);
+}
+
+function pulseCumulative(px) {
+  const cum = [0];
+  for (let i = 1; i < px.length; i++) {
+    cum.push(cum[i - 1] + Math.hypot(px[i][0] - px[i - 1][0], px[i][1] - px[i - 1][1]));
+  }
+  return cum;
+}
+
+// Point at arc length a (clamped), and the unit tangent of the segment it is on.
+export function pulsePointAt(px, cum, a) {
+  const total = cum[cum.length - 1];
+  const t = Math.min(Math.max(a, 0), total);
+  let i = 1;
+  while (i < cum.length - 1 && cum[i] < t) i++;
+  const seg = cum[i] - cum[i - 1];
+  const f = seg === 0 ? 0 : (t - cum[i - 1]) / seg;
+  const dx = px[i][0] - px[i - 1][0], dy = px[i][1] - px[i - 1][1];
+  const len = Math.hypot(dx, dy) || 1;
+  return {
+    x: px[i - 1][0] + f * dx,
+    y: px[i - 1][1] + f * dy,
+    tx: dx / len,
+    ty: dy / len,
+  };
+}
+
+// The moving segment at progress s in [0, 1]: its head runs from the start of the
+// path to one segment length past the end, so it grows out of one node and
+// vanishes into the other. Returns offset vertices (lane = px to the left).
+export function pulseSegment(px, s, segPx, lanePx) {
+  if (px.length < 2) return [];
+  const cum = pulseCumulative(px);
+  const total = cum[cum.length - 1];
+  const head = Math.min(Math.max(s * (total + segPx), 0), total);
+  const tail = Math.min(Math.max(s * (total + segPx) - segPx, 0), total);
+  if (head <= tail) return [];
+  const arcs = [tail];
+  for (let i = 1; i < cum.length - 1; i++) if (cum[i] > tail && cum[i] < head) arcs.push(cum[i]);
+  arcs.push(head);
+  return arcs.map((a) => {
+    const p = pulsePointAt(px, cum, a);
+    // left of travel on a y-down screen: (dy, -dx)
+    return [p.x + p.ty * lanePx, p.y - p.tx * lanePx];
+  });
+}
+
 export function createController(options) {
   const st = {
     spec: options.spec,
@@ -369,6 +434,15 @@ export function createController(options) {
     // here and everything between it and the one in flight is dropped.
     inFlight: false,
     queuedUrl: null,
+    // Pulse overlay. Opt-in: a chart that never gets a `pulses` prop never calls
+    // setPulses with a batch, and then nothing below runs or is created.
+    pulsesOn: false,
+    pulses: [],
+    pulseSeen: new Map(),
+    pulseView: null,
+    pulseCanvas: null,
+    raf: null,
+    visHandler: null,
   };
 
   st.model = {
@@ -448,9 +522,105 @@ export function createController(options) {
     }
   };
 
+  // ---- pulse overlay ----
+  // Times are performance.now() milliseconds throughout, the same clock
+  // requestAnimationFrame hands its callback. A descriptor carries `start_in`
+  // (seconds from when the server built it), converted to a local start at
+  // RECEIPT, so a page/server clock difference cannot skip or delay a pulse.
+  st.setPulses = (batch, nowMs) => {
+    st.pulsesOn = batch !== undefined && batch !== null;
+    if (!st.pulsesOn) {
+      st.pulses = [];
+      return;
+    }
+    if (batch.view) st.pulseView = batch.view;
+    if (!st.visHandler && typeof document !== "undefined" && document.addEventListener) {
+      st.visHandler = st.onVisible;
+      document.addEventListener("visibilitychange", st.visHandler);
+    }
+    for (const it of batch.items || []) {
+      if (st.pulseSeen.has(it.id)) continue;  // each descriptor is applied once
+      const start = nowMs + it.start_in * 1000;
+      const end = start + it.dur * 1000;
+      st.pulseSeen.set(it.id, end);
+      if (end <= nowMs) continue;  // already over on arrival: never replayed
+      st.pulses.push({ id: it.id, dir: it.dir, hue: it.color, path: it.path, start, end });
+    }
+    for (const [id, end] of st.pulseSeen) if (end < nowMs - 10000) st.pulseSeen.delete(id);
+    st.kickPulses();
+  };
+
+  // Drops what has ended (a tab that was hidden comes back to nothing to replay)
+  // and returns what is moving now, with its progress.
+  st.activePulses = (nowMs) => {
+    st.pulses = st.pulses.filter((p) => p.end > nowMs);
+    return st.pulses
+      .filter((p) => p.start <= nowMs)
+      .map((p) => ({ ...p, s: (nowMs - p.start) / (p.end - p.start) }));
+  };
+
+  st.drawPulses = (nowMs) => {
+    const el = st.el;
+    const active = st.activePulses(nowMs);
+    if (!el || !st.pulseView || typeof document === "undefined") return;
+    if (!st.pulseCanvas) {
+      if (!active.length) return;
+      const c = document.createElement("canvas");
+      c.dataset.helaoSlot = "pulses";
+      c.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none";
+      st.pulseCanvas = c;
+    }
+    const c = st.pulseCanvas;
+    // xy may rebuild its DOM on a layout change; keep the overlay attached.
+    if (!c.isConnected) el.appendChild(c);
+    const w = el.clientWidth, h = el.clientHeight;
+    const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
+    if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {
+      c.width = Math.round(w * dpr);
+      c.height = Math.round(h * dpr);
+    }
+    const g = c.getContext("2d");
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+    g.lineCap = "round";
+    g.lineJoin = "round";
+    g.lineWidth = PULSE_WIDTH_PX;
+    for (const p of active) {
+      const pts = pulseSegment(pulsePixelPath(p.path, st.pulseView, w, h), p.s, PULSE_SEG_PX, PULSE_LANE_PX);
+      if (pts.length < 2) continue;
+      g.strokeStyle = p.hue;
+      g.beginPath();
+      g.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]);
+      g.stroke();
+    }
+  };
+
+  st.pulseFrame = (t) => {
+    st.raf = null;
+    if (st.disposed || !st.pulsesOn) return;
+    st.drawPulses(t);
+    st.kickPulses();
+  };
+
+  // One rAF loop, alive only while a pulse is pending.
+  st.kickPulses = () => {
+    if (st.raf !== null || st.disposed || !st.pulsesOn || !st.pulses.length) return;
+    if (!st.el || typeof requestAnimationFrame !== "function") return;
+    st.raf = requestAnimationFrame(st.pulseFrame);
+  };
+
+  st.onVisible = () => {
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+    st.activePulses(typeof performance !== "undefined" ? performance.now() : 0);
+    if (st.pulseCanvas && !st.pulses.length) st.drawPulses(0);  // clear the last frame
+    st.kickPulses();
+  };
+
   st.attach = (mod, el) => {
     st.module = mod;
     st.el = el;
+    st.kickPulses();
     el.addEventListener("xy:click", st.onClick);
     el.addEventListener("xy:hover", st.onHoverEvent);
     el.addEventListener("xy:leave", st.onLeave);
@@ -574,6 +744,10 @@ export function createController(options) {
 
   st.dispose = () => {
     st.disposed = true;
+    if (st.raf !== null && typeof cancelAnimationFrame === "function") cancelAnimationFrame(st.raf);
+    st.raf = null;
+    if (st.visHandler) document.removeEventListener("visibilitychange", st.visHandler);
+    if (st.pulseCanvas && st.pulseCanvas.remove) st.pulseCanvas.remove();
     if (st.observer) st.observer.disconnect();
     st.teardown();
   };
@@ -585,7 +759,7 @@ export function createController(options) {
 #: The React wrapper. Deliberately thin — it wires props and lifecycle to the
 #: controller above and holds no logic of its own.
 _SHIM_COMPONENT_JS = """
-export function XYChart({ spec, bufferUrl, layout, height, width, onSelect, onHover }) {
+export function XYChart({ spec, bufferUrl, layout, height, width, onSelect, onHover, pulses }) {
   const hostRef = useRef(null);
   const ctrlRef = useRef(null);
   if (ctrlRef.current === null) {
@@ -606,6 +780,11 @@ export function XYChart({ spec, bufferUrl, layout, height, width, onSelect, onHo
 
     return () => st.dispose();
   }, []);
+
+  // Pulse descriptors arrive once each; the controller animates them itself.
+  useEffect(() => {
+    ctrlRef.current.setPulses(pulses, performance.now());
+  }, [pulses]);
 
   // Data updates take the bundle's in-place append path, not a remount. The
   // URL is passed as an argument so this always fetches the current version.
@@ -632,6 +811,8 @@ export function XYChart({ spec, bufferUrl, layout, height, width, onSelect, onHo
         height: height,
         minHeight: height,
         flexShrink: 0,
+        // the pulse overlay is absolutely positioned inside this element
+        ...(pulses !== undefined ? { position: "relative" } : {}),
       }}
     />
   );
@@ -673,6 +854,7 @@ class XYChart(rx.Component):
 
     on_select: rx.EventHandler[lambda payload: [payload]]
     on_hover: rx.EventHandler[lambda payload: [payload]]
+    pulses: rx.Var[dict]
 
     def add_imports(self):
         """Declare the React hooks the shim uses.

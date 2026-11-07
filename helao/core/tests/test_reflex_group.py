@@ -58,6 +58,8 @@ def state():
         _first_at=0.0,
         _hovered="",
         _hover_slot=(-1, -1),
+        _pulse_seq=0,
+        graph_pulses={},
         exp_hover="",
         act_hover="",
         tree_header="select a row",
@@ -155,7 +157,7 @@ def test_fresh_page_renders_latest_snapshot_but_replays_no_pulses(group):
     assert s._pulses == () and s.tick_ms == group.SLOW_MS
     feed.push(frame(7, [DISPATCH]), now=100.6)
     group.apply_tick(s, feed, 100.7, "t")
-    assert len(s._pulses) == 1 and s.tick_ms == group.FAST_MS
+    assert len(s._pulses) == 1 and s.tick_ms == group.SLOW_MS
     assert s._cursor == feed.n_batches
 
 
@@ -175,27 +177,6 @@ def test_orch_restart_does_not_repulse_old_frames(group):
     assert len(s._pulses) == 1
     group.apply_tick(s, feed, 100.2, "t")
     assert len(s._pulses) == 1  # the old frame was not returned a second time
-
-
-def test_fast_tick_with_a_live_pulse_does_not_rebuild_the_strips(group, monkeypatch):
-    feed = Feed()
-    feed.push(frame(1))
-    s = state()
-    group.apply_tick(s, feed, 100.0, "t")
-    feed.push(frame(2, [DISPATCH]))
-    group.apply_tick(s, feed, 100.1, "t")
-    assert s.tick_ms == group.FAST_MS
-    built = []
-    real = group.plots.marks_chart
-    monkeypatch.setattr(
-        group.plots,
-        "marks_chart",
-        lambda *a, **k: built.append(k["panel_id"]) or real(*a, **k),
-    )
-    group.apply_tick(s, feed, 100.116, "t")  # no frame, inside SLOW_MS
-    assert built == ["group-graph-t"]
-    group.apply_tick(s, feed, 100.7, "t")  # slow cadence due again
-    assert sorted(built[1:]) == ["group-act-t", "group-exp-t", "group-graph-t"]
 
 
 def test_new_frame_rebuilds_the_strips(group, monkeypatch):
@@ -503,9 +484,7 @@ def test_graph_marks_unknown_status_and_lost_stream():
             {"key": "X", "status": "weird", "active_action": None},
         ],
     }
-    marks, pulses = graph_marks(
-        snap, [["SIM", "fwd", 0.0, 0.6, GROUP_PULSE_DISPATCH]], 0.1, "ORCH", False
-    )
+    marks = graph_marks(snap, "ORCH", False)
     by_colour: dict = {}
     for m in marks:
         if m.get("name", "").startswith("nodes:"):
@@ -513,8 +492,7 @@ def test_graph_marks_unknown_status_and_lost_stream():
                 by_colour[c] = by_colour.get(c, 0) + 1
     assert by_colour == {GROUP_STATE_COLORS["busy"]: 2, GROUP_STATE_COLORS["idle"]: 1}
     assert "X (weird)" in [m["value"] for m in marks if m["kind"] == "text"]
-    assert len(pulses) == 1
-    lost, _ = graph_marks(snap, [], 0.1, "ORCH", True)
+    lost = graph_marks(snap, "ORCH", True)
     drawn = [m for m in lost if m.get("name", "").startswith("nodes:") and m["x"]]
     assert {c for m in drawn for c in m["colors"]} == {
         GROUP_STATE_COLORS["unreachable"]
@@ -889,56 +867,132 @@ def test_estop_flag_is_available_in_every_state_but_estopped(group):
     assert flags(est, lost=False)["can_clear_estop"] is True
 
 
-# ---- return pulse: queued per edge ------------------------------------------
-
-
-def _drawn(group, s, now):
-    """Points drawn per pulse trace for edge SIM at ``now``, via the real render."""
-    marks, _ = group.graph_marks(s._snap[0], s._pulses, now, "ORCH", False)
-    return {
-        m["name"]: len(m["x"]) for m in marks if m.get("name", "").startswith("pulse:")
-    }
-
-
-def test_finish_makes_a_reverse_pulse_drawn_over_many_frames(group):
+def test_a_live_pulse_costs_no_extra_ticks_or_renders(group, monkeypatch):
+    """The 60 Hz tick is gone: pulses move in the browser, so nothing here is timed."""
+    assert not hasattr(group, "FAST_MS")
     feed = Feed()
     feed.push(frame(1))
     s = state()
     group.apply_tick(s, feed, 100.0, "t")
-    feed.push(frame(2, [FINISH]))
-    group.apply_tick(s, feed, 100.0, "t")
-    assert [p[1] for p in s._pulses] == ["rev"]
-    t, seen = 100.0, 0
-    while s._pulses:
-        t += 1 / 60
+    feed.push(frame(2, [DISPATCH]))
+    group.apply_tick(s, feed, 100.1, "t")
+    assert s.tick_ms == group.SLOW_MS and s._pulses
+    built = []
+    real = group.plots.marks_chart
+    monkeypatch.setattr(
+        group.plots,
+        "marks_chart",
+        lambda *a, **k: built.append(k["panel_id"]) or real(*a, **k),
+    )
+    for t in (100.116, 100.2, 100.4):  # no frame, inside SLOW_MS: nothing redrawn
         group.apply_tick(s, feed, t, "t")
-        seen += (
-            _drawn(group, s, t)["pulse:triangle"]
-            + _drawn(group, s, t)["pulse:triangle_down"]
+        assert s.tick_ms == group.SLOW_MS
+    assert built == []
+    group.apply_tick(s, feed, 100.7, "t")  # slow cadence due
+    assert sorted(built) == ["group-act-t", "group-exp-t", "group-graph-t"]
+
+
+def test_graph_marks_carry_no_pulse_traces_and_no_time(group):
+    snap = frame(1, loop_state="started")
+    marks = group.graph_marks(snap, "ORCH", False)
+    assert not [m for m in marks if m.get("name", "").startswith("pulse")]
+    assert marks == group.graph_marks(snap, "ORCH", False)  # a pure function
+
+
+# ---- pulse descriptors: sent once, in travel order ---------------------------
+
+
+def _tick_frames(group, *events_per_frame, t=100.0):
+    feed = Feed()
+    feed.push(frame(1))
+    s = state()
+    group.apply_tick(s, feed, t, "t")
+    for i, evs in enumerate(events_per_frame, 2):
+        feed.push(frame(i, evs))
+        group.apply_tick(s, feed, t, "t")
+    return feed, s
+
+
+def test_each_event_is_one_descriptor_published_once(group):
+    feed, s = _tick_frames(group, [FINISH])
+    batch = s.graph_pulses
+    assert [it["dir"] for it in batch["items"]] == ["rev"]
+    it = batch["items"][0]
+    assert set(it) == {"id", "dir", "start_in", "dur", "color", "path"}
+    assert it["dur"] == group.PULSE_S and it["start_in"] == pytest.approx(0.0)
+    assert it["color"] == group.GROUP_STATE_COLORS["done"]
+    assert batch["view"] == group.PULSE_VIEW and batch["seq"] == 1
+    # later ticks, with or without frames, never re-publish it
+    for t in (100.016, 100.032, 100.6, 101.2):
+        group.apply_tick(s, feed, t, "t")
+        assert s.graph_pulses is batch
+    feed.push(frame(3, [DISPATCH]))
+    group.apply_tick(s, feed, 101.3, "t")
+    assert [x["dir"] for x in s.graph_pulses["items"]] == ["fwd"]
+    assert s.graph_pulses["seq"] == 2
+
+
+def test_descriptor_path_is_the_edge_curve_in_travel_order(group):
+    snap = frame(1)
+    g = group.build_graph(snap, "ORCH", False)
+    curve = g.edge_path("SIM")  # orch -> server, data units
+    fwd = group.pulse_items(
+        snap, [("SIM", "fwd", 100.0, 1.2, "#111")], 100.0, "ORCH", False
+    )
+    rev = group.pulse_items(
+        snap, [("SIM", "rev", 100.0, 1.2, "#111")], 100.0, "ORCH", False
+    )
+    assert fwd[0]["path"][0] == pytest.approx(list(curve[0]), abs=1e-4)
+    assert rev[0]["path"][0] == pytest.approx(list(curve[-1]), abs=1e-4)
+    assert rev[0]["path"] == fwd[0]["path"][::-1]
+    assert len(fwd[0]["path"]) == 24
+    # an edge that left the graph yields nothing
+    assert (
+        group.pulse_items(
+            snap, [("GONE", "fwd", 100.0, 1.2, "#111")], 100.0, "ORCH", False
         )
-    assert seen >= 60  # 1.2 s at 60 Hz, never a couple of frames
+        == []
+    )
 
 
-def test_dispatch_and_finish_in_one_frame_run_one_after_the_other(group):
+def test_dispatch_and_finish_in_one_frame_start_one_after_the_other(group):
+    _, s = _tick_frames(group, [DISPATCH, FINISH])
+    out, back = s.graph_pulses["items"]
+    assert (out["dir"], back["dir"]) == ("fwd", "rev")
+    assert out["start_in"] == pytest.approx(0.0)
+    # the return leg starts as the outbound ends (start times are honoured)
+    assert back["start_in"] == pytest.approx(out["start_in"] + out["dur"])
+    assert out["id"] != back["id"]
+
+
+def test_pulse_bounding_is_unchanged_by_browser_animation(group):
+    """A 100-event burst still yields a handful of descriptors, all soon."""
+    _, s = _tick_frames(group, [DISPATCH, FINISH] * 50)
+    items = s.graph_pulses["items"]
+    assert 0 < len(items) <= 3
+    assert max(it["start_in"] for it in items) <= 2 * group.PULSE_S
+    assert len(s._pulses) == len(items)
+
+
+def test_expired_pulses_leave_the_bounding_state(group):
+    feed, s = _tick_frames(group, [FINISH])
+    assert len(s._pulses) == 1
+    group.apply_tick(s, feed, 100.0 + group.PULSE_S + 0.1, "t")
+    assert s._pulses == ()
+
+
+def test_a_pulse_leaves_the_graph_layout_token_and_payload_alone(group):
     feed = Feed()
     feed.push(frame(1))
     s = state()
     group.apply_tick(s, feed, 100.0, "t")
-    feed.push(frame(2, [DISPATCH, FINISH]))
-    group.apply_tick(s, feed, 100.0, "t")
-    (_, d1, t1, dur1, _), (_, d2, t2, _, _) = s._pulses
-    assert (d1, d2) == ("fwd", "rev")
-    assert t2 == pytest.approx(t1 + dur1)  # return leg starts as the outbound ends
-    # first half of the window: only the outbound is drawn; second: only the return
-    t, seen = 100.0, []
-    while t < 100.0 + group.PULSE_S * 1.5:
-        t += 1 / 60
-        group.apply_tick(s, feed, t, "t")
-        d = _drawn(group, s, t)
-        seen.append((t, d["pulse:triangle"], d["pulse:triangle_down"]))
-    assert all(rev == 0 for t, _, rev in seen if t < 100.0 + group.PULSE_S - 0.03)
-    assert all(fwd == 0 for t, fwd, _ in seen if t > 100.0 + group.PULSE_S + 0.03)
-    assert any(rev for _, _, rev in seen)
+    layout, spec = s.graph_layout, s.graph_spec
+    feed.push(frame(2, [DISPATCH]))
+    group.apply_tick(s, feed, 100.1, "t")
+    assert s.graph_layout == layout
+    assert [t["name"] for t in s.graph_spec["traces"]] == [
+        t["name"] for t in spec["traces"]
+    ]
 
 
 # ---- hover and rebuild-free status changes -----------------------------------
@@ -976,7 +1030,7 @@ def test_hovering_a_node_redraws_it_larger_in_its_own_colour_then_clears(
     _hover(group, s, {"trace": f"nodes:SIM:{busy}", "index": 0})
     assert s._hovered == "SIM" and s._version == v + 3  # one redraw per change
     assert s.graph_layout == layout  # point columns only: no chart rebuild
-    marks, _ = group.graph_marks(s._snap[0], (), 100.0, "ORCH", False, "SIM")
+    marks = group.graph_marks(s._snap[0], "ORCH", False, "SIM")
     hov = next(m for m in marks if m.get("name") == f"hovered:{busy}")
     assert hov["colors"] == [busy]
     assert hov["size"] == group.HOVER_PX > group.NODE_PX
@@ -1069,7 +1123,7 @@ def test_every_status_places_each_node_in_exactly_one_node_trace(group):
             "servers": [{"key": "SIM", "status": a}, {"key": "CPSIM", "status": b}],
         }
         for lost in (False, True):
-            marks, _ = group.graph_marks(snap, (), 0.0, "ORCH", lost)
+            marks = group.graph_marks(snap, "ORCH", lost)
             assert _real_node_points(marks) == {"ORCH": 1, "SIM": 1, "CPSIM": 1}, (
                 orch,
                 a,
@@ -1126,7 +1180,7 @@ def test_xy_repaints_every_node_after_any_status_change(group):
                 {"key": k, "status": s} for k, s in zip(("SIM", "CP", "GP"), sts)
             ],
         }
-        marks, _ = group.graph_marks(snap, (), 0.0, "ORCH", False)
+        marks = group.graph_marks(snap, "ORCH", False)
         p = plots.marks_chart(
             marks, x_domain=(-1, 1), y_domain=(-1, 1), panel_id="t", version=1
         )
