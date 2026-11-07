@@ -58,10 +58,12 @@ def state():
         _act_ords=(),
         _scopes=(),
         _first_at=0.0,
-        _hover_slot=(-1, -1),
+        _hover_col=(-1, -1),
         _pulse_seq=0,
         graph_pulses={},
         graph_nodes={"items": []},
+        exp_progress={},
+        act_progress={},
         exp_hover="",
         act_hover="",
         tree_header="select a row",
@@ -1557,3 +1559,60 @@ def test_fetched_info_never_shows_a_shifted_queue_item(group):
         act,
         "",
     )
+
+
+def test_the_hover_follows_the_item_under_a_still_pointer_when_the_edges_move(group):
+    def exp(*states):
+        return [
+            {"name": n, "state": st, "uuid": f"u{n}", "t_start": 1.0, "t_end": 2.0}
+            for n, st in zip("abcd", states)
+        ]
+
+    s = state()
+    snap = frame(1, seq={"uuid": "S"}, experiments=exp("done", "active", "queued"))
+    group._render_strips(s, snap, 100.0, "t")
+    group.GroupState._hover_strip(s, 0, {"trace": "hit", "index": 40})
+    assert s.exp_hover.startswith("b:")  # x 356 px: slot 1 of 3
+    # the active item advances; four slots now, the pointer has not moved
+    snap = frame(
+        2, seq={"uuid": "S"}, experiments=exp("done", "done", "active", "queued")
+    )
+    group._render_strips(s, snap, 101.0, "t")
+    assert s.exp_hover.startswith("c:")  # the same x is slot 2 of 4
+    group.GroupState._hover_strip(s, 0, {"trace": "hit", "index": 40 + 80})  # row 1
+    assert s.exp_hover.startswith("c:")
+    group.GroupState._hover_strip(s, 0, {"trace": "", "index": -1})
+    assert s.exp_hover == ""
+    group._render_strips(s, snap, 102.0, "t")
+    assert s.exp_hover == ""
+
+
+def test_progress_descriptors_appear_with_an_active_slot_and_only_change_with_it(group):
+    s = state()
+    run = [
+        {"name": "a", "state": "done", "uuid": "ua", "t_start": 1.0, "t_end": 2.0},
+        {"name": "b", "state": "active", "uuid": "ub", "t_start": 2.0},
+        {"name": "c", "state": "queued", "uuid": "uc", "qidx": 0},
+    ]
+    idle = [dict(r, state="done", t_end=3.0) for r in run[:2]]
+    group._render_strips(s, frame(1, seq={"uuid": "S"}, experiments=idle), 100.0, "t")
+    assert s.exp_progress == {"view": group.STRIP_VIEW, "items": []}
+    snap = frame(2, seq={"uuid": "S"}, experiments=run)
+    group._render_strips(s, snap, 100.0, "t")
+    first = s.exp_progress
+    assert [(i["x0"], i["x1"]) for i in first["items"]] == [
+        (s._exp_edges[1], s._exp_edges[2])
+    ]
+    assert first["view"] == {"x": [0.0, float(group.PLOT_W)], "y": [0.0, 1.0], "pad": 8}
+    for now in (100.5, 101.0, 107.3):  # ticks with the same active item: no new value
+        group._render_strips(s, frame(3, seq={"uuid": "S"}, experiments=run), now, "t")
+        assert s.exp_progress is first
+    # the active item advances: edges move, so the descriptor changes
+    run2 = [
+        dict(run[0]),
+        dict(run[1], state="done", t_end=4.0),
+        dict(run[2], state="active"),
+    ]
+    group._render_strips(s, frame(4, seq={"uuid": "S"}, experiments=run2), 108.0, "t")
+    assert s.exp_progress is not first
+    assert s.act_progress["items"] == [] and "progress" not in str(s.exp_spec).lower()

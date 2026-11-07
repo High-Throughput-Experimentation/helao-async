@@ -28,23 +28,36 @@ from helao.ui.shared.palette import (
 #: clipped with an ellipsis, which is acceptable because it is rare.
 MIN_KEY_PX = 60.0
 NARROW_PX = MIN_KEY_PX
+#: Room one "HH:MM:SS" needs inside a label box: measured 43.7 px (11 px
+#: system-ui), rounded up. A segment whose box (width less 2 x LABEL_PAD_PX)
+#: is narrower shows the name only, so a clipped "07:33..." never appears.
+TIME_PX = 44.0
 #: Clearance kept on each side of a label inside its segment.
 LABEL_PAD_PX = 4.0
 #: Narrowest label box worth drawing: one glyph and the ellipsis at 11 px. A
 #: segment with less room than this carries no text at all (the browser cuts
 #: the rest of a longer line with an ellipsis, see ``plots.marks_chart``).
 LABEL_MIN_PX = 24.0
+#: Sweeps per second of the active slot's progress bar. The bar is animated in
+#: the browser (see ``xy_component``), so this is a frame-rate-smooth rate, not
+#: something the 2 Hz page tick samples.
 SAWTOOTH_HZ = 2.0
+#: Bar thickness in px and its height in plot fractions: centred 2 px above the
+#: plot bottom, so it sits under the label rows (measured with xy's label
+#: placement, the bottom row's glyphs end ~6 px above the plot bottom).
+PROGRESS_W = 4.0
+PROGRESS_Y = 0.0455
 #: Rows of a three-line label (name, start, end), in plot fractions from the
-#: bottom; the progress line sits below them at y 0.08.
-TEXT_Y = (0.80, 0.52, 0.24)
+#: bottom; the progress bar sits below them (``PROGRESS_Y``).
+TEXT_Y = (0.82, 0.54, 0.26)
 #: The invisible ``hit`` trace is a fixed grid of squares tiling the whole
 #: strip. xy's pick is pixel-exact on a point's drawn marker (measured: with
 #: 4 px circles a hover registered only on a marker and "left" a frame later),
 #: so the markers must touch: 80 columns over ~700 px (8.75 px) and 3 rows
 #: over ~44 px (14.7 px, a 60 px strip less its padding); 16 px squares still
-#: overlap. 80 > 73, the EXP strip's maximum slot count (20 done + active + 50 queued + two ellipses), so every
-#: slot owns a column. One point per segment centre answered only a hover on
+#: overlap. 80 > 73, the EXP strip's maximum slot count (20 done + active + 50
+#: queued + two ellipses), so while the strip is not squeezed every slot owns
+#: a column. One point per segment centre answered only a hover on
 #: that centre. The columns are spaced uniformly across the plot width and a
 #: column maps to the slot whose span holds its centre, so a slot at least one
 #: column wide (8.8 px) is always reachable; a squeezed sliver narrower than
@@ -153,22 +166,23 @@ def _finished(it):
 
 
 def key_indices(slots):
-    """Slots that keep ``MIN_KEY_PX``: active, the finished one before it, the queued one after.
+    """Slots that keep ``MIN_KEY_PX``: every active one, plus its neighbours.
 
-    With no active item the last finished one takes the active role. A missing
-    role is absent; ``+N`` slots (None) are never key.
+    The neighbours are the finished slot just before the first active one and
+    the queued slot just after the last. With no active item the last
+    finished one takes the active role. A missing role is absent; ``+N``
+    slots (None) are never key.
     """
-    role = next((i for i, it in enumerate(slots) if _is(it, "active")), None)
-    if role is None:
-        role = next(
-            (i for i in reversed(range(len(slots))) if _finished(slots[i])), None
-        )
-    keys = set()
-    if role is not None:
-        keys.add(role)
-        if role and _finished(slots[role - 1]):
-            keys.add(role - 1)
-    nxt = 0 if role is None else role + 1
+    roles = [i for i, it in enumerate(slots) if _is(it, "active")]
+    if not roles:
+        roles = [
+            next((i for i in reversed(range(len(slots))) if _finished(slots[i])), None)
+        ]
+        roles = [i for i in roles if i is not None]
+    keys = set(roles)
+    if roles and roles[0] and _finished(slots[roles[0] - 1]):
+        keys.add(roles[0] - 1)
+    nxt = roles[-1] + 1 if roles else 0
     if (
         nxt < len(slots)
         and slots[nxt] is not None
@@ -212,6 +226,22 @@ def _vline(x, color, width):
     return {"kind": "vline", "x": x, "color": color, "width": width}
 
 
+def progress_items(slots, edges):
+    """One browser-animated progress bar descriptor per active slot."""
+    return [
+        {
+            "x0": edges[i],
+            "x1": edges[i + 1],
+            "y": PROGRESS_Y,
+            "color": GROUP_PROGRESS,
+            "width": PROGRESS_W,
+            "hz": SAWTOOTH_HZ,
+        }
+        for i, it in enumerate(slots)
+        if _is(it, "active")
+    ]
+
+
 def strip_marks(items, *, n_before, n_after, now, width_px, selected=None, today=None):
     """``(marks, slots, edges)`` for one strip; render with x_domain ``(0, width_px)``.
 
@@ -223,14 +253,6 @@ def strip_marks(items, *, n_before, n_after, now, width_px, selected=None, today
     slots = ([None] if n_before else []) + list(items) + ([None] if n_after else [])
     edges = slot_edges(slots, width_px)
     bands, outlines, texts = [], [], []
-    progress = {
-        "kind": "line",
-        "name": "progress",
-        "x": [],
-        "y": [],
-        "color": GROUP_PROGRESS,
-        "width": 4.0,
-    }
     for i, it in enumerate(slots):
         x0, x1 = edges[i], edges[i + 1]
         cx = (x0 + x1) / 2
@@ -269,12 +291,11 @@ def strip_marks(items, *, n_before, n_after, now, width_px, selected=None, today
             if labels
             else ("", "", "")
         )
+        if box < TIME_PX:
+            lines = (lines[0], "", "")
         for y, line in zip(TEXT_Y, lines):
             if line:
                 texts.append(_text(cx, y, line, GROUP_LABEL_COLORS[state], box))
-        if state == "active":
-            frac = (now * SAWTOOTH_HZ) % 1.0
-            progress["x"], progress["y"] = [x0, x0 + frac * (x1 - x0)], [0.08, 0.08]
         if selected is not None and item_key(it) == selected:
             outlines += [
                 _vline(x0, GROUP_SELECTED_OUTLINE, 3.0),
@@ -296,4 +317,4 @@ def strip_marks(items, *, n_before, n_after, now, width_px, selected=None, today
         "symbol": "square",
         "opacity": 0.0,
     }
-    return bands + partitions + outlines + [progress, hit] + texts, slots, edges
+    return bands + partitions + outlines + [hit] + texts, slots, edges

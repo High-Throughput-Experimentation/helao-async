@@ -459,6 +459,12 @@ export function createController(options) {
     // Node hover overlay. Opt-in like the pulses: no `nodes` prop, no listener.
     nodesOn: false,
     nodes: null,
+    // Progress bars (the /group strips'): opt-in like the other two. Each item
+    // sweeps from x0 to x1 at `hz` per second, drawn on the same canvas at
+    // animation-frame rate from the browser clock, so the server sends a
+    // descriptor only when the active slot or its edges change.
+    progressOn: false,
+    progress: [],
     nodeListening: false,
     pointer: null,
     hoverNode: null,
@@ -582,6 +588,19 @@ export function createController(options) {
       .map((p) => ({ ...p, s: (nowMs - p.start) / (p.end - p.start) }));
   };
 
+  // ---- progress overlay ----
+  st.setProgress = (batch) => {
+    const items = batch && batch.items ? batch.items : [];
+    st.progressOn = batch !== undefined && batch !== null;
+    st.progress = items;
+    if (st.progressOn && batch.view) st.pulseView = batch.view;
+    st.requestDraw();  // one frame: draws the bars, or clears the last ones
+    st.kickPulses();
+  };
+
+  // Something is animating: a pulse in flight or a progress bar to sweep.
+  st.animating = () => (st.pulsesOn && st.pulses.length > 0) || st.progress.length > 0;
+
   // ---- node hover overlay ----
   // Descriptors arrive once per real change. The pointer is hit-tested here, in
   // the browser, and the circle is drawn on the pulses' canvas: no server event.
@@ -647,7 +666,7 @@ export function createController(options) {
     const active = st.activePulses(nowMs);
     if (!el || !st.pulseView || typeof document === "undefined") return;
     if (!st.pulseCanvas) {
-      if (!active.length && !st.hoverNode) return;
+      if (!active.length && !st.hoverNode && !st.progress.length) return;
       const c = document.createElement("canvas");
       c.dataset.helaoSlot = "pulses";
       c.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none";
@@ -682,6 +701,19 @@ export function createController(options) {
       g.arc(c0[0], c0[1], st.nodes.hover_r, 0, 2 * Math.PI);
       g.fill();
     }
+    // progress bars: fraction of the sweep from the browser clock, butt ends so
+    // a bar stays inside its slot
+    g.lineCap = "butt";
+    for (const b of st.progress) {
+      const frac = ((nowMs / 1000) * b.hz) % 1;
+      const [a, z] = pulsePixelPath([[b.x0, b.y], [b.x0 + frac * (b.x1 - b.x0), b.y]], st.pulseView, w, h);
+      g.strokeStyle = b.color;
+      g.lineWidth = b.width;
+      g.beginPath();
+      g.moveTo(a[0], a[1]);
+      g.lineTo(z[0], z[1]);
+      g.stroke();
+    }
     g.lineCap = "round";
     g.lineJoin = "round";
     g.lineWidth = PULSE_WIDTH_PX;
@@ -698,14 +730,14 @@ export function createController(options) {
 
   st.pulseFrame = (t) => {
     st.raf = null;
-    if (st.disposed || (!st.pulsesOn && !st.nodesOn)) return;
+    if (st.disposed || (!st.pulsesOn && !st.nodesOn && !st.progressOn)) return;
     st.drawPulses(t);
     st.kickPulses();
   };
 
-  // One rAF loop, alive only while a pulse is pending.
+  // One rAF loop, alive only while a pulse is pending or a progress bar sweeps.
   st.kickPulses = () => {
-    if (st.raf !== null || st.disposed || !st.pulsesOn || !st.pulses.length) return;
+    if (st.raf !== null || st.disposed || !st.animating()) return;
     if (!st.el || typeof requestAnimationFrame !== "function") return;
     st.raf = requestAnimationFrame(st.pulseFrame);
   };
@@ -861,7 +893,7 @@ export function createController(options) {
 #: The React wrapper. Deliberately thin — it wires props and lifecycle to the
 #: controller above and holds no logic of its own.
 _SHIM_COMPONENT_JS = """
-export function XYChart({ spec, bufferUrl, layout, height, width, onSelect, onHover, pulses, nodes }) {
+export function XYChart({ spec, bufferUrl, layout, height, width, onSelect, onHover, pulses, nodes, progress }) {
   const hostRef = useRef(null);
   const ctrlRef = useRef(null);
   if (ctrlRef.current === null) {
@@ -893,6 +925,11 @@ export function XYChart({ spec, bufferUrl, layout, height, width, onSelect, onHo
     ctrlRef.current.setNodes(nodes);
   }, [nodes]);
 
+  // The strips' progress bars: a descriptor per active slot, swept in the browser.
+  useEffect(() => {
+    ctrlRef.current.setProgress(progress);
+  }, [progress]);
+
   // Data updates take the bundle's in-place append path, not a remount. The
   // URL is passed as an argument so this always fetches the current version.
   useEffect(() => {
@@ -919,7 +956,7 @@ export function XYChart({ spec, bufferUrl, layout, height, width, onSelect, onHo
         minHeight: height,
         flexShrink: 0,
         // the overlay canvas is absolutely positioned inside this element
-        ...(pulses !== undefined || nodes !== undefined ? { position: "relative" } : {}),
+        ...(pulses !== undefined || nodes !== undefined || progress !== undefined ? { position: "relative" } : {}),
       }}
     />
   );
@@ -963,6 +1000,7 @@ class XYChart(rx.Component):
     on_hover: rx.EventHandler[lambda payload: [payload]]
     pulses: rx.Var[dict]
     nodes: rx.Var[dict]
+    progress: rx.Var[dict]
 
     def add_imports(self):
         """Declare the React hooks the shim uses.
