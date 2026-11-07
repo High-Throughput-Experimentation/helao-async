@@ -596,8 +596,9 @@ def test_reentering_the_page_does_not_replay_buffered_events(group):
     feed.push(frame(2, [DISPATCH]))
     group.apply_tick(s, feed, 100.1, "t")
     assert len(s._pulses) == 1
+    s._old_orch = True
     group.GroupState.mount.fn(s)  # leave and come back: state persists, mount fires
-    assert s._cursor == -1 and s._pulses == ()
+    assert s._cursor == -1 and s._pulses == () and s._old_orch is False
     group.apply_tick(s, feed, 200.0, "t")
     assert s._pulses == () and s._snap[0]["seq_no"] == 2
 
@@ -619,6 +620,42 @@ def test_probe_waits_five_seconds_after_the_first_empty_tick(group):
 def test_buttons_are_disabled_while_a_call_is_pending(group):
     rendered = str(group._button("Start", "start", group.GroupState.can_start).render())
     assert "pyOr(" in rendered and "pending_rx_state_" in rendered
+
+
+def _disabled_expr(component):
+    import re
+
+    found = re.search(r"disabled:[^']*", str(component.render()))
+    assert found is not None
+    return found.group(0)
+
+
+def test_estop_is_never_gated_by_another_calls_pending_state(group):
+    S = group.GroupState
+    assert "pending_rx_state_" not in _disabled_expr(
+        group._button("E-stop", "estop", S.can_estop, gate_pending=False)
+    )
+    for label, name, var in (
+        ("Start", "start", S.can_start),
+        ("Stop", "stop", S.can_stop),
+        ("Clear E-stop", "clear_estop", S.can_clear_estop),
+    ):
+        assert "pending_rx_state_" in _disabled_expr(group._button(label, name, var))
+    # and the page wires E-stop that way, beside gated Start/Stop/Clear buttons
+    import re
+
+    text = str(group.group_page().render())
+    gated = {}
+    for m in re.finditer(r"RadixThemesButton', 'props': \[([^\]]*)\]", text):
+        props = m.group(1)
+        d = re.search(r"disabled:[^']*", props)
+        if d:
+            is_estop = group.REFLEX_MOTION_STOP_CLASS in props
+            gated[is_estop] = gated.get(is_estop, []) + [
+                "pending_rx_state_" in d.group(0)
+            ]
+    assert gated[True] == [False]
+    assert gated[False] == [True, True, True]
 
 
 class _FakeState(SimpleNamespace):

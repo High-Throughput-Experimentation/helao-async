@@ -422,6 +422,7 @@ def reset_for_mount(s) -> None:
     """
     s._cursor = -1
     s._pulses = ()
+    s._old_orch = False
     s._first_at = 0.0
     s._full_at = 0.0
 
@@ -634,11 +635,17 @@ def _badge(prefix: str, label_var, group_var):
     )
 
 
-def _button(label: str, name: str, enabled_var, class_name: str = ""):
+def _button(
+    label: str, name: str, enabled_var, class_name: str = "", gate_pending: bool = True
+):
+    """A control button. ``gate_pending=False`` (E-stop) never waits on another call."""
+    disabled = ~enabled_var
+    if gate_pending:
+        disabled = disabled | (GroupState.pending != "")
     return rx.button(
         rx.cond(GroupState.pending == name, rx.spinner(size="1"), label),
         on_click=GroupState.control(name),
-        disabled=~enabled_var | (GroupState.pending != ""),
+        disabled=disabled,
         class_name=class_name,
     )
 
@@ -679,7 +686,13 @@ def group_page() -> rx.Component:
         rx.cond(
             S.estopped,
             _button("Clear E-stop", "clear_estop", S.can_clear_estop),
-            _button("E-stop", "estop", S.can_estop, REFLEX_MOTION_STOP_CLASS),
+            _button(
+                "E-stop",
+                "estop",
+                S.can_estop,
+                REFLEX_MOTION_STOP_CLASS,
+                gate_pending=False,
+            ),
         ),
         width="100%",
         align="center",
