@@ -56,7 +56,7 @@ def state():
         _act_ords=(),
         _scopes=(),
         _first_at=0.0,
-        _tick_at=0.0,
+        _hovered="",
         tree_header="select a row",
         tree_html="",
         _full_at=0.0,
@@ -503,17 +503,19 @@ def test_graph_marks_unknown_status_and_lost_stream():
     marks, pulses = graph_marks(
         snap, [["SIM", "fwd", 0.0, 0.6, GROUP_PULSE_DISPATCH]], 0.1, "ORCH", False
     )
-    nodes = next(m for m in marks if m.get("name", "").startswith("nodes:"))
-    assert nodes["colors"] == [
-        GROUP_STATE_COLORS["busy"],
-        GROUP_STATE_COLORS["busy"],
-        GROUP_STATE_COLORS["idle"],
-    ]
+    by_colour = {
+        m["colors"][0]: len(m["x"])
+        for m in marks
+        if m.get("name", "").startswith("nodes:") and m["x"]
+    }
+    assert by_colour == {GROUP_STATE_COLORS["busy"]: 2, GROUP_STATE_COLORS["idle"]: 1}
     assert "X (weird)" in [m["value"] for m in marks if m["kind"] == "text"]
     assert len(pulses) == 1
     lost, _ = graph_marks(snap, [], 0.1, "ORCH", True)
-    nodes = next(m for m in lost if m.get("name", "").startswith("nodes:"))
-    assert set(nodes["colors"]) == {GROUP_STATE_COLORS["unreachable"]}
+    drawn = [m for m in lost if m.get("name", "").startswith("nodes:") and m["x"]]
+    assert {c for m in drawn for c in m["colors"]} == {
+        GROUP_STATE_COLORS["unreachable"]
+    }
 
 
 def test_header_fields_idle_and_running():
@@ -884,7 +886,7 @@ def test_estop_flag_is_available_in_every_state_but_estopped(group):
     assert flags(est, lost=False)["can_clear_estop"] is True
 
 
-# ---- return pulse: queued per edge, held still through a client stall --------
+# ---- return pulse: queued per edge ------------------------------------------
 
 
 def _drawn(group, s, now):
@@ -936,16 +938,58 @@ def test_dispatch_and_finish_in_one_frame_run_one_after_the_other(group):
     assert any(rev for _, _, rev in seen)
 
 
-def test_pulses_do_not_age_through_a_browser_stall(group):
+# ---- hover and rebuild-free status changes -----------------------------------
+
+
+def _two_server_frame(seq, status):
+    f = frame(seq)
+    f["servers"] = [
+        {"key": "SIM", "status": status, "active_action": None},
+        {"key": "CPSIM", "status": "idle", "active_action": None},
+    ]
+    return f
+
+
+def _hover(group, s, payload):
+    s.router = SimpleNamespace(session=SimpleNamespace(client_token="t"))
+    group.GroupState.hover_node.fn(s, payload)
+
+
+def test_hovering_a_node_redraws_it_larger_in_its_own_colour_then_clears(
+    group, monkeypatch
+):
+    monkeypatch.setattr(group, "stream_lost", lambda feed, now: False)
     feed = Feed()
-    feed.push(frame(1))
+    feed.push(_two_server_frame(1, "busy"))
     s = state()
     group.apply_tick(s, feed, 100.0, "t")
-    feed.push(frame(2, [FINISH]))
+    layout, v = s.graph_layout, s._version
+    busy = group.GROUP_STATE_COLORS["busy"]
+    idle = group.GROUP_STATE_COLORS["idle"]
+    _hover(group, s, {"trace": f"nodes:44:{busy}", "index": 0})  # SIM, busy
+    assert s._hovered == "SIM"
+    _hover(group, s, {"trace": f"nodes:44:{idle}", "index": 1})  # CPSIM (ORCH is 0)
+    assert s._hovered == "CPSIM"
+    _hover(group, s, {"trace": f"nodes:44:{busy}", "index": 0})
+    assert s._hovered == "SIM" and s._version == v + 3  # one redraw per change
+    assert s.graph_layout == layout  # point columns only: no chart rebuild
+    marks, _ = group.graph_marks(s._snap[0], (), 100.0, "ORCH", False, "SIM")
+    hov = next(m for m in marks if m.get("name") == f"hovered:{busy}")
+    assert hov["colors"] == [busy]
+    assert hov["size"] == group.HOVER_PX > group.NODE_PX
+    _hover(group, s, {"trace": "", "index": -1})  # pointer left
+    assert s._hovered == "" and s.graph_layout == layout
+    _hover(group, s, {"trace": "pulse:triangle", "index": 0})  # not a node
+    assert s._hovered == ""
+
+
+def test_a_status_change_leaves_the_graph_layout_token_unchanged(group):
+    feed = Feed()
+    feed.push(_two_server_frame(1, "idle"))
+    s = state()
     group.apply_tick(s, feed, 100.0, "t")
-    t0 = s._pulses[0][2]
-    group.apply_tick(s, feed, 100.02, "t")  # a normal 60 Hz-ish tick
-    assert s._pulses[0][2] == pytest.approx(t0)
-    group.apply_tick(s, feed, 100.02 + 0.6, "t")  # the page froze for 0.6 s
-    age = 100.02 + 0.6 - s._pulses[0][2]
-    assert age == pytest.approx(0.02 + group.STALL_CAP_S)
+    idle = s.graph_layout
+    for status in ("busy", "error", "estopped", "mystery"):
+        feed.push(_two_server_frame(2, status))
+        group.apply_tick(s, feed, 101.0, "t")
+        assert s.graph_layout == idle, status

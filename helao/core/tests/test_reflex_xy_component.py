@@ -710,3 +710,61 @@ def test_a_panel_that_is_only_read_is_not_evicted_before_one_only_written():
     store.put("other", 1, _bufs())  # forces one eviction
     assert store.versions("static") == [1]
     assert store.versions("live") == []
+
+
+_HOVER_HARNESS = """
+%(controller)s
+const got = [];
+const st = createController({ spec: {}, onSelect: null, onHover: (m) => got.push(m) });
+const listeners = {};
+st.attach({ decodeFrame: () => ({ buffers: [] }), render: () => () => {} },
+          { addEventListener: (n, cb) => { listeners[n] = cb; } });
+const out = {};
+listeners["xy:hover"]({ detail: { points: [{ trace: "nodes:44", index: 2 }] } });
+listeners["xy:hover"]({ detail: { active: true } });  // no point: ignored
+out.hover = got.slice();
+// moving onto empty plot: xy hides its tooltip (display:none), nothing else
+const tip = { dataset: { xySlot: "tooltip" }, style: { display: "none" } };
+st.onTooltipMutation([{ target: { dataset: {}, style: { display: "none" } } }]);
+out.otherElementIgnored = got.length === 1;
+st.onTooltipMutation([{ target: tip }]);
+st.onTooltipMutation([{ target: tip }]);  // a second hide is not a second leave
+out.afterLeave = got.slice();
+listeners["xy:hover"]({ detail: { points: [{ trace: "nodes:44", index: 0 }] } });
+listeners["xy:leave"]();
+out.afterPointerLeave = got.slice(2);
+console.log(JSON.stringify(out));
+"""
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_controller_forwards_hover_and_both_kinds_of_leave():
+    assert _JS_RUNTIME is not None
+    script = _HOVER_HARNESS % {"controller": xc._SHIM_CONTROLLER_JS}
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "h.mjs")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(script)
+        proc = subprocess.run(
+            [_JS_RUNTIME, path], capture_output=True, text=True, timeout=60
+        )
+    assert proc.returncode == 0, proc.stderr
+    out = json.loads(proc.stdout.strip().splitlines()[-1])
+    assert out["hover"] == [{"trace": "nodes:44", "index": 2}]
+    assert out["otherElementIgnored"] is True
+    assert out["afterLeave"] == [
+        {"trace": "nodes:44", "index": 2},
+        {"trace": "", "index": -1},
+    ]
+    assert out["afterPointerLeave"] == [
+        {"trace": "nodes:44", "index": 0},
+        {"trace": "", "index": -1},
+    ]
+
+
+def test_the_component_declares_and_passes_on_hover():
+    assert "on_hover" in xc.XYChart.get_event_triggers()
+    assert (
+        "onHover" in xc._SHIM_COMPONENT_JS
+        and "st.onHover = onHover" in xc._SHIM_COMPONENT_JS
+    )

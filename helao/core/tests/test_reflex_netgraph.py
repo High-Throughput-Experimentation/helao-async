@@ -47,16 +47,57 @@ def test_bezier_end_tangents_are_vertical():
     )
 
 
-def test_node_trace_is_drawn_last_and_no_arrowheads():
-    # xy's hover marker reuses the symbol of the LAST scatter trace drawn
-    # (probe note, 2026-11-06): last = a pulse triangle hovered as a big
-    # down-triangle over the node. Nodes last, and no arrow traces at all.
+def test_no_arrowheads_and_the_hover_disc_sits_under_the_nodes():
     g = _g()
     g.add_node("UP", 0.0, 0.7, color=GROUP_IDLE, label_color=WHITE)
     g.add_edge("UP", "ORCH", "UP", color=GROUP_IDLE)
-    scatters = [m for m in g.marks(0.0) if m["kind"] == "scatter"]
-    assert [m["symbol"] for m in scatters] == ["triangle", "triangle_down", "circle"]
-    assert not any(m.get("name", "").startswith("arrow") for m in g.marks(0.0))
+    marks = g.marks(0.0)
+    assert not any(m.get("name", "").startswith("arrow") for m in marks)
+    names = [m["name"] for m in marks if m["kind"] == "scatter"]
+    assert names.index(f"hovered:{GROUP_IDLE}") < names.index(f"nodes:28:{GROUP_IDLE}")
+
+
+def test_hovered_node_is_a_larger_disc_in_its_own_colour_and_clears():
+    g = NetGraphWith(hover_px=40.0)
+    g.add_node("UP", 0.2, 0.7, color=GROUP_PULSE_DISPATCH, label_color=WHITE)
+    g.hovered = "UP"
+    on = _trace(g.marks(0.0), f"hovered:{GROUP_PULSE_DISPATCH}")
+    assert (on["x"], on["y"], on["colors"]) == ([0.2], [0.7], [GROUP_PULSE_DISPATCH])
+    assert (
+        on["size"]
+        == 40.0
+        > _trace(g.marks(0.0), f"nodes:28:{GROUP_PULSE_DISPATCH}")["size"]
+    )
+    g.hovered = None
+    off = _trace(g.marks(0.0), f"hovered:{GROUP_PULSE_DISPATCH}")
+    assert off["x"] == [] and off["size"] == 40.0  # same trace, same style
+
+
+def NetGraphWith(**kw):
+    from helao.ui.reflex.netgraph import NetGraph
+
+    g = NetGraph(height_px=360, width_px=720, **kw)
+    g.add_node("ORCH", 0.0, 0.0, color=GROUP_IDLE, label_color=WHITE)
+    return g
+
+
+def test_an_edge_changing_style_changes_only_column_data():
+    # A line's style is spec (a restyle rebuilds the chart); a trace per declared
+    # style keeps the trace set, names and styles identical across statuses.
+    styles = ((GROUP_IDLE, 2.0), (GROUP_PULSE_DISPATCH, 4.0))
+    g = NetGraphWith(edge_styles=styles)
+    g.add_node("UP", 0.0, 0.7, color=GROUP_IDLE, label_color=WHITE)
+    g.add_edge("UP", "ORCH", "UP", color=GROUP_IDLE, width=2.0)
+    before = [m for m in g.marks(0.0) if m["kind"] == "segments"]
+    g.set_edge_color("UP", GROUP_PULSE_DISPATCH)
+    g.edges["UP"].width = 4.0
+    after = [m for m in g.marks(0.0) if m["kind"] == "segments"]
+    strip = lambda ms: [
+        {k: v for k, v in m.items() if k not in ("x0", "y0", "x1", "y1")} for m in ms
+    ]
+    assert strip(before) == strip(after) and len(after) == 2
+    assert [len(m["x0"]) > 0 for m in before] == [True, False]
+    assert [len(m["x0"]) > 0 for m in after] == [False, True]
 
 
 def test_a_queued_pulse_is_kept_but_not_drawn_until_its_start():

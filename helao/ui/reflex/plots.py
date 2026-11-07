@@ -214,6 +214,7 @@ def chart(
     height: int = 320,
     width: int | None = None,
     on_select=None,
+    on_hover=None,
 ):
     """Bind a chart component to three Reflex state vars.
 
@@ -233,6 +234,10 @@ def chart(
             click's data-space ``x``/``y`` (and ``trace``/``index`` when a
             point was hit); the figure must enable clicks, as
             :func:`scatter_map` and :func:`ternary` do.
+        on_hover: Optional handler for hover; receives ``{trace, index}`` of the
+            point under the pointer (``trace`` is the mark's name) and
+            ``{trace: "", index: -1}`` when none. The figure must ask for it
+            (``marks_chart(hover_events=True)``).
 
     Returns:
         An ``rx.Component``.
@@ -250,6 +255,7 @@ def chart(
         height=f"{height}px",
         width=f"{width}px" if width else "100%",
         on_select=on_select,
+        on_hover=on_hover,
     )
 
 
@@ -961,7 +967,7 @@ CHART_PADDING_PX = 8
 
 
 def marks_chart(
-    marks, *, x_domain, y_domain, panel_id, version, click=False, hover=None
+    marks, *, x_domain, y_domain, panel_id, version, click=False, hover_events=False
 ) -> ChartPayload:
     """Render plain mark dicts (see ``netgraph``/``timeline_strip``) on a fixed view.
 
@@ -971,11 +977,11 @@ def marks_chart(
     anything that is spec -- line colour and width, scatter symbol/size/opacity,
     and annotations while :data:`ANNOTATIONS_IN_TOKEN` -- joins the layout token.
 
-    ``hover`` is xy's chart-wide hover marker style (``{"size": px, "color":
-    css, "opacity": 0..1}``). The marker is drawn with the symbol of the last
-    scatter trace in ``marks``, so put the trace that should hover last. Giving
-    it also turns the x/y/value tooltip off: the marks' coordinates mean
-    nothing to a reader.
+    ``hover_events`` makes the chart report the point under the pointer (see
+    :func:`chart`'s ``on_hover``) and silences xy's own hover feedback: the
+    highlight is made fully transparent and the tooltip invisible (kept, not
+    ``show_tooltip=False``: the shim reads its hiding as "pointer left every
+    point"). The page draws any hover effect itself, from the event.
     """
     children, style, notes = [], [], []
     for m in marks:
@@ -988,6 +994,19 @@ def marks_chart(
                 xy.line(
                     x=np.asarray(xs, float),
                     y=np.asarray(ys, float),
+                    name=m["name"],
+                    color=m["color"],
+                    width=float(m["width"]),
+                )
+            )
+            style.append(f"{m['name']}:{m['color']}:{m['width']}")
+        elif kind == "segments":
+            cols = [list(m[k]) for k in ("x0", "y0", "x1", "y1")]
+            if not cols[0]:
+                cols = [[PLACEHOLDER_XY]] * 4
+            children.append(
+                xy.segments(
+                    *(np.asarray(c, float) for c in cols),
                     name=m["name"],
                     color=m["color"],
                     width=float(m["width"]),
@@ -1054,6 +1073,8 @@ def marks_chart(
         ),
         xy.legend(show=False),
     ]
+    if hover_events:
+        axes.append(xy.tooltip(style={"opacity": "0", "pointer_events": "none"}))
     pad = CHART_PADDING_PX
     figure = xy.chart(
         *children,
@@ -1064,11 +1085,11 @@ def marks_chart(
         pan=False,
         zoom=False,
         click=click,
+        hover=True if hover_events else None,
     )
-    if hover:
-        figure.figure().set_mark_style(hover=hover)
-        figure.figure().show_tooltip = False
-        style.append(f"hover:{sorted(hover.items())}:no-tooltip")
+    if hover_events:
+        figure.figure().set_mark_style(hover={"opacity": 0.0})
+        style.append("hover-events")
     parts = style + (notes if ANNOTATIONS_IN_TOKEN else [])
     digest = hashlib.blake2b("|".join(parts).encode(), digest_size=8).hexdigest()
     return _publish(

@@ -656,16 +656,34 @@ def test_marks_chart_maps_kinds_to_traces_and_annotations():
     )
 
 
-def test_marks_chart_hover_styles_the_marker_and_drops_the_tooltip():
-    hover = {"size": 60, "color": WHITE, "opacity": 0.3}
-    p = _mc(_marks(), hover=hover)
-    assert p.spec["mark_style"]["hover"] == hover
-    assert p.spec["show_tooltip"] is False
-    plain = _mc(_marks())
+def test_marks_chart_hover_events_silence_xys_own_feedback():
+    p = _mc(_marks(), hover_events=True)
+    assert p.spec["interaction"]["hover"] is True
+    assert p.spec["mark_style"]["hover"]["opacity"] == 0.0  # no highlight
     assert (
-        "mark_style" not in plain.spec and plain.spec.get("show_tooltip") is not False
-    )
+        p.spec.get("show_tooltip") is not False
+    )  # kept: its hiding is the leave signal
+    assert p.spec["dom"]["styles"]["tooltip"]["opacity"] == "0"
+    plain = _mc(_marks())
+    assert "mark_style" not in plain.spec and "hover" not in plain.spec["interaction"]
     assert p.layout != plain.layout  # spec, so it must rebuild the chart
+
+
+def test_marks_chart_draws_segments_and_pads_an_empty_one():
+    seg = {
+        "kind": "segments",
+        "name": "s",
+        "x0": [0.0],
+        "y0": [0.0],
+        "x1": [1.0],
+        "y1": [1.0],
+        "color": WHITE,
+        "width": 2.0,
+    }
+    full = _mc([seg])
+    empty = _mc([{**seg, "x0": [], "y0": [], "x1": [], "y1": []}])
+    assert [t["kind"] for t in full.spec["traces"]] == ["segments"]
+    assert full.layout == empty.layout  # same trace set: an update, not a rebuild
 
 
 def test_marks_chart_hides_both_axes_down_to_the_tick_labels():

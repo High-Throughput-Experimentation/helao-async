@@ -127,6 +127,9 @@ class NetGraph:
         width_px=720,
         domain=((-1.0, 1.0), (-1.0, 1.0)),
         padding_px=None,
+        edge_styles=(),
+        node_colors=(),
+        hover_px=36.0,
     ):
         (x0, x1), (y0, y1) = domain
         self.domain = domain
@@ -137,6 +140,19 @@ class NetGraph:
         self.nodes: dict = {}
         self.edges: dict = {}
         self.pulses: list = []
+        #: Every (colour, width) an edge may take. A line's style is spec, so a
+        #: restyled edge rebuilds the chart; instead each style is its own
+        #: always-present trace and an edge moves between them as column data.
+        self.edge_styles = tuple(edge_styles)
+        #: Every colour a node may take. xy applies a column update in place only
+        #: when the point positions change too (measured: a colour-only change
+        #: leaves the old colour on screen), so a node trace exists per colour
+        #: and a node moves between them, exactly as edges do.
+        self.node_colors = tuple(node_colors)
+        #: Size of the hover disc (one fixed size: a size change is spec too).
+        self.hover_px = float(hover_px)
+        #: Key of the node under the pointer, drawn enlarged in its own colour.
+        self.hovered = None
 
     def add_node(
         self, key, x, y, *, color, label_color, text="", subtext="", size_px=28.0
@@ -162,6 +178,13 @@ class NetGraph:
 
     def pulse(self, edge_id, *, t0, color, direction="fwd", duration=0.6):
         self.pulses.append(Pulse(edge_id, direction, float(t0), float(duration), color))
+
+    def node_traces(self):
+        """Trace name -> node keys in point order, as ``marks`` lays them out."""
+        out: dict = {}
+        for n in self.nodes.values():
+            out.setdefault(f"nodes:{n.size_px:g}:{n.color}", []).append(n.key)
+        return out
 
     def ports(self):
         """edge_id -> (src port, dst port), fanned out where ends share a side."""
@@ -194,28 +217,22 @@ class NetGraph:
 
         Every scatter trace is always present (possibly empty), so the trace
         set -- and the layout token -- does not change as pulses come and go.
-        The node trace is LAST: xy's hover marker reuses the symbol of the last
-        scatter trace drawn, so any other order hovers as a pulse triangle.
+        A segments (edge) trace exists per declared style; the ``hovered`` disc sits just under the nodes.
         """
         self.pulses = [p for p in self.pulses if (now - p.t0) / p.duration < 1.0]
         ports = self.ports()
-        lines, texts, curves = [], [], {}
+        texts, curves = [], {}
+        by_style = {st: ([], [], [], []) for st in self.edge_styles}
         moving = {sym: ([], [], []) for sym in SYMBOLS}
         for eid in sorted(self.edges):
             e = self.edges[eid]
             pa, pb = ports[eid]
             pts = bezier(pa, pb)
             curves[eid] = (pts, arc_table(pts, self.sx, self.sy))
-            lines.append(
-                {
-                    "kind": "line",
-                    "name": f"edge:{eid}",
-                    "x": [p[0] for p in pts],
-                    "y": [p[1] for p in pts],
-                    "color": e.color,
-                    "width": e.width,
-                }
-            )
+            seg = by_style.setdefault((e.color, e.width), ([], [], [], []))
+            for (xa, ya), (xb, yb) in zip(pts, pts[1:]):
+                for col, v in zip(seg, (xa, ya, xb, yb)):
+                    col.append(v)
             if e.text:
                 mx, my = pts[len(pts) // 2]
                 texts.append(
@@ -241,12 +258,15 @@ class NetGraph:
             xs.append(x)
             ys.append(y)
             cs.append(p.color)
-        by_size: dict = {}
+        by_node = {
+            (n.size_px, c): ([], [])
+            for n in self.nodes.values()
+            for c in self.node_colors
+        }
         for n in self.nodes.values():
-            xs, ys, cs = by_size.setdefault(n.size_px, ([], [], []))
+            xs, ys = by_node.setdefault((n.size_px, n.color), ([], []))
             xs.append(n.x)
             ys.append(n.y)
-            cs.append(n.color)
             if n.text:
                 texts.append(
                     {
@@ -289,10 +309,38 @@ class NetGraph:
                 "opacity": 1.0,
             }
 
-        out = list(lines)
+        out = [
+            {
+                "kind": "segments",
+                "name": f"edges:{color}:{width:g}",
+                "x0": by_style[(color, width)][0],
+                "y0": by_style[(color, width)][1],
+                "x1": by_style[(color, width)][2],
+                "y1": by_style[(color, width)][3],
+                "color": color,
+                "width": width,
+            }
+            for color, width in sorted(by_style)
+        ]
         out += [scatter(f"pulse:{s}", moving[s], PULSE_PX, s) for s in SYMBOLS]
+        hov = self.nodes.get(self.hovered)
+        for color in sorted({c for _, c in by_node}):
+            on = hov is not None and hov.color == color
+            out.append(
+                scatter(
+                    f"hovered:{color}",
+                    ([hov.x], [hov.y], [color]) if on and hov else ([], [], []),
+                    self.hover_px,
+                    "circle",
+                )
+            )
         out += [
-            scatter(f"nodes:{size:g}", by_size[size], size, "circle")
-            for size in sorted(by_size)
+            scatter(
+                f"nodes:{size:g}:{color}",
+                (*by_node[(size, color)], [color] * len(by_node[(size, color)][0])),
+                size,
+                "circle",
+            )
+            for size, color in sorted(by_node)
         ]
         return out + texts

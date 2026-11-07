@@ -39,7 +39,6 @@ from helao.ui.shared.palette import (
     GROUP_ERROR_TEXT_CLASS,
     GROUP_LABEL_COLORS,
     GROUP_PULSE_DISPATCH,
-    GROUP_SELECTED_OUTLINE,
     GROUP_STATE_COLORS,
     REFLEX_MOTION_STOP_CLASS,
 )
@@ -52,20 +51,20 @@ GRAPH_H, GRAPH_W = 360, 720
 STRIP_H, STRIP_W = 120, 720
 #: Wide enough that a short server key (5-6 characters) sits inside its node.
 NODE_PX = 44.0
-#: xy's hover marker, chart-wide (one colour for every node): a translucent
-#: disc a third larger than the node, so the node reads as enlarged.
-NODE_HOVER = {
-    "size": round(NODE_PX * 1.35),
-    "color": GROUP_SELECTED_OUTLINE,
-    "opacity": 0.35,
-}
+#: The node under the pointer is redrawn this much larger, in its own colour.
+HOVER_PX = round(NODE_PX * 1.3)
+#: Every (colour, width) a server edge can take; a busy edge is thicker. Each
+#: is a fixed trace of the graph, so a status change is column data, not a
+#: chart rebuild.
+NODE_COLORS = tuple(sorted(set(GROUP_STATE_COLORS.values())))
+EDGE_STYLES = tuple(
+    sorted({(c, 4.0 if k == "busy" else 2.0) for k, c in GROUP_STATE_COLORS.items()})
+)
 FAST_MS, SLOW_MS = 16, 500
 STALE_S = 5.0
-#: Long enough that a browser stall (a chart rebuild blocks the main thread for
-#: ~150 ms, measured) cannot swallow a pulse; see :func:`shift_for_stall`.
+#: Long enough that the one remaining chart rebuild (a strip whose slot count
+#: changed, ~150 ms of frozen main thread) cannot swallow a pulse.
 PULSE_S = 1.2
-#: A tick gap beyond this is a client stall: pulses do not age through it.
-STALL_CAP_S = 0.05
 PENDING_TIMEOUT_S = 10.0
 NO_ORCH_NOTE = "This config has no orchestrator, so there is no server group to show."
 LOST_BANNER = "orchestrator unreachable"
@@ -180,19 +179,6 @@ def queue_pulse(pulses, p) -> list:
     return [*pulses, (edge, p[1], max(p[2], end), *p[3:])]
 
 
-def shift_for_stall(pulses, gap: float) -> list:
-    """Hold every pulse still through the part of a tick gap past ``STALL_CAP_S``.
-
-    The browser freezes while a chart rebuilds (and ticks stop), so a pulse
-    timed in wall-clock seconds is half gone, or all of it on a slow client,
-    by the first frame the user can see. Measured: 157 ms per rebuild here.
-    """
-    extra = gap - STALL_CAP_S
-    if extra <= 0:
-        return list(pulses)
-    return [(e, d, t0 + extra, *rest) for e, d, t0, *rest in pulses]
-
-
 def _estopped(snap: dict) -> bool:
     return snap.get("loop_state") == "estopped" or snap.get("orch_state") == "estopped"
 
@@ -300,11 +286,20 @@ def _color_key(status: str) -> str:
     return status if status in GROUP_STATE_COLORS else "idle"
 
 
-def graph_marks(snap: dict, pulses, now: float, orch_key: str, lost: bool):
-    """``(marks, live pulses)`` for the network graph."""
+def build_graph(
+    snap: dict, pulses, orch_key: str, lost: bool, hovered=None
+) -> NetGraph:
+    """The network graph for one snapshot: nodes, edges, queued pulses."""
     servers = snap.get("servers", [])
     pos = group_layout(orch_key, [s["key"] for s in servers])
-    g = NetGraph(height_px=GRAPH_H, width_px=GRAPH_W)
+    g = NetGraph(
+        height_px=GRAPH_H,
+        width_px=GRAPH_W,
+        edge_styles=EDGE_STYLES,
+        node_colors=NODE_COLORS,
+        hover_px=HOVER_PX,
+    )
+    g.hovered = hovered
     orch_status = (
         "unreachable"
         if lost
@@ -342,6 +337,14 @@ def graph_marks(snap: dict, pulses, now: float, orch_key: str, lost: bool):
     for edge_id, direction, t0, duration, color in pulses:
         if edge_id in g.edges:
             g.pulse(edge_id, t0=t0, color=color, direction=direction, duration=duration)
+    return g
+
+
+def graph_marks(
+    snap: dict, pulses, now: float, orch_key: str, lost: bool, hovered=None
+):
+    """``(marks, live pulses)`` for the network graph."""
+    g = build_graph(snap, pulses, orch_key, lost, hovered)
     marks = g.marks(now)
     return marks, [
         [p.edge_id, p.direction, p.t0, p.duration, p.color] for p in g.pulses
@@ -418,7 +421,9 @@ def _backend(token: str):
 
 def _render_graph(s, snap: dict, now: float, lost: bool, token: str) -> None:
     s._version += 1
-    marks, live = graph_marks(snap, s._pulses, now, _CFG["orch_key"], lost)
+    marks, live = graph_marks(
+        snap, s._pulses, now, _CFG["orch_key"], lost, s._hovered or None
+    )
     s._pulses = tuple(tuple(p) for p in live)
     p = plots.marks_chart(
         marks,
@@ -426,7 +431,7 @@ def _render_graph(s, snap: dict, now: float, lost: bool, token: str) -> None:
         y_domain=(-1.0, 1.0),
         panel_id=f"group-graph-{token}",
         version=s._version,
-        hover=NODE_HOVER,
+        hover_events=True,
     )
     s.graph_spec, s.graph_url, s.graph_layout = p.spec, p.buffer_url, p.layout
 
@@ -490,7 +495,7 @@ def reset_for_mount(s) -> None:
     s._old_orch = False
     s._first_at = 0.0
     s._full_at = 0.0
-    s._tick_at = 0.0
+    s._hovered = ""
 
 
 def apply_tick(s, feed, now: float, token: str) -> bool:
@@ -515,8 +520,7 @@ def apply_tick(s, feed, now: float, token: str) -> bool:
     else:
         frames, s._cursor = new_frames(feed, s._cursor)
         replay = True
-    pulses = shift_for_stall(s._pulses, now - s._tick_at if s._tick_at else 0.0)
-    s._tick_at = now
+    pulses = list(s._pulses)
     for f in frames:
         if replay:
             for ev in f.get("events", []):
@@ -616,7 +620,7 @@ class GroupState(rx.State):
     _unconfirmed: str = ""  # button whose "not confirmed" message is showing
     _probe_at: float = 0.0
     _first_at: float = 0.0
-    _tick_at: float = 0.0
+    _hovered: str = ""  # key of the hovered node, or ""
     _old_orch: bool = False
 
     @rx.event
@@ -668,6 +672,27 @@ class GroupState(rx.State):
             self.action_error = err
             if err:
                 self.pending = ""
+
+    @rx.event
+    def hover_node(self, payload: dict):
+        """Pointer over (or off) a node: redraw the graph now, not at the next tick.
+
+        Only the graph's point columns change, so xy updates in place; the
+        2 Hz idle tick would otherwise lag the pointer by up to 500 ms.
+        """
+        trace = (payload or {}).get("trace")
+        idx = (payload or {}).get("index", -1)
+        if not self._snap:
+            return
+        now = time.time()
+        lost = stream_lost(_FEED, now)
+        g = build_graph(self._snap[0], (), _CFG["orch_key"], lost)
+        keys = g.node_traces().get(trace, [])
+        key = keys[idx] if 0 <= idx < len(keys) else ""
+        if key == self._hovered:
+            return
+        self._hovered = key
+        _render_graph(self, self._snap[0], now, lost, self.router.session.client_token)
 
     async def _select(self, kind: str, payload: dict):
         async with self:
@@ -804,7 +829,12 @@ def group_page() -> rx.Component:
     )
     charts = rx.vstack(
         plots.chart(
-            S.graph_spec, S.graph_url, S.graph_layout, height=GRAPH_H, width=GRAPH_W
+            S.graph_spec,
+            S.graph_url,
+            S.graph_layout,
+            height=GRAPH_H,
+            width=GRAPH_W,
+            on_hover=S.hover_node,
         ),
         rx.text("EXP", size="1", weight="bold"),
         plots.chart(

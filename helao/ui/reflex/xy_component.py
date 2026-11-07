@@ -361,6 +361,9 @@ export function createController(options) {
     pendingUrl: null,
     cleanup: null,
     onSelect: options.onSelect,
+    onHover: options.onHover,
+    hovered: false,
+    observer: null,
     lastUrl: null,
     // One fetch outstanding per chart; the newest URL to arrive meanwhile waits
     // here and everything between it and the one in flight is dropped.
@@ -419,10 +422,42 @@ export function createController(options) {
     st.onSelect({ type: "click", x: d.x, y: d.y, trace: d.trace, index: d.index });
   };
 
+  // Hover reaches the page the same way: `xy:hover` (only when the point under
+  // the pointer changes) carries `points[0] = {trace: <name>, index}`. xy has no
+  // event for moving from a point onto empty plot, so that is read off the
+  // tooltip element: xy hides it (display:none) in exactly that case, and the
+  // chart styles it invisible, so it is a free "left every point" signal.
+  // `xy:leave` is the pointer leaving the chart.
+  st.onHoverEvent = (event) => {
+    const p = (((event && event.detail) || {}).points || [])[0];
+    if (!st.onHover || !p) return;
+    st.hovered = true;
+    st.onHover({ trace: String(p.trace), index: p.index });
+  };
+  st.onLeave = () => {
+    if (!st.hovered) return;
+    st.hovered = false;
+    if (st.onHover) st.onHover({ trace: "", index: -1 });
+  };
+  st.onTooltipMutation = (records) => {
+    for (const r of records) {
+      const t = r.target;
+      if (t && t.dataset && t.dataset.xySlot === "tooltip" && t.style.display === "none") {
+        st.onLeave();
+      }
+    }
+  };
+
   st.attach = (mod, el) => {
     st.module = mod;
     st.el = el;
     el.addEventListener("xy:click", st.onClick);
+    el.addEventListener("xy:hover", st.onHoverEvent);
+    el.addEventListener("xy:leave", st.onLeave);
+    if (typeof MutationObserver === "function" && typeof el.nodeType === "number") {
+      st.observer = new MutationObserver(st.onTooltipMutation);
+      st.observer.observe(el, { subtree: true, attributes: true, attributeFilter: ["style"] });
+    }
     const url = st.pendingUrl;
     st.pendingUrl = null;
     if (url) st.refetch(url);
@@ -538,6 +573,7 @@ export function createController(options) {
 
   st.dispose = () => {
     st.disposed = true;
+    if (st.observer) st.observer.disconnect();
     st.teardown();
   };
 
@@ -548,11 +584,11 @@ export function createController(options) {
 #: The React wrapper. Deliberately thin — it wires props and lifecycle to the
 #: controller above and holds no logic of its own.
 _SHIM_COMPONENT_JS = """
-export function XYChart({ spec, bufferUrl, layout, height, width, onSelect }) {
+export function XYChart({ spec, bufferUrl, layout, height, width, onSelect, onHover }) {
   const hostRef = useRef(null);
   const ctrlRef = useRef(null);
   if (ctrlRef.current === null) {
-    ctrlRef.current = createController({ spec: spec, onSelect: onSelect });
+    ctrlRef.current = createController({ spec: spec, onSelect: onSelect, onHover: onHover });
   }
 
   useEffect(() => {
@@ -576,9 +612,10 @@ export function XYChart({ spec, bufferUrl, layout, height, width, onSelect }) {
     const st = ctrlRef.current;
     st.spec = spec;
     st.onSelect = onSelect;
+    st.onHover = onHover;
     st.applyLayout(layout);
     st.refetch(bufferUrl);
-  }, [spec, bufferUrl, layout, onSelect]);
+  }, [spec, bufferUrl, layout, onSelect, onHover]);
 
   // minHeight and flexShrink belong here, on the element xy observes and
   // draws into -- not on a wrapper. `height` alone collapses to nothing when
@@ -634,6 +671,7 @@ class XYChart(rx.Component):
     width: rx.Var[str]
 
     on_select: rx.EventHandler[lambda payload: [payload]]
+    on_hover: rx.EventHandler[lambda payload: [payload]]
 
     def add_imports(self):
         """Declare the React hooks the shim uses.
@@ -654,7 +692,7 @@ def xy_chart(**props) -> XYChart:
     """Create an :class:`XYChart`.
 
     Args:
-        **props: ``spec``, ``buffer_url``, ``height``, ``width``, ``on_select``.
+        **props: ``spec``, ``buffer_url``, ``height``, ``width``, ``on_select``, ``on_hover``.
 
     Returns:
         XYChart: The component.
