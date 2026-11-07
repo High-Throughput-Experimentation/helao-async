@@ -233,8 +233,9 @@ Pure Python. It builds the marks for one strip from a list of items.
 └───────────────────────────────────────────┴──────────────────────────────┘
 ```
 
-- **Registration:** the route is added only when the group config has an
-  orchestrator, and the orchestrator's host and port come from the config.
+- **Registration:** the route is always registered. A config with no
+  orchestrator renders a "no orchestrator" note there; otherwise the
+  orchestrator's host and port come from the config.
   - `GroupState` is a plain `rx.State`, because there is one page per
     orchestrator.
   - Its classes are created **before** `add_page`, because the page callable is
@@ -271,8 +272,16 @@ Pure Python. It builds the marks for one strip from a list of items.
   the stream as lost while disconnected or when no frame has arrived for over
   5 s. Every node then turns `GROUP_UNREACHABLE`, a banner reads "orchestrator
   unreachable", and the buttons are disabled.
-- **Older orchestrator:** a `/ws_orch` handshake 404 shows "orchestrator lacks
-  /ws_orch — update the orchestrator".
+- **Older orchestrator:** detected by heuristic, not by parsing a 404. If no
+  frame arrives within 5 s while the orchestrator still answers over HTTP, the
+  page shows "orchestrator lacks /ws_orch — update the orchestrator".
+- **Frames and selection:**
+  - Frames are watermarked by local arrival order, not by `seq_no`, so an
+    orchestrator restart cannot freeze the page.
+  - E-stop is never gated by another call's pending state, and stays enabled
+    when the stream is lost.
+  - A selection is identified by the sequence ordinal of the item, so it
+    survives window shifts.
 - **Unknown status:** an unknown status string uses the idle colour and shows
   the raw text on the node.
 

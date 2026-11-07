@@ -689,9 +689,9 @@ def test_a_moving_pulse_keeps_the_layout_but_a_new_edge_colour_rebuilds():
     assert _mc(_marks(color=GROUP_STATE_COLORS["error"], pulse_x=0.1)).layout != base
 
 
-def test_changed_annotation_text_rebuilds_while_annotations_are_in_the_token():
-    assert plots.ANNOTATIONS_IN_TOKEN is True
-    assert _mc(_marks(text="A")).layout != _mc(_marks(text="B")).layout
+def test_changed_annotation_text_updates_in_place():
+    assert plots.ANNOTATIONS_IN_TOKEN is False
+    assert _mc(_marks(text="A")).layout == _mc(_marks(text="B")).layout
 
 
 def test_marks_chart_rejects_an_unknown_kind():

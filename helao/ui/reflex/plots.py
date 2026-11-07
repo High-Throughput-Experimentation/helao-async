@@ -953,7 +953,7 @@ PLACEHOLDER_XY = 1e6
 #: Annotations (text, bands, rules) are spec, not columns. Until a browser check
 #: shows xy's append path applies a changed annotation in place, their content
 #: joins the layout token and a changed label rebuilds the chart.
-ANNOTATIONS_IN_TOKEN = True
+ANNOTATIONS_IN_TOKEN = False
 
 #: Plot padding on every side, in px. netgraph's px <-> data scale assumes it.
 CHART_PADDING_PX = 8

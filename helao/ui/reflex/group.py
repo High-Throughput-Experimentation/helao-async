@@ -41,9 +41,11 @@ from helao.ui.shared.palette import (
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 GRAPH_H, GRAPH_W = 360, 720
-#: At least 70 px: below that the progress bar (y=0.08) and the second label
-#: line (y=0.32) overlap in pixels once the chart padding is taken off.
-STRIP_H, STRIP_W = 70, 720
+#: xy lays a chart out at least 120 px tall whatever its host reserves, so a
+#: shorter host lets the strip spill over the label and chart below it.
+STRIP_H, STRIP_W = 120, 720
+#: Wide enough that a short server key (5-6 characters) sits inside its node.
+NODE_PX = 44.0
 FAST_MS, SLOW_MS = 16, 500
 STALE_S = 5.0
 PULSE_S = 0.6
@@ -273,6 +275,7 @@ def graph_marks(snap: dict, pulses, now: float, orch_key: str, lost: bool):
         label_color=GROUP_LABEL_COLORS[orch_status],
         text=orch_key,
         subtext=snap.get("orch_action") or "",
+        size_px=NODE_PX,
     )
     for s in servers:
         status = "unreachable" if lost else s.get("status", "idle")
@@ -285,6 +288,7 @@ def graph_marks(snap: dict, pulses, now: float, orch_key: str, lost: bool):
             label_color=GROUP_LABEL_COLORS[key],
             text=text,
             subtext=s.get("active_action") or "",
+            size_px=NODE_PX,
         )
         g.add_edge(
             s["key"],
