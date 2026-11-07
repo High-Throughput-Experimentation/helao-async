@@ -172,6 +172,16 @@ class RemoteBackend:
         )
         return resp or {}
 
+    async def get_object(self, kind, uuid):
+        """One experiment or action by uuid (``/get_object``), or ``None``.
+
+        ``None`` covers both "not found" and "orchestrator unreachable"; the
+        /group info box shows the empty state either way.
+        """
+        return await self._call(
+            "get_object", params_dict={"kind": kind, "uuid": str(uuid)}
+        )
+
     async def get_histories(self):
         resp = await self._call("get_histories")
         return resp or {"action": [], "experiment": [], "sequence": []}
@@ -247,20 +257,22 @@ class RemoteBackend:
     async def remove_action(self, idx):
         await self._call("remove_action", params_dict={"idx": idx})
 
-    async def start(self):
-        await self._call("start")
+    async def start(self, strict: bool = False):
+        await self._call("start", strict=strict)
 
-    async def stop(self, reset_run_id: bool = False):
-        await self._call("stop", params_dict={"reset_run_id": reset_run_id})
+    async def stop(self, reset_run_id: bool = False, strict: bool = False):
+        await self._call(
+            "stop", params_dict={"reset_run_id": reset_run_id}, strict=strict
+        )
 
     async def skip(self):
         await self._call("skip_experiment")
 
-    async def estop(self):
-        await self._call("estop_orch")
+    async def estop(self, strict: bool = False):
+        await self._call("estop_orch", strict=strict)
 
-    async def clear_estop(self):
-        await self._call("clear_estop")
+    async def clear_estop(self, strict: bool = False):
+        await self._call("clear_estop", strict=strict)
 
     async def clear_sequences(self):
         await self._call("clear_sequences")

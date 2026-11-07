@@ -41,6 +41,10 @@ async def test_normalizer_face_is_behavioral_over_real_frames():
 
     results = {}
     for channel, normalizer in NORMALIZERS.items():
+        if channel == "ws_orch":
+            # Whole snapshots read from ``WsIngest.raw``; nothing is numeric.
+            assert normalizer([frames["ws_live"]]) == ({}, [])
+            continue
         right_cols, _ = normalizer([frames[channel]])
         other = next(c for c in frames if c != channel)
         wrong_cols, wrong_rows = normalizer([frames[other]])
@@ -107,7 +111,7 @@ def test_registry_has_no_ws_status_consumer(monkeypatch):
     """
     assert set(VIS_KEY_TO_WS_PATH) == {"live_vis", "action_vis"}
     assert set(VIS_KEY_TO_WS_PATH.values()) == {"ws_live", "ws_data"}
-    assert set(NORMALIZERS) == {"ws_live", "ws_data"}
+    assert set(NORMALIZERS) == {"ws_live", "ws_data", "ws_orch"}  # ws_orch: /group page
     assert "ws_status" in wf.CHANNELS  # the channel exists; only the consumer does not
 
     world_cfg = {

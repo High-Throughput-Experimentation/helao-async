@@ -139,6 +139,13 @@ from helao.ui.reflex.sync_quarantine import (
     sync_quarantine_page,
 )
 from helao.ui.reflex.logs import LogsState, configure_logs, logs_page
+from helao.ui.reflex.group import (
+    GroupState,
+    configure_group,
+    group_page,
+    start_feed,
+    stop_feed,
+)
 from helao.ui.reflex.state import make_panel_state
 from helao.ui.reflex.xy_component import make_buffer_router
 
@@ -151,6 +158,7 @@ SHELL_ROUTES = (
     "/live",
     "/action",
     "/operator",
+    "/group",
     "/browser",
     "/control",
     "/composition",
@@ -398,29 +406,99 @@ def _render_panel(target: PanelTarget):
         )
 
 
+def _menu_item(text: str, href: str):
+    """One navigation entry inside a dropdown group."""
+    return rx.menu.item(_icon_label(NAV_ICONS[text], text), on_click=rx.redirect(href))
+
+
+def _icon_label(icon: str, text: str):
+    """A Lucide icon beside its label, so nav entries read at a glance."""
+    return rx.hstack(rx.icon(icon, size=16), rx.text(text), spacing="1", align="center")
+
+
+def _nav_menu(label: str, items: tuple, gated: tuple):
+    """A navigation button that drops down its pages.
+
+    ``items`` are always shown; ``gated`` only when credentials are available
+    (see :data:`CREDENTIAL_ROUTES`). Each is a ``(text, href)`` pair.
+    """
+    return rx.menu.root(
+        rx.menu.trigger(
+            rx.button(
+                _icon_label(NAV_ICONS[label], label),
+                rx.icon("chevron-down", size=14),
+                variant="ghost",
+            )
+        ),
+        rx.menu.content(
+            *[_menu_item(text, href) for text, href in items],
+            rx.cond(
+                CredentialsState.has_credentials,
+                rx.fragment(*[_menu_item(text, href) for text, href in gated]),
+            ),
+        ),
+    )
+
+
+#: Dropdown groups in the nav: ``(label, always shown, credential-gated)``.
+#: The gated entries together must be exactly :data:`CREDENTIAL_ROUTES`.
+NAV_MENUS = (
+    (
+        "Data",
+        (("Browser", "/browser"),),
+        (
+            ("Composition", "/composition"),
+            ("UV-Vis", "/uvvis"),
+            ("XAFS", "/xafs"),
+            ("XRD", "/xrds"),
+        ),
+    ),
+    (
+        "Admin",
+        (("Control", "/control"), ("Quarantine", "/quarantine"), ("Logs", "/logs")),
+        (("Retire", "/retire"),),
+    ),
+)
+
+
+#: Top-level nav links, in display order: ``(text, href)``.
+NAV_LINKS = (
+    ("Group", "/group"),
+    ("Operator", "/operator"),
+    ("Action", "/action"),
+    ("Live", "/live"),
+)
+
+#: Lucide icon per nav entry (top-level and menu items), keyed by its label.
+NAV_ICONS = {
+    "Group": "network",
+    "Operator": "list-checks",
+    "Action": "zap",
+    "Live": "activity",
+    "Data": "database",
+    "Browser": "folder-open",
+    "Composition": "flask-conical",
+    "UV-Vis": "sun",
+    "XAFS": "atom",
+    "XRD": "gem",
+    "Admin": "settings",
+    "Control": "sliders-horizontal",
+    "Quarantine": "shield-alert",
+    "Logs": "scroll-text",
+    "Retire": "archive",
+}
+
+
 def _nav():
     """Render the shared navigation bar."""
     return rx.hstack(
         rx.heading("HELAO", size="4"),
         rx.spacer(),
-        rx.link("Live", href="/live"),
-        rx.link("Action", href="/action"),
-        rx.link("Operator", href="/operator"),
-        rx.link("Browser", href="/browser"),
-        rx.link("Control", href="/control"),
-        rx.cond(
-            CredentialsState.has_credentials,
-            rx.hstack(
-                rx.link("Composition", href="/composition"),
-                rx.link("UV-Vis", href="/uvvis"),
-                rx.link("XAFS", href="/xafs"),
-                rx.link("XRD", href="/xrds"),
-                rx.link("Retire", href="/retire"),
-                spacing="4",
-            ),
-        ),
-        rx.link("Quarantine", href="/quarantine"),
-        rx.link("Logs", href="/logs"),
+        *[
+            rx.link(_icon_label(NAV_ICONS[text], text), href=href)
+            for text, href in NAV_LINKS
+        ],
+        *[_nav_menu(label, items, gated) for label, items, gated in NAV_MENUS],
         width="100%",
         padding="0.75em 1em",
         align="center",
@@ -588,6 +666,8 @@ def build_app(world_cfg: dict, server_key: str):
     assert RetireState is not None
     assert QuarantineState is not None
     assert LogsState is not None
+    # And the /group page's state: created at import, before add_page.
+    assert GroupState is not None
     # The operator's backend is built per session from this config; without
     # this the page renders but can never reach an orchestrator.
     configure_operator(world_cfg, server_key)
@@ -601,6 +681,7 @@ def build_app(world_cfg: dict, server_key: str):
     # And the sync-quarantine page, off unless this server opts in.
     configure_quarantine(world_cfg, server_key)
     configure_logs(world_cfg, server_key)
+    configure_group(world_cfg)
 
     # The buffer route carries bulk column data out-of-band, so megabyte float
     # arrays never traverse Reflex's JSON state channel. `api_transformer` is
@@ -669,6 +750,11 @@ def build_app(world_cfg: dict, server_key: str):
         title="HELAO operator",
     )
     application.add_page(
+        lambda: _page("Server group", group_page(), "/group"),
+        route="/group",
+        title="HELAO group",
+    )
+    application.add_page(
         lambda: _page("Data browser", browser_page(), "/browser"),
         route="/browser",
         title="HELAO browser",
@@ -726,11 +812,15 @@ def build_app(world_cfg: dict, server_key: str):
         loop would outlive the app.
         """
         registry.start()
+        start_feed()
         LOGGER.info(f"reflex ingest started for targets: {registry.targets()}")
         try:
             yield
         finally:
-            await registry.stop()
+            try:
+                await stop_feed()
+            finally:
+                await registry.stop()
             LOGGER.info("reflex ingest stopped")
 
     application.register_lifespan_task(_ingest_lifespan)

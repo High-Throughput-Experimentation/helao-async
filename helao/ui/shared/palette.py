@@ -91,6 +91,7 @@ TW: Final[Mapping[str, str]] = {
     "violet-700": "#6d28d9",
     "purple-800": "#6b21a8",
     "fuchsia-600": "#c026d3",
+    "pink-50": "#fdf2f8",
     "pink-400": "#f472b6",
     "pink-500": "#ec4899",
     # The /control page canvas. A rose rather than a sixth cool tint because it
@@ -203,6 +204,7 @@ REFLEX_PAGE_TINTS: Final[Mapping[str, str]] = {
     "/retire": "orange-50",
     "/quarantine": "red-50",
     "/logs": "indigo-50",
+    "/group": "pink-50",
 }
 """One page canvas per Reflex route — the functional-section signal.
 
@@ -947,6 +949,60 @@ TRANSPARENT: Final[str] = "rgba(0, 0, 0, 0)"
 WINDOW_COLORMAP: Final[str] = "magma"
 AVERAGE_SPECTRUM: Final[str] = TW["slate-300"]
 WINDOW_BAND: Final[str] = TW["sky-600"]
+
+# --- /group page: server-group graph and timelines ----------------------------
+GROUP_SHADES: Final[Mapping[str, str]] = {
+    "idle": "slate-600",
+    "busy": "sky-700",
+    "active": "sky-700",
+    "done": "emerald-700",
+    "error": "red-600",
+    "estop": "red-900",
+    "unreachable": "amber-700",
+    "queued": "slate-300",
+}
+"""State -> TW shade name for the /group graph, strips and badges.
+
+Server states (idle/busy/error/estop/unreachable) colour nodes and edges; item
+states (queued/active/done/error) colour timeline segments. ``active`` is the
+same shade as ``busy`` on purpose: the running action and the busy server are
+one fact. Weights are 600/700 so the white label drawn on a node or segment
+clears the 4.5 body floor; ``queued`` is the one light fill and takes dark text.
+"""
+
+GROUP_STATE_COLORS: Final[Mapping[str, str]] = {
+    state: TW[name] for state, name in GROUP_SHADES.items()
+}
+GROUP_IDLE: Final[str] = GROUP_STATE_COLORS["idle"]
+GROUP_BUSY: Final[str] = GROUP_STATE_COLORS["busy"]
+GROUP_DONE: Final[str] = GROUP_STATE_COLORS["done"]
+GROUP_ERROR: Final[str] = GROUP_STATE_COLORS["error"]
+GROUP_ESTOP: Final[str] = GROUP_STATE_COLORS["estop"]
+GROUP_UNREACHABLE: Final[str] = GROUP_STATE_COLORS["unreachable"]
+GROUP_QUEUED: Final[str] = GROUP_STATE_COLORS["queued"]
+#: Forward (dispatch) pulse along an edge.
+GROUP_PULSE_DISPATCH: Final[str] = TW["violet-600"]
+GROUP_LABEL_COLORS: Final[Mapping[str, str]] = {
+    state: (TW["slate-900"] if state == "queued" else WHITE) for state in GROUP_SHADES
+}
+GROUP_SELECTED_OUTLINE: Final[str] = TW["slate-900"]
+#: Drawn as a bar under the segment label, never behind label text.
+GROUP_PROGRESS: Final[str] = TW["sky-200"]
+GROUP_EDGE_TEXT: Final[str] = TW["slate-700"]
+#: Literal class strings, not built at runtime: Tailwind only emits utilities it
+#: can see, and a class assembled from a state var would render unstyled.
+GROUP_BADGE_CLASSES: Final[Mapping[str, str]] = {
+    "idle": "bg-slate-600 text-white",
+    "busy": "bg-sky-700 text-white",
+    "active": "bg-sky-700 text-white",
+    "done": "bg-emerald-700 text-white",
+    "error": "bg-red-600 text-white",
+    "estop": "bg-red-900 text-white",
+    "unreachable": "bg-amber-700 text-white",
+    "queued": "bg-slate-300 text-slate-900",
+}
+#: Text on the page/card white (SURFACE_WHITE).
+GROUP_ERROR_TEXT_CLASS: Final[str] = "text-red-700"
 
 
 def _rgba(hex_color: str, alpha: float) -> str:

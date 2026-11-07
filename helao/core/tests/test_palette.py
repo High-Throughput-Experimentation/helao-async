@@ -123,6 +123,7 @@ CANONICAL_TAILWIND: Final[dict[str, str]] = {
     "purple-800": "#6b21a8",
     "fuchsia-600": "#c026d3",
     "fuchsia-700": "#a21caf",
+    "pink-50": "#fdf2f8",
     "pink-400": "#f472b6",
     "pink-500": "#ec4899",
     "rose-50": "#fff1f2",
@@ -596,6 +597,8 @@ PAGE_TINT_TEXT_ROWS: Final[dict[tuple[str, str], float]] = {
     ("slate-600", "red-50"): 6.93,
     ("slate-900", "indigo-50"): 15.97,  # /logs
     ("slate-600", "indigo-50"): 6.78,
+    ("slate-900", "pink-50"): 16.35,  # /group
+    ("slate-600", "pink-50"): 6.94,
 }
 
 # The shade slate-600 replaced, kept as a measurement rather than a comment.
@@ -616,6 +619,7 @@ SLATE_500_ON_TINT_ROWS: Final[dict[tuple[str, str], float]] = {
     ("slate-500", "cyan-50"): 4.57,
     ("slate-500", "teal-50"): 4.56,
     ("slate-500", "yellow-50"): 4.60,
+    ("slate-500", "pink-50"): 4.36,  # /group
 }
 
 # Each table's header text on its own header background. Body-floor rows: a
@@ -900,7 +904,7 @@ def test_page_tint_rows_cover_every_route_twice() -> None:
 def test_slate_500_is_measured_on_every_tint(pair: tuple[str, str]) -> None:
     """The shade the Reflex stack moved *away* from, pinned as a measurement.
 
-    Six of the thirteen tints put ``slate-500`` under the 4.5 body floor, which
+    Seven of the fourteen tints put ``slate-500`` under the 4.5 body floor, which
     is why ``REFLEX_MUTED_TEXT`` is ``slate-600``.
     Asserting the numbers here means a future edit that reintroduces
     ``slate-500`` cannot claim it was fine, and a Tailwind revision that changed
@@ -911,8 +915,8 @@ def test_slate_500_is_measured_on_every_tint(pair: tuple[str, str]) -> None:
     assert measured == pytest.approx(SLATE_500_ON_TINT_ROWS[pair], abs=0.01)
 
 
-def test_slate_500_fails_the_body_floor_on_six_of_the_thirteen_tints() -> None:
-    """Exactly six, and named -- not "at least one".
+def test_slate_500_fails_the_body_floor_on_seven_of_the_fourteen_tints() -> None:
+    """Exactly seven, and named -- not "at least one".
 
     A count would pass if the failing set moved to four different tints, and
     the point of the row block above is that *which* surfaces fail is not
@@ -922,7 +926,7 @@ def test_slate_500_fails_the_body_floor_on_six_of_the_thirteen_tints() -> None:
     ``/composition`` at 4.60 and did not join them, which is the other half of
     the same point -- the set is measured, not predicted. ``orange-50`` joined
     them with ``/retire``, at 4.48, ``red-50`` with ``/quarantine``, at 4.35, and
-    ``indigo-50`` with ``/logs``, at 4.26.
+    ``indigo-50`` with ``/logs``, at 4.26. ``pink-50`` joined them with ``/group``, at 4.36.
     """
     failing = {
         bg
@@ -936,6 +940,7 @@ def test_slate_500_fails_the_body_floor_on_six_of_the_thirteen_tints() -> None:
         "orange-50",
         "red-50",
         "indigo-50",
+        "pink-50",
     }
 
 
@@ -2040,3 +2045,69 @@ def test_the_ramps_light_end_is_the_newest_trace_and_is_visible() -> None:
     # And the ramp must still span enough luminance to read as recency at all.
     spread = _luminance(palette.RAMP_START) / _luminance(palette.RAMP_END)
     assert spread > 4.0, f"ramp spread collapsed to {spread:.1f}x; recency unreadable"
+
+
+# --- /group page ------------------------------------------------------------
+GROUP_STATES = {
+    "idle",
+    "busy",
+    "active",
+    "done",
+    "error",
+    "estop",
+    "unreachable",
+    "queued",
+}
+
+
+def test_group_state_maps_cover_exactly_the_states() -> None:
+    assert set(palette.GROUP_SHADES) == GROUP_STATES
+    assert set(palette.GROUP_STATE_COLORS) == GROUP_STATES
+    assert set(palette.GROUP_LABEL_COLORS) == GROUP_STATES
+    assert set(palette.GROUP_BADGE_CLASSES) == GROUP_STATES
+
+
+def test_group_state_colours_are_tw_shades() -> None:
+    for state, name in palette.GROUP_SHADES.items():
+        assert palette.GROUP_STATE_COLORS[state] == TW[name]
+
+
+def test_group_labels_clear_the_body_floor_on_their_fills() -> None:
+    for state, fill in palette.GROUP_STATE_COLORS.items():
+        label = palette.GROUP_LABEL_COLORS[state]
+        measured = contrast_ratio(label, fill)
+        assert measured >= FLOOR_BODY_TEXT, f"{state}: {measured:.2f}"
+
+
+def test_group_badges_use_their_state_shade() -> None:
+    for state, classes in palette.GROUP_BADGE_CLASSES.items():
+        parts = classes.split()
+        bg = palette.GROUP_SHADES[state]
+        assert f"bg-{bg}" in parts
+        (text,) = [c[len("text-") :] for c in parts if c.startswith("text-")]
+        fg = palette.WHITE if text == "white" else TW[text]
+        assert fg == palette.GROUP_LABEL_COLORS[state]
+        measured = contrast_ratio(fg, TW[bg])
+        assert measured >= FLOOR_BODY_TEXT, f"{state}: {measured:.2f}"
+
+
+def test_group_standalone_roles_clear_their_floors() -> None:
+    white = palette.SURFACE_WHITE
+    assert contrast_ratio(palette.GROUP_EDGE_TEXT, white) >= FLOOR_BODY_TEXT
+    assert contrast_ratio(palette.GROUP_SELECTED_OUTLINE, white) >= FLOOR_CONTROL
+    assert contrast_ratio(palette.GROUP_PULSE_DISPATCH, white) >= FLOOR_CONTROL
+    busy = palette.GROUP_STATE_COLORS["busy"]
+    assert contrast_ratio(palette.GROUP_PROGRESS, busy) >= FLOOR_CONTROL
+    shade = palette.GROUP_ERROR_TEXT_CLASS.removeprefix("text-")
+    assert contrast_ratio(TW[shade], white) >= FLOOR_BODY_TEXT
+
+
+def test_group_named_constants_follow_the_map() -> None:
+    assert palette.GROUP_IDLE == palette.GROUP_STATE_COLORS["idle"]
+    assert palette.GROUP_BUSY == palette.GROUP_STATE_COLORS["busy"]
+    assert palette.GROUP_DONE == palette.GROUP_STATE_COLORS["done"]
+    assert palette.GROUP_ERROR == palette.GROUP_STATE_COLORS["error"]
+    assert palette.GROUP_ESTOP == palette.GROUP_STATE_COLORS["estop"]
+    assert palette.GROUP_UNREACHABLE == palette.GROUP_STATE_COLORS["unreachable"]
+    assert palette.GROUP_QUEUED == palette.GROUP_STATE_COLORS["queued"]
+    assert palette.GROUP_PULSE_DISPATCH == TW["violet-600"]

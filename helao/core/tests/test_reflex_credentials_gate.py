@@ -55,10 +55,34 @@ def test_ungated_page_is_unchanged(route):
     assert body.count("has_credentials") == nav.count("has_credentials")
 
 
-def test_nav_hides_exactly_the_gated_links():
+def test_nav_menus_gate_exactly_the_credential_routes():
+    gated = {href for _, _, g in app.NAV_MENUS for _, href in g}
+    shown = {href for _, items, _ in app.NAV_MENUS for _, href in items}
+    assert gated == set(app.CREDENTIAL_ROUTES)
+    assert not shown & gated
+
+
+@pytest.mark.parametrize("menu", app.NAV_MENUS, ids=lambda m: m[0])
+def test_each_menu_hides_exactly_its_gated_links(menu):
+    label, items, gated = menu
+    rendered = str(app._nav_menu(label, items, gated))
+    gate = rendered.index("has_credentials")
+    for _, href in gated:
+        assert rendered.index(f'"{href}"') > gate, href
+    for _, href in items:
+        assert rendered.index(f'"{href}"') < gate, href
+
+
+def test_nav_renders_every_menu_and_top_level_link():
     nav = str(app._nav())
-    gate = nav.index("has_credentials")
-    for route in app.CREDENTIAL_ROUTES:
-        assert nav.index(f'"{route}"') > gate, route
-    for route in ("/live", "/action", "/operator", "/browser", "/control"):
-        assert nav.index(f'"{route}"') < gate, route
+    labels = [t for t, _ in app.NAV_LINKS] + [m[0] for m in app.NAV_MENUS]
+    assert labels == ["Group", "Operator", "Action", "Live", "Data", "Admin"]
+    entries = {t for _, i, g in app.NAV_MENUS for t, _ in (*i, *g)}
+    assert set(app.NAV_ICONS) == set(labels) | entries
+    positions = [nav.index(f'"{label}"') for label in labels]
+    assert positions == sorted(positions)
+    for _, route in app.NAV_LINKS:
+        assert f'"{route}"' in nav, route
+    for _, items, gated in app.NAV_MENUS:
+        for _, href in (*items, *gated):
+            assert f'"{href}"' in nav, href

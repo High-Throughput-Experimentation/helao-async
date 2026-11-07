@@ -1,0 +1,551 @@
+# pyright: reportOptionalSubscript=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportOptionalMemberAccess=false
+"""OrchGraphFeed against a fake orch, plus the OrchHost wiring and /get_object."""
+
+import asyncio
+
+import pytest
+
+from helao.core.models.hlostatus import HloStatus
+from helao.core.models.orchstatus import LoopStatus
+from helao.hexagon.tests.group_fakes import (
+    T0,
+    NoScan,
+    fake_act,
+    fake_exp,
+    fake_orch,
+    fake_seq,
+)
+
+
+class _Q:
+    def __init__(self):
+        self.items = []
+
+    def put_nowait(self, item):
+        self.items.append(item)
+
+
+def _feed(orch):
+    from helao.hexagon.app.orch_graph_feed import OrchGraphFeed
+
+    return OrchGraphFeed(orch, _Q())
+
+
+def test_unchanged_state_sends_nothing_but_the_heartbeat_still_arrives():
+    feed = _feed(fake_orch())
+    first = feed.step(0.0)
+    assert first is not None and first["seq_no"] == 1
+    assert feed.step(0.1) is None
+    assert feed.step(1.9) is None
+    beat = feed.step(2.0)
+    assert beat is not None and beat["seq_no"] == 2 and beat["events"] == []
+    assert beat is not first  # WsPublisher identity cache: a new object per publish
+
+
+def test_first_frame_primes_without_replaying_old_finishes():
+    orch = fake_orch()
+    old = fake_act()
+    orch.globalstatusmodel.nonactive_dict = {HloStatus.finished: {old.action_uuid: old}}
+    assert _feed(orch).step(0.0)["events"] == []
+
+
+def test_dispatch_then_finish_events():
+    orch = fake_orch()
+    feed = _feed(orch)
+    feed.step(0.0)
+    a = fake_act(server="SIM", name="acquire")
+    orch.globalstatusmodel.active_dict = {a.action_uuid: a}
+    frame = feed.step(0.1)
+    assert [(e["kind"], e["server"], e["action_name"]) for e in frame["events"]] == [
+        ("dispatch", "SIM", "acquire")
+    ]
+    orch.globalstatusmodel.active_dict = {}
+    orch.globalstatusmodel.nonactive_dict = {HloStatus.finished: {a.action_uuid: a}}
+    frame = feed.step(0.2)
+    assert [(e["kind"], e["status"]) for e in frame["events"]] == [
+        ("finish", "finished")
+    ]
+    assert {s["key"]: s["status"] for s in frame["servers"]}["SIM"] == "idle"
+
+
+def test_errored_finish_marks_the_server_error():
+    orch = fake_orch()
+    feed = _feed(orch)
+    feed.step(0.0)
+    a = fake_act(server="SIM")
+    orch.globalstatusmodel.active_dict = {a.action_uuid: a}
+    feed.step(0.1)
+    orch.globalstatusmodel.active_dict = {}
+    orch.globalstatusmodel.nonactive_dict = {HloStatus.errored: {a.action_uuid: a}}
+    frame = feed.step(0.2)
+    assert frame["events"][0]["status"] == "errored"
+    assert {s["key"]: s["status"] for s in frame["servers"]}["SIM"] == "error"
+
+
+def test_an_action_seen_only_finished_still_yields_dispatch_then_finish():
+    orch = fake_orch()
+    feed = _feed(orch)
+    feed.step(0.0)
+    a = fake_act()
+    orch.globalstatusmodel.nonactive_dict = {HloStatus.finished: {a.action_uuid: a}}
+    frame = feed.step(0.1)
+    assert [e["kind"] for e in frame["events"]] == ["dispatch", "finish"]
+
+
+def test_an_action_that_vanishes_without_a_terminal_bucket_still_finishes():
+    orch = fake_orch()
+    feed = _feed(orch)
+    feed.step(0.0)
+    a = fake_act()
+    orch.globalstatusmodel.active_dict = {a.action_uuid: a}
+    feed.step(0.1)
+    orch.globalstatusmodel.active_dict = {}
+    frame = feed.step(0.2)
+    assert [(e["kind"], e["status"]) for e in frame["events"]] == [
+        ("finish", "finished")
+    ]
+
+
+def test_unhashable_driver_status_does_not_break_the_fingerprint():
+    orch = fake_orch()
+    orch.status_summary = {"SIM": ("idle", {"axis": [1, 2]})}
+    feed = _feed(orch)
+    assert feed.step(0.0) is not None
+    orch.status_summary = {"SIM": ("idle", {"axis": [1, 3]})}
+    assert feed.step(0.1) is not None  # a changed driver status is a change
+    orch.status_summary = {"SIM": ("idle", {"axis": [1, 3]})}
+    assert feed.step(0.2) is None  # unchanged again: nothing to send
+
+
+def test_window_and_closing_out_reach_the_frame():
+    orch = fake_orch()
+    seq = fake_seq()
+    seq.dispatched_experiments = [
+        fake_exp(f"d{i}", ts=T0, fin=T0, status=(HloStatus.finished,))
+        for i in range(22)
+    ]
+    orch.active_sequence = seq
+    orch.active_experiment = fake_exp("a", ts=T0)
+    frame = _feed(orch).step(0.0)
+    assert frame["n_done"] == 2 and frame["closing_out"] is True
+
+
+@pytest.mark.asyncio
+async def test_an_exception_in_the_build_does_not_kill_the_task():
+    from helao.hexagon.app.orch_graph_feed import OrchGraphFeed
+
+    q = _Q()
+    feed = OrchGraphFeed(fake_orch(), q, tick_s=0.01, heartbeat_s=0.02)
+    real_step = feed.step
+    calls = {"n": 0}
+
+    def flaky(now):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("boom")
+        return real_step(now)
+
+    feed.step = flaky
+    task = asyncio.create_task(feed.run())
+    await asyncio.sleep(0.2)
+    task.cancel()
+    await asyncio.gather(task, return_exceptions=True)
+    assert calls["n"] > 2 and len(q.items) >= 1
+
+
+def test_last_experiment_finishing_alone_yields_a_new_frame():
+    orch = fake_orch()
+    seq = fake_seq()
+    orch.active_sequence = seq
+    feed = _feed(orch)
+    assert feed.step(0.0) is not None
+    assert feed.step(0.1) is None
+    seq.dispatched_experiments.append(
+        fake_exp("d", ts=T0, fin=T0, status=(HloStatus.finished,))
+    )
+    assert feed.step(0.2) is not None  # nothing else changed
+
+
+def test_the_last_sequence_dispatched_count_is_fingerprinted_too():
+    orch = fake_orch()
+    seq = fake_seq()
+    orch.last_sequence = seq
+    feed = _feed(orch)
+    feed.step(0.0)
+    seq.dispatched_experiments.append(fake_exp("d"))
+    assert feed.step(0.1) is not None
+
+
+def _host():
+    from helao.hexagon.tests.test_orch_host_surface import _host as surface_host
+
+    return surface_host()
+
+
+def test_host_serves_ws_orch_once_with_identity_encoding():
+    host = _host()
+    assert [
+        r for r in host.routes if getattr(r, "path", "") == "/ws_orch"
+    ].__len__() == 1
+    assert "as_dict" not in host.orch_graph_publisher.xform_func.__code__.co_names
+    assert host.graph_feed.orch is host
+
+
+def test_get_object_finds_each_tier_and_misses_with_null():
+    from uuid import uuid4
+
+    from fastapi.testclient import TestClient
+
+    from helao.core.models.machine import MachineModel
+    from helao.helpers.premodels import Action, Experiment, Sequence
+
+    host = _host()
+    sim = MachineModel(server_name="SIM")
+    act_active = Action(action_name="a_active", action_server=sim, action_uuid=uuid4())
+    act_parked = Action(action_name="a_parked", action_server=sim, action_uuid=uuid4())
+    act_live = Action(action_name="a_live", action_server=sim, action_uuid=uuid4())
+    act_queued = Action(action_name="a_queued", action_server=sim, action_uuid=uuid4())
+    exp_active = Experiment(experiment_name="e_active", experiment_uuid=uuid4())
+    exp_active.dispatched_actions = [act_active]
+    exp_queued = Experiment(experiment_name="e_queued", experiment_uuid=uuid4())
+    exp_done = Experiment(experiment_name="e_done", experiment_uuid=uuid4())
+    seq = Sequence(sequence_name="s", sequence_uuid=uuid4())
+    seq.dispatched_experiments = [exp_done.get_exp()]
+    host.active_sequence = seq
+    host.active_experiment = exp_active
+    host.parked_head_action = act_parked
+    host.globalstatusmodel.active_dict[act_live.action_uuid] = act_live
+    # queued items hold no uuid until activation and the zdeque unpickles every
+    # item on iteration: the endpoint must never touch them
+    host.experiment_dq.append(exp_queued)
+    host.action_dq.append(act_queued)
+    hist_uuid = uuid4()
+    host.action_history[hist_uuid] = {"action_name": "a_hist"}
+    ehist_uuid = uuid4()
+    host.experiment_history[ehist_uuid] = {"experiment_name": "e_hist"}
+
+    client = TestClient(host)
+
+    def get(kind, uid):
+        r = client.post("/get_object", params={"kind": kind, "uuid": str(uid)})
+        assert r.status_code == 200
+        return r.json()
+
+    assert (
+        get("experiment", exp_active.experiment_uuid)["experiment_name"] == "e_active"
+    )
+    assert get("experiment", exp_done.experiment_uuid)["experiment_name"] == "e_done"
+    assert get("experiment", ehist_uuid)["experiment_name"] == "e_hist"
+    assert get("action", act_active.action_uuid)["action_name"] == "a_active"
+    assert get("action", act_parked.action_uuid)["action_name"] == "a_parked"
+    assert get("action", act_live.action_uuid)["action_name"] == "a_live"
+    assert get("action", hist_uuid)["action_name"] == "a_hist"
+    assert get("action", uuid4()) is None
+    assert get("experiment", exp_queued.experiment_uuid) is None
+    assert get("action", act_queued.action_uuid) is None
+    assert get("sequence", seq.sequence_uuid) is None
+    host.action_history[seq.sequence_uuid] = {"action_name": "decoy"}
+    assert get("sequence", seq.sequence_uuid) is None  # unknown kind never searches
+
+
+def test_get_object_never_iterates_a_queue():
+    from uuid import uuid4
+
+    from helao.hexagon.app.orch_payloads import _object_payload
+
+    class Boom:
+        def __iter__(self):
+            raise AssertionError("queue iterated")
+
+        def __len__(self):
+            raise AssertionError("queue measured")
+
+    orch = fake_orch()
+    orch.experiment_dq = orch.action_dq = Boom()
+    orch.action_history = {}
+    orch.experiment_history = {}
+    assert _object_payload(orch, "experiment", str(uuid4())) is None
+    assert _object_payload(orch, "action", str(uuid4())) is None
+
+
+@pytest.mark.asyncio
+async def test_shutdown_cancels_the_feed_task_and_closes_its_queue():
+    host = _host()
+    host.graph_feed_task = asyncio.create_task(host.graph_feed.run())
+    closed = []
+
+    async def close():
+        closed.append(True)
+
+    host.orch_graph_q.close = close
+    await asyncio.sleep(0)
+    await host.orch_shutdown()
+    await asyncio.sleep(0)
+    assert host.graph_feed_task.cancelled()
+    assert closed == [True]
+
+
+def _finish_of(orch, feed, a, buckets):
+    feed.step(0.0)
+    orch.globalstatusmodel.active_dict = {a.action_uuid: a}
+    feed.step(0.1)
+    orch.globalstatusmodel.active_dict = {}
+    orch.globalstatusmodel.nonactive_dict = {s: {a.action_uuid: a} for s in buckets}
+    return feed.step(0.2)
+
+
+def test_estopped_action_filed_only_under_finished_is_an_error_finish():
+    orch = fake_orch()
+    a = fake_act(server="SIM", status=(HloStatus.estopped,))
+    frame = _finish_of(orch, _feed(orch), a, [HloStatus.finished])
+    assert [(e["kind"], e["status"]) for e in frame["events"]][-1] == (
+        "finish",
+        "estopped",
+    )
+    assert {s["key"]: s["status"] for s in frame["servers"]}["SIM"] == "error"
+
+
+@pytest.mark.parametrize(
+    "buckets",
+    [[HloStatus.errored, HloStatus.finished], [HloStatus.finished, HloStatus.errored]],
+)
+def test_error_wins_across_buckets_in_either_order(buckets):
+    orch = fake_orch()
+    a = fake_act(server="SIM")
+    frame = _finish_of(orch, _feed(orch), a, buckets)
+    assert frame["events"][-1]["status"] == "errored"
+    assert {s["key"]: s["status"] for s in frame["servers"]}["SIM"] == "error"
+
+
+def test_an_errored_action_that_vanishes_still_finishes_as_error():
+    orch = fake_orch()
+    feed = _feed(orch)
+    feed.step(0.0)
+    a = fake_act(server="SIM")
+    orch.globalstatusmodel.active_dict = {a.action_uuid: a}
+    feed.step(0.1)
+    a.action_status = [HloStatus.errored]
+    orch.globalstatusmodel.active_dict = {}
+    frame = feed.step(0.2)
+    assert frame["events"][-1]["status"] == "errored"
+    assert {s["key"]: s["status"] for s in frame["servers"]}["SIM"] == "error"
+
+
+def test_startup_creates_and_runs_the_feed_task_and_shutdown_stops_it():
+    from fastapi.testclient import TestClient
+
+    host = _host()
+    with TestClient(host):
+        task = host.graph_feed_task
+        assert task is not None and not task.done()
+    assert task.cancelled() or task.done()
+
+
+def test_ws_orch_sends_the_cached_latest_frame_first_without_its_events():
+    import threading
+
+    from fastapi.testclient import TestClient
+
+    from helao.helpers.ws_utils import wire_loads
+
+    host = _host()
+    cached = {"seq_no": 777, "events": [{"kind": "dispatch", "server": "SIM"}]}
+    got: list = []
+    with TestClient(host) as client:
+        host.graph_feed_task.cancel()  # freeze the cache
+        host.graph_feed.latest = cached
+        with client.websocket_connect("/ws_orch") as ws:
+            t = threading.Thread(
+                target=lambda: got.append(ws.receive_bytes()), daemon=True
+            )
+            t.start()
+            t.join(3)
+            assert got, "no cached frame arrived"
+            frame = wire_loads(got[0])
+            assert frame["seq_no"] == 777
+            assert frame["events"] == []  # a reconnect must not re-pulse old events
+    assert len(cached["events"]) == 1  # the cache itself is untouched
+
+
+def test_get_object_runs_on_the_event_loop_not_the_threadpool():
+    import inspect
+
+    (route,) = [r for r in _host().routes if getattr(r, "path", "") == "/get_object"]
+    assert inspect.iscoroutinefunction(route.endpoint)
+
+
+def _primed_feed_with_history(n=5):
+    orch = fake_orch()
+    old = {a.action_uuid: a for a in (fake_act(fin=T0) for _ in range(n))}
+    bucket = NoScan(old)
+    bucket.armed = False
+    orch.globalstatusmodel.nonactive_dict = {HloStatus.finished: bucket}
+    feed = _feed(orch)
+    assert feed.step(0.0)["events"] == []
+    return orch, feed, bucket
+
+
+def test_an_unchanged_tick_never_iterates_the_finished_buckets():
+    orch, feed, bucket = _primed_feed_with_history()
+    bucket.armed = True  # any walk of the history now raises
+    for t in (0.1, 0.2, 2.5):  # quiet ticks and a heartbeat
+        feed.step(t)
+    new = fake_act(fin=T0)
+    bucket.armed = False
+    bucket[new.action_uuid] = new  # a real change may read the bucket once
+    frame = feed.step(3.0)
+    assert [(e["kind"], e["action_uuid"]) for e in frame["events"]] == [
+        ("dispatch", str(new.action_uuid)),
+        ("finish", str(new.action_uuid)),
+    ]
+    bucket.armed = True
+    assert feed.step(3.1) is None
+
+
+def test_a_uuid_that_reappears_after_removal_is_not_emitted_again():
+    orch, feed, bucket = _primed_feed_with_history()
+    bucket.armed = False
+    a = fake_act(fin=T0)
+    bucket[a.action_uuid] = a
+    assert len(feed.step(0.1)["events"]) == 2
+    del bucket[a.action_uuid]
+    feed.step(0.2)
+    bucket[a.action_uuid] = a  # e.g. a resurrected estopped uuid
+    frame = feed.step(0.3)
+    assert frame is None or frame["events"] == []
+    orch.globalstatusmodel.nonactive_dict = {HloStatus.finished: {a.action_uuid: a}}
+    assert (feed.step(0.4) or {"events": []})["events"] == []
+
+
+def test_seen_uuids_are_never_re_emitted_however_many_new_finishes_follow():
+    orch, feed, bucket = _primed_feed_with_history(n=5)
+    bucket.armed = False
+    old = dict(bucket)
+    n = 0
+    for _ in range(20):
+        a = fake_act(fin=T0)
+        bucket[a.action_uuid] = a
+        n += 1
+        frame = feed.step(0.1 * n)
+        emitted = [e["action_uuid"] for e in frame["events"]] if frame else []
+        assert not set(emitted) & set(old)
+        assert len(emitted) == 2  # this one action's dispatch + finish
+
+
+def _loop(orch, state):
+    orch.globalstatusmodel.loop_state = state
+
+
+def _statuses(frame):
+    return {s["key"]: s["status"] for s in frame["servers"]}
+
+
+def test_clear_estop_returns_estopped_servers_to_idle_but_keeps_real_errors():
+    orch = fake_orch()
+    feed = _feed(orch)
+    feed.step(0.0)
+    _loop(orch, LoopStatus.estopped)
+    stopped = fake_act(server="SIM", status=(HloStatus.estopped,))
+    failed = fake_act(server="PSTAT", status=(HloStatus.errored,))
+    orch.globalstatusmodel.nonactive_dict = {
+        HloStatus.finished: {stopped.action_uuid: stopped, failed.action_uuid: failed}
+    }
+    frame = feed.step(0.1)
+    assert _statuses(frame) == {"SIM": "error", "PSTAT": "error"}
+    assert feed._finish_errors == {"SIM": "estopped", "PSTAT": "errored"}
+    _loop(orch, LoopStatus.stopped)  # Clear E-stop
+    frame = feed.step(0.2)
+    assert _statuses(frame) == {"SIM": "idle", "PSTAT": "error"}
+
+
+def test_estopped_uuids_do_not_replay_after_clear_estop():
+    orch = fake_orch()
+    feed = _feed(orch)
+    feed.step(0.0)
+    _loop(orch, LoopStatus.estopped)
+    a = fake_act(server="SIM", status=(HloStatus.estopped,))
+    orch.globalstatusmodel.nonactive_dict = {HloStatus.finished: {a.action_uuid: a}}
+    feed.step(0.1)
+    orch.globalstatusmodel.nonactive_dict = {HloStatus.finished: {}}  # cleared...
+    _loop(orch, LoopStatus.stopped)
+    feed.step(0.2)
+    orch.globalstatusmodel.nonactive_dict = {  # ...and re-sorted back (orch quirk)
+        HloStatus.finished: {a.action_uuid: a}
+    }
+    frame = feed.step(0.3)
+    assert frame is None or frame["events"] == []
+    assert _statuses(frame or feed.latest)["SIM"] == "idle"
+
+
+def test_one_server_with_several_finishes_in_a_tick_reads_error_if_any_failed():
+    for order in (
+        (HloStatus.finished, HloStatus.errored),
+        (HloStatus.errored, HloStatus.finished),
+    ):
+        orch = fake_orch()
+        feed = _feed(orch)
+        feed.step(0.0)
+        bad = fake_act(server="SIM", status=(HloStatus.errored,))
+        ok = fake_act(server="SIM", status=(HloStatus.finished,))
+        by = {HloStatus.errored: bad, HloStatus.finished: ok}
+        orch.globalstatusmodel.nonactive_dict = {
+            s: {by[s].action_uuid: by[s]} for s in order
+        }
+        assert _statuses(feed.step(0.1))["SIM"] == "error", order
+
+
+def test_a_later_clean_finish_clears_a_server_error():
+    orch = fake_orch()
+    feed = _feed(orch)
+    feed.step(0.0)
+    bad = fake_act(server="SIM", status=(HloStatus.errored,))
+    orch.globalstatusmodel.nonactive_dict = {HloStatus.errored: {bad.action_uuid: bad}}
+    assert _statuses(feed.step(0.1))["SIM"] == "error"
+    ok = fake_act(server="SIM", status=(HloStatus.finished,))
+    orch.globalstatusmodel.nonactive_dict[HloStatus.finished] = {ok.action_uuid: ok}
+    assert _statuses(feed.step(0.2))["SIM"] == "idle"
+
+
+@pytest.mark.asyncio
+async def test_a_persistent_failure_logs_one_traceback_then_sparse_lines_then_recovery(
+    monkeypatch,
+):
+    from helao.hexagon.app import orch_graph_feed as mod
+
+    monkeypatch.setattr(mod, "FAIL_LOG_EVERY", 50)
+    log = []
+    monkeypatch.setattr(
+        mod,
+        "LOGGER",
+        type(
+            "L",
+            (),
+            {
+                "exception": staticmethod(lambda m: log.append(("exception", m))),
+                "error": staticmethod(lambda m: log.append(("error", m))),
+                "info": staticmethod(lambda m: log.append(("info", m))),
+            },
+        ),
+    )
+    feed = mod.OrchGraphFeed(fake_orch(), _Q(), tick_s=0.001, heartbeat_s=1e9)
+    real = feed.step
+    broken = {"on": True, "n": 0}
+
+    def step(now):
+        if broken["on"]:
+            broken["n"] += 1
+            raise RuntimeError("boom")
+        return real(now)
+
+    feed.step = step
+    task = asyncio.create_task(feed.run())
+    await asyncio.sleep(0.15)
+    broken["on"] = False
+    await asyncio.sleep(0.05)
+    task.cancel()
+    await asyncio.gather(task, return_exceptions=True)
+    kinds = [k for k, _ in log]
+    assert kinds[0] == "exception" and kinds.count("exception") == 1
+    assert kinds.count("error") == (broken["n"] - 1) // 50  # ticks 50, 100, ...
+    assert broken["n"] > 60  # long enough to have logged one sparse line
+    assert kinds.count("info") == 1 and kinds[-1] == "info"

@@ -256,9 +256,18 @@ def normalize_data_package(messages: list) -> tuple:
     return cols, rows
 
 
+def normalize_none(messages: list) -> tuple:
+    """``ws_orch`` frames are whole snapshots read from ``raw``; nothing is numeric."""
+    return {}, []
+
+
 #: Which normalizer each subscribed endpoint needs. The two carry genuinely
 #: different payloads; one normalizer silently drops the other's messages.
-NORMALIZERS = {"ws_live": normalize, "ws_data": normalize_data_package}
+NORMALIZERS = {
+    "ws_live": normalize,
+    "ws_data": normalize_data_package,
+    "ws_orch": normalize_none,
+}
 
 
 @dataclass
@@ -292,6 +301,7 @@ class WsIngest:
         rows: Mixed-type rows (strings, labels) from the same stream.
         raw: Bounded deque of untransformed message batches, for panels whose
             payloads do not fit the numeric-column model.
+        n_batches: Monotonic count of batches appended to ``raw``.
         status: Current :class:`IngestStatus`.
     """
 
@@ -327,6 +337,9 @@ class WsIngest:
         self.buffer = RingBuffer([], capacity=capacity)
         self.rows = RowBuffer(maxlen=row_maxlen)
         self.raw: collections.deque = collections.deque(maxlen=raw_maxlen)
+        #: Batches ever appended to ``raw``, in local arrival order. The batch
+        #: at ``raw[i]`` is number ``n_batches - len(raw) + i + 1``.
+        self.n_batches = 0
         self.status = IngestStatus()
         self._normalize = NORMALIZERS.get(ws_path, normalize)
         self._drain_interval = drain_interval
@@ -380,6 +393,7 @@ class WsIngest:
                 messages = await self._wss.read_messages()
                 if messages:
                     self.raw.append(messages)
+                    self.n_batches += 1
                     cols, rows = self._normalize(messages)
                     if cols:
                         self.buffer.append(cols)

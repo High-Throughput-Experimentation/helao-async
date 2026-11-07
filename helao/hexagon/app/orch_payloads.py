@@ -114,3 +114,40 @@ def _queue_object_payload(orch, kind: str, idx: int) -> dict:
         return dq[idx].as_dict()
     except (IndexError, KeyError, AttributeError):
         return {}
+
+
+def _object_payload(orch, kind: str, uuid: str) -> Optional[dict]:
+    """The experiment or action with ``uuid`` as a dict, or ``None``.
+
+    Read-only and lock-free. Never iterates a queue: queued experiments and
+    actions hold no uuid until activation, and the deques unpickle every item.
+    The page fetches queued rows with ``get_queue_object``. Search order: the
+    active run (active experiment, its dispatched actions, the active
+    sequence's finished experiments, the parked head action, ``active_dict``),
+    then the history containers (meta dicts, returned as they are).
+    """
+    target = str(uuid)
+    seq = getattr(orch, "active_sequence", None)
+    exp = getattr(orch, "active_experiment", None)
+    if kind == "experiment":
+        candidates = [exp] if exp is not None else []
+        candidates += list(getattr(seq, "dispatched_experiments", None) or [])
+        for e in candidates:
+            if str(e.experiment_uuid) == target:
+                return e.as_dict()
+        history = orch.experiment_history
+    elif kind == "action":
+        candidates = list(getattr(exp, "dispatched_actions", None) or [])
+        if orch.parked_head_action is not None:
+            candidates.append(orch.parked_head_action)
+        candidates += list(orch.globalstatusmodel.active_dict.values())
+        for a in candidates:
+            if str(a.action_uuid) == target:
+                return a.as_dict()
+        history = orch.action_history
+    else:
+        return None
+    for key, meta in history.items():
+        if str(key) == target:
+            return dict(meta)
+    return None

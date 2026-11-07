@@ -47,6 +47,8 @@ There is no project-wide build step for the Python side. Tests are a mix of pyte
 
 An optional second UI stack, opt-in per config via a `reflex:` server key alongside `fast:`/`bokeh:`. The Bokeh path is untouched; a station runs either, or both in the same group. A Reflex server occupies **two consecutive ports**: `port` serves the prebuilt static frontend, `port + 1` is the backend. Try it with `python launch.py goldenreflex`. Every Reflex server also serves `/logs`, a live tail of `<root>/LOGS` (always on, no config key).
 
+`/group` shows the group's orchestrator as a live graph with experiment/action timelines and Start/Stop/E-stop, fed by the orchestrator's `/ws_orch` stream; a config with no orchestrator renders a note there.
+
 Read `helao/ui/reflex/CLAUDE.md` before editing anything under `helao/ui/reflex/`. The bundle stamp, the mixin rule for panel state, the lazy-`add_page` trap, the WebGL context cap, and the paged-queue index rules live there, and each one fails silently.
 
 ### Colours

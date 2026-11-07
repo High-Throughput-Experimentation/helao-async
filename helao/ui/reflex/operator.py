@@ -98,6 +98,7 @@ from helao.ui.shared.palette import (
     reflex_table_class,
 )
 from helao.ui.reflex import plots
+from helao.ui.reflex.tree_pane import tree_pane as _tree_pane
 from helao.helpers import helao_logging as logging
 from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.import_autolibs import deployment_from_config_path
@@ -2741,26 +2742,6 @@ def _pager(
         width="100%",
         spacing="2",
         align="center",
-    )
-
-
-def _tree_pane(header_var, html_var):
-    """The attribute tree beside a set of tables.
-
-    Mirrors the Bokeh operator's header Div plus tree Div. The HTML is nested
-    ``<details>``, so expanding a node needs no round trip.
-    """
-    return rx.vstack(
-        rx.text(header_var, weight="bold", size="1"),
-        rx.scroll_area(
-            rx.html(html_var),
-            type="auto",
-            scrollbars="vertical",
-            height="14em",
-        ),
-        width="100%",
-        spacing="1",
-        font_size="0.8em",
     )
 
 

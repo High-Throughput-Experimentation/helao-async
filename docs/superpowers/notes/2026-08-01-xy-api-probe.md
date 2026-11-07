@@ -181,3 +181,24 @@ key, not `traces`. A diagram with 3 vertex labels and a populated point cloud
 therefore publishes 4 `traces` (1 scatter + 3 edge lines) and 3
 `annotations` — not 7 traces, which is what you'd expect from treating
 `xy.text` as a mark.
+
+## Verified for the /group page (2026-11-06, xy 0.0.8)
+
+Probe: a scratch script asserting each fact below (run with the helao env python).
+
+| Fact | Consequence |
+|---|---|
+| `xy.scatter(symbol=...)` takes `"triangle"` and `"triangle_down"`; `"triangle-down"` raises `ValueError` from `build_payload_split`, not at construction | arrowheads and pulses use the underscore names |
+| a per-point `color=[hex, ...]` list encodes as `direct_rgba` column data | node, arrow and pulse colours update in place, no rebuild |
+| an **empty** `color=[]` encodes as `continuous` (viridis), not `direct_rgba` | `plots.marks_chart` pads an empty trace with one off-domain point so its column layout never changes |
+| a `size` array is a mapped channel (`range_px (2, 18)`), not pixels | one scalar size per trace |
+| `x_axis(show=False, grid=False, domain=...)` only paints the axis transparent (colours `#00000000`); it does NOT remove it from layout | alone it still reserves tick-label room: bottom at least `max(padding[2], 42)` (36 when narrow), left at least the tick-label width |
+| `x_axis(..., tick_label_strategy="none")` (same on `y_axis`) lands in `spec["axes"][...]["tick_label_strategy"]` and `_layout` then skips the axis room | graph and strips hide axes with `show=False, grid=False, tick_label_strategy="none"` |
+| `xy.chart(..., pan=False, zoom=False, click=True)` lands in `spec["interaction"]` | fixed view; clicks still reach `on_select` |
+| `xy.text(..., anchor="middle")`, `x_band` (`band`) and `vline` (`rule`) are annotations, not traces | they are spec, so `plots.ANNOTATIONS_IN_TOKEN` decides whether a changed label rebuilds the chart |
+| a chart of annotations only has zero traces | each strip carries an invisible `hit` scatter |
+| `xy.chart(padding=[top, right, bottom, left])` lands in `spec["padding"]` and `_layout` uses it as the plot-rect margin px, provided the axes also carry `tick_label_strategy="none"` | netgraph takes the inset as a parameter, defaulting to its `padding` (8 px each side in the probe); confirm in a browser in Task 9 |
+
+Plot-area inset (host edge to plot rect): with `show=False` alone it is NOT the padding. `_layout` still reserves tick-label room (bottom `max(padding[2], 42)`, 36 when narrow, i.e. about 34 px more than an 8 px padding; left includes the tick-label width). With `tick_label_strategy="none"` on both axes, `_layout` reads as inset = padding (top `padding[0]`, right `padding[1]`, bottom `padding[2]`, left `padding[3]`), except on a fluid (`width="100%"`) host narrower than 520 px, where right is `min(padding[1], 8)` and left `min(padding[3], 46)`. This is from reading the minified `_layout`, not a browser measurement: Task 9 must measure it, and netgraph must take the inset as a parameter.
+
+Browser outcome (2026-11-06, Task 9 and the final-wave re-check, headless Chromium): xy applies a changed annotation (text label, `x_band` colour, `vline` position) in place on an append, with no rebuild, so `plots.ANNOTATIONS_IN_TOKEN` is False. Charts are laid out at least 120 px tall whatever the host reserves, which is why `STRIP_H` is 120.
