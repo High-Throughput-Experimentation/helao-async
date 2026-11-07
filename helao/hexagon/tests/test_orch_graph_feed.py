@@ -417,19 +417,19 @@ def test_a_uuid_that_reappears_after_removal_is_not_emitted_again():
     assert (feed.step(0.4) or {"events": []})["events"] == []
 
 
-def test_the_seen_set_is_bounded_oldest_first(monkeypatch):
-    from helao.hexagon.app import orch_graph_feed
-
-    monkeypatch.setattr(orch_graph_feed, "SEEN_CAP", 3)
-    orch = fake_orch()
-    feed = _feed(orch)
-    feed.step(0.0)
-    acts = [fake_act(fin=T0) for _ in range(5)]
-    orch.globalstatusmodel.nonactive_dict = {
-        HloStatus.finished: {a.action_uuid: a for a in acts}
-    }
-    feed.step(0.1)
-    assert list(feed._seen_finished) == [a.action_uuid for a in acts[2:]]
+def test_seen_uuids_are_never_re_emitted_however_many_new_finishes_follow():
+    orch, feed, bucket = _primed_feed_with_history(n=5)
+    bucket.armed = False
+    old = dict(bucket)
+    n = 0
+    for _ in range(20):
+        a = fake_act(fin=T0)
+        bucket[a.action_uuid] = a
+        n += 1
+        frame = feed.step(0.1 * n)
+        emitted = [e["action_uuid"] for e in frame["events"]] if frame else []
+        assert not set(emitted) & set(old)
+        assert len(emitted) == 2  # this one action's dispatch + finish
 
 
 def _loop(orch, state):

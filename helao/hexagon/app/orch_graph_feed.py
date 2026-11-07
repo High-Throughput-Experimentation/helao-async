@@ -7,13 +7,12 @@ takes ``aiolock`` and never mutates the orchestrator; a frame goes out only when
 a cheap fingerprint changes, or every 2 s as a heartbeat so a client can tell a
 quiet stream from a dead one. Events are derived by diffing ``active_dict``
 between ticks and, for ``nonactive_dict`` (which only ever grows), against a
-bounded set of uuids already reported, reading a bucket only when its length
+set of uuids already reported, reading a bucket only when its length
 changed: an unchanged tick does not grow with the finished actions.
 """
 
 import asyncio
 import time
-from collections import OrderedDict
 from typing import Optional
 
 from helao.core.models.group_snapshot import (
@@ -29,7 +28,6 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 TICK_S = 0.1
 HEARTBEAT_S = 2.0
-SEEN_CAP = 100_000
 #: Log a persistently failing frame build once at first, then every Nth tick.
 FAIL_LOG_EVERY = 600
 
@@ -75,8 +73,8 @@ class OrchGraphFeed:
         self._primed = False
         self._prev_active: dict = {}
         self._prev_models: dict = {}
-        #: Finished-action uuids already reported, oldest first, capped.
-        self._seen_finished: OrderedDict = OrderedDict()
+        #: Finished-action uuids already reported (unbounded: a cap would re-emit evicted ones).
+        self._seen_finished: set = set()
         self._bucket_lens: dict = {}
         self._prev_loop: Optional[str] = None
         #: server -> status of its latest finish; an entry is an error status
@@ -106,7 +104,7 @@ class OrchGraphFeed:
         lens = {s: len(b) for s, b in buckets}
         changed = [b for s, b in buckets if lens[s] != self._bucket_lens.get(s)]
         self._bucket_lens = lens
-        new: dict = {}  # insertion order = bucket order, so the cap evicts oldest
+        new: dict = {}  # insertion order = bucket order
         for bucket in changed:
             new.update(dict.fromkeys(u for u in bucket if u not in self._seen_finished))
         out = {}
@@ -129,10 +127,7 @@ class OrchGraphFeed:
         return out
 
     def _remember(self, uuids) -> None:
-        for u in uuids:
-            self._seen_finished[u] = None
-        while len(self._seen_finished) > SEEN_CAP:
-            self._seen_finished.popitem(last=False)
+        self._seen_finished.update(uuids)
 
     def diff_events(self, now: float) -> list:
         """dispatch/finish events since the previous tick."""
