@@ -36,13 +36,18 @@ def fmt_elapsed(sec):
 def segment_label(item, now, narrow, today):
     """``(line 1, line 2)``: name, then times. Narrow: start time only."""
     t0, t1 = item.get("t_start"), item.get("t_end")
+    state = item.get("state")
+    if state == "queued":
+        t0 = None  # not started: no time, whatever a stale t_start says
     if narrow:
         return "", (fmt_hms(t0, today) if t0 is not None else "")
     name = item.get("name") or ""
     if t0 is None:
         return name, ""
-    if item.get("state") == "active" or t1 is None:
+    if state == "active":
         return name, f"{fmt_hms(t0, today)}– ({fmt_elapsed(now - t0)})"
+    if t1 is None:  # finished with no end time recorded: never a running counter
+        return name, f"{fmt_hms(t0, today)}–"
     return name, f"{fmt_hms(t0, today)}–{fmt_hms(t1, today)}"
 
 

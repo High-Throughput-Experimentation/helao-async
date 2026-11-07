@@ -950,9 +950,10 @@ def ternary(
 #: would change its column layout under an unchanged layout token.
 PLACEHOLDER_XY = 1e6
 
-#: Annotations (text, bands, rules) are spec, not columns. Until a browser check
-#: shows xy's append path applies a changed annotation in place, their content
-#: joins the layout token and a changed label rebuilds the chart.
+#: Annotations (text, bands, rules) are spec, not columns. When True their
+#: content joins the layout token and a changed label rebuilds the chart. False
+#: since the browser check of 2026-11-06: xy applies a changed annotation (label,
+#: band colour, rule position) in place on an append.
 ANNOTATIONS_IN_TOKEN = False
 
 #: Plot padding on every side, in px. netgraph's px <-> data scale assumes it.

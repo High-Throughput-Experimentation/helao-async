@@ -21,7 +21,9 @@ from helao.hexagon.tests.live_group import (
 def _backend():
     from helao.ui.shared.operator.orch_backend import RemoteBackend
 
-    b = RemoteBackend.__new__(RemoteBackend)  # only the transport fields _call reads
+    # No cheap supported construction: RemoteBackend(vis) wants an operator vis
+    # object and runs import_autolibs. Only the transport fields _call reads.
+    b = RemoteBackend.__new__(RemoteBackend)
     b.orch_key, b.host, b.port, b._dispatch = (
         "ORCH",
         ORCH_HOST,
@@ -76,7 +78,10 @@ async def test_ws_orch_reports_each_action_once_and_experiments_in_order(tmp_pat
             seqs = [f["seq_no"] for f in frames]
             assert seqs == sorted(seqs) and len(set(seqs)) == len(seqs)
 
-            assert any(r["state"] == "queued" for f in frames for r in f["experiments"])
+            queued_counts = [
+                sum(r["state"] == "queued" for r in f["experiments"]) for f in frames
+            ]
+            assert max(queued_counts) >= 1 and queued_counts[-1] == 0
             per_uuid = {}
             for f in frames:
                 for r in f["experiments"]:
@@ -86,13 +91,11 @@ async def test_ws_orch_reports_each_action_once_and_experiments_in_order(tmp_pat
                     if not states or states[-1] != r["state"]:
                         states.append(r["state"])
             assert len(per_uuid) == 2
-            order = ["queued", "active", "done"]
-            for states in per_uuid.values():  # forward-only through the lifecycle
-                assert states == [x for x in order if x in states], per_uuid
-            first, last = list(per_uuid.values())
-            # The last experiment's "done" is never framed: the sequence clears
-            # (empty rows) in the same tick. See task-9 report.
-            assert first[-1] == "done" and "active" in last, per_uuid
+            # queued -> active -> done for every experiment, the last one
+            # included: the feed frames the finished sequence (last_sequence).
+            for states in per_uuid.values():
+                assert states == ["queued", "active", "done"], per_uuid
+            assert any(f["seq"] and f["seq"]["finished"] for f in frames)
 
             backend = _backend()
             more = build_ws_sequence(3, wait_time=1.0, data_duration=1.0)

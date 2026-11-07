@@ -1402,8 +1402,13 @@ class OrchHost(ActionHost):
             """Stream group snapshots; the cached latest one goes first."""
             await self.orch_graph_publisher.connect(websocket)
             try:
+                # Events are one-shot pulses: a (re)connect must not replay them.
                 latest = self.graph_feed.latest
-                frame = self.orch_graph_publisher._frame(latest) if latest else None
+                frame = (
+                    self.orch_graph_publisher._frame({**latest, "events": []})
+                    if latest
+                    else None
+                )
                 if frame is not None:
                     await websocket.send_bytes(frame)
                 await self.orch_graph_publisher.broadcast(websocket)

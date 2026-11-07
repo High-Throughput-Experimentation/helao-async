@@ -247,8 +247,21 @@ Pure Python. It builds the marks for one strip from a list of items.
     uuid on hover and a copy button.
   - Badges for `loop_state`, `orch_state` and closing out.
   - With no active sequence, the header reads "idle — no active sequence".
-- **Buttons** go through `RemoteBackend` via the operator's
-  `session_backend(token)`; no new wire protocol.
+  - After the last experiment finishes the orchestrator empties
+    `active_sequence` within one tick, so the feed falls back to
+    `last_sequence`: the header keeps the sequence name with a "finished" badge,
+    the final experiment is framed as `done`, and no queued rows are listed.
+    "idle" appears only when there is no sequence at all.
+- **Buttons** call the orchestrator's endpoints directly through
+  `async_private_dispatcher` with the configured orchestrator's host and port,
+  not through `RemoteBackend`: constructing one runs `import_autolibs`
+  synchronously, which would block the first click (E-stop included). A call
+  the orchestrator accepts but ignores (`/estop_orch` acts only while the loop
+  is started; a refused `/start` returns `{}`) is not an error on the wire, so
+  a pending button that the next snapshots never confirm within 10 s shows
+  "<button> not confirmed by the orchestrator" in the inline error line. The
+  info box keeps using the operator's `RemoteBackend` (`session_backend(token)`);
+  no new wire protocol.
 
   | Button | Enabled when | Calls |
   |---|---|---|

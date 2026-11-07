@@ -10,6 +10,7 @@ Times are epoch seconds, or ``None`` until known. Item ``state`` is one of
 """
 
 import itertools
+from collections import deque
 from datetime import datetime
 from typing import Optional
 
@@ -44,6 +45,29 @@ def _item_state(statuses) -> str:
     return "active"
 
 
+def _head(dq):
+    """O(1) identity of a queue's head: the stored object (a zdeque's raw blob)."""
+    return deque.__getitem__(dq, 0) if dq else None
+
+
+def _queued(dq, window, build, cache, slot):
+    """``build(item)`` rows of ``dq``'s first ``window`` items.
+
+    A zdeque unpickles every item it yields, so with a ``cache`` dict the rows
+    are rebuilt only when the length or the head's identity changes (an edit
+    that keeps both, such as a middle removal paired with an append, shows on
+    the next change).
+    """
+    key = (len(dq), _head(dq))
+    hit = None if cache is None else cache.get(slot)
+    if hit is not None and hit[0][0] == key[0] and hit[0][1] is key[1]:
+        return hit[1]
+    rows = [build(i, x) for i, x in enumerate(itertools.islice(dq, window))]
+    if cache is not None:
+        cache[slot] = (key, rows)
+    return rows
+
+
 def server_rows(orch, finish_errors: dict) -> list:
     """Every config ``group: action`` server, plus any other the orch knows."""
     gsm = orch.globalstatusmodel
@@ -68,7 +92,7 @@ def server_rows(orch, finish_errors: dict) -> list:
             status = "estop"
         elif key in active:
             status = "busy"
-        elif finish_errors.get(key):
+        elif finish_errors.get(key) in ERROR_STATUSES:
             status = "error"
         else:
             status = "idle"
@@ -76,14 +100,15 @@ def server_rows(orch, finish_errors: dict) -> list:
     return rows
 
 
-def experiment_rows(orch) -> tuple:
+def experiment_rows(orch, cache=None) -> tuple:
     """Windowed experiments of the active sequence: ``(rows, n_done, n_queued)``.
 
     Queued experiments have no uuid until ``init_exp`` runs at activation, so a
     queued row carries ``qidx``, its ABSOLUTE index in ``experiment_dq``. The
     deque unpickles each item on access, so only the queued window is read.
     """
-    seq = orch.active_sequence
+    seq = orch.active_sequence or getattr(orch, "last_sequence", None)
+    finished = orch.active_sequence is None and seq is not None
     done_all = list(getattr(seq, "dispatched_experiments", None) or []) if seq else []
     done = done_all[-EXP_DONE_WINDOW:]
     rows = [
@@ -109,50 +134,72 @@ def experiment_rows(orch) -> tuple:
                 "qidx": None,
             }
         )
-    for idx, e in enumerate(itertools.islice(orch.experiment_dq, EXP_QUEUED_WINDOW)):
-        rows.append(
-            {
+    if not finished:  # a finished sequence queues nothing
+        rows += _queued(
+            orch.experiment_dq,
+            EXP_QUEUED_WINDOW,
+            lambda idx, e: {
                 "uuid": str(e.experiment_uuid) if e.experiment_uuid else None,
                 "name": e.experiment_name,
                 "state": "queued",
                 "t_start": None,
                 "t_end": None,
                 "qidx": idx,
-            }
+            },
+            cache,
+            "exp",
         )
     n_done = len(done_all) - len(done)
-    n_queued = max(0, len(orch.experiment_dq) - EXP_QUEUED_WINDOW)
+    n_queued = (
+        max(0, len(orch.experiment_dq) - EXP_QUEUED_WINDOW) if not finished else 0
+    )
     return rows, n_done, n_queued
 
 
-def action_rows(orch, first_seen: dict) -> list:
-    """Actions of the active experiment: dispatched, then active-only, then queued."""
+def _queued_action(_idx, a):
+    """``(uuid, row)`` of one queued action."""
+    return a.action_uuid, {
+        "uuid": str(a.action_uuid) if a.action_uuid else None,
+        "name": a.action_name,
+        "server": a.action_server.server_name,
+        "state": "queued",
+        "t_start": None,
+        "t_end": None,
+    }
+
+
+def action_rows(orch, first_seen: dict, cache=None) -> list:
+    """Actions of the active experiment: dispatched, then active-only, then queued.
+
+    Looks the experiment's own uuids up per bucket instead of scanning
+    ``nonactive_dict``, which holds every finished action since orch start.
+    """
     exp = orch.active_experiment
     if exp is None:
         return []
     gsm = orch.globalstatusmodel
-    # Only this experiment's actions matter; nonactive_dict grows all run long.
-    wanted = {str(a.action_uuid) for a in exp.dispatched_actions or []}
+    wanted = {a.action_uuid for a in exp.dispatched_actions or []}
     active = {}
     for u, a in gsm.active_dict.items():
-        if str(u) in wanted or a.experiment_uuid == exp.experiment_uuid:
-            active[str(u)] = a
+        if u in wanted or a.experiment_uuid == exp.experiment_uuid:
+            active[u] = a
     wanted |= set(active)
     # sort_status files a finished action under `finished` AND its sub-status, so
     # an error status must win whatever the dict order.
     finished = {}
-    for status, bucket in gsm.nonactive_dict.items():
-        name = _v(status)
-        for u, a in bucket.items():
-            uid = str(u)
-            if uid in wanted and not (
-                uid in finished and finished[uid][0] in ERROR_STATUSES
-            ):
-                finished[uid] = (name, a)
+    for u in wanted:
+        for status, bucket in gsm.nonactive_dict.items():
+            a = bucket.get(u)
+            if a is None:
+                continue
+            name = _v(status)
+            if not (u in finished and finished[u][0] in ERROR_STATUSES):
+                finished[u] = (name, a)
     rows, seen = [], set()
 
-    def add(uid, model, state, t_end):
-        seen.add(uid)
+    def add(u, model, state, t_end):
+        seen.add(u)
+        uid = str(u)
         t_start = epoch(model.action_timestamp)
         rows.append(
             {
@@ -166,50 +213,44 @@ def action_rows(orch, first_seen: dict) -> list:
         )
 
     for a in exp.dispatched_actions or []:
-        uid = str(a.action_uuid)
-        if uid in seen:
+        u = a.action_uuid
+        if u in seen:
             continue
-        if uid in active:
-            add(uid, active[uid], "active", None)
-        elif uid in finished:
-            status, model = finished[uid]
+        if u in active:
+            add(u, active[u], "active", None)
+        elif u in finished:
+            status, model = finished[u]
             state = "error" if status in ERROR_STATUSES else "done"
-            add(uid, model, state, epoch(model.action_finished_timestamp))
+            add(u, model, state, epoch(model.action_finished_timestamp))
         else:
-            add(
-                uid, a, _item_state(a.action_status), epoch(a.action_finished_timestamp)
-            )
-    for uid, a in active.items():
-        if uid not in seen and a.experiment_uuid == exp.experiment_uuid:
-            add(uid, a, "active", None)
+            add(u, a, _item_state(a.action_status), epoch(a.action_finished_timestamp))
+    for u, a in active.items():
+        if u not in seen and a.experiment_uuid == exp.experiment_uuid:
+            add(u, a, "active", None)
     # The head action is popped before its start condition is waited on and is
     # held only here meanwhile (helao/hexagon/app/CLAUDE.md).
     parked = getattr(orch, "parked_head_action", None)
-    queued = [] if parked is None else [parked]
-    queued += itertools.islice(orch.action_dq, ACT_QUEUED_WINDOW)
-    for a in queued:
-        uid = str(a.action_uuid) if a.action_uuid else None
-        if uid in seen:
-            continue
-        rows.append(
-            {
-                "uuid": uid,
-                "name": a.action_name,
-                "server": a.action_server.server_name,
-                "state": "queued",
-                "t_start": None,
-                "t_end": None,
-            }
-        )
+    queued = _queued(
+        orch.action_dq,
+        ACT_QUEUED_WINDOW,
+        _queued_action,
+        cache,
+        "act",
+    )
+    if parked is not None:
+        queued = [_queued_action(0, parked)] + queued
+    rows += [row for u, row in queued if u not in seen]
     return rows
 
 
-def build_snapshot(orch, *, seq_no, now, events, finish_errors, first_seen) -> dict:
+def build_snapshot(
+    orch, *, seq_no, now, events, finish_errors, first_seen, queued_cache=None
+) -> dict:
     """One ``/ws_orch`` frame. Reads only; never takes ``aiolock``."""
     gsm = orch.globalstatusmodel
     loop_state = _v(gsm.loop_state)
-    seq = orch.active_sequence
-    experiments, n_done, n_queued = experiment_rows(orch)
+    seq = orch.active_sequence or getattr(orch, "last_sequence", None)
+    experiments, n_done, n_queued = experiment_rows(orch, queued_cache)
     orch_action = None
     for act in gsm.active_dict.values():
         if act.action_server.server_name == orch.server_key:
@@ -231,6 +272,7 @@ def build_snapshot(orch, *, seq_no, now, events, finish_errors, first_seen) -> d
                 "name": seq.sequence_name,
                 "label": seq.sequence_label,
                 "t_start": epoch(seq.sequence_timestamp),
+                "finished": orch.active_sequence is None,
             }
         ),
         "orch_action": orch_action,
@@ -238,6 +280,6 @@ def build_snapshot(orch, *, seq_no, now, events, finish_errors, first_seen) -> d
         "experiments": experiments,
         "n_done": n_done,
         "n_queued": n_queued,
-        "actions": action_rows(orch, first_seen),
+        "actions": action_rows(orch, first_seen, queued_cache),
         "events": list(events),
     }

@@ -5,7 +5,14 @@ from types import SimpleNamespace
 
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.orchstatus import LoopStatus
-from helao.hexagon.tests.group_fakes import T0, fake_act, fake_exp, fake_orch, fake_seq
+from helao.hexagon.tests.group_fakes import (
+    T0,
+    NoScan,
+    fake_act,
+    fake_exp,
+    fake_orch,
+    fake_seq,
+)
 
 
 def _snap(orch, **kw):
@@ -91,7 +98,8 @@ def test_server_status_precedence_and_config_filter():
         ("X", "m"): SimpleNamespace(estop=False),
     }
     rows = {
-        r["key"]: r for r in server_rows(orch, finish_errors={"D": True, "E": False})
+        r["key"]: r
+        for r in server_rows(orch, finish_errors={"D": "errored", "E": "finished"})
     }
     assert rows["A"]["status"] == "unreachable"  # beats busy
     assert rows["B"]["status"] == "estop"  # beats busy
@@ -281,3 +289,94 @@ def test_action_rows_caps_queue_and_ignores_other_experiments_history():
     rows = action_rows(orch, first_seen={})
     assert len(rows) == ACT_QUEUED_WINDOW
     assert all(r["state"] == "queued" for r in rows)
+    assert "stale" not in {r["name"] for r in rows}
+
+
+def test_action_rows_never_scans_the_finished_history():
+    from helao.core.models.group_snapshot import action_rows
+
+    orch = fake_orch()
+    exp = fake_exp("e", ts=T0)
+    orch.active_experiment = exp
+    mine = fake_act(name="mine", exp_uuid=exp.experiment_uuid, fin=T0)
+    exp.dispatched_actions = [mine]
+    history = NoScan(
+        {fake_act(fin=T0).action_uuid: fake_act(fin=T0) for _ in range(50)}
+    )
+    history[mine.action_uuid] = mine
+    orch.globalstatusmodel.nonactive_dict = {HloStatus.finished: history}
+    rows = action_rows(orch, first_seen={})
+    assert [(r["name"], r["state"]) for r in rows] == [("mine", "done")]
+
+
+def test_finished_sequence_is_framed_from_last_sequence_with_its_last_experiment():
+    from helao.core.models.group_snapshot import experiment_rows
+
+    orch = fake_orch()
+    seq = fake_seq()
+    last = fake_exp("last", ts=T0, fin=T0, status=(HloStatus.finished,))
+    seq.dispatched_experiments = [last]
+    orch.last_sequence = seq  # close-out emptied active_sequence
+    orch.experiment_dq.append(fake_exp("stray", with_uuid=False))
+    snap = _snap(orch)
+    assert snap["seq"]["finished"] is True and snap["seq"]["name"] == "seq"
+    assert [(r["name"], r["state"]) for r in snap["experiments"]] == [("last", "done")]
+    assert snap["n_queued"] == 0
+    orch.active_sequence = seq
+    snap = _snap(orch)
+    assert snap["seq"]["finished"] is False
+    assert [r["state"] for r in snap["experiments"]] == ["done", "queued"]
+    rows, _, _ = experiment_rows(orch)
+    assert len(rows) == 2
+
+
+def test_idle_orch_with_no_sequence_at_all_has_no_seq():
+    assert _snap(fake_orch())["seq"] is None
+
+
+def test_queued_rows_are_rebuilt_only_when_length_or_head_changes():
+    from collections import deque
+
+    from helao.core.models.group_snapshot import experiment_rows
+
+    class Counting(deque):
+        pulled = 0
+
+        def __iter__(self):
+            for item in super().__iter__():
+                type(self).pulled += 1
+                yield item
+
+    orch = fake_orch()
+    orch.active_sequence = fake_seq()
+    orch.experiment_dq = Counting(fake_exp(f"q{i}", with_uuid=False) for i in range(5))
+    cache: dict = {}
+    experiment_rows(orch, cache)
+    first = Counting.pulled
+    assert first == 5
+    rows, _, _ = experiment_rows(orch, cache)
+    assert Counting.pulled == first  # unchanged: served from the cache
+    assert [r["name"] for r in rows] == [f"q{i}" for i in range(5)]
+    orch.experiment_dq.popleft()  # head and length both change
+    rows, _, _ = experiment_rows(orch, cache)
+    assert Counting.pulled == first + 4
+    assert [r["name"] for r in rows] == [f"q{i}" for i in range(1, 5)]
+    assert [r["qidx"] for r in rows] == [0, 1, 2, 3]
+    orch.experiment_dq.append(fake_exp("new", with_uuid=False))  # length only
+    rows, _, _ = experiment_rows(orch, cache)
+    assert rows[-1]["name"] == "new"
+    orch.experiment_dq.popleft()  # pop + push: same length, new head
+    orch.experiment_dq.append(fake_exp("newer", with_uuid=False))
+    rows, _, _ = experiment_rows(orch, cache)
+    assert [r["name"] for r in rows] == ["q2", "q3", "q4", "new", "newer"]
+
+
+def test_a_zdeque_head_identity_is_o1_and_changes_with_the_head():
+    from helao.core.models.group_snapshot import _head
+    from helao.helpers.zdeque import zdeque
+
+    dq = zdeque([fake_exp("a"), fake_exp("b")])
+    h = _head(dq)
+    assert isinstance(h, bytes) and _head(dq) is h
+    dq.popleft()
+    assert _head(dq) is not h and _head(zdeque()) is None

@@ -63,6 +63,7 @@ def state():
         _probe_at=0.0,
         _old_orch=False,
         pending="",
+        action_error="",
         info_note="",
         tick_ms=500,
         lost=True,
@@ -344,7 +345,7 @@ def test_exp_row_ordinals_are_sequence_positions():
 def test_strip_height_keeps_progress_bar_and_labels_apart():
     from helao.ui.reflex import group
 
-    assert group.STRIP_H >= 70
+    assert group.STRIP_H == 120  # xy's minimum chart height, and a bar + 2 labels fit
 
 
 # ---- S10: same orchestrator for stream and buttons ---------------------------
@@ -529,6 +530,18 @@ def test_header_fields_idle_and_running():
         "89abcdef",
         "busy",
     )
+    assert h["seq_finished"] is False
+    done = header_fields({"seq": {"name": "S", "finished": True}})
+    assert done["seq_finished"] is True and done["seq_name"] == "S"
+    assert header_fields({})["seq_finished"] is False
+
+
+def test_finished_badge_shows_beside_the_name_and_idle_only_without_a_sequence(group):
+    group.configure_group(CFG)
+    rendered = str(group.group_page().render())
+    assert "seq_finished" in rendered and "finished" in rendered
+    assert "no active sequence" in rendered
+    assert rendered.index("seq_name") < rendered.index("seq_finished")
 
 
 def test_ws_orch_frames_are_not_numeric_normalized():
@@ -666,25 +679,105 @@ class _FakeState(SimpleNamespace):
         return False
 
 
-def test_control_error_sets_action_error_and_clears_pending(group, monkeypatch):
-    import asyncio
-
-    class Backend:
-        async def start(self, strict=False):
-            raise RuntimeError("orch said no")
-
-    monkeypatch.setattr(group, "_backend", lambda token: Backend())
-    s = _FakeState(
+def _control_state():
+    return _FakeState(
         router=SimpleNamespace(session=SimpleNamespace(client_token="t")),
         pending="",
         action_error="",
         _pending_at=0.0,
     )
+
+
+def _no_backend(monkeypatch, group):
+    """Fail loudly if a control press touches the operator's RemoteBackend."""
+    from helao.ui.shared.operator.orch_backend import RemoteBackend
+
+    def boom(*a, **k):
+        raise AssertionError("control built a RemoteBackend")
+
+    monkeypatch.setattr(RemoteBackend, "__init__", boom)
+    monkeypatch.setattr(group, "session_backend", boom)
+    monkeypatch.setattr(group, "_backend", boom)
+
+
+def test_control_goes_straight_to_the_orchestrator_without_a_remote_backend(
+    group, monkeypatch
+):
+    import asyncio
+
+    from helao.core.error import ErrorCodes
+
+    _no_backend(monkeypatch, group)
+    calls = []
+
+    async def dispatch(key, host, port, endpoint, params_dict=None, json_dict=None):
+        calls.append((key, host, port, endpoint, params_dict))
+        return {}, ErrorCodes.none
+
+    monkeypatch.setattr(group, "async_private_dispatcher", dispatch)
+    for name in ("start", "stop", "estop", "clear_estop"):
+        s = _control_state()
+        asyncio.run(group.GroupState.control.fn(s, name))
+        assert s.action_error == "" and s.pending == name
+    assert calls == [
+        ("ORCH", "127.0.0.1", 8001, "start", {}),
+        ("ORCH", "127.0.0.1", 8001, "stop", {"reset_run_id": False}),
+        ("ORCH", "127.0.0.1", 8001, "estop_orch", {}),
+        ("ORCH", "127.0.0.1", 8001, "clear_estop", {}),
+    ]
+
+
+def test_control_error_sets_action_error_and_clears_pending(group, monkeypatch):
+    import asyncio
+
+    from helao.core.error import ErrorCodes
+
+    _no_backend(monkeypatch, group)
+
+    async def refused(*a, **k):
+        return None, ErrorCodes.http
+
+    monkeypatch.setattr(group, "async_private_dispatcher", refused)
+    s = _control_state()
     asyncio.run(group.GroupState.control.fn(s, "start"))
-    assert s.action_error == "orch said no" and s.pending == ""
-    monkeypatch.setattr(group, "_backend", lambda token: None)
+    assert s.action_error == f"start failed: {ErrorCodes.http}" and s.pending == ""
+
+    async def raises(*a, **k):
+        raise OSError("link down")
+
+    monkeypatch.setattr(group, "async_private_dispatcher", raises)
+    asyncio.run(group.GroupState.control.fn(s, "stop"))
+    assert s.action_error == "link down" and s.pending == ""
+    group._CFG.clear()
     asyncio.run(group.GroupState.control.fn(s, "stop"))
     assert s.action_error == "cannot reach the orchestrator" and s.pending == ""
+
+
+def test_an_unconfirmed_button_names_itself_after_the_timeout(group):
+    feed = Feed()
+    feed.push(frame(1, loop_state="stopped"), now=100.0)
+    s = state()
+    group.apply_tick(s, feed, 100.1, "t")
+    s.pending, s._pending_at = "estop", 100.0
+    group.apply_tick(s, feed, 100.0 + group.PENDING_TIMEOUT_S - 1, "t")
+    assert s.pending == "estop" and s.action_error == ""  # still waiting
+    group.apply_tick(s, feed, 100.0 + group.PENDING_TIMEOUT_S + 1, "t")
+    assert s.pending == ""
+    assert s.action_error.startswith("estop not confirmed by the orchestrator")
+    assert "only while its loop is started" in s.action_error
+    s.pending, s._pending_at, s.action_error = "start", 200.0, ""
+    group.apply_tick(s, feed, 200.0 + group.PENDING_TIMEOUT_S + 1, "t")
+    assert s.action_error == "start not confirmed by the orchestrator"
+
+
+def test_a_confirmed_button_clears_pending_without_an_error(group):
+    feed = Feed()
+    feed.push(frame(1, loop_state="started"), now=100.0)
+    s = state()
+    group.apply_tick(s, feed, 100.1, "t")
+    s.pending, s._pending_at = "start", 100.0
+    group.apply_tick(s, feed, 100.0 + group.PENDING_TIMEOUT_S + 1, "t")
+    assert s.pending == "" and s.action_error == ""
 
 
 def test_ingest_lifespan_always_stops_the_registry():

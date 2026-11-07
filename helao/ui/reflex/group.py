@@ -4,8 +4,11 @@ One process-wide ``WsIngest`` on the orchestrator's ``/ws_orch``; frames are
 whole snapshots, read from ``ingest.raw``. ``GroupState`` is a plain
 ``rx.State`` (one page per orchestrator) ticked by ``rx.moment``: 60 Hz while
 a pulse is alive, 2 Hz otherwise. Never a server-side loop. Buttons and the
-info box go over HTTP through the operator's ``RemoteBackend``, which is bound
-to the same orchestrator this page streams from (see :func:`_backend`).
+info box go over HTTP: the four control buttons straight through
+``async_private_dispatcher`` (building a ``RemoteBackend`` runs ``import_autolibs``
+on the Reflex loop, which would stall the first click), the info box through the
+operator's ``RemoteBackend``, bound to the same orchestrator this page streams
+from (see :func:`_backend`).
 
 Frames are followed by LOCAL arrival order (``WsIngest.n_batches``), never by
 the orchestrator's own ``seq_no``: ``raw`` keeps old batches across an
@@ -20,8 +23,10 @@ from typing import Optional
 
 import reflex as rx
 
+from helao.core.error import ErrorCodes
 from helao.core.models.group_snapshot import ERROR_STATUSES
 from helao.helpers import helao_logging as logging
+from helao.helpers.dispatcher import async_private_dispatcher
 from helao.ui.reflex import plots
 from helao.ui.reflex.ingest import WsIngest
 from helao.ui.reflex.netgraph import NetGraph, group_layout
@@ -319,6 +324,7 @@ def header_fields(snap: dict) -> dict:
         ),
         "seq_uuid": seq.get("uuid") or "",
         "seq_uuid_short": truncate_uuid(seq.get("uuid")),
+        "seq_finished": bool(seq.get("finished")),
         "loop_state": loop_state,
         "orch_state": orch_state,
         "loop_group": LOOP_TO_GROUP.get(loop_state, "idle"),
@@ -327,12 +333,33 @@ def header_fields(snap: dict) -> dict:
     }
 
 
+#: button name -> (orchestrator endpoint, params)
 CONTROL_CALLS = {
-    "start": lambda b: b.start(strict=True),
-    "stop": lambda b: b.stop(reset_run_id=False, strict=True),
-    "estop": lambda b: b.estop(strict=True),
-    "clear_estop": lambda b: b.clear_estop(strict=True),
+    "start": ("start", {}),
+    "stop": ("stop", {"reset_run_id": False}),
+    "estop": ("estop_orch", {}),
+    "clear_estop": ("clear_estop", {}),
 }
+#: The orchestrator answers an ignored call like an accepted one, so a button
+#: its snapshots never confirm is named to the operator.
+NOT_CONFIRMED = {
+    "estop": " (the orchestrator latches E-STOP only while its loop is started)",
+}
+
+
+async def _control_call(name: str) -> None:
+    """Raise unless the orchestrator took the call. No ``RemoteBackend`` involved."""
+    endpoint, params = CONTROL_CALLS[name]
+    _, err = await async_private_dispatcher(
+        _CFG["orch_key"],
+        _CFG["host"],
+        _CFG["port"],
+        endpoint,
+        params_dict=params,
+        json_dict={},
+    )
+    if err != ErrorCodes.none:
+        raise RuntimeError(f"{endpoint} failed: {err}")
 
 
 def _backend(token: str):
@@ -475,9 +502,13 @@ def apply_tick(s, feed, now: float, token: str) -> bool:
             setattr(s, name, value)
         s.lost = lost
         s.banner = (OLD_ORCH_BANNER if s._old_orch else LOST_BANNER) if lost else ""
-        if s.pending and (
-            pending_done(s.pending, snap) or now - s._pending_at > PENDING_TIMEOUT_S
-        ):
+        if s.pending and pending_done(s.pending, snap):
+            s.pending = ""
+        elif s.pending and now - s._pending_at > PENDING_TIMEOUT_S:
+            s.action_error = (
+                f"{s.pending} not confirmed by the orchestrator"
+                + NOT_CONFIRMED.get(s.pending, "")
+            )
             s.pending = ""
         _render_strips(s, snap, now, token)
     s.tick_ms = FAST_MS if s._pulses else SLOW_MS
@@ -495,6 +526,7 @@ class GroupState(rx.State):
     seq_started: str = ""
     seq_uuid: str = ""
     seq_uuid_short: str = ""
+    seq_finished: bool = False
     loop_state: str = ""
     orch_state: str = ""
     loop_group: str = "idle"
@@ -572,19 +604,17 @@ class GroupState(rx.State):
 
     @rx.event(background=True)
     async def control(self, name: str):
-        """Start / Stop / E-stop / Clear E-stop through RemoteBackend."""
+        """Start / Stop / E-stop / Clear E-stop straight to the orchestrator."""
         async with self:
-            token = self.router.session.client_token
             self.pending = name
             self.action_error = ""
             self._pending_at = time.time()
-        backend = _backend(token)
         err = ""
-        if backend is None:
+        if not _CFG:
             err = "cannot reach the orchestrator"
         else:
             try:
-                await CONTROL_CALLS[name](backend)
+                await _control_call(name)
             except Exception as exc:
                 err = str(exc)
         async with self:
@@ -664,6 +694,10 @@ def group_page() -> rx.Component:
         rx.hstack(
             rx.text("SEQ", weight="bold"),
             rx.text(S.seq_name),
+            rx.cond(
+                S.seq_finished,
+                rx.badge("finished", class_name=GROUP_BADGE_CLASSES["idle"]),
+            ),
             rx.text("started ", S.seq_started),
             rx.text("uuid"),
             rx.tooltip(

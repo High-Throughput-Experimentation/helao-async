@@ -166,3 +166,17 @@ def test_narrow_strip_drops_names_and_progress_follows_the_sawtooth():
         if m.get("name") == "progress"
     )["x"][1]
     assert abs(p(T0 + 0.125) - 0.25) < 1e-6 and abs(p(T0 + 0.5) - p(T0)) < 1e-6
+
+
+def test_only_an_active_row_counts_elapsed_time():
+    from helao.ui.reflex.timeline_strip import fmt_hms, segment_label
+
+    t0 = T0
+    for state in ("done", "error"):  # no end recorded: never a running counter
+        _, line2 = segment_label(_item(state, t1=None), T0 + 500, False, TODAY)
+        assert line2 == f"{fmt_hms(t0, TODAY)}–" and "(" not in line2
+    _, active = segment_label(_item("active"), T0 + 125, False, TODAY)
+    assert active.endswith("(2:05)")
+    # a queued row shows no time even when a stale t_start is set
+    assert segment_label(_item("queued", t0=T0), T0, False, TODAY) == ("exp", "")
+    assert segment_label(_item("queued", t0=T0), T0, True, TODAY) == ("", "")

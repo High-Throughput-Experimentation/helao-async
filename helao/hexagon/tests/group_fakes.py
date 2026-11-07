@@ -16,6 +16,37 @@ from helao.core.models.orchstatus import LoopIntent, LoopStatus, OrchStatus
 T0 = datetime(2026, 11, 6, 10, 0, 0)
 
 
+class NoScan(dict):
+    """A bucket that may be looked up and measured but never iterated.
+
+    Pins "per-tick work does not grow with the finished actions": a read that
+    walks the bucket raises. ``keys()`` is a view and is not overridden, so a
+    test that needs a walk to fail must not rely on it.
+    """
+
+    armed = True
+
+    def _no(self, *a, **k):
+        if self.armed:
+            raise AssertionError("bucket iterated")
+
+    def __iter__(self):
+        self._no()
+        return super().__iter__()
+
+    def items(self):
+        self._no()
+        return super().items()
+
+    def values(self):
+        self._no()
+        return super().values()
+
+    def keys(self):
+        self._no()
+        return super().keys()
+
+
 def fake_act(
     server="SIM",
     name="acquire",
