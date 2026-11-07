@@ -500,7 +500,8 @@ def test_a_segment_that_cannot_fit_a_time_shows_the_name_only():
     )
 
     items = _states(*["done"] * 3, "active", *["queued"] * 9)  # slivers of 52.4 px
-    for width in (W, 640.0):  # 52.4 px and 46.9 px boxes: the second is under TIME_PX
+    for width in (W, 640.0):  # segments 52.4 and 46.0 px, boxes 44.4 and 38.0 px:
+        # the first sits just over TIME_PX, the second under it
         marks, _, edges = strip_marks(
             items, n_before=0, n_after=0, now=T0, width_px=width, today=TODAY
         )
@@ -509,13 +510,85 @@ def test_a_segment_that_cannot_fit_a_time_shows_the_name_only():
         assert (TEXT_Y[1] in got) == (box >= TIME_PX), (width, box, got)
         assert TEXT_Y[0] in got
     assert 44 <= TIME_PX <= 46
-    # the threshold itself: a 52 px segment has a 44 px box and still shows the time
+
+
+def test_ellipsis_is_never_the_previous_or_the_next_key():
+    from helao.ui.reflex.timeline_strip import key_indices
+
+    items = _states("active", "done")  # an odd order: still no ellipsis keys
+    assert key_indices([None, *items[:1], None]) == {1}
+    assert key_indices([None, *_states("done"), None]) == {1}
+
+
+def test_narrow_mode_is_decided_per_segment():
+    from helao.ui.reflex.timeline_strip import NARROW_PX, strip_marks
+
+    items = _states(*["done"] * 3, "active", *["queued"] * 9)
     marks, _, edges = strip_marks(
-        items,
-        n_before=0,
-        n_after=0,
-        now=T0,
-        width_px=3 * 60 + 52 * 9 + 2 * 52,
-        today=TODAY,
+        items, n_before=0, n_after=0, now=T0, width_px=W, today=TODAY
     )
-    assert TEXT_Y[1] in _row_values(marks, edges, 0)
+    w = _widths(edges)
+    assert 24 + 8 <= w[0] < NARROW_PX <= w[3] + 1e-6  # 52 px beside a 60 px key slot
+    rows = lambda i: {
+        t["y"]: t["value"]
+        for t in _texts(marks)
+        if abs(t["x"] - (edges[i] + edges[i + 1]) / 2) < 1e-6
+    }
+    from helao.ui.reflex.timeline_strip import TEXT_Y
+
+    assert rows(0) == {TEXT_Y[0]: "exp", TEXT_Y[1]: "10:00:00"}  # start only
+    assert rows(3) == {  # key slot: start and elapsed
+        TEXT_Y[0]: "exp",
+        TEXT_Y[1]: "10:00:00",
+        TEXT_Y[2]: "(0:00)",
+    }
+
+
+def test_key_status_is_not_sticky_when_the_active_item_advances():
+    from helao.ui.reflex.timeline_strip import MIN_KEY_PX, slot_edges
+
+    def widths(n_done):
+        items = _states(*["done"] * n_done, "active", *["queued"] * (20 - n_done))
+        return _widths(slot_edges(items, W))
+
+    before, after = widths(9), widths(10)  # the active item advances by one
+    rest = (W - 3 * MIN_KEY_PX) / 18
+    assert before[8:11] == pytest.approx([MIN_KEY_PX] * 3)
+    assert after[9:12] == pytest.approx([MIN_KEY_PX] * 3)
+    # the former previous (slot 8) is now two behind the active one: shared width
+    assert after[8] == pytest.approx(rest) and before[11] == pytest.approx(rest)
+    assert sum(after) == pytest.approx(W)
+
+
+def test_label_rows_are_distinct_and_clear_of_the_progress_line():
+    from helao.ui.reflex.timeline_strip import PROGRESS_W, PROGRESS_Y, TEXT_Y
+
+    plot_h = 60 - 2 * 8  # STRIP_H less the chart padding
+    ys = [y * plot_h for y in TEXT_Y]
+    assert all(a - b >= 12 for a, b in zip(ys, ys[1:]))  # 11 px text, 13.2 px line
+    assert ys[0] + 6.6 <= plot_h  # the top row's box stays inside the plot
+    progress_top = PROGRESS_Y * plot_h + PROGRESS_W / 2  # the bar's top edge
+    assert ys[-1] - 4 > progress_top
+
+
+def test_three_line_marks_per_state():
+    from helao.ui.reflex.timeline_strip import TEXT_Y, strip_marks
+
+    items = [
+        _item("done", uuid="d", t1=T0 + 65),
+        _item("active", uuid="a"),
+        _item("queued", t0=None, uuid=None, qidx=0),
+    ]
+    marks, _, edges = strip_marks(
+        items, n_before=0, n_after=0, now=T0 + 125, width_px=720, today=TODAY
+    )
+    by_slot = {}
+    for t in _texts(marks):
+        by_slot.setdefault(int(t["x"] // (720 / 3)), {})[t["y"]] = t["value"]
+    assert by_slot[0] == {
+        TEXT_Y[0]: "exp",
+        TEXT_Y[1]: "10:00:00",
+        TEXT_Y[2]: "10:01:05",
+    }
+    assert by_slot[1] == {TEXT_Y[0]: "exp", TEXT_Y[1]: "10:00:00", TEXT_Y[2]: "(2:05)"}
+    assert by_slot[2] == {TEXT_Y[0]: "exp"}
