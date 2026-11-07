@@ -60,6 +60,7 @@ def state():
         tree_html="",
         _full_at=0.0,
         _pending_at=0.0,
+        _unconfirmed="",
         _probe_at=0.0,
         _old_orch=False,
         pending="",
@@ -536,6 +537,40 @@ def test_header_fields_idle_and_running():
     assert header_fields({})["seq_finished"] is False
 
 
+def test_header_names_how_the_sequence_ended():
+    from helao.ui.reflex.group import header_fields
+
+    for ended, want in (
+        ("estopped", "estopped"),
+        ("error", "error"),
+        ("finished", "finished"),
+    ):
+        h = header_fields({"seq": {"name": "S", "finished": True, "ended": ended}})
+        assert h["seq_ended"] == want
+    # an older orchestrator sends no `ended`; a running sequence has none
+    assert (
+        header_fields({"seq": {"name": "S", "finished": True}})["seq_ended"]
+        == "finished"
+    )
+    assert header_fields({"seq": {"name": "S", "finished": False}})["seq_ended"] == ""
+    assert header_fields({})["seq_ended"] == ""
+
+
+def test_estopped_sequence_badge_uses_the_estop_colour_not_finished(group):
+    from helao.ui.shared.palette import GROUP_BADGE_CLASSES
+
+    node = group._seq_ended_badge(group.GroupState.seq_ended).render()["children"][0]
+    cases = {c[0][0]: c[1] for c in node["match_cases"]}
+    est = cases['"estopped"']
+    assert est["children"][0]["contents"] == '"E-stopped"'
+    assert f'className:"{GROUP_BADGE_CLASSES["estop"]}"' in est["props"]
+    assert f'className:"{GROUP_BADGE_CLASSES["error"]}"' in cases['"error"']["props"]
+    assert node["default"]["children"][0]["contents"] == '"finished"'
+    assert f'className:"{GROUP_BADGE_CLASSES["idle"]}"' in node["default"]["props"]
+    group.configure_group(CFG)
+    assert "seq_ended" in str(group.group_page().render())
+
+
 def test_finished_badge_shows_beside_the_name_and_idle_only_without_a_sequence(group):
     group.configure_group(CFG)
     rendered = str(group.group_page().render())
@@ -685,6 +720,7 @@ def _control_state():
         pending="",
         action_error="",
         _pending_at=0.0,
+        _unconfirmed="",
     )
 
 
@@ -768,6 +804,41 @@ def test_an_unconfirmed_button_names_itself_after_the_timeout(group):
     s.pending, s._pending_at, s.action_error = "start", 200.0, ""
     group.apply_tick(s, feed, 200.0 + group.PENDING_TIMEOUT_S + 1, "t")
     assert s.action_error == "start not confirmed by the orchestrator"
+
+
+def test_a_late_confirmation_clears_only_the_not_confirmed_message(group):
+    feed = Feed()
+    feed.push(frame(1, loop_state="stopped"), now=100.0)
+    s = state()
+    group.apply_tick(s, feed, 100.1, "t")
+    s.pending, s._pending_at = "estop", 100.0
+    group.apply_tick(s, feed, 100.0 + group.PENDING_TIMEOUT_S + 1, "t")
+    assert s.action_error.startswith("estop not confirmed")
+    # the effect arrives late: the message goes
+    feed.push(frame(2, loop_state="estopped", orch_state="estopped"), now=120.0)
+    group.apply_tick(s, feed, 120.1, "t")
+    assert s.action_error == ""
+    # an unrelated error is never cleared by a snapshot
+    s.action_error, s._unconfirmed = "start failed: boom", ""
+    group.apply_tick(s, feed, 121.0, "t")
+    assert s.action_error == "start failed: boom"
+    # nor is one that replaced the message
+    s.action_error, s._unconfirmed = "link down", "estop"
+    feed.push(frame(3, loop_state="estopped", orch_state="estopped"), now=122.0)
+    group.apply_tick(s, feed, 122.1, "t")
+    assert s.action_error == "link down"
+
+
+def test_an_unconfirmed_message_stays_while_the_snapshot_still_disagrees(group):
+    feed = Feed()
+    feed.push(frame(1, loop_state="stopped"), now=100.0)
+    s = state()
+    group.apply_tick(s, feed, 100.1, "t")
+    s.pending, s._pending_at = "estop", 100.0
+    group.apply_tick(s, feed, 100.0 + group.PENDING_TIMEOUT_S + 1, "t")
+    feed.push(frame(2, loop_state="stopped"), now=130.0)
+    group.apply_tick(s, feed, 130.1, "t")
+    assert s.action_error.startswith("estop not confirmed")
 
 
 def test_a_confirmed_button_clears_pending_without_an_error(group):

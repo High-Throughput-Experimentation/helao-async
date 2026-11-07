@@ -309,15 +309,29 @@ class GlobalStatusModel(BaseModel, HelaoDict):
         return uuid_dict
 
     def clear_in_finished(self, hlostatus: HloStatus):
-        """Clear the bucket of finished actions associated with `hlostatus`."""
+        """Clear the bucket of finished actions associated with `hlostatus`.
+
+        The same uuids are also dropped from every stored endpoint's
+        `nonactive_dict`: `_sort_status` re-folds all of those into this
+        model on the next status from any server, which would otherwise put
+        the cleared actions straight back.
+        """
+        cleared = set()
         if hlostatus in self.nonactive_dict:
+            cleared.update(self.nonactive_dict[hlostatus])
             self.nonactive_dict[hlostatus] = {}
         elif HloStatus.finished in self.nonactive_dict:
             # can only be in finished; clear the whole finished bucket.
             # (Was: `for key in ....keys(): del ....[key]`, which raised
             # "dictionary changed size during iteration" whenever the bucket
             # was non-empty — a live RuntimeError on the clear_estop path.)
+            cleared.update(self.nonactive_dict[HloStatus.finished])
             self.nonactive_dict[HloStatus.finished] = {}
+        for server in self.server_dict.values():
+            for endpoint in server.endpoints.values():
+                for bucket in endpoint.nonactive_dict.values():
+                    for uuid in cleared & bucket.keys():
+                        del bucket[uuid]
 
     def new_experiment(self, exp_uuid: UUID):
         """Initialize the dispatched-action counter for a new experiment."""

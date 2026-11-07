@@ -45,6 +45,20 @@ def _item_state(statuses) -> str:
     return "active"
 
 
+def _seq_ended(seq, finished: bool) -> Optional[str]:
+    """How a finished sequence ended: ``estopped``, ``error`` or ``finished``.
+
+    ``None`` while it is still the active sequence."""
+    if not finished:
+        return None
+    names = _names(getattr(seq, "sequence_status", None))
+    if "estopped" in names:
+        return "estopped"
+    if names & ERROR_STATUSES:
+        return "error"
+    return "finished"
+
+
 def _head(dq):
     """O(1) identity of a queue's head: the stored object (a zdeque's raw blob)."""
     return deque.__getitem__(dq, 0) if dq else None
@@ -273,6 +287,7 @@ def build_snapshot(
                 "label": seq.sequence_label,
                 "t_start": epoch(seq.sequence_timestamp),
                 "finished": orch.active_sequence is None,
+                "ended": _seq_ended(seq, orch.active_sequence is None),
             }
         ),
         "orch_action": orch_action,

@@ -116,10 +116,20 @@ def test_estopped_uuid_when_loop_not_started_is_noop():
     assert s == s0 and cmds == ()
 
 
-def test_estop_requested_when_loop_not_started_is_noop():
-    """Mirrors production /estop_orch (orch_api.py:364-373): only estops when
-    loop_state == started; stopped (and estopped) are no-ops."""
-    s0 = st(loop_state=LoopStatus.stopped)
+def test_estop_requested_when_loop_stopped_still_estops():
+    """After Stop the loop reads ``stopped`` while the final experiment closes
+    out with actions running; the route decides whether anything is running,
+    so the reducer must accept the event from ``stopped``."""
+    s, cmds = fsm.step(
+        st(loop_state=LoopStatus.stopped, active_experiment_present=True),
+        fsm.EstopRequested(reason="ui"),
+    )
+    assert s.loop_state == LoopStatus.estopped
+    assert fsm.EstopFanout in kinds(cmds) and fsm.FinishActiveEstopped in kinds(cmds)
+
+
+def test_estop_requested_when_already_estopped_is_noop():
+    s0 = st(loop_state=LoopStatus.estopped)
     s, cmds = fsm.step(s0, fsm.EstopRequested(reason="ui"))
     assert s == s0 and cmds == ()
 

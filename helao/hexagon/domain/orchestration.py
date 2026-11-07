@@ -400,9 +400,9 @@ def _estop_transition(state: OrchestrationState, reason: str) -> StepResult:
 
     Idempotent re-entry guard (DD-3): ``ActionResultErrored`` and
     ``UncaughtLoopException`` escalate to estop unconditionally (no
-    started-only guard, unlike ``EstopRequested``/``EstoppedUuidIngested`` —
-    both must stay reachable so an escalation landing mid-finalization can
-    still be observed). A second escalation racing in while already estopped
+    started-only guard, unlike ``EstoppedUuidIngested`` — both must stay
+    reachable so an escalation landing mid-finalization can still be
+    observed; ``EstopRequested`` is unguarded too since the close-out fix). A second escalation racing in while already estopped
     (e.g. a stale in-flight dispatch effect that crashes against
     post-finalize state) must therefore no-op here instead of re-running the
     cascade: ``FinishActiveEstopped`` is the SOLE finalizer and must never
@@ -515,8 +515,9 @@ def step(state: OrchestrationState, event: Event) -> StepResult:
         return replace(state, loop_intent=LoopIntent.skip), ()
 
     if isinstance(event, EstopRequested):  # T9 (API source)
-        if state.loop_state != LoopStatus.started:
-            return state, ()
+        # Not started-only: after Stop the loop is ``stopped`` while the final
+        # experiment closes out with actions running. The route decides whether
+        # anything is running; an already-estopped loop no-ops in the transition.
         return _estop_transition(state, event.reason)
 
     if isinstance(event, ActionResultErrored):  # T9 (result escalation)

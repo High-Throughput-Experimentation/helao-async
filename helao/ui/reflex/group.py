@@ -325,6 +325,8 @@ def header_fields(snap: dict) -> dict:
         "seq_uuid": seq.get("uuid") or "",
         "seq_uuid_short": truncate_uuid(seq.get("uuid")),
         "seq_finished": bool(seq.get("finished")),
+        # frames from an older orchestrator carry no `ended`
+        "seq_ended": (seq.get("ended") or "finished") if seq.get("finished") else "",
         "loop_state": loop_state,
         "orch_state": orch_state,
         "loop_group": LOOP_TO_GROUP.get(loop_state, "idle"),
@@ -343,7 +345,8 @@ CONTROL_CALLS = {
 #: The orchestrator answers an ignored call like an accepted one, so a button
 #: its snapshots never confirm is named to the operator.
 NOT_CONFIRMED = {
-    "estop": " (the orchestrator latches E-STOP only while its loop is started)",
+    "estop": " (the orchestrator latches E-STOP only while its loop is started"
+    " or an action is running)",
 }
 
 
@@ -509,7 +512,16 @@ def apply_tick(s, feed, now: float, token: str) -> bool:
                 f"{s.pending} not confirmed by the orchestrator"
                 + NOT_CONFIRMED.get(s.pending, "")
             )
+            s._unconfirmed = s.pending
             s.pending = ""
+        # a late snapshot that does show the effect retires that message only
+        if (
+            s._unconfirmed
+            and s.action_error.startswith(f"{s._unconfirmed} not confirmed")
+            and pending_done(s._unconfirmed, snap)
+        ):
+            s.action_error = ""
+            s._unconfirmed = ""
         _render_strips(s, snap, now, token)
     s.tick_ms = FAST_MS if s._pulses else SLOW_MS
     never_live = feed is not None and feed.status.message_count == 0
@@ -527,6 +539,7 @@ class GroupState(rx.State):
     seq_uuid: str = ""
     seq_uuid_short: str = ""
     seq_finished: bool = False
+    seq_ended: str = ""
     loop_state: str = ""
     orch_state: str = ""
     loop_group: str = "idle"
@@ -569,6 +582,7 @@ class GroupState(rx.State):
     _running: bool = False
     _full_at: float = 0.0
     _pending_at: float = 0.0
+    _unconfirmed: str = ""  # button whose "not confirmed" message is showing
     _probe_at: float = 0.0
     _first_at: float = 0.0
     _old_orch: bool = False
@@ -608,6 +622,7 @@ class GroupState(rx.State):
         async with self:
             self.pending = name
             self.action_error = ""
+            self._unconfirmed = ""
             self._pending_at = time.time()
         err = ""
         if not _CFG:
@@ -669,6 +684,16 @@ def _badge(prefix: str, label_var, group_var):
     )
 
 
+def _seq_ended_badge(ended_var) -> rx.Component:
+    """How the finished sequence ended; classes literal for Tailwind."""
+    return rx.match(  # type: ignore[return-value]
+        ended_var,
+        ("estopped", rx.badge("E-stopped", class_name=GROUP_BADGE_CLASSES["estop"])),
+        ("error", rx.badge("error", class_name=GROUP_BADGE_CLASSES["error"])),
+        rx.badge("finished", class_name=GROUP_BADGE_CLASSES["idle"]),
+    )
+
+
 def _button(
     label: str, name: str, enabled_var, class_name: str = "", gate_pending: bool = True
 ):
@@ -696,7 +721,7 @@ def group_page() -> rx.Component:
             rx.text(S.seq_name),
             rx.cond(
                 S.seq_finished,
-                rx.badge("finished", class_name=GROUP_BADGE_CLASSES["idle"]),
+                _seq_ended_badge(S.seq_ended),
             ),
             rx.text("started ", S.seq_started),
             rx.text("uuid"),

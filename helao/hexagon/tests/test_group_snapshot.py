@@ -330,6 +330,23 @@ def test_finished_sequence_is_framed_from_last_sequence_with_its_last_experiment
     assert len(rows) == 2
 
 
+def test_finished_sequence_says_how_it_ended():
+    orch = fake_orch()
+    seq = fake_seq()
+    orch.last_sequence = seq
+    cases = [
+        ((HloStatus.finished,), "finished"),
+        ((HloStatus.finished, HloStatus.estopped), "estopped"),
+        ((HloStatus.estopped, HloStatus.finished), "estopped"),
+        ((HloStatus.finished, HloStatus.errored), "error"),
+    ]
+    for statuses, want in cases:
+        seq.sequence_status = list(statuses)
+        assert _snap(orch)["seq"]["ended"] == want, statuses
+    orch.active_sequence = seq  # still running: nothing has ended
+    assert _snap(orch)["seq"]["ended"] is None
+
+
 def test_idle_orch_with_no_sequence_at_all_has_no_seq():
     assert _snap(fake_orch())["seq"] is None
 

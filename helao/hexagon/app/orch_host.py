@@ -1172,11 +1172,21 @@ class OrchHost(ActionHost):
 
         @self.post("/estop_orch", tags=["private"])
         async def estop_orch():
-            """Latch E-STOP if the loop is running; otherwise log and return."""
-            if self.globalstatusmodel.loop_state == LoopStatus.started:
-                await self.estop_loop()
-            elif self.globalstatusmodel.loop_state == LoopStatus.estopped:
+            """Latch E-STOP if anything is running; otherwise log and return.
+
+            "Running" is not only a started loop: after Stop the loop reads
+            ``stopped`` while the experiment closes out with actions still
+            active on hardware, and that is exactly when E-STOP is needed.
+            """
+            gsm = self.globalstatusmodel
+            if gsm.loop_state == LoopStatus.estopped:
                 LOGGER.info("orchestrator E-STOP flag already raised")
+            elif (
+                gsm.loop_state == LoopStatus.started
+                or gsm.active_dict
+                or self.active_experiment is not None
+            ):
+                await self.estop_loop()
             else:
                 LOGGER.info("orchestrator is not running")
             return {}

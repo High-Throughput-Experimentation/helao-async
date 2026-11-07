@@ -123,7 +123,7 @@ def _object_payload(orch, kind: str, uuid: str) -> Optional[dict]:
     actions hold no uuid until activation, and the deques unpickle every item.
     The page fetches queued rows with ``get_queue_object``. Search order: the
     active run (active experiment, its dispatched actions, the active
-    sequence's finished experiments, the parked head action, ``active_dict``),
+    sequence's finished experiments, the last sequence's experiments, the parked head action, ``active_dict``),
     then the history containers (meta dicts, returned as they are).
     """
     target = str(uuid)
@@ -132,6 +132,10 @@ def _object_payload(orch, kind: str, uuid: str) -> Optional[dict]:
     if kind == "experiment":
         candidates = [exp] if exp is not None else []
         candidates += list(getattr(seq, "dispatched_experiments", None) or [])
+        # a finished sequence leaves ``active_sequence`` empty; the page still
+        # shows its experiments and must be able to open them
+        last_seq = getattr(orch, "last_sequence", None)
+        candidates += list(getattr(last_seq, "dispatched_experiments", None) or [])
         for e in candidates:
             if str(e.experiment_uuid) == target:
                 return e.as_dict()

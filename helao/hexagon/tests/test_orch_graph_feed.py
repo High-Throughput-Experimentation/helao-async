@@ -212,6 +212,10 @@ def test_get_object_finds_each_tier_and_misses_with_null():
     seq = Sequence(sequence_name="s", sequence_uuid=uuid4())
     seq.dispatched_experiments = [exp_done.get_exp()]
     host.active_sequence = seq
+    exp_last = Experiment(experiment_name="e_last", experiment_uuid=uuid4())
+    last_seq = Sequence(sequence_name="s_last", sequence_uuid=uuid4())
+    last_seq.dispatched_experiments = [exp_last.get_exp()]
+    host.last_sequence = last_seq  # a finished sequence the page still shows
     host.active_experiment = exp_active
     host.parked_head_action = act_parked
     host.globalstatusmodel.active_dict[act_live.action_uuid] = act_live
@@ -235,6 +239,7 @@ def test_get_object_finds_each_tier_and_misses_with_null():
         get("experiment", exp_active.experiment_uuid)["experiment_name"] == "e_active"
     )
     assert get("experiment", exp_done.experiment_uuid)["experiment_name"] == "e_done"
+    assert get("experiment", exp_last.experiment_uuid)["experiment_name"] == "e_last"
     assert get("experiment", ehist_uuid)["experiment_name"] == "e_hist"
     assert get("action", act_active.action_uuid)["action_name"] == "a_active"
     assert get("action", act_parked.action_uuid)["action_name"] == "a_parked"
