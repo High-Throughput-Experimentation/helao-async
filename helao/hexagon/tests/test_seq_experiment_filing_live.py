@@ -42,9 +42,11 @@ async def test_each_sequence_files_only_its_own_experiments(tmp_path):
             await orch_call("append_sequence", body={"sequence": s.as_dict()})
         await orch_call("start")
         await wait_parked(orch)
-        recs = await _seq_records(tmp_path, 2)
-        # let the last move_dir settle, then re-read
-        await asyncio.sleep(2.0)
+        # ``stopped`` is not parked: wait for the close-out itself
+        deadline = asyncio.get_event_loop().time() + 30
+        while orch.active_experiment is not None or orch.active_sequence is not None:
+            assert asyncio.get_event_loop().time() < deadline, "close-out never ran"
+            await asyncio.sleep(0.1)
         recs = await _seq_records(tmp_path, 2)
 
         # the -exp records say which sequence each experiment belongs to
