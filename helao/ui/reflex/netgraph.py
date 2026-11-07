@@ -144,10 +144,14 @@ class NetGraph:
         #: restyled edge rebuilds the chart; instead each style is its own
         #: always-present trace and an edge moves between them as column data.
         self.edge_styles = tuple(edge_styles)
-        #: Every colour a node may take. xy applies a column update in place only
-        #: when the point positions change too (measured: a colour-only change
-        #: leaves the old colour on screen), so a node trace exists per colour
-        #: and a node moves between them, exactly as edges do.
+        #: Every colour a node may take. xy applies a column update in place by
+        #: writing only the points past the old length, and only when the trace
+        #: keeps its length and column offsets (a colour-only change leaves the
+        #: old colour on screen; a node joining a colour trace ahead of its
+        #: existing points left a stale copy of them and no node: the orch
+        #: vanished). So every (node, colour) is its own trace of ONE point that
+        #: is either the node or the off-domain placeholder, and a node
+        #: changing colour swaps two traces' offsets, which xy rebuilds.
         self.node_colors = tuple(node_colors)
         #: Size of the hover disc (one fixed size: a size change is spec too).
         self.hover_px = float(hover_px)
@@ -179,12 +183,9 @@ class NetGraph:
     def pulse(self, edge_id, *, t0, color, direction="fwd", duration=0.6):
         self.pulses.append(Pulse(edge_id, direction, float(t0), float(duration), color))
 
-    def node_traces(self):
-        """Trace name -> node keys in point order, as ``marks`` lays them out."""
-        out: dict = {}
-        for n in self.nodes.values():
-            out.setdefault(f"nodes:{n.size_px:g}:{n.color}", []).append(n.key)
-        return out
+    def node_traces(self) -> dict:
+        """Trace name -> the node it draws (one node per trace)."""
+        return {f"nodes:{n.key}:{n.color}": [n.key] for n in self.nodes.values()}
 
     def ports(self):
         """edge_id -> (src port, dst port), fanned out where ends share a side."""
@@ -259,12 +260,12 @@ class NetGraph:
             ys.append(y)
             cs.append(p.color)
         by_node = {
-            (n.size_px, c): ([], [])
+            (n.key, c): ([], [])
             for n in self.nodes.values()
-            for c in self.node_colors
+            for c in {*self.node_colors, n.color}
         }
         for n in self.nodes.values():
-            xs, ys = by_node.setdefault((n.size_px, n.color), ([], []))
+            xs, ys = by_node[(n.key, n.color)]
             xs.append(n.x)
             ys.append(n.y)
             if n.text:
@@ -338,11 +339,11 @@ class NetGraph:
             )
         out += [
             scatter(
-                f"nodes:{size:g}:{color}",
-                (*by_node[(size, color)], [color] * len(by_node[(size, color)][0])),
-                size,
+                f"nodes:{key}:{color}",
+                (*by_node[(key, color)], [color] * len(by_node[(key, color)][0])),
+                self.nodes[key].size_px,
                 "circle",
             )
-            for size, color in sorted(by_node)
+            for key, color in sorted(by_node)
         ]
         return out + texts

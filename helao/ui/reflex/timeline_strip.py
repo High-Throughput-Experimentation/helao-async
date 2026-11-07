@@ -18,6 +18,46 @@ from helao.ui.shared.palette import (
 
 NARROW_PX = 90
 SAWTOOTH_HZ = 2.0
+#: The invisible ``hit`` trace is a fixed grid of squares tiling the whole
+#: strip. xy's pick is pixel-exact on a point's drawn marker (measured: with
+#: 4 px circles a hover registered only on a marker and "left" a frame later),
+#: so the markers must touch: 60 columns over ~700 px (11.7 px) and 7 rows over
+#: ~100 px (14.9 px) with 16 px squares leave no gap. One point per segment
+#: centre answered only a hover on that centre. The count never depends on the
+#: slot count, only the x positions do.
+HIT_COLS = 60
+HIT_ROWS = 7
+HIT_TRACE = "hit"
+HIT_PX = 16.0
+
+
+def hit_slot(index, n_slots):
+    """Slot index under hit-grid point ``index`` (row-major), or None."""
+    try:
+        col = int(index) % HIT_COLS
+    except (TypeError, ValueError):
+        return None
+    if int(index) < 0 or int(index) >= HIT_COLS * HIT_ROWS:
+        return None
+    return min(int((col + 0.5) * max(n_slots, 1) / HIT_COLS), n_slots - 1)
+
+
+def item_tooltip(item, now, today=None):
+    """One line for a hovered segment: name, then start/end (same format as labels)."""
+    if item is None:
+        return ""
+    today = today or date.today()
+    name = item.get("name") or "?"
+    state, t0, t1 = item.get("state"), item.get("t_start"), item.get("t_end")
+    if state == "queued":
+        return f"{name}: queued"
+    if t0 is None:
+        return name
+    start = fmt_hms(t0, today)
+    if state == "active":
+        return f"{name}: start {start}, running ({fmt_elapsed(now - t0)})"
+    end = fmt_hms(t1, today) if t1 is not None else "—"
+    return f"{name}: start {start}, end {end}"
 
 
 def fmt_hms(t, today):
@@ -139,14 +179,17 @@ def strip_marks(items, *, n_before, n_after, now, width_px, selected=None, today
                 _vline(i + 1, GROUP_SELECTED_OUTLINE, 3.0),
             ]
     partitions = [_vline(i, CHART_CHROME["--chart-axis"], 1.0) for i in range(1, n)]
+    n_hit = HIT_COLS * HIT_ROWS
     hit = {
         "kind": "scatter",
-        "name": "hit",
-        "x": [i + 0.5 for i in range(len(slots))],
-        "y": [0.5] * len(slots),
-        "colors": [GROUP_STATE_COLORS["queued"]] * len(slots),
-        "size": 4.0,
-        "symbol": "circle",
+        "name": HIT_TRACE,
+        "x": [
+            (c + 0.5) * n / HIT_COLS for _ in range(HIT_ROWS) for c in range(HIT_COLS)
+        ],
+        "y": [(r + 0.5) / HIT_ROWS for r in range(HIT_ROWS) for _ in range(HIT_COLS)],
+        "colors": [GROUP_STATE_COLORS["queued"]] * n_hit,
+        "size": HIT_PX,
+        "symbol": "square",
         "opacity": 0.0,
     }
     return bands + partitions + outlines + [progress, hit] + texts, slots

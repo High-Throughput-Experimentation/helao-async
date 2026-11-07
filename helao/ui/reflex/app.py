@@ -492,7 +492,7 @@ NAV_ICONS = {
 def _nav():
     """Render the shared navigation bar."""
     return rx.hstack(
-        rx.heading("HELAO", size="4"),
+        rx.heading("HELAO dashboard", size="4"),
         rx.spacer(),
         *[
             rx.link(_icon_label(NAV_ICONS[text], text), href=href)

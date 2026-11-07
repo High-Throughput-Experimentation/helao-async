@@ -397,3 +397,128 @@ def test_a_zdeque_head_identity_is_o1_and_changes_with_the_head():
     assert isinstance(h, bytes) and _head(dq) is h
     dq.popleft()
     assert _head(dq) is not h and _head(zdeque()) is None
+
+
+# --- timeline rules: EXP follows the sequence, ACT follows the experiment ---
+
+
+def _finished_exp(name, *actions):
+    exp = fake_exp(name, ts=T0, fin=T0, status=(HloStatus.finished,))
+    exp.dispatched_actions = list(actions)
+    return exp
+
+
+def _done_act(name, exp):
+    return fake_act(name=name, exp_uuid=exp.experiment_uuid, ts=T0, fin=T0)
+
+
+def test_exp_strip_clears_only_when_the_active_sequence_changes():
+    orch = fake_orch()
+    seq_a, seq_b = fake_seq("A"), fake_seq("B")
+    seq_a.dispatched_experiments = [_finished_exp("a1"), _finished_exp("a2")]
+    orch.active_sequence = seq_a
+    assert [r["name"] for r in _snap(orch)["experiments"]] == ["a1", "a2"]
+    # a1/a2 finishing into the next experiment does not clear it
+    orch.active_experiment = fake_exp("a3", ts=T0)
+    assert [r["name"] for r in _snap(orch)["experiments"]] == ["a1", "a2", "a3"]
+    # A ends: idle, nothing queued, last_sequence keeps its rows
+    orch.active_experiment, orch.active_sequence, orch.last_sequence = None, None, seq_a
+    assert [r["name"] for r in _snap(orch)["experiments"]] == ["a1", "a2"]
+    # B starts: the strip shows B (empty), A's rows are gone
+    orch.active_sequence = seq_b
+    assert _snap(orch)["experiments"] == []
+
+
+def test_act_strip_clears_only_when_the_active_experiment_changes():
+    orch = fake_orch()
+    e1 = _finished_exp("e1")
+    e1.dispatched_actions = [_done_act("x1", e1), _done_act("x2", e1)]
+    orch.active_sequence = fake_seq()
+    # e1 just finished: no active experiment, last_experiment is e1
+    orch.last_experiment = e1
+    snap = _snap(orch)
+    assert [(r["name"], r["state"]) for r in snap["actions"]] == [
+        ("x1", "done"),
+        ("x2", "done"),
+    ]
+    assert snap["act_exp"] == str(e1.experiment_uuid)
+    # e2 starts: the strip now shows e2 (empty so far), not e1
+    e2 = fake_exp("e2", ts=T0)
+    orch.active_experiment = e2
+    snap = _snap(orch)
+    assert snap["actions"] == [] and snap["act_exp"] == str(e2.experiment_uuid)
+
+
+def test_idle_orch_keeps_the_last_experiments_actions_and_the_last_sequences_rows():
+    orch = fake_orch()
+    seq = fake_seq()
+    e1 = _finished_exp("e1")
+    unresolved = fake_act(name="stuck", exp_uuid=e1.experiment_uuid, ts=T0)
+    e1.dispatched_actions = [_done_act("x1", e1), unresolved]  # status: active
+    seq.dispatched_experiments = [e1]
+    orch.last_sequence, orch.last_experiment = seq, e1
+    orch.action_dq.append(fake_act(name="stray", ts=None))
+    snap = _snap(orch)
+    assert [r["name"] for r in snap["experiments"]] == ["e1"]
+    # nothing of a finished experiment is still running, and nothing is queued
+    assert [(r["name"], r["state"]) for r in snap["actions"]] == [
+        ("x1", "done"),
+        ("stuck", "done"),
+    ]
+
+
+def test_act_strip_falls_back_to_the_sequences_last_dispatched_experiment():
+    orch = fake_orch()
+    seq = fake_seq()
+    e1 = _finished_exp("e1")
+    e1.dispatched_actions = [_done_act("x1", e1)]
+    seq.dispatched_experiments = [_finished_exp("e0"), e1]
+    orch.last_sequence = seq  # a fresh orchestrator: no last_experiment
+    snap = _snap(orch)
+    assert [r["name"] for r in snap["actions"]] == ["x1"]
+    assert snap["act_exp"] == str(e1.experiment_uuid)
+    assert _snap(fake_orch())["act_exp"] is None
+
+
+def test_queued_experiments_and_actions_are_in_the_rows():
+    orch = fake_orch()
+    orch.active_sequence = fake_seq()
+    orch.active_experiment = fake_exp("e", ts=T0)
+    orch.experiment_dq.extend(fake_exp(f"q{i}", with_uuid=False) for i in range(3))
+    orch.action_dq.extend(fake_act(name=f"qa{i}", ts=None) for i in range(2))
+    snap = _snap(orch)
+    assert [(r["name"], r["state"]) for r in snap["experiments"]] == [
+        ("e", "active"),
+        ("q0", "queued"),
+        ("q1", "queued"),
+        ("q2", "queued"),
+    ]
+    assert [(r["name"], r["state"]) for r in snap["actions"]] == [
+        ("qa0", "queued"),
+        ("qa1", "queued"),
+    ]
+
+
+def test_previous_sequences_last_experiment_is_not_a_row_of_the_new_sequence():
+    # The orchestrator activates sequence B while A's last experiment is still
+    # closing out, then appends that experiment to B's dispatched_experiments.
+    orch = fake_orch()
+    seq_a, seq_b = fake_seq("A"), fake_seq("B")
+    stale = fake_exp(
+        "a-last",
+        ts=T0,
+        fin=T0,
+        status=(HloStatus.finished,),
+        seq_uuid=seq_a.sequence_uuid,
+    )
+    own = fake_exp(
+        "b1", ts=T0, fin=T0, status=(HloStatus.finished,), seq_uuid=seq_b.sequence_uuid
+    )
+    seq_b.dispatched_experiments = [stale, own]
+    orch.active_sequence = seq_b
+    orch.active_experiment = fake_exp("a-closing", ts=T0, seq_uuid=seq_a.sequence_uuid)
+    snap = _snap(orch)
+    assert [r["name"] for r in snap["experiments"]] == ["b1"]
+    assert snap["n_done"] == 0
+    # ... but ACT still follows the experiment that is really active
+    assert snap["act_exp"] == str(orch.active_experiment.experiment_uuid)

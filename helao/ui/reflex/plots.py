@@ -1072,6 +1072,11 @@ def marks_chart(
             show=False, grid=False, tick_label_strategy="none", domain=tuple(y_domain)
         ),
         xy.legend(show=False),
+        # Pan and zoom are off, so the toolbar has nothing to offer; its invisible
+        # buttons would also sit over the chart's top-left corner and swallow
+        # the pointer there (measured: no hover or click reached a strip's
+        # first slots).
+        xy.modebar(show=False),
     ]
     if hover_events:
         axes.append(xy.tooltip(style={"opacity": "0", "pointer_events": "none"}))

@@ -54,7 +54,7 @@ def test_no_arrowheads_and_the_hover_disc_sits_under_the_nodes():
     marks = g.marks(0.0)
     assert not any(m.get("name", "").startswith("arrow") for m in marks)
     names = [m["name"] for m in marks if m["kind"] == "scatter"]
-    assert names.index(f"hovered:{GROUP_IDLE}") < names.index(f"nodes:28:{GROUP_IDLE}")
+    assert names.index(f"hovered:{GROUP_IDLE}") < names.index(f"nodes:UP:{GROUP_IDLE}")
 
 
 def test_hovered_node_is_a_larger_disc_in_its_own_colour_and_clears():
@@ -66,7 +66,7 @@ def test_hovered_node_is_a_larger_disc_in_its_own_colour_and_clears():
     assert (
         on["size"]
         == 40.0
-        > _trace(g.marks(0.0), f"nodes:28:{GROUP_PULSE_DISPATCH}")["size"]
+        > _trace(g.marks(0.0), f"nodes:UP:{GROUP_PULSE_DISPATCH}")["size"]
     )
     g.hovered = None
     off = _trace(g.marks(0.0), f"hovered:{GROUP_PULSE_DISPATCH}")

@@ -31,7 +31,14 @@ from helao.ui.reflex import plots
 from helao.ui.reflex.ingest import WsIngest
 from helao.ui.reflex.netgraph import NetGraph, group_layout
 from helao.ui.reflex.operator import TREE_EMPTY_HEADER, session_backend, tree_for
-from helao.ui.reflex.timeline_strip import click_item, item_key, strip_marks
+from helao.ui.reflex.timeline_strip import (
+    HIT_TRACE,
+    click_item,
+    hit_slot,
+    item_key,
+    item_tooltip,
+    strip_marks,
+)
 from helao.ui.reflex.tree_pane import tree_pane
 from helao.ui.shared.operator.object_tree import truncate_uuid
 from helao.ui.shared.palette import (
@@ -56,7 +63,9 @@ HOVER_PX = round(NODE_PX * 1.3)
 #: Every (colour, width) a server edge can take; a busy edge is thicker. Each
 #: is a fixed trace of the graph, so a status change is column data, not a
 #: chart rebuild.
-NODE_COLORS = tuple(sorted(set(GROUP_STATE_COLORS.values())))
+#: A node's colour is its status; the strips' done/queued colours never reach it.
+NODE_STATUSES = ("idle", "busy", "error", "estop", "unreachable")
+NODE_COLORS = tuple(sorted({GROUP_STATE_COLORS[k] for k in NODE_STATUSES}))
 EDGE_STYLES = tuple(
     sorted({(c, 4.0 if k == "busy" else 2.0) for k, c in GROUP_STATE_COLORS.items()})
 )
@@ -272,10 +281,18 @@ def exp_row_ordinals(snap: dict) -> list:
 
 
 def selection_scope(snap: dict, kind: str):
-    """What an ordinal is relative to: the sequence, and for actions the experiment."""
+    """What an ordinal is relative to: the sequence, and for actions the experiment.
+
+    Both follow the strip: EXP clears when the sequence changes, ACT when the
+    experiment it shows does (``act_exp``: the active one, else the last
+    finished). Frames from an older orchestrator carry no ``act_exp`` and fall
+    back to the active experiment's ordinal.
+    """
     seq = (snap.get("seq") or {}).get("uuid")
     if kind == "experiment":
         return (seq,)
+    if "act_exp" in snap:  # the experiment whose actions the ACT strip shows
+        return (seq, snap["act_exp"])
     rows, ords = snap.get("experiments", []), exp_row_ordinals(snap)
     active = next((o for r, o in zip(rows, ords) if r.get("state") == "active"), None)
     return (seq, active)
@@ -377,6 +394,39 @@ def graph_marks(
     ]
 
 
+def current_experiment(snap: dict):
+    """The EXP strip's current row: the active one, else the last finished."""
+    rows = snap.get("experiments", [])
+    active = [r for r in rows if r.get("state") == "active"]
+    done = [r for r in rows if r.get("state") in ("done", "error")]
+    return (active or done or [None])[-1]
+
+
+def current_action(snap: dict):
+    """The ACT strip's current row: the most recently STARTED active action,
+    else the last finished one (rows are in dispatch order)."""
+    rows = snap.get("actions", [])
+    active = [r for r in rows if r.get("state") == "active"]
+    if active:
+        return max(active, key=lambda r: r.get("t_start") or 0.0)
+    done = [r for r in rows if r.get("state") in ("done", "error")]
+    return done[-1] if done else None
+
+
+def _current_fields(prefix: str, row) -> dict:
+    t = (row or {}).get("t_start")
+    uuid = (row or {}).get("uuid") or ""
+    return {
+        f"{prefix}_name": (row or {}).get("name") or "",
+        f"{prefix}_started": (
+            datetime.fromtimestamp(t).strftime("%Y-%m-%d %H:%M:%S") if t else ""
+        ),
+        f"{prefix}_uuid": uuid,
+        f"{prefix}_uuid_short": truncate_uuid(uuid) if uuid else "",
+        f"{prefix}_state": (row or {}).get("state") or "",
+    }
+
+
 def header_fields(snap: dict) -> dict:
     seq = snap.get("seq") or {}
     t = seq.get("t_start")
@@ -397,6 +447,8 @@ def header_fields(snap: dict) -> dict:
         "loop_group": LOOP_TO_GROUP.get(loop_state, "idle"),
         "orch_group": ORCH_TO_GROUP.get(orch_state, "idle"),
         "closing_out": bool(snap.get("closing_out")),
+        **_current_fields("exp", current_experiment(snap)),
+        **_current_fields("act", current_action(snap)),
     }
 
 
@@ -462,6 +514,10 @@ def _render_graph(s, snap: dict, now: float, lost: bool, token: str) -> None:
     s.graph_spec, s.graph_url, s.graph_layout = p.spec, p.buffer_url, p.layout
 
 
+def _hover_line(slots, slot: int, now: float) -> str:
+    return item_tooltip(slots[slot], now) if 0 <= slot < len(slots) else ""
+
+
 def _render_strips(s, snap: dict, now: float, token: str) -> None:
     v = s._version
     exp_key = selected_key(s._selected, snap, "experiment")
@@ -484,6 +540,7 @@ def _render_strips(s, snap: dict, now: float, token: str) -> None:
         panel_id=f"group-exp-{token}",
         version=v,
         click=True,
+        hover_events=True,
     )
     s.exp_spec, s.exp_url, s.exp_layout = p.spec, p.buffer_url, p.layout
     am, act_slots = strip_marks(
@@ -503,8 +560,12 @@ def _render_strips(s, snap: dict, now: float, token: str) -> None:
         panel_id=f"group-act-{token}",
         version=v,
         click=True,
+        hover_events=True,
     )
     s.act_spec, s.act_url, s.act_layout = p.spec, p.buffer_url, p.layout
+    # the hover line keeps following its slot: the elapsed time ticks
+    s.exp_hover = _hover_line(s._exp_slots, s._hover_slot[0], now)
+    s.act_hover = _hover_line(s._act_slots, s._hover_slot[1], now)
     if s._selected and (exp_key if s._selected[0] == "experiment" else act_key) is None:
         s._selected = ()
         s.info_note = SELECTION_GONE
@@ -522,6 +583,7 @@ def reset_for_mount(s) -> None:
     s._first_at = 0.0
     s._full_at = 0.0
     s._hovered = ""
+    s._hover_slot = (-1, -1)
 
 
 def apply_tick(s, feed, now: float, token: str) -> bool:
@@ -604,6 +666,18 @@ class GroupState(rx.State):
     loop_group: str = "idle"
     orch_group: str = "idle"
     closing_out: bool = False
+    exp_name: str = ""
+    exp_started: str = ""
+    exp_uuid: str = ""
+    exp_uuid_short: str = ""
+    exp_state: str = ""
+    act_name: str = ""
+    act_started: str = ""
+    act_uuid: str = ""
+    act_uuid_short: str = ""
+    act_state: str = ""
+    exp_hover: str = ""
+    act_hover: str = ""
     can_start: bool = False
     can_stop: bool = False
     # on before the first frame: the operator can always E-STOP (HTTP, no stream)
@@ -646,6 +720,7 @@ class GroupState(rx.State):
     _probe_at: float = 0.0
     _first_at: float = 0.0
     _hovered: str = ""  # key of the hovered node, or ""
+    _hover_slot: tuple = (-1, -1)  # hovered (EXP, ACT) slot, -1 for none
     _old_orch: bool = False
 
     @rx.event
@@ -727,6 +802,40 @@ class GroupState(rx.State):
         self._hovered = key
         _render_graph(self, self._snap[0], now, lost, self.router.session.client_token)
 
+    def _hover_strip(self, which: int, payload: dict) -> None:
+        """Pointer over (or off) a strip segment: set only the hover line.
+
+        No chart redraw: the line is plain text, so hovering never rebuilds or
+        re-uploads a strip.
+        """
+        slots = self._exp_slots if which == 0 else self._act_slots
+        trace = (payload or {}).get("trace")
+        slot = (
+            hit_slot((payload or {}).get("index", -1), len(slots))
+            if trace == HIT_TRACE
+            else -1  # the pointer left the strip's points
+        )
+        if slot is None:
+            slot = -1
+        cur = list(self._hover_slot)
+        if cur[which] == slot:
+            return
+        cur[which] = slot
+        self._hover_slot = tuple(cur)
+        line = _hover_line(slots, slot, time.time())
+        if which == 0:
+            self.exp_hover = line
+        else:
+            self.act_hover = line
+
+    @rx.event
+    def hover_exp(self, payload: dict):
+        self._hover_strip(0, payload)
+
+    @rx.event
+    def hover_act(self, payload: dict):
+        self._hover_strip(1, payload)
+
     async def _select(self, kind: str, payload: dict):
         async with self:
             token = self.router.session.client_token
@@ -799,6 +908,27 @@ def _button(
     )
 
 
+def _uuid_row(label: str, name, state, started, uuid, short) -> rx.Component:
+    """One header row under the sequence line; "—" while there is none."""
+    return rx.cond(
+        name == "",
+        rx.hstack(rx.text(label, weight="bold"), rx.text("—"), spacing="2"),
+        rx.hstack(
+            rx.text(label, weight="bold"),
+            rx.text(name),
+            rx.text("(", state, ")", size="1"),
+            rx.cond(started != "", rx.text("started ", started)),
+            rx.text("uuid"),
+            rx.tooltip(rx.text(short, "…", font_family="monospace"), content=uuid),
+            rx.button(
+                "copy", size="1", variant="soft", on_click=rx.set_clipboard(uuid)
+            ),
+            align="center",
+            spacing="2",
+        ),
+    )
+
+
 def group_page() -> rx.Component:
     if not _CFG:
         return rx.text(NO_ORCH_NOTE, padding_x="1em")
@@ -852,6 +982,12 @@ def group_page() -> rx.Component:
     )
     header = rx.vstack(
         seq_row,
+        _uuid_row(
+            "EXP", S.exp_name, S.exp_state, S.exp_started, S.exp_uuid, S.exp_uuid_short
+        ),
+        _uuid_row(
+            "ACT", S.act_name, S.act_state, S.act_started, S.act_uuid, S.act_uuid_short
+        ),
         controls,
         rx.cond(
             S.action_error != "",
@@ -877,7 +1013,9 @@ def group_page() -> rx.Component:
             height=STRIP_H,
             width=STRIP_W,
             on_select=S.select_exp,
+            on_hover=S.hover_exp,
         ),
+        rx.text(S.exp_hover, size="1", min_height="1.4em"),
         rx.text("ACT", size="1", weight="bold"),
         plots.chart(
             S.act_spec,
@@ -886,7 +1024,9 @@ def group_page() -> rx.Component:
             height=STRIP_H,
             width=STRIP_W,
             on_select=S.select_act,
+            on_hover=S.hover_act,
         ),
+        rx.text(S.act_hover, size="1", min_height="1.4em"),
     )
     # Stretches to the chart column's height (graph + both strips), so the
     # box ends at the ACT strip's bottom edge. Its content is absolutely
