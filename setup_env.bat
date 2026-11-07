@@ -4,7 +4,7 @@ if "%HA_DIR:~-1%"=="\" set HA_DIR=%HA_DIR:~0,-1%
 conda env list | findstr /r /c:"^helao.*envs\\helao$"
 if ERRORLEVEL 1 (
     echo 'helao' conda environment was not found, creating it now...
-    call conda env create --solver=rattler -f helao_dev_win-64.yml -n helao || exit /b 1
+    call conda env create --solver=rattler -f "%HA_DIR%\helao_dev_win-64.yml" -n helao || exit /b 1
 )
 echo.
 call conda activate helao

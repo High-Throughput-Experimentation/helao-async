@@ -331,10 +331,17 @@ def main(argv=None) -> int:
         else:
             configs = []
         if not configs:
-            print(
-                "no station configs given or recorded: base env only. Run "
-                "setup_env <config prefix> ... to install a station's packages."
-            )
+            if a.mode == "setup":
+                print(
+                    "no config prefix given: base env only (root helao_dev_*.yml "
+                    "and requirements.txt). Add config prefixes to setup_env to "
+                    "also install a station's server packages."
+                )
+            else:
+                print(
+                    "no station configs given or recorded: base env only. Run "
+                    "setup_env <config prefix> ... to install a station's packages."
+                )
             return 0
         folders: set[Path] = set()
         for cfg in configs:

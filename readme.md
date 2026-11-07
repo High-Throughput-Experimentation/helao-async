@@ -22,9 +22,9 @@ From a miniconda prompt or PowerShell with an active conda profile:
     cd helao-async
     bash setup_env.sh
 
-`setup_env` creates the `helao` env from `helao_dev_<platform>.yml` if it is missing, activates it and checks that `helao` is the active env, installs `requirements.txt` with `uv pip install`, and sets `PYTHONPATH` (the repo root) and `HELAOLAUNCH` in the env.
+`setup_env` creates the `helao` env from `helao_dev_<platform>.yml` if it is missing, activates it and checks that `helao` is the active env, installs `requirements.txt` with `uv pip install`, and sets `PYTHONPATH` (the repo root) and `HELAOLAUNCH` in the env. With no arguments that is the whole install: the base env from the root env files. For a station, add its config prefixes (`setup_env.bat <prefix> ...` / `bash setup_env.sh <prefix> ...`) to also install the packages its servers need and record the prefixes for later `update_env` runs.
 
-To pick up changed env files later, run `update_env.bat` / `bash update_env.sh`. It does the same, after a `conda env update` from the yml. `update_env.bat` sets `PYTHONPATH` and `HELAOLAUNCH` to `<parent folder>\helao-async`, so on Windows the clone folder must be named `helao-async`.
+To pick up changed env files later, run `update_env.bat` / `bash update_env.sh`. It does the same, after a `conda env update` from the yml; with no arguments it replays the recorded station prefixes, or updates the base env only when none are recorded.
 
 An env built before 2026-10-16 has no `uv`, so `setup_env` fails at the uv step. Run `update_env` once instead; it adds `uv` from the yml.
 

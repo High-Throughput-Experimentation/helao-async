@@ -5,7 +5,7 @@ source $CONDA_DIR/etc/profile.d/conda.sh
 if [[ ! $(conda env list | grep "^helao.*envs/helao$") ]]
 then
     echo "'helao' conda environment was not found, creating it now..."
-    conda env create --solver=rattler -f helao_dev_linux-64.yml -n helao
+    conda env create --solver=rattler -f "$HA_DIR/helao_dev_linux-64.yml" -n helao || exit 1
 fi
 echo ""
 echo ""

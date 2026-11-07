@@ -176,6 +176,15 @@ def test_main_update_without_anything_is_a_hint(monkeypatch, capsys):
     assert "setup_env" in capsys.readouterr().out
 
 
+def test_main_setup_without_prefixes_is_base_only(monkeypatch, capsys):
+    calls = []
+    monkeypatch.setattr(he, "install", lambda *a, **k: calls.append("install"))
+    monkeypatch.setattr(he, "record", lambda *a, **k: calls.append("record"))
+    assert he.main(["setup"]) == 0
+    assert calls == []
+    assert "no config prefix given" in capsys.readouterr().out
+
+
 def test_main_bad_prefix_exits_2(capsys):
     assert he.main(["setup", "definitely_not_a_config"]) == 2
     assert "error:" in capsys.readouterr().err
