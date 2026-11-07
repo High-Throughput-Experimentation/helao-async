@@ -817,8 +817,10 @@ def build_app(world_cfg: dict, server_key: str):
         try:
             yield
         finally:
-            await stop_feed()
-            await registry.stop()
+            try:
+                await stop_feed()
+            finally:
+                await registry.stop()
             LOGGER.info("reflex ingest stopped")
 
     application.register_lifespan_task(_ingest_lifespan)

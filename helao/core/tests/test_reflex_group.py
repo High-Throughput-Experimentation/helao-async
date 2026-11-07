@@ -52,6 +52,12 @@ def state():
         _exp_slots=(),
         _act_slots=(),
         _selected=(),
+        _exp_ords=(),
+        _act_ords=(),
+        _scopes=(),
+        _first_at=0.0,
+        tree_header="select a row",
+        tree_html="",
         _full_at=0.0,
         _pending_at=0.0,
         _probe_at=0.0,
@@ -216,37 +222,123 @@ def test_backend_vars_touched_each_tick_are_tuples(group):
 # ---- selection identity ------------------------------------------------------
 
 
-def test_queued_selection_is_dropped_when_qidx_shifts_to_another_experiment(group):
-    exp = lambda name, qidx: {
-        "uuid": None,
-        "qidx": qidx,
-        "name": name,
-        "state": "queued",
-    }  # noqa: E731
+def _exp(tag, state, qidx=None, uuid=None, name="scan"):
+    return {"uuid": uuid, "qidx": qidx, "name": name, "state": state, "tag": tag}
+
+
+def _click(group, s, kind, slot, snap):
+    """Select slot ``slot`` the way ``_select`` does."""
+    exp = kind == "experiment"
+    ords = s._exp_ords if exp else s._act_ords
+    s._selected = (kind, ords[slot], s._scopes[0 if exp else 1])
+
+
+def _selected_row(group, s, snap, kind="experiment"):
+    key = group.selected_key(s._selected, snap, kind)
+    rows = snap["experiments" if kind == "experiment" else "actions"]
+    row = next((r for r in rows if group.item_key(r) == key), None)
+    assert row is not None, "selection not in view"
+    return row
+
+
+def _queue(tags, start, active=None, n_done=0):
+    rows = [active] if active else []
+    rows += [_exp(t, "queued", qidx=i) for i, t in enumerate(tags[start:])]
+    return frame(1, experiments=rows, n_done=n_done)
+
+
+def test_same_named_queued_selection_follows_the_item_when_the_head_pops(group):
     s = state()
-    s._selected = ("experiment", "q3", "exp_c")
-    snap = frame(1, experiments=[exp("exp_c", 3)])
+    tags = ["a", "b", "c", "d", "e"]
+    before = _queue(tags, 0)
+    group._render_strips(s, before, 100.0, "t")
+    _click(group, s, "experiment", 3, before)  # queued item "d"
+    assert _selected_row(group, s, before)["tag"] == "d"
+    # head pops and starts running; every name is still "scan"
+    after = _queue(tags, 1, active=_exp("a", "active", uuid="ua"))
+    group._render_strips(s, after, 101.0, "t")
+    assert s.info_note == "" and _selected_row(group, s, after)["tag"] == "d"
+
+
+def test_queued_selection_keeps_when_it_becomes_active(group):
+    s = state()
+    before = _queue(["a", "b", "c"], 0)
+    group._render_strips(s, before, 100.0, "t")
+    _click(group, s, "experiment", 0, before)  # head "a"
+    after = _queue(["a", "b", "c"], 1, active=_exp("a", "active", uuid="ua"))
+    group._render_strips(s, after, 101.0, "t")
+    assert _selected_row(group, s, after)["tag"] == "a" and s.info_note == ""
+    # and when it finishes: still "a", now a done row
+    done = frame(
+        3,
+        experiments=[_exp("a", "done", uuid="ua"), _exp("b", "active", uuid="ub")]
+        + [_exp("c", "queued", qidx=0)],
+    )
+    group._render_strips(s, done, 102.0, "t")
+    assert _selected_row(group, s, done)["tag"] == "a"
+
+
+def test_selection_clears_when_the_item_leaves_the_window_or_sequence(group):
+    s = state()
+    snap = _queue(["a", "b"], 0)
     group._render_strips(s, snap, 100.0, "t")
-    assert s._selected and s.info_note == ""
-    # queue head popped: the same key now names a different experiment
-    snap = frame(2, experiments=[exp("exp_d", 3)])
+    _click(group, s, "experiment", 1, snap)
+    s.tree_header, s.tree_html = "old", "<b>x</b>"
+    group._render_strips(s, _queue(["a"], 0), 101.0, "t")  # "b" is gone
+    assert s._selected == () and s.info_note == group.SELECTION_GONE
+    assert (s.tree_header, s.tree_html) == ("select a row", "")
+    # a new sequence restarts the ordinals: an old selection must not carry over
+    s2 = state()
+    one = {**_queue(["a", "b"], 0), "seq": {"uuid": "S1"}}
+    group._render_strips(s2, one, 100.0, "t")
+    _click(group, s2, "experiment", 1, one)
+    two = {**_queue(["x", "y"], 0), "seq": {"uuid": "S2"}}
+    group._render_strips(s2, two, 101.0, "t")
+    assert s2._selected == ()
+
+
+def test_action_selection_clears_when_the_experiment_changes(group):
+    s = state()
+    acts = [{"uuid": f"a{i}", "name": "act", "state": "done"} for i in range(3)]
+    snap = frame(1, experiments=[_exp("e1", "active", uuid="u1")], actions=acts)
+    group._render_strips(s, snap, 100.0, "t")
+    _click(group, s, "action", 1, snap)
+    assert _selected_row(group, s, snap, "action")["uuid"] == "a1"
     group._render_strips(s, snap, 101.0, "t")
+    assert s._selected != ()
+    nxt = frame(
+        2, experiments=[_exp("e2", "active", uuid="u2")], actions=acts[:2], n_done=1
+    )
+    group._render_strips(s, nxt, 102.0, "t")
     assert s._selected == () and s.info_note == group.SELECTION_GONE
 
 
 def test_selection_by_uuid_survives_and_vanishes_with_the_item(group):
     s = state()
-    s._selected = ("experiment", "u1", "e")
-    keep = frame(
-        1,
-        experiments=[
-            {"uuid": "u1", "qidx": None, "name": "renamed", "state": "active"}
-        ],
-    )
-    group._render_strips(s, keep, 100.0, "t")
+    snap = frame(1, experiments=[_exp("u", "active", uuid="u1", name="renamed")])
+    group._render_strips(s, snap, 100.0, "t")
+    _click(group, s, "experiment", 0, snap)
+    group._render_strips(s, snap, 100.5, "t")
     assert s._selected != ()
     group._render_strips(s, frame(2), 101.0, "t")
     assert s._selected == () and s.info_note == group.SELECTION_GONE
+
+
+def test_exp_row_ordinals_are_sequence_positions():
+    from helao.ui.reflex.group import exp_row_ordinals
+
+    snap = {
+        "n_done": 4,
+        "experiments": [
+            _exp("d", "done"),
+            _exp("e", "error"),
+            _exp("r", "active"),
+            _exp("q0", "queued", qidx=0),
+            _exp("q1", "queued", qidx=1),
+        ],
+    }
+    assert exp_row_ordinals(snap) == [4, 5, 6, 7, 8]
+    assert exp_row_ordinals({"experiments": [_exp("q", "queued", qidx=2)]}) == [2]
 
 
 def test_strip_height_keeps_progress_bar_and_labels_apart():
@@ -337,6 +429,7 @@ def test_button_flags():
         "can_stop": False,
         "estopped": False,
         "can_estop": True,
+        "can_clear_estop": False,
     }
     assert button_flags({**idle, "n_sequences_queued": 0}, False)["can_start"] is False
     resumable = {
@@ -353,12 +446,18 @@ def test_button_flags():
         button_flags(stopped, False)["estopped"] is True
         and button_flags(stopped, False)["can_start"] is False
     )
+    # a lost stream disables everything except E-stop
     assert button_flags(running, True) == {
         "can_start": False,
         "can_stop": False,
         "estopped": False,
-        "can_estop": False,
+        "can_estop": True,
+        "can_clear_estop": False,
     }
+    # E-stop is disabled only while estopped; then Clear E-stop is offered
+    assert button_flags(stopped, False)["can_estop"] is False
+    assert button_flags(stopped, False)["can_clear_estop"] is True
+    assert button_flags(stopped, True)["can_clear_estop"] is False
 
 
 def test_pending_done():
@@ -435,7 +534,9 @@ def test_header_fields_idle_and_running():
 def test_ws_orch_frames_are_not_numeric_normalized():
     from helao.ui.reflex.ingest import NORMALIZERS
 
-    assert NORMALIZERS["ws_orch"]([{"seq_no": 1, "servers": []}]) == ({}, [])
+    assert NORMALIZERS["ws_orch"](
+        [{"seq_no": 1, "servers": [], "n_done": [1.0, 2.0], "orch_state": ("busy", 1)}]
+    ) == ({}, [])
 
 
 def test_page_renders_with_and_without_an_orchestrator(group):
@@ -482,3 +583,79 @@ def test_wsingest_counts_batches_in_local_arrival_order():
         asyncio.run(ing._drain_loop())
     assert ing.n_batches == 2 and len(ing.raw) == 2
     assert ing.status.message_count == 3
+
+
+# ---- mount reset, probe delay, buttons, control, minors -----------------------
+
+
+def test_reentering_the_page_does_not_replay_buffered_events(group):
+    feed = Feed()
+    feed.push(frame(1))
+    s = state()
+    group.apply_tick(s, feed, 100.0, "t")
+    feed.push(frame(2, [DISPATCH]))
+    group.apply_tick(s, feed, 100.1, "t")
+    assert len(s._pulses) == 1
+    group.GroupState.mount.fn(s)  # leave and come back: state persists, mount fires
+    assert s._cursor == -1 and s._pulses == ()
+    group.apply_tick(s, feed, 200.0, "t")
+    assert s._pulses == () and s._snap[0]["seq_no"] == 2
+
+
+def test_mount_chains_a_first_tick(group):
+    result = group.GroupState.mount.fn(state())
+    assert "GroupState.tick" in str(result)
+    assert "GroupState.mount" in str(group.group_page().event_triggers["on_mount"])
+
+
+def test_probe_waits_five_seconds_after_the_first_empty_tick(group):
+    feed = Feed()  # never connected: message_count == 0
+    s = state()
+    assert group.apply_tick(s, feed, 100.0, "t") is False
+    assert group.apply_tick(s, feed, 103.0, "t") is False
+    assert group.apply_tick(s, feed, 105.5, "t") is True
+
+
+def test_buttons_are_disabled_while_a_call_is_pending(group):
+    rendered = str(group._button("Start", "start", group.GroupState.can_start).render())
+    assert "pyOr(" in rendered and "pending_rx_state_" in rendered
+
+
+class _FakeState(SimpleNamespace):
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+
+def test_control_error_sets_action_error_and_clears_pending(group, monkeypatch):
+    import asyncio
+
+    class Backend:
+        async def start(self, strict=False):
+            raise RuntimeError("orch said no")
+
+    monkeypatch.setattr(group, "_backend", lambda token: Backend())
+    s = _FakeState(
+        router=SimpleNamespace(session=SimpleNamespace(client_token="t")),
+        pending="",
+        action_error="",
+        _pending_at=0.0,
+    )
+    asyncio.run(group.GroupState.control.fn(s, "start"))
+    assert s.action_error == "orch said no" and s.pending == ""
+    monkeypatch.setattr(group, "_backend", lambda token: None)
+    asyncio.run(group.GroupState.control.fn(s, "stop"))
+    assert s.action_error == "cannot reach the orchestrator" and s.pending == ""
+
+
+def test_ingest_lifespan_always_stops_the_registry():
+    import inspect
+
+    from helao.ui.reflex import app
+
+    src = inspect.getsource(app.build_app)
+    assert "await stop_feed()" in src
+    tail = src[src.index("await stop_feed()") :]
+    assert tail.index("finally") < tail.index("await registry.stop()")

@@ -25,7 +25,7 @@ from helao.helpers import helao_logging as logging
 from helao.ui.reflex import plots
 from helao.ui.reflex.ingest import WsIngest
 from helao.ui.reflex.netgraph import NetGraph, group_layout
-from helao.ui.reflex.operator import session_backend, tree_for
+from helao.ui.reflex.operator import TREE_EMPTY_HEADER, session_backend, tree_for
 from helao.ui.reflex.timeline_strip import click_item, item_key, strip_marks
 from helao.ui.reflex.tree_pane import tree_pane
 from helao.ui.shared.operator.object_tree import truncate_uuid
@@ -164,7 +164,9 @@ def button_flags(snap: dict, lost: bool) -> dict:
         "can_start": not lost and not started and not estopped and has_work,
         "can_stop": not lost and started,
         "estopped": estopped,
-        "can_estop": not lost,
+        # A lost stream must not stop the operator from e-stopping.
+        "can_estop": not estopped,
+        "can_clear_estop": not lost and estopped,
     }
 
 
@@ -188,18 +190,66 @@ def object_request(kind: str, item: dict):
     return None
 
 
-def selection_in_view(selected: tuple, slots) -> bool:
-    """Is the selected ``(kind, key, name)`` still the same item in ``slots``?
+def exp_row_ordinals(snap: dict) -> list:
+    """Stable sequence ordinal of each windowed experiment row.
 
-    A queued item is keyed ``q{qidx}`` and qidx shifts when the queue head pops,
-    so the same key can name a different experiment. Items without a uuid must
-    match by name too.
+    Done rows run ``n_done ...``; the active row is ``done_total``; a queued row
+    is ``done_total + (1 if an active row exists) + qidx``. The ordinal does not
+    move when the queue head pops or when a queued item becomes active, unlike
+    ``q{qidx}`` (which also cannot tell same-named experiments apart).
     """
-    _, key, name = selected
-    for it in slots:
-        if it is not None and item_key(it) == key:
-            return bool(it.get("uuid")) or it.get("name") == name
-    return False
+    rows = snap.get("experiments", [])
+    n_finished = sum(1 for r in rows if r.get("state") in ("done", "error"))
+    done_total = snap.get("n_done", 0) + n_finished
+    has_active = any(r.get("state") == "active" for r in rows)
+    ords, seen_done = [], 0
+    for r in rows:
+        state = r.get("state")
+        if state in ("done", "error"):
+            ords.append(snap.get("n_done", 0) + seen_done)
+            seen_done += 1
+        elif state == "active":
+            ords.append(done_total)
+        else:
+            ords.append(done_total + (1 if has_active else 0) + (r.get("qidx") or 0))
+    return ords
+
+
+def selection_scope(snap: dict, kind: str):
+    """What an ordinal is relative to: the sequence, and for actions the experiment."""
+    seq = (snap.get("seq") or {}).get("uuid")
+    if kind == "experiment":
+        return (seq,)
+    rows, ords = snap.get("experiments", []), exp_row_ordinals(snap)
+    active = next((o for r, o in zip(rows, ords) if r.get("state") == "active"), None)
+    return (seq, active)
+
+
+def _slot_ordinals(snap: dict, kind: str) -> tuple:
+    """Ordinals aligned with ``strip_marks``' slots (None for an ellipsis)."""
+    if kind == "action":
+        return tuple(range(len(snap.get("actions", []))))
+    return (
+        ((None,) if snap.get("n_done", 0) else ())
+        + tuple(exp_row_ordinals(snap))
+        + ((None,) if snap.get("n_queued", 0) else ())
+    )
+
+
+def selected_key(selected: tuple, snap: dict, kind: str):
+    """``item_key`` of the selected row if it is still in view, else None."""
+    if (
+        not selected
+        or selected[0] != kind
+        or selected[2] != selection_scope(snap, kind)
+    ):
+        return None
+    rows = snap.get("experiments" if kind == "experiment" else "actions", [])
+    ords = exp_row_ordinals(snap) if kind == "experiment" else list(range(len(rows)))
+    for row, o in zip(rows, ords):
+        if o == selected[1]:
+            return item_key(row)
+    return None
 
 
 def _color_key(status: str) -> str:
@@ -318,16 +368,19 @@ def _render_graph(s, snap: dict, now: float, lost: bool, token: str) -> None:
 
 def _render_strips(s, snap: dict, now: float, token: str) -> None:
     v = s._version
-    sel_kind, sel_key, _ = s._selected if s._selected else (None, None, None)
+    exp_key = selected_key(s._selected, snap, "experiment")
+    act_key = selected_key(s._selected, snap, "action")
     em, exp_slots = strip_marks(
         snap.get("experiments", []),
         n_before=snap.get("n_done", 0),
         n_after=snap.get("n_queued", 0),
         now=now,
         width_px=STRIP_W,
-        selected=sel_key if sel_kind == "experiment" else None,
+        selected=exp_key,
     )
     s._exp_slots = tuple(exp_slots)
+    s._exp_ords = _slot_ordinals(snap, "experiment")
+    s._scopes = (selection_scope(snap, "experiment"), selection_scope(snap, "action"))
     p = plots.marks_chart(
         em,
         x_domain=(0.0, float(max(len(exp_slots), 1))),
@@ -343,9 +396,10 @@ def _render_strips(s, snap: dict, now: float, token: str) -> None:
         n_after=0,
         now=now,
         width_px=STRIP_W,
-        selected=sel_key if sel_kind == "action" else None,
+        selected=act_key,
     )
     s._act_slots = tuple(act_slots)
+    s._act_ords = _slot_ordinals(snap, "action")
     p = plots.marks_chart(
         am,
         x_domain=(0.0, float(max(len(act_slots), 1))),
@@ -355,11 +409,21 @@ def _render_strips(s, snap: dict, now: float, token: str) -> None:
         click=True,
     )
     s.act_spec, s.act_url, s.act_layout = p.spec, p.buffer_url, p.layout
-    if s._selected:
-        slots = s._exp_slots if sel_kind == "experiment" else s._act_slots
-        if not selection_in_view(s._selected, slots):
-            s._selected = ()
-            s.info_note = SELECTION_GONE
+    if s._selected and (exp_key if s._selected[0] == "experiment" else act_key) is None:
+        s._selected = ()
+        s.info_note = SELECTION_GONE
+        s.tree_header, s.tree_html = TREE_EMPTY_HEADER, ""
+
+
+def reset_for_mount(s) -> None:
+    """A page (re)entering: state outlives navigation, so forget the old watermark.
+
+    Without this a return to /group would replay every buffered event as pulses.
+    """
+    s._cursor = -1
+    s._pulses = ()
+    s._first_at = 0.0
+    s._full_at = 0.0
 
 
 def apply_tick(s, feed, now: float, token: str) -> bool:
@@ -369,6 +433,8 @@ def apply_tick(s, feed, now: float, token: str) -> bool:
     when a frame arrived or ``SLOW_MS`` has passed, so the 60 Hz pulse ticks
     cost one chart.
     """
+    if s._first_at <= 0:
+        s._first_at = now
     if s._cursor < 0:
         # First tick after the page opened: show the latest buffered snapshot as
         # the current state, but replay none of its events as pulses.
@@ -411,7 +477,10 @@ def apply_tick(s, feed, now: float, token: str) -> bool:
         _render_strips(s, snap, now, token)
     s.tick_ms = FAST_MS if s._pulses else SLOW_MS
     never_live = feed is not None and feed.status.message_count == 0
-    return lost and never_live and now - s._probe_at > STALE_S
+    # The heartbeat is 2 s: a page that has only just opened has not waited
+    # long enough to call the orchestrator old.
+    waited = s._first_at > 0 and now - s._first_at > STALE_S
+    return lost and never_live and waited and now - s._probe_at > STALE_S
 
 
 class GroupState(rx.State):
@@ -429,6 +498,7 @@ class GroupState(rx.State):
     can_start: bool = False
     can_stop: bool = False
     can_estop: bool = False
+    can_clear_estop: bool = False
     estopped: bool = False
     lost: bool = True
     pending: str = ""
@@ -455,12 +525,22 @@ class GroupState(rx.State):
     _version: int = 0
     _exp_slots: tuple = ()
     _act_slots: tuple = ()
+    _exp_ords: tuple = ()
+    _act_ords: tuple = ()
+    _scopes: tuple = ()  # (experiment scope, action scope)
     _selected: tuple = ()  # (kind, key, name) or ()
     _running: bool = False
     _full_at: float = 0.0
     _pending_at: float = 0.0
     _probe_at: float = 0.0
+    _first_at: float = 0.0
     _old_orch: bool = False
+
+    @rx.event
+    def mount(self):
+        """Page mount: reset the watermark, then take the first tick."""
+        reset_for_mount(self)
+        return GroupState.tick("")
 
     @rx.event(background=True)
     async def tick(self, _tick: str = ""):
@@ -510,11 +590,14 @@ class GroupState(rx.State):
     async def _select(self, kind: str, payload: dict):
         async with self:
             token = self.router.session.client_token
-            slots = self._exp_slots if kind == "experiment" else self._act_slots
+            exp = kind == "experiment"
+            slots = self._exp_slots if exp else self._act_slots
+            ords = self._exp_ords if exp else self._act_ords
             item = click_item(slots, (payload or {}).get("x"))
-            if item is None:
+            if item is None or len(self._scopes) != 2:
                 return
-            self._selected = (kind, item_key(item), item.get("name"))
+            at = next(i for i, it in enumerate(slots) if it is item)
+            self._selected = (kind, ords[at], self._scopes[0 if exp else 1])
             self.info_note = ""
         request = object_request(kind, item)
         backend = _backend(token)
@@ -555,7 +638,7 @@ def _button(label: str, name: str, enabled_var, class_name: str = ""):
     return rx.button(
         rx.cond(GroupState.pending == name, rx.spinner(size="1"), label),
         on_click=GroupState.control(name),
-        disabled=~enabled_var,
+        disabled=~enabled_var | (GroupState.pending != ""),
         class_name=class_name,
     )
 
@@ -595,7 +678,7 @@ def group_page() -> rx.Component:
         _button("Stop", "stop", S.can_stop),
         rx.cond(
             S.estopped,
-            _button("Clear E-stop", "clear_estop", S.can_estop),
+            _button("Clear E-stop", "clear_estop", S.can_clear_estop),
             _button("E-stop", "estop", S.can_estop, REFLEX_MOTION_STOP_CLASS),
         ),
         width="100%",
@@ -644,7 +727,7 @@ def group_page() -> rx.Component:
         header,
         rx.hstack(charts, info, width="100%", align="start", spacing="4"),
         rx.moment(interval=S.tick_ms, on_change=S.tick, display="none"),
-        on_mount=S.tick(""),
+        on_mount=S.mount,
         padding_x="1em",
         width="100%",
     )
