@@ -47,20 +47,26 @@ def test_bezier_end_tangents_are_vertical():
     )
 
 
-def test_arrowhead_symbol_follows_direction():
+def test_node_trace_is_drawn_last_and_no_arrowheads():
+    # xy's hover marker reuses the symbol of the LAST scatter trace drawn
+    # (probe note, 2026-11-06): last = a pulse triangle hovered as a big
+    # down-triangle over the node. Nodes last, and no arrow traces at all.
     g = _g()
     g.add_node("UP", 0.0, 0.7, color=GROUP_IDLE, label_color=WHITE)
-    g.add_node("DN", 0.0, -0.7, color=GROUP_IDLE, label_color=WHITE)
-    g.add_edge("UP", "ORCH", "UP", color=GROUP_IDLE)  # ORCH -> UP: runs upward
-    g.add_edge("DN", "ORCH", "DN", color=GROUP_IDLE)  # ORCH -> DN: runs downward
-    g.add_arrowhead("UP", at="dst")
-    g.add_arrowhead("DN", at="dst")
-    marks = g.marks(0.0)
-    up, down = _trace(marks, "arrow:triangle"), _trace(marks, "arrow:triangle_down")
-    assert len(up["x"]) == len(down["x"]) == 1
-    assert up["y"][0] > 0 and down["y"][0] < 0
-    assert up["y"][0] < g.ports()["UP"][1][1]  # flush below the tip
-    assert down["y"][0] > g.ports()["DN"][1][1]
+    g.add_edge("UP", "ORCH", "UP", color=GROUP_IDLE)
+    scatters = [m for m in g.marks(0.0) if m["kind"] == "scatter"]
+    assert [m["symbol"] for m in scatters] == ["triangle", "triangle_down", "circle"]
+    assert not any(m.get("name", "").startswith("arrow") for m in g.marks(0.0))
+
+
+def test_a_queued_pulse_is_kept_but_not_drawn_until_its_start():
+    g = _g()
+    g.add_node("UP", 0.0, 0.7, color=GROUP_IDLE, label_color=WHITE)
+    g.add_edge("UP", "ORCH", "UP", color=GROUP_IDLE)
+    g.pulse("UP", t0=5.0, duration=1.0, color=GROUP_PULSE_DISPATCH, direction="rev")
+    assert _trace(g.marks(4.0), "pulse:triangle_down")["x"] == []
+    assert len(g.pulses) == 1
+    assert len(_trace(g.marks(5.5), "pulse:triangle_down")["x"]) == 1
 
 
 def test_pulse_positions_and_expiry():

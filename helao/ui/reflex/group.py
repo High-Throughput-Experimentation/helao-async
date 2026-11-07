@@ -39,6 +39,7 @@ from helao.ui.shared.palette import (
     GROUP_ERROR_TEXT_CLASS,
     GROUP_LABEL_COLORS,
     GROUP_PULSE_DISPATCH,
+    GROUP_SELECTED_OUTLINE,
     GROUP_STATE_COLORS,
     REFLEX_MOTION_STOP_CLASS,
 )
@@ -51,9 +52,20 @@ GRAPH_H, GRAPH_W = 360, 720
 STRIP_H, STRIP_W = 120, 720
 #: Wide enough that a short server key (5-6 characters) sits inside its node.
 NODE_PX = 44.0
+#: xy's hover marker, chart-wide (one colour for every node): a translucent
+#: disc a third larger than the node, so the node reads as enlarged.
+NODE_HOVER = {
+    "size": round(NODE_PX * 1.35),
+    "color": GROUP_SELECTED_OUTLINE,
+    "opacity": 0.35,
+}
 FAST_MS, SLOW_MS = 16, 500
 STALE_S = 5.0
-PULSE_S = 0.6
+#: Long enough that a browser stall (a chart rebuild blocks the main thread for
+#: ~150 ms, measured) cannot swallow a pulse; see :func:`shift_for_stall`.
+PULSE_S = 1.2
+#: A tick gap beyond this is a client stall: pulses do not age through it.
+STALL_CAP_S = 0.05
 PENDING_TIMEOUT_S = 10.0
 NO_ORCH_NOTE = "This config has no orchestrator, so there is no server group to show."
 LOST_BANNER = "orchestrator unreachable"
@@ -145,7 +157,7 @@ def pulse_for(ev: dict, now: float, orch_key: str):
     """``[edge_id, direction, t0, duration, colour]``; None for the orch's own actions.
 
     ``t0`` is when the page saw the event, not the event's own time: a 2 Hz
-    page would otherwise start a 0.6 s pulse already half done.
+    page would otherwise start a pulse already half done.
     """
     server = ev.get("server")
     if not server or server == orch_key:
@@ -154,6 +166,31 @@ def pulse_for(ev: dict, now: float, orch_key: str):
         return [server, "fwd", now, PULSE_S, GROUP_PULSE_DISPATCH]
     state = "error" if ev.get("status") in ERROR_STATUSES else "done"
     return [server, "rev", now, PULSE_S, GROUP_STATE_COLORS[state]]
+
+
+def queue_pulse(pulses, p) -> list:
+    """``pulses`` plus ``p``, started once the edge's last pulse has ended.
+
+    A dispatch and a finish seen in one frame (a short action) share an edge;
+    both start at once and cross mid-edge, so the return leg is lost in the
+    crossing. Queued, the finish leaves the server after the dispatch arrives.
+    """
+    edge = p[0]
+    end = max((q[2] + q[3] for q in pulses if q[0] == edge), default=p[2])
+    return [*pulses, (edge, p[1], max(p[2], end), *p[3:])]
+
+
+def shift_for_stall(pulses, gap: float) -> list:
+    """Hold every pulse still through the part of a tick gap past ``STALL_CAP_S``.
+
+    The browser freezes while a chart rebuilds (and ticks stop), so a pulse
+    timed in wall-clock seconds is half gone, or all of it on a slow client,
+    by the first frame the user can see. Measured: 157 ms per rebuild here.
+    """
+    extra = gap - STALL_CAP_S
+    if extra <= 0:
+        return list(pulses)
+    return [(e, d, t0 + extra, *rest) for e, d, t0, *rest in pulses]
 
 
 def _estopped(snap: dict) -> bool:
@@ -302,7 +339,6 @@ def graph_marks(snap: dict, pulses, now: float, orch_key: str, lost: bool):
             color=GROUP_STATE_COLORS[key],
             width=4.0 if status == "busy" else 2.0,
         )
-        g.add_arrowhead(s["key"], at="dst")
     for edge_id, direction, t0, duration, color in pulses:
         if edge_id in g.edges:
             g.pulse(edge_id, t0=t0, color=color, direction=direction, duration=duration)
@@ -390,6 +426,7 @@ def _render_graph(s, snap: dict, now: float, lost: bool, token: str) -> None:
         y_domain=(-1.0, 1.0),
         panel_id=f"group-graph-{token}",
         version=s._version,
+        hover=NODE_HOVER,
     )
     s.graph_spec, s.graph_url, s.graph_layout = p.spec, p.buffer_url, p.layout
 
@@ -453,6 +490,7 @@ def reset_for_mount(s) -> None:
     s._old_orch = False
     s._first_at = 0.0
     s._full_at = 0.0
+    s._tick_at = 0.0
 
 
 def apply_tick(s, feed, now: float, token: str) -> bool:
@@ -477,13 +515,14 @@ def apply_tick(s, feed, now: float, token: str) -> bool:
     else:
         frames, s._cursor = new_frames(feed, s._cursor)
         replay = True
-    pulses = list(s._pulses)
+    pulses = shift_for_stall(s._pulses, now - s._tick_at if s._tick_at else 0.0)
+    s._tick_at = now
     for f in frames:
         if replay:
             for ev in f.get("events", []):
                 p = pulse_for(ev, now, _CFG["orch_key"])
                 if p is not None:
-                    pulses.append(tuple(p))
+                    pulses = queue_pulse(pulses, tuple(p))
     s._pulses = tuple(pulses)
     if frames:
         s._snap = (frames[-1],)
@@ -577,6 +616,7 @@ class GroupState(rx.State):
     _unconfirmed: str = ""  # button whose "not confirmed" message is showing
     _probe_at: float = 0.0
     _first_at: float = 0.0
+    _tick_at: float = 0.0
     _old_orch: bool = False
 
     @rx.event
@@ -785,15 +825,25 @@ def group_page() -> rx.Component:
             on_select=S.select_act,
         ),
     )
-    info = rx.vstack(
-        rx.text("INFO", weight="bold"),
-        rx.cond(S.info_note != "", rx.text(S.info_note, size="1")),
-        tree_pane(S.tree_header, S.tree_html),
-        width="100%",
+    # Stretches to the chart column's height (graph + both strips), so the
+    # box ends at the ACT strip's bottom edge. Its content is absolutely
+    # positioned: a tall tree must scroll inside the box, not stretch the row.
+    info = rx.card(
+        rx.vstack(
+            rx.text("INFO", weight="bold"),
+            rx.cond(S.info_note != "", rx.text(S.info_note, size="1")),
+            tree_pane(S.tree_header, S.tree_html, fill=True),
+            position="absolute",
+            inset="0",
+            padding="0.75em",
+        ),
+        position="relative",
+        flex="1",
+        min_width="0",
     )
     return rx.vstack(
         header,
-        rx.hstack(charts, info, width="100%", align="start", spacing="4"),
+        rx.hstack(charts, info, width="100%", align="stretch", spacing="4"),
         rx.moment(interval=S.tick_ms, on_change=S.tick, display="none"),
         on_mount=S.mount,
         padding_x="1em",

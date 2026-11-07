@@ -6,19 +6,18 @@ in px and ports in data units, so the chart has a fixed domain, a fixed pixel
 size and padding (``plots.CHART_PADDING_PX``); ``sx``/``sy`` convert between
 them. Markers cannot rotate, so every curve ends vertically: a cubic Bezier
 whose end tangents are vertical, which lets a ``triangle`` (up) or
-``triangle_down`` sit flush at either end.
+``triangle_down`` pulse sit flush at either end.
 """
 
 import bisect
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from helao.ui.reflex import plots
 from helao.ui.shared.palette import GROUP_EDGE_TEXT
 
 CURVE_SAMPLES = 24
 FANOUT = 0.7
-ARROW_PX = 10.0
 PULSE_PX = 12.0
 SYMBOLS = ("triangle", "triangle_down")
 
@@ -43,7 +42,6 @@ class Edge:
     color: str
     text: str = ""
     width: float = 2.0
-    arrow_at: set = field(default_factory=set)
 
 
 @dataclass
@@ -121,7 +119,7 @@ def group_layout(orch_key, server_keys):
 
 
 class NetGraph:
-    """Nodes, edges, arrowheads and pulses on a fixed view."""
+    """Nodes, edges and pulses on a fixed view."""
 
     def __init__(
         self,
@@ -149,9 +147,6 @@ class NetGraph:
 
     def add_edge(self, edge_id, src, dst, *, color, text="", width=2.0):
         self.edges[edge_id] = Edge(edge_id, src, dst, color, text, float(width))
-
-    def add_arrowhead(self, edge_id, at="dst"):
-        self.edges[edge_id].arrow_at.add(at)
 
     def set_node_color(self, key, c):
         self.nodes[key].color = c
@@ -195,13 +190,16 @@ class NetGraph:
     def marks(self, now):
         """Mark dicts for ``plots.marks_chart``. Drops pulses with s >= 1.
 
+        A pulse whose ``t0`` is still ahead of ``now`` is queued: kept, not drawn.
+
         Every scatter trace is always present (possibly empty), so the trace
         set -- and the layout token -- does not change as pulses come and go.
+        The node trace is LAST: xy's hover marker reuses the symbol of the last
+        scatter trace drawn, so any other order hovers as a pulse triangle.
         """
         self.pulses = [p for p in self.pulses if (now - p.t0) / p.duration < 1.0]
         ports = self.ports()
         lines, texts, curves = [], [], {}
-        arrows = {sym: ([], [], []) for sym in SYMBOLS}
         moving = {sym: ([], [], []) for sym in SYMBOLS}
         for eid in sorted(self.edges):
             e = self.edges[eid]
@@ -218,14 +216,6 @@ class NetGraph:
                     "width": e.width,
                 }
             )
-            for at in sorted(e.arrow_at):
-                tip, other = (pb, pa) if at == "dst" else (pa, pb)
-                up = tip[1] > other[1]
-                half = ARROW_PX / 2 * self.sy
-                xs, ys, cs = arrows["triangle" if up else "triangle_down"]
-                xs.append(tip[0])
-                ys.append(tip[1] - half if up else tip[1] + half)
-                cs.append(e.color)
             if e.text:
                 mx, my = pts[len(pts) // 2]
                 texts.append(
@@ -241,7 +231,7 @@ class NetGraph:
                     }
                 )
         for p in self.pulses:
-            if p.edge_id not in curves:
+            if p.edge_id not in curves or p.t0 > now:
                 continue
             pts, cum = curves[p.edge_id]
             s = max(0.0, (now - p.t0) / p.duration)
@@ -300,10 +290,9 @@ class NetGraph:
             }
 
         out = list(lines)
-        out += [scatter(f"arrow:{s}", arrows[s], ARROW_PX, s) for s in SYMBOLS]
+        out += [scatter(f"pulse:{s}", moving[s], PULSE_PX, s) for s in SYMBOLS]
         out += [
             scatter(f"nodes:{size:g}", by_size[size], size, "circle")
             for size in sorted(by_size)
         ]
-        out += [scatter(f"pulse:{s}", moving[s], PULSE_PX, s) for s in SYMBOLS]
         return out + texts

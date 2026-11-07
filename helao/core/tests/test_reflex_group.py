@@ -56,6 +56,7 @@ def state():
         _act_ords=(),
         _scopes=(),
         _first_at=0.0,
+        _tick_at=0.0,
         tree_header="select a row",
         tree_html="",
         _full_at=0.0,
@@ -84,6 +85,7 @@ def frame(seq_no, events=(), **kw):
 
 
 DISPATCH = {"kind": "dispatch", "server": "SIM", "status": "active"}
+FINISH = {"kind": "finish", "server": "SIM", "status": "finished"}
 
 
 # ---- new_frames: local arrival order, not the orchestrator's seq_no ----------
@@ -396,12 +398,12 @@ def test_stream_lost():
 
 
 def test_pulse_for_direction_colour_and_self():
-    from helao.ui.reflex.group import pulse_for
+    from helao.ui.reflex.group import PULSE_S, pulse_for
 
     d = pulse_for(
         {"kind": "dispatch", "server": "SIM", "status": "active"}, 5.0, "ORCH"
     )
-    assert d is not None and d == ["SIM", "fwd", 5.0, 0.6, GROUP_PULSE_DISPATCH]
+    assert d is not None and d == ["SIM", "fwd", 5.0, PULSE_S, GROUP_PULSE_DISPATCH]
     f = pulse_for({"kind": "finish", "server": "SIM", "status": "errored"}, 5.0, "ORCH")
     assert f is not None and f[1] == "rev" and f[4] == GROUP_STATE_COLORS["error"]
     ok = pulse_for(
@@ -880,3 +882,70 @@ def test_estop_flag_is_available_in_every_state_but_estopped(group):
     est = {"loop_state": "estopped", "orch_state": "estopped"}
     assert flags(est, lost=False)["can_estop"] is False
     assert flags(est, lost=False)["can_clear_estop"] is True
+
+
+# ---- return pulse: queued per edge, held still through a client stall --------
+
+
+def _drawn(group, s, now):
+    """Points drawn per pulse trace for edge SIM at ``now``, via the real render."""
+    marks, _ = group.graph_marks(s._snap[0], s._pulses, now, "ORCH", False)
+    return {
+        m["name"]: len(m["x"]) for m in marks if m.get("name", "").startswith("pulse:")
+    }
+
+
+def test_finish_makes_a_reverse_pulse_drawn_over_many_frames(group):
+    feed = Feed()
+    feed.push(frame(1))
+    s = state()
+    group.apply_tick(s, feed, 100.0, "t")
+    feed.push(frame(2, [FINISH]))
+    group.apply_tick(s, feed, 100.0, "t")
+    assert [p[1] for p in s._pulses] == ["rev"]
+    t, seen = 100.0, 0
+    while s._pulses:
+        t += 1 / 60
+        group.apply_tick(s, feed, t, "t")
+        seen += (
+            _drawn(group, s, t)["pulse:triangle"]
+            + _drawn(group, s, t)["pulse:triangle_down"]
+        )
+    assert seen >= 60  # 1.2 s at 60 Hz, never a couple of frames
+
+
+def test_dispatch_and_finish_in_one_frame_run_one_after_the_other(group):
+    feed = Feed()
+    feed.push(frame(1))
+    s = state()
+    group.apply_tick(s, feed, 100.0, "t")
+    feed.push(frame(2, [DISPATCH, FINISH]))
+    group.apply_tick(s, feed, 100.0, "t")
+    (_, d1, t1, dur1, _), (_, d2, t2, _, _) = s._pulses
+    assert (d1, d2) == ("fwd", "rev")
+    assert t2 == pytest.approx(t1 + dur1)  # return leg starts as the outbound ends
+    # first half of the window: only the outbound is drawn; second: only the return
+    t, seen = 100.0, []
+    while t < 100.0 + group.PULSE_S * 1.5:
+        t += 1 / 60
+        group.apply_tick(s, feed, t, "t")
+        d = _drawn(group, s, t)
+        seen.append((t, d["pulse:triangle"], d["pulse:triangle_down"]))
+    assert all(rev == 0 for t, _, rev in seen if t < 100.0 + group.PULSE_S - 0.03)
+    assert all(fwd == 0 for t, fwd, _ in seen if t > 100.0 + group.PULSE_S + 0.03)
+    assert any(rev for _, _, rev in seen)
+
+
+def test_pulses_do_not_age_through_a_browser_stall(group):
+    feed = Feed()
+    feed.push(frame(1))
+    s = state()
+    group.apply_tick(s, feed, 100.0, "t")
+    feed.push(frame(2, [FINISH]))
+    group.apply_tick(s, feed, 100.0, "t")
+    t0 = s._pulses[0][2]
+    group.apply_tick(s, feed, 100.02, "t")  # a normal 60 Hz-ish tick
+    assert s._pulses[0][2] == pytest.approx(t0)
+    group.apply_tick(s, feed, 100.02 + 0.6, "t")  # the page froze for 0.6 s
+    age = 100.02 + 0.6 - s._pulses[0][2]
+    assert age == pytest.approx(0.02 + group.STALL_CAP_S)

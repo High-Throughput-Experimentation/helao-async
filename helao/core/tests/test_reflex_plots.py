@@ -656,6 +656,18 @@ def test_marks_chart_maps_kinds_to_traces_and_annotations():
     )
 
 
+def test_marks_chart_hover_styles_the_marker_and_drops_the_tooltip():
+    hover = {"size": 60, "color": WHITE, "opacity": 0.3}
+    p = _mc(_marks(), hover=hover)
+    assert p.spec["mark_style"]["hover"] == hover
+    assert p.spec["show_tooltip"] is False
+    plain = _mc(_marks())
+    assert (
+        "mark_style" not in plain.spec and plain.spec.get("show_tooltip") is not False
+    )
+    assert p.layout != plain.layout  # spec, so it must rebuild the chart
+
+
 def test_marks_chart_hides_both_axes_down_to_the_tick_labels():
     p = _mc(_marks())
     assert set(p.spec["axes"]) == {"x", "y"}

@@ -202,3 +202,15 @@ Probe: a scratch script asserting each fact below (run with the helao env python
 Plot-area inset (host edge to plot rect): with `show=False` alone it is NOT the padding. `_layout` still reserves tick-label room (bottom `max(padding[2], 42)`, 36 when narrow, i.e. about 34 px more than an 8 px padding; left includes the tick-label width). With `tick_label_strategy="none"` on both axes, `_layout` reads as inset = padding (top `padding[0]`, right `padding[1]`, bottom `padding[2]`, left `padding[3]`), except on a fluid (`width="100%"`) host narrower than 520 px, where right is `min(padding[1], 8)` and left `min(padding[3], 46)`. This is from reading the minified `_layout`, not a browser measurement: Task 9 must measure it, and netgraph must take the inset as a parameter.
 
 Browser outcome (2026-11-06, Task 9 and the final-wave re-check, headless Chromium): xy applies a changed annotation (text label, `x_band` colour, `vline` position) in place on an append, with no rebuild, so `plots.ANNOTATIONS_IN_TOKEN` is False. Charts are laid out at least 120 px tall whatever the host reserves, which is why `STRIP_H` is 120.
+
+Hover, tooltip and tweening (2026-11-06, xy 0.0.8, read from `static/index.js` and confirmed in headless Chromium):
+
+| Fact | Consequence |
+|---|---|
+| the hover highlight (`_drawHoverPoint`) never sets `u_symbol`, so it is drawn with the symbol of the LAST scatter trace drawn that frame | with pulse traces last, hovering any point drew a large dark `triangle_down`; `netgraph` now puts the node trace last, so the highlight is a circle |
+| the hover marker's size, colour and opacity come from `mark_style.hover` (`{"size": px, "color": css, "opacity": 0..1}`), chart-wide; defaults are `max(1.75*size, size+5)` px, `rgba(15,23,42,.92)`, 0.95 | one colour for every point: a node cannot get a highlight in its own colour; `NODE_HOVER` is a translucent disc a third larger |
+| `mark_style` is only reachable as `chart.figure().set_mark_style(hover=...)` (the declarative API does not expose it); `figure()` returns the same cached `Figure`, so `_publish` ships it | `plots.marks_chart(hover=...)`; it is spec, so it joins the layout token |
+| `figure.show_tooltip = False` ships `spec["show_tooltip"] = False` and suppresses the x/y/value readout while the highlight still draws (`xy.tooltip(show=False)` does the same through the component API) | `marks_chart(hover=...)` also turns the tooltip off |
+| no per-trace hover switch: pick is a pixel pass over every point trace, then a 12 px nearest-point fallback | a travelling pulse under the pointer would also be highlighted (as a circle) |
+| `xy.animation(...)` / `scatter(animation=...)` exists (match index, interpolate position, duration, easing); not used: measured 38-43 drawn positions per 1.2 s pulse without it | revisit if a slow client still looks choppy |
+| a layout-token change rebuilds a chart: one `rm`/`add` of 3 canvases plus a 157 ms main-thread long task (two rebuilds: 297 ms); ticks stop meanwhile | pulses do not age through a tick gap past `STALL_CAP_S` |

@@ -961,7 +961,7 @@ CHART_PADDING_PX = 8
 
 
 def marks_chart(
-    marks, *, x_domain, y_domain, panel_id, version, click=False
+    marks, *, x_domain, y_domain, panel_id, version, click=False, hover=None
 ) -> ChartPayload:
     """Render plain mark dicts (see ``netgraph``/``timeline_strip``) on a fixed view.
 
@@ -970,6 +970,12 @@ def marks_chart(
     off, domain fixed. Column data (x, y, per-point colours) updates in place;
     anything that is spec -- line colour and width, scatter symbol/size/opacity,
     and annotations while :data:`ANNOTATIONS_IN_TOKEN` -- joins the layout token.
+
+    ``hover`` is xy's chart-wide hover marker style (``{"size": px, "color":
+    css, "opacity": 0..1}``). The marker is drawn with the symbol of the last
+    scatter trace in ``marks``, so put the trace that should hover last. Giving
+    it also turns the x/y/value tooltip off: the marks' coordinates mean
+    nothing to a reader.
     """
     children, style, notes = [], [], []
     for m in marks:
@@ -1059,6 +1065,10 @@ def marks_chart(
         zoom=False,
         click=click,
     )
+    if hover:
+        figure.figure().set_mark_style(hover=hover)
+        figure.figure().show_tooltip = False
+        style.append(f"hover:{sorted(hover.items())}:no-tooltip")
     parts = style + (notes if ANNOTATIONS_IN_TOKEN else [])
     digest = hashlib.blake2b("|".join(parts).encode(), digest_size=8).hexdigest()
     return _publish(
