@@ -720,6 +720,17 @@ const listeners = {};
 st.attach({ decodeFrame: () => ({ buffers: [] }), render: () => () => {} },
           { addEventListener: (n, cb) => { listeners[n] = cb; } });
 const out = {};
+// a chart that never asked for hover installs no tooltip observer
+let observers = 0;
+globalThis.MutationObserver = class { constructor() { observers += 1; } observe() {} disconnect() {} };
+const plain = createController({ spec: {}, onSelect: null });
+plain.attach({ decodeFrame: () => ({ buffers: [] }), render: () => () => {} },
+             { nodeType: 1, addEventListener: () => {} });
+out.plainObservers = observers;
+const hov = createController({ spec: {}, onSelect: null, onHover: () => {} });
+hov.attach({ decodeFrame: () => ({ buffers: [] }), render: () => () => {} },
+           { nodeType: 1, addEventListener: () => {} });
+out.hoverObservers = observers;
 listeners["xy:hover"]({ detail: { points: [{ trace: "nodes:44", index: 2 }] } });
 listeners["xy:hover"]({ detail: { active: true } });  // no point: ignored
 out.hover = got.slice();
@@ -750,6 +761,7 @@ def test_controller_forwards_hover_and_both_kinds_of_leave():
         )
     assert proc.returncode == 0, proc.stderr
     out = json.loads(proc.stdout.strip().splitlines()[-1])
+    assert out["plainObservers"] == 0 and out["hoverObservers"] == 1
     assert out["hover"] == [{"trace": "nodes:44", "index": 2}]
     assert out["otherElementIgnored"] is True
     assert out["afterLeave"] == [

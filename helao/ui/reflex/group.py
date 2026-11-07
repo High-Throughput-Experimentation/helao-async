@@ -65,6 +65,8 @@ STALE_S = 5.0
 #: Long enough that the one remaining chart rebuild (a strip whose slot count
 #: changed, ~150 ms of frozen main thread) cannot swallow a pulse.
 PULSE_S = 1.2
+#: Frames that arrive in one tick pulse only their last second of events.
+CATCH_UP_S = 1.0
 PENDING_TIMEOUT_S = 10.0
 NO_ORCH_NOTE = "This config has no orchestrator, so there is no server group to show."
 LOST_BANNER = "orchestrator unreachable"
@@ -168,15 +170,39 @@ def pulse_for(ev: dict, now: float, orch_key: str):
 
 
 def queue_pulse(pulses, p) -> list:
-    """``pulses`` plus ``p``, started once the edge's last pulse has ended.
+    """``pulses`` plus ``p``, bounded per edge.
 
     A dispatch and a finish seen in one frame (a short action) share an edge;
     both start at once and cross mid-edge, so the return leg is lost in the
-    crossing. Queued, the finish leaves the server after the dispatch arrives.
+    crossing. So ``p`` starts once the edge's last pulse has ended, but never
+    more than one pulse-length ahead, and an edge holds at most one not-yet-
+    started pulse per direction: a burst (a run of short actions, or a tab
+    catching up) merges into that one instead of queueing for minutes.
     """
-    edge = p[0]
-    end = max((q[2] + q[3] for q in pulses if q[0] == edge), default=p[2])
-    return [*pulses, (edge, p[1], max(p[2], end), *p[3:])]
+    edge, direction, now, duration = p[0], p[1], p[2], p[3]
+    same = [q for q in pulses if q[0] == edge]
+    if any(q[1] == direction and q[2] > now for q in same):
+        return list(pulses)
+    end = max((q[2] + q[3] for q in same), default=now)
+    return [*pulses, (edge, direction, min(max(now, end), now + duration), *p[3:])]
+
+
+def recent_events(frames, window: float = CATCH_UP_S) -> list:
+    """Events of ``frames`` from the last ``window`` s of event time.
+
+    A page that was backgrounded returns to many frames at once; pulsing every
+    event in them would animate minutes of history. Events without a time stay.
+    """
+    events = [ev for f in frames for ev in f.get("events", [])]
+    times = [ev["t"] for ev in events if isinstance(ev.get("t"), (int, float))]
+    if not times:
+        return events
+    cut = max(times) - window
+    return [
+        ev
+        for ev in events
+        if not isinstance(ev.get("t"), (int, float)) or ev["t"] >= cut
+    ]
 
 
 def _estopped(snap: dict) -> bool:
@@ -521,12 +547,11 @@ def apply_tick(s, feed, now: float, token: str) -> bool:
         frames, s._cursor = new_frames(feed, s._cursor)
         replay = True
     pulses = list(s._pulses)
-    for f in frames:
-        if replay:
-            for ev in f.get("events", []):
-                p = pulse_for(ev, now, _CFG["orch_key"])
-                if p is not None:
-                    pulses = queue_pulse(pulses, tuple(p))
+    if replay:
+        for ev in recent_events(frames):
+            p = pulse_for(ev, now, _CFG["orch_key"])
+            if p is not None:
+                pulses = queue_pulse(pulses, tuple(p))
     s._pulses = tuple(pulses)
     if frames:
         s._snap = (frames[-1],)
@@ -687,8 +712,16 @@ class GroupState(rx.State):
         now = time.time()
         lost = stream_lost(_FEED, now)
         g = build_graph(self._snap[0], (), _CFG["orch_key"], lost)
-        keys = g.node_traces().get(trace, [])
-        key = keys[idx] if 0 <= idx < len(keys) else ""
+        keys = g.node_traces().get(trace)
+        if keys is not None and 0 <= idx < len(keys):
+            key = keys[idx]
+        elif not trace or idx < 0:
+            key = ""  # the pointer left every point (or the chart)
+        else:
+            # The hover disc sits over the node's ring and pulses cross it: xy
+            # picks them, but they are not a change of node (clearing here
+            # flickers the disc on and off).
+            return
         if key == self._hovered:
             return
         self._hovered = key

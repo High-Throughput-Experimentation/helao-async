@@ -979,7 +979,16 @@ def test_hovering_a_node_redraws_it_larger_in_its_own_colour_then_clears(
     assert hov["size"] == group.HOVER_PX > group.NODE_PX
     _hover(group, s, {"trace": "", "index": -1})  # pointer left
     assert s._hovered == "" and s.graph_layout == layout
-    _hover(group, s, {"trace": "pulse:triangle", "index": 0})  # not a node
+
+    _hover(group, s, {"trace": f"nodes:44:{busy}", "index": 0})
+    assert s._hovered == "SIM"
+    # The disc over the node's ring and a crossing pulse are picked by xy too,
+    # but neither is a change of node: the hover must hold (no flicker).
+    _hover(group, s, {"trace": f"hovered:{busy}", "index": 0})
+    _hover(group, s, {"trace": "pulse:triangle", "index": 0})
+    _hover(group, s, {"trace": "edges:x:2", "index": 5})
+    assert s._hovered == "SIM"
+    _hover(group, s, {"trace": "", "index": -1})
     assert s._hovered == ""
 
 
@@ -993,3 +1002,38 @@ def test_a_status_change_leaves_the_graph_layout_token_unchanged(group):
         feed.push(_two_server_frame(2, status))
         group.apply_tick(s, feed, 101.0, "t")
         assert s.graph_layout == idle, status
+
+
+# ---- bursts stay bounded -----------------------------------------------------
+
+
+def test_a_burst_of_events_on_one_edge_stays_bounded(group):
+    pulses = []
+    for i in range(100):
+        pulses = group.queue_pulse(
+            pulses, ("SIM", "fwd" if i % 2 else "rev", 50.0, group.PULSE_S, "c")
+        )
+    assert len(pulses) <= 3  # the running one plus one pending per direction
+    assert max(p[2] for p in pulses) <= 50.0 + 2 * group.PULSE_S
+
+
+def test_a_catch_up_batch_pulses_only_the_last_second():
+    from helao.ui.reflex.group import recent_events
+
+    old = {"kind": "dispatch", "server": "SIM", "t": 10.0}
+    new = {"kind": "finish", "server": "SIM", "t": 500.0}
+    untimed = {"kind": "dispatch", "server": "SIM"}
+    got = recent_events([{"events": [old]}, {"events": [new, untimed]}])
+    assert got == [new, untimed]
+
+
+def test_a_tick_with_many_old_frames_starts_a_bounded_number_of_pulses(group):
+    feed = Feed()
+    feed.push(frame(1))
+    s = state()
+    group.apply_tick(s, feed, 100.0, "t")
+    for i in range(100):
+        feed.push(frame(2 + i, [{**(DISPATCH if i % 2 else FINISH), "t": 1000.0 + i}]))
+    group.apply_tick(s, feed, 100.0, "t")
+    assert 1 <= len(s._pulses) <= 3
+    assert max(p[2] for p in s._pulses) <= 100.0 + 2 * group.PULSE_S

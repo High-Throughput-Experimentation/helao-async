@@ -281,6 +281,8 @@ class NetGraph:
                     }
                 )
             if n.subtext:
+                # clear the enlarged hover disc too, not just the node
+                grow = max(0.0, (self.hover_px - n.size_px) / 2)
                 ry = n.size_px / 2 * self.sy
                 above = n.y > 0
                 texts.append(
@@ -290,7 +292,7 @@ class NetGraph:
                         "y": n.y + ry if above else n.y - ry,
                         "value": n.subtext,
                         "dx": 0.0,
-                        "dy": -6.0 if above else 14.0,
+                        "dy": -6.0 - grow if above else 14.0 + grow,
                         "color": GROUP_EDGE_TEXT,
                         "anchor": "middle",
                     }

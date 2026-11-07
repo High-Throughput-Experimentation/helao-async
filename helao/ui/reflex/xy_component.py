@@ -454,7 +454,8 @@ export function createController(options) {
     el.addEventListener("xy:click", st.onClick);
     el.addEventListener("xy:hover", st.onHoverEvent);
     el.addEventListener("xy:leave", st.onLeave);
-    if (typeof MutationObserver === "function" && typeof el.nodeType === "number") {
+    // Only a chart that asked for hover pays for the observer.
+    if (st.onHover && typeof MutationObserver === "function" && typeof el.nodeType === "number") {
       st.observer = new MutationObserver(st.onTooltipMutation);
       st.observer.observe(el, { subtree: true, attributes: true, attributeFilter: ["style"] });
     }

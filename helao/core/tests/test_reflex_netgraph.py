@@ -197,3 +197,13 @@ def test_default_padding_is_the_charts_padding():
     g = NetGraph(height_px=360, width_px=720)
     assert g.sx == pytest.approx(2.0 / (720 - 2 * plots.CHART_PADDING_PX))
     assert g.sy == pytest.approx(2.0 / (360 - 2 * plots.CHART_PADDING_PX))
+
+
+def test_subtext_clears_the_enlarged_hover_disc():
+    def dy(hover_px):
+        g = NetGraphWith(hover_px=hover_px)
+        g.add_node("UP", 0.0, 0.7, color=GROUP_IDLE, label_color=WHITE, subtext="move")
+        return next(m for m in g.marks(0.0) if m.get("value") == "move")["dy"]
+
+    assert dy(28.0) == -6.0  # no enlargement, no nudge
+    assert dy(40.0) == -6.0 - 6.0  # pushed out by the disc's growth (12 px / 2)
