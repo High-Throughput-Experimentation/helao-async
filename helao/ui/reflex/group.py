@@ -266,11 +266,14 @@ def object_request(kind: str, item: dict):
 def fetched_info(kind: str, item: dict, obj) -> tuple:
     """``(obj to show, note)`` for a clicked item's fetch result.
 
-    ``qidx`` is absolute and comes from the last drawn snapshot; a head pop
-    before the click shifts every index, so a queue-index fetch can return the
-    neighbour. The name is the only identity a queued item has, so a name
-    mismatch is never shown; a same-named neighbour cannot be told apart. An
-    empty result (out of range, unreachable, failed) stays "not found".
+    Queued experiments and actions carry uuids (from enqueue / unpack) and are
+    fetched by uuid; only a row without one falls back to a queue-index fetch,
+    which is what the rest of this applies to. ``qidx`` is absolute and comes
+    from the last drawn snapshot; a head pop before the click shifts every
+    index, so such a fetch can return the neighbour. The name is then the only
+    identity the row has, so a name mismatch is never shown; a same-named
+    neighbour cannot be told apart. An empty result (out of range,
+    unreachable, failed) stays "not found".
     """
     if not obj:
         return None, NOT_FOUND
@@ -574,7 +577,7 @@ def _render_strips(s, snap: dict, now: float, token: str) -> None:
     v = s._version
     exp_key = selected_key(s._selected, snap, "experiment")
     act_key = selected_key(s._selected, snap, "action")
-    em, exp_slots = strip_marks(
+    em, exp_slots, exp_edges = strip_marks(
         snap.get("experiments", []),
         n_before=snap.get("n_done", 0),
         n_after=snap.get("n_queued", 0),
@@ -583,11 +586,12 @@ def _render_strips(s, snap: dict, now: float, token: str) -> None:
         selected=exp_key,
     )
     s._exp_slots = tuple(exp_slots)
+    s._exp_edges = exp_edges
     s._exp_ords = _slot_ordinals(snap, "experiment")
     s._scopes = (selection_scope(snap, "experiment"), selection_scope(snap, "action"))
     p = plots.marks_chart(
         em,
-        x_domain=(0.0, float(max(len(exp_slots), 1))),
+        x_domain=(0.0, float(PLOT_W)),
         y_domain=(0.0, 1.0),
         panel_id=f"group-exp-{token}",
         version=v,
@@ -596,7 +600,7 @@ def _render_strips(s, snap: dict, now: float, token: str) -> None:
         height_px=STRIP_H,
     )
     s.exp_spec, s.exp_url, s.exp_layout = p.spec, p.buffer_url, p.layout
-    am, act_slots = strip_marks(
+    am, act_slots, act_edges = strip_marks(
         snap.get("actions", []),
         n_before=0,
         n_after=0,
@@ -605,10 +609,11 @@ def _render_strips(s, snap: dict, now: float, token: str) -> None:
         selected=act_key,
     )
     s._act_slots = tuple(act_slots)
+    s._act_edges = act_edges
     s._act_ords = _slot_ordinals(snap, "action")
     p = plots.marks_chart(
         am,
-        x_domain=(0.0, float(max(len(act_slots), 1))),
+        x_domain=(0.0, float(PLOT_W)),
         y_domain=(0.0, 1.0),
         panel_id=f"group-act-{token}",
         version=v,
@@ -776,6 +781,8 @@ class GroupState(rx.State):
     _version: int = 0
     _exp_slots: tuple = ()
     _act_slots: tuple = ()
+    _exp_edges: tuple = (0.0, float(PLOT_W))
+    _act_edges: tuple = (0.0, float(PLOT_W))
     _exp_ords: tuple = ()
     _act_ords: tuple = ()
     _scopes: tuple = ()  # (experiment scope, action scope)
@@ -847,9 +854,10 @@ class GroupState(rx.State):
         re-uploads a strip.
         """
         slots = self._exp_slots if which == 0 else self._act_slots
+        edges = self._exp_edges if which == 0 else self._act_edges
         trace = (payload or {}).get("trace")
         slot = (
-            hit_slot((payload or {}).get("index", -1), len(slots))
+            hit_slot((payload or {}).get("index", -1), edges)
             if trace == HIT_TRACE
             else -1  # the pointer left the strip's points
         )
@@ -879,8 +887,9 @@ class GroupState(rx.State):
             token = self.router.session.client_token
             exp = kind == "experiment"
             slots = self._exp_slots if exp else self._act_slots
+            edges = self._exp_edges if exp else self._act_edges
             ords = self._exp_ords if exp else self._act_ords
-            item = click_item(slots, (payload or {}).get("x"))
+            item = click_item(slots, edges, (payload or {}).get("x"))
             if item is None or len(self._scopes) != 2:
                 return
             at = next(i for i, it in enumerate(slots) if it is item)

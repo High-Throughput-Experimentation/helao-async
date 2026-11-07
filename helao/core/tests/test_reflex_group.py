@@ -51,6 +51,8 @@ def state():
         _version=0,
         _exp_slots=(),
         _act_slots=(),
+        _exp_edges=(),
+        _act_edges=(),
         _selected=(),
         _exp_ords=(),
         _act_ords=(),
@@ -201,9 +203,11 @@ def test_backend_vars_touched_each_tick_are_tuples(group):
     feed = Feed()
     feed.push(frame(1))
     group.apply_tick(s, feed, 100.0, "t")
-    for name in ("_snap", "_pulses", "_exp_slots", "_act_slots", "_selected"):
+    names = ("_snap", "_pulses", "_exp_slots", "_act_slots", "_selected")
+    names += ("_exp_edges", "_act_edges")
+    for name in names:
         assert isinstance(getattr(s, name), tuple), name
-    for name in ("_snap", "_pulses", "_exp_slots", "_act_slots", "_selected"):
+    for name in names:
         assert vars(group.GroupState)[name].annotated_type is tuple, name
 
 
@@ -1374,21 +1378,28 @@ def test_hit_grid_answers_every_segment_and_maps_back_to_its_slot():
         items = [
             {"name": f"e{i}", "state": "done", "uuid": f"u{i}"} for i in range(n_items)
         ]
-        marks, slots = strip_marks(items, n_before=0, n_after=0, now=1.0, width_px=720)
+        marks, slots, edges = strip_marks(
+            items, n_before=0, n_after=0, now=1.0, width_px=720
+        )
         hit = next(m for m in marks if m.get("name") == "hit")
         assert len(hit["x"]) == HIT_COLS * HIT_ROWS == len(hit["y"])
         # each grid point sits in the slot hit_slot names for it
         for idx, x in enumerate(hit["x"]):
-            assert hit_slot(idx, len(slots)) == int(x)
+            assert hit_slot(idx, edges) == next(
+                i for i in range(len(slots)) if edges[i] <= x < edges[i + 1]
+            )
         # every slot has a point, and the points are never further apart than xy's
         # 12 px pick radius allows (720 px / HIT_COLS columns)
-        assert {hit_slot(i, len(slots)) for i in range(HIT_COLS * HIT_ROWS)} == set(
-            range(len(slots))
-        )
+        reach = {hit_slot(i, edges) for i in range(HIT_COLS * HIT_ROWS)}
+        wide = {
+            i for i in range(len(slots)) if edges[i + 1] - edges[i] >= 720 / HIT_COLS
+        }
+        assert wide <= reach
         # xy picks pixel-exact on a drawn marker, so the squares must tile the plot
         assert hit["size"] == HIT_PX and hit["symbol"] == "square"
         assert HIT_PX >= 704 / HIT_COLS and HIT_PX >= (STRIP_H - 16) / HIT_ROWS
-    assert hit_slot(-1, 3) is None and hit_slot(HIT_COLS * HIT_ROWS, 3) is None
+    assert hit_slot(-1, edges) is None
+    assert hit_slot(HIT_COLS * HIT_ROWS, edges) is None
 
 
 def test_item_tooltip_formats(group):
@@ -1461,14 +1472,12 @@ def test_strips_ask_for_hover_events_and_clicks(group):
         assert spec.get("show_modebar") is False
 
 
-def test_every_slot_of_the_largest_exp_strip_is_reachable():
-    from helao.core.models.group_snapshot import EXP_DONE_WINDOW, EXP_QUEUED_WINDOW
+def test_every_slot_of_the_largest_unsqueezed_exp_strip_is_reachable():
     from helao.ui.reflex.timeline_strip import HIT_COLS, HIT_ROWS, hit_slot
 
-    n_max = EXP_DONE_WINDOW + 1 + EXP_QUEUED_WINDOW + 2  # + both ellipses
-    assert n_max == 73
-    for n in (n_max - 1, n_max):
-        hit = {hit_slot(i, n) for i in range(HIT_COLS * HIT_ROWS)}
+    for n in (5, 6):  # up to PLOT_W / MIN_KEY_PX equal slots
+        edges = tuple(i * 704.0 / n for i in range(n)) + (704.0,)
+        hit = {hit_slot(i, edges) for i in range(HIT_COLS * HIT_ROWS)}
         assert hit == set(range(n)), sorted(set(range(n)) - hit)
 
 
