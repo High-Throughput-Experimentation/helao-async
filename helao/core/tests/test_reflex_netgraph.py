@@ -174,3 +174,13 @@ def test_subtext_clears_the_enlarged_hover_disc():
 
     assert dy(28.0) == -6.0  # no enlargement, no nudge
     assert dy(40.0) == -6.0 - 6.0  # pushed out by the disc's growth (12 px / 2)
+
+
+def test_centre_row_subtext_sits_right_of_the_node_left_aligned():
+    """The orch row has edges above and below: its action name goes to the right."""
+    g = _g()
+    g.add_node("ORCH", 0.0, 0.0, color=GROUP_IDLE, label_color=WHITE, subtext="wait")
+    m = next(m for m in g.marks() if m.get("value") == "wait")
+    assert m["anchor"] == "start" and m["y"] == 0.0
+    assert m["x"] >= 28.0 / 2 * g.sx  # starts past the node's edge
+    assert m["x"] + m["dx"] * g.sx >= g.hover_px / 2 * g.sx  # and past the hover disc

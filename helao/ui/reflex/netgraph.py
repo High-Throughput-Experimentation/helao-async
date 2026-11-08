@@ -247,6 +247,23 @@ class NetGraph:
                 grow = max(0.0, (self.hover_px - n.size_px) / 2)
                 ry = n.size_px / 2 * self.sy
                 above = n.y > 0
+                if n.y == 0:
+                    # the centre row (the orch) has edges above and below, so a
+                    # name under it hits them: put it to the right, left-aligned,
+                    # so a long name grows away from the node
+                    texts.append(
+                        {
+                            "kind": "text",
+                            "x": n.x + n.size_px / 2 * self.sx,
+                            "y": n.y,
+                            "value": n.subtext,
+                            "dx": 6.0 + grow,
+                            "dy": 4.0,
+                            "color": GROUP_EDGE_TEXT,
+                            "anchor": "start",
+                        }
+                    )
+                    continue
                 texts.append(
                     {
                         "kind": "text",
