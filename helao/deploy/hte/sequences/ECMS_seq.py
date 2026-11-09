@@ -27,6 +27,7 @@ SEQUENCES = [
     "ECMS_series_pulseCA",
     "ECMS_MS_calibration_second",
     "ECMS_transition_clean",
+    "ECMS_final_clean",
 ]
 
 from helao.helpers.lib_decorators import sequence
@@ -1684,8 +1685,108 @@ def ECMS_series_CA_change_gasflow(
     return epm.planned_experiments
 
 
-@sequence(version=2)
+@sequence(version=1)
 def ECMS_transition_clean(
+    plate_id: int = 4534,
+    solid_sample_no: int = 1,
+    liquid_fill_time_init: float = 40,
+    liquid_fill_time: float = 0,
+    reservoir_liquid_sample_no: int = 2,
+    volume_ul_cell_liquid: float = 2020,
+    liquid_backward_time_init: float = 0,
+    liquid_backward_time: float = 150,
+    tube_clear_time: float = 0,
+    liquid_drain_time_init: float = 0.0,
+    liquid_drain_time: float = 150.0,
+    cleaning_times: int = 2,
+) -> list:
+    """ECMS cell setup variant with electrolyte recirculation reservoir fill.
+
+    Same shape as :func:`ECMS_initiation` but fills a recirculation reservoir before the cell and drains via the recirculation loop.
+
+    Args:
+        plate_id: Plate ID of the solid sample library.
+        solid_sample_no: Solid-sample number on the plate to measure.
+        liquid_fill_time: Duration of the liquid fill (s).
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        liquid_backward_time: Duration of backward liquid pumping (s).
+        vacuum_time: Vacuum hold duration (s).
+        CO2equilibrium_duration: CO2 equilibration duration.
+        flowrate_sccm: Flow rate (sccm).
+        flow_ramp_sccm: Flow ramp (sccm).
+        MS_baseline_duration_1: Mass-spec baseline acquisition duration, segment 1 (s).
+        MS_baseline_duration_2: Mass-spec baseline acquisition duration, segment 2 (s).
+        tube_clear_time: Duration to clear the tube (s).
+        liquid_drain_time: Duration of the liquid drain (s).
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
+
+    epm = ExperimentPlanMaker()
+
+    # drain tubing for previous electrolyte
+    epm.add(
+        "ECMS_sub_load_solid_only",
+        {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
+    )
+    epm.add(
+        "ECMS_sub_electrolyte_fill_recirculationreservoir",
+        {
+            "liquid_fill_time": liquid_fill_time_init,
+        },
+    )
+
+    epm.add(
+        "ECMS_sub_electrolyte_fill_cell_recirculation",
+        {
+            "liquid_backward_time": liquid_backward_time_init,
+            "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+            "volume_ul_cell_liquid": volume_ul_cell_liquid,
+        },
+    )
+    epm.add(
+        "ECMS_sub_drain_recirculation",
+        {
+            "tube_clear_time": tube_clear_time,
+            "liquid_drain_time": liquid_drain_time_init,
+        },
+    )
+    # cleaning tubing
+
+    for number_clean in range(cleaning_times):
+        epm.add(
+            "ECMS_sub_load_solid_only",
+            {"solid_plate_id": plate_id, "solid_sample_no": solid_sample_no},
+        )
+        epm.add(
+            "ECMS_sub_electrolyte_fill_recirculationreservoir",
+            {
+                "liquid_fill_time": liquid_fill_time,
+            },
+        )
+
+        epm.add(
+            "ECMS_sub_electrolyte_fill_cell_recirculation",
+            {
+                "liquid_backward_time": liquid_backward_time,
+                "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+                "volume_ul_cell_liquid": volume_ul_cell_liquid,
+            },
+        )
+        epm.add(
+            "ECMS_sub_drain_recirculation",
+            {
+                "tube_clear_time": tube_clear_time,
+                "liquid_drain_time": liquid_drain_time,
+            },
+        )
+    return epm.planned_experiments
+
+
+@sequence(version=2)
+def ECMS_final_clean(
     plate_id: int = 4534,
     solid_sample_no: int = 1,
     liquid_fill_time_init: float = 12,
@@ -1782,3 +1883,4 @@ def ECMS_transition_clean(
             },
         )
     return epm.planned_experiments
+
