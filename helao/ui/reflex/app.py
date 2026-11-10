@@ -412,8 +412,14 @@ def _menu_item(text: str, href: str):
 
 
 def _icon_label(icon: str, text: str):
-    """A Lucide icon beside its label, so nav entries read at a glance."""
-    return rx.hstack(rx.icon(icon, size=16), rx.text(text), spacing="1", align="center")
+    """A Lucide icon beside its label, so nav entries read at a glance.
+
+    Size 2 matches the Data/Admin menu buttons (a size-2 Radix button sets
+    font-size-2); a bare ``rx.text`` in a link would render at size 3.
+    """
+    return rx.hstack(
+        rx.icon(icon, size=16), rx.text(text, size="2"), spacing="1", align="center"
+    )
 
 
 def _nav_menu(label: str, items: tuple, gated: tuple):
@@ -489,10 +495,11 @@ NAV_ICONS = {
 }
 
 
-def _nav():
-    """Render the shared navigation bar."""
+def _nav(title: str = ""):
+    """Render the shared navigation bar, with the page *title* after the brand."""
+    heading = f"HELAO dashboard - {title}" if title else "HELAO dashboard"
     return rx.hstack(
-        rx.heading("HELAO dashboard", size="4"),
+        rx.heading(heading, size="4"),
         rx.spacer(),
         *[
             rx.link(_icon_label(NAV_ICONS[text], text), href=href)
@@ -516,7 +523,7 @@ def _page(title: str, body, route: str):
     ``min-h-screen`` so a short page does not read as two colours.
 
     Args:
-        title: Page heading.
+        title: Page title, shown in the nav bar after "HELAO dashboard - ".
         body: Page content.
         route: The route being rendered, a key of ``REFLEX_PAGE_TINTS``.
     """
@@ -527,9 +534,8 @@ def _page(title: str, body, route: str):
             rx.text(CREDENTIALS_NOTE, padding_x="1em"),
         )
     return rx.vstack(
-        _nav(),
+        _nav(title),
         rx.divider(),
-        rx.heading(title, size="5", padding_x="1em"),
         body,
         width="100%",
         spacing="3",
