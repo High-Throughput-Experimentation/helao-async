@@ -3,8 +3,9 @@ fed the decoded payload the real `VisSubscriber.IOloop_data` would hand them,
 built from `harness/ws_frames` (real encoder -> real WsSubscriber decoder,
 never a hand-built dict standing in for the wire).
 
-11 hte visualizer modules define `add_points`; **9** are conformance-tested
-here. Two are excluded, both measured rather than assumed:
+9 hte visualizer modules define `add_points`; **7** are conformance-tested
+here. pressure_vis and temp_vis moved to helao/deploy/base (tests in
+base/tests/test_live_vis_ws_parity.py). Two are excluded, both measured rather than assumed:
 
 - `sample_vis.add_points(self)` takes no payload argument at all -- it is
   driven by a custom `IOloop_data` that does a `list_new_samples` *private
@@ -23,8 +24,8 @@ Two families, two different unrecognized-key tolerances, measured and pinned
 rather than assumed uniform (a correction to the plan's implicit "does not
 raise" premise for the ws_live family):
 
-- ws_live (`LiveVisualizer`): `co2_vis`, `pressure_vis`,
-  `tec_vis`, `temp_vis`, `mfc_vis` all initialize `data_dict = {k: [] for k in
+- ws_live (`LiveVisualizer`): `co2_vis`, `tec_vis`, `mfc_vis` (and base's
+  `pressure_vis`, `temp_vis`) all initialize `data_dict = {k: [] for k in
   self.data_dict_keys}` then do an unconditional `data_dict[datalab].append`
   for any wire key that isn't `"sim_dict"`/`"tec_vals"` -- an unrecognized
   key is a `KeyError`. Only `power_supply_vis` guards with `if datalab in
@@ -52,64 +53,15 @@ import importlib
 from helao.helpers.server_modules import import_path, locate, module_file
 
 import pytest
-from bokeh.document import Document
 
 from harness import ws_frames as wf
-
-
-class _FakeVis:
-    """The attributes `VisSubscriber.__init__` reads, plus a document.
-
-    `server_cfg["params"]` is the VIS server's own config (num_channels
-    etc.); `world_cfg["servers"][key]["params"]` is the ACTION server's
-    config (devices/dev_ai/dev_monitor etc.) -- two different injection
-    points, per vis_subscriber.py:206 vs each panel's own
-    `self.serv_config.get("params", ...)` reads.
-    """
-
-    def __init__(self, doc, vis_params=None, servers=None):
-        self.doc = doc
-        self.server_cfg = {"params": vis_params or {}}
-        self.world_cfg = {"servers": servers or {}}
-
-
-def _servers(serv_key: str, action_params: dict | None = None) -> dict:
-    return {
-        serv_key: {
-            "host": "127.0.0.1",
-            "port": 8004,
-            "params": action_params or {},
-        }
-    }
-
-
-def _build(module, serv_key: str, vis_params=None, action_params=None):
-    """Construct a visualizer and stop its ingest task before it can open a
-    socket to a server that is not there (recipe shared with
-    test_pstat_vis_axis_selectors.py)."""
-    vis = module.C_vis(
-        _FakeVis(
-            Document(), vis_params=vis_params, servers=_servers(serv_key, action_params)
-        ),
-        serv_key,
-    )
-    vis.IOloop_data_run = False
-    vis.IOtask.cancel()
-    return vis
-
-
-async def _decoded_live(numeric: dict, strings: dict | None = None) -> dict:
-    payload = wf.build_live_payload(numeric=numeric, strings=strings or {})
-    _, decoded = await wf.roundtrip("ws_live", "base_api", payload=payload)
-    return decoded
-
-
-async def _decoded_data(numeric: dict, strings: dict, action_name: str) -> object:
-    payload = wf.build_data_payload(
-        numeric=numeric, strings=strings, action_name=action_name
-    )
-    _, decoded = await wf.roundtrip("ws_data", "base_api", payload=payload)
-    return decoded
+from helao.deploy.base.tests.test_live_vis_ws_parity import (
+    _FakeVis,
+    _servers,
+    _build,
+    _decoded_live,
+    _decoded_data,
+)
 
 
 def _import(modname):
@@ -122,19 +74,18 @@ def _import(modname):
 
 
 def test_targeted_module_set_matches_disk_and_is_documented():
-    """11 hte modules define add_points; 9 are conformance-tested; the 2
+    """9 hte modules define add_points; 7 are conformance-tested; the 2
     exclusions are named and justified in the module docstring above, not
     silently dropped."""
     from pathlib import Path
 
     hte = Path("helao/deploy/hte/servers")
-    base = Path("helao/deploy/base/servers")
-    files = [*base.glob("visualizer/*.py"), *hte.glob("*/bokeh/*.py")]
+    files = hte.glob("*/bokeh/*.py")
     found = {p.stem for p in files if "def add_points" in p.read_text(encoding="utf-8")}
-    assert len(found) == 11, found
+    assert len(found) == 9, found
     excluded = {"sample_vis", "spec_vis"}
     tested = found - excluded
-    assert len(tested) == 9, tested
+    assert len(tested) == 7, tested
     assert excluded <= found
 
 
@@ -152,48 +103,6 @@ def test_co2_vis_ingests_recognized_and_raises_on_unrecognized():
         vis.add_points([decoded])
         assert len(vis.datasource.data["co2_ppm"]) == before + 1
         assert vis.datasource.data["co2_ppm"][-1] == 410.0
-
-        bad = await _decoded_live({}, strings={wf.LIVE_STRING_LABEL: "x"})
-        with pytest.raises(KeyError):
-            vis.add_points([bad])
-
-    asyncio.run(_run())
-
-
-def test_temp_vis_ingests_recognized_and_raises_on_unrecognized():
-    module = _import("temp_vis")
-
-    async def _run():
-        vis = _build(module, "TEMP0", action_params={"dev_monitor": {"TC0": {}}})
-        assert vis.connected
-        assert vis.data_dict_keys == ["datetime", "TC0"]
-        before = len(vis.datasource.data["TC0"])
-        decoded = await _decoded_live({"TC0": 22.5})
-        vis.add_points([decoded])
-        assert len(vis.datasource.data["TC0"]) == before + 1
-        assert vis.datasource.data["TC0"][-1] == 22.5
-
-        bad = await _decoded_live({}, strings={wf.LIVE_STRING_LABEL: "x"})
-        with pytest.raises(KeyError):
-            vis.add_points([bad])
-
-    asyncio.run(_run())
-
-
-def test_pressure_vis_ingests_recognized_and_raises_on_unrecognized():
-    module = _import("pressure_vis")
-
-    async def _run():
-        vis = _build(module, "PRESSURE0", action_params={"dev_ai": {"AI0": {}}})
-        assert vis.connected
-        assert vis.ai_keys == ["AI0"]
-        before = len(vis.datasource.data["AI0"])
-        decoded = await _decoded_live({"AI0": 14.7})
-        vis.add_points([decoded])
-        assert len(vis.datasource.data["AI0"]) == before + 1
-        assert vis.datasource.data["AI0"][-1] == 14.7
-        # rolling-mean column self-computes to the same length, not raised
-        assert len(vis.datasource.data["AI0_mean"]) == before + 1
 
         bad = await _decoded_live({}, strings={wf.LIVE_STRING_LABEL: "x"})
         with pytest.raises(KeyError):
@@ -372,8 +281,6 @@ def test_nidaqmx_vis_ingests_recognized_columns_and_drops_string():
 if __name__ == "__main__":
     test_targeted_module_set_matches_disk_and_is_documented()
     test_co2_vis_ingests_recognized_and_raises_on_unrecognized()
-    test_temp_vis_ingests_recognized_and_raises_on_unrecognized()
-    test_pressure_vis_ingests_recognized_and_raises_on_unrecognized()
     test_tec_vis_ingests_recognized_via_tec_vals_and_raises_on_unrecognized()
     test_mfc_vis_ingests_recognized_and_raises_on_unrecognized()
     test_power_supply_vis_ingests_a_recognized_payload()

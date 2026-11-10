@@ -78,8 +78,7 @@ def test_gate_config_ws_sources_present():
     assert len(hostports) == len(set(hostports))
 
 
-_SERVERS = os.path.join(_REPO_ROOT, "helao", "deploy", "hte", "servers")
-_BASE_SERVERS = os.path.join(_REPO_ROOT, "helao", "deploy", "base", "servers")
+_SERVERS = os.path.join(_REPO_ROOT, "helao", "deploy", "base", "servers")
 
 
 def _dotted(deployment: str, root: str, paths: list[str]) -> list[str]:
@@ -98,10 +97,10 @@ def _dotted(deployment: str, root: str, paths: list[str]) -> list[str]:
     ]
 
 
-# the shared visualizers live in base; each instrument's panels stay in hte
+# the shared visualizers; hte's instrument panels are swept in hte's tests
 _VIS_MODULES = _dotted(
-    "base", _BASE_SERVERS, glob.glob(os.path.join(_BASE_SERVERS, "visualizer", "*.py"))
-) + _dotted("hte", _SERVERS, glob.glob(os.path.join(_SERVERS, "*", "bokeh", "*.py")))
+    "base", _SERVERS, glob.glob(os.path.join(_SERVERS, "visualizer", "*.py"))
+)
 
 
 def test_vis_module_set_nonempty():
@@ -111,6 +110,6 @@ def test_vis_module_set_nonempty():
 
 
 @pytest.mark.parametrize("mod", _VIS_MODULES)
-def test_hte_vis_imports_on_linux(mod):
-    """Every hte visualizer module imports without hardware/vendor runtime."""
+def test_base_vis_imports_on_linux(mod):
+    """Every base visualizer module imports without hardware/vendor runtime."""
     import_module(mod)

@@ -277,7 +277,7 @@ async def _teardown(app):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("make", [_make_hte, _make_sim], ids=["hte", "sim"])
+@pytest.mark.parametrize("make", [_make_hte, _make_sim], ids=["base", "sim"])
 async def test_server_routes_use_the_port(make, tmp_path, monkeypatch):
     app = make(tmp_path, monkeypatch)
     await _started(app)
