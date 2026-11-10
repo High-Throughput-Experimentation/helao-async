@@ -143,8 +143,24 @@ def test_the_real_estop_route_reaches_the_motors(driver):
 # --------------------------------------------------------------------------
 # E-STOP latch gate: no path that can move the stage runs while latched
 # --------------------------------------------------------------------------
+#: Calls that never move an axis: the stop itself and the status read the host's
+#: status task may make at any moment (under xdist load it landed inside the
+#: "no move" window and failed the test).
+_NOT_MOVES = {"stop", "get_full_status"}
+
+
 def _move_calls(driver):
-    return [c for m in driver.motors.values() for c in m.calls if c[0] != "stop"]
+    return [
+        c for m in driver.motors.values() for c in m.calls if c[0] not in _NOT_MOVES
+    ]
+
+
+def test_a_status_read_is_not_a_move(driver):
+    motor = next(iter(driver.motors.values()))
+    motor.get_full_status(include=["position"])
+    assert _move_calls(driver) == []
+    motor.move_by(1.0)
+    assert [c[0] for c in _move_calls(driver)] == ["move_by"]
 
 
 @pytest.fixture
