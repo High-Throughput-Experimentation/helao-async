@@ -7,7 +7,7 @@ panel by adding a ``reflex:`` server and changing nothing else.
 
 __all__ = ["WS_PATH", "STATE_BASE", "Y_LABEL", "build", "panel_id"]
 
-from helao.deploy.hte.servers.reflex._live import make_live_panel, suffix_matcher
+from helao.deploy.base.servers.reflex._live import make_live_panel, suffix_matcher
 
 WS_PATH = "ws_live"
 Y_LABEL = "CO2 (ppm)"

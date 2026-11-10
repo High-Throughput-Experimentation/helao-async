@@ -7,7 +7,7 @@ the SAMPLE server's private endpoint and renders four tables.
 
 import numpy as np
 
-from helao.deploy.hte.servers.reflex import _samples, _spectra
+from helao.deploy.base.servers.reflex import _samples, _spectra
 
 
 def _snap(**cols):

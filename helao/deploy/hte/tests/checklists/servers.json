@@ -38,11 +38,6 @@
       "representative_key": "CO2SENSOR"
     },
     {
-      "module": "sync_server.py",
-      "keys": ["DB"],
-      "representative_key": "DB"
-    },
-    {
       "module": "diapump_server.py",
       "keys": ["DOSEPUMP"],
       "representative_key": "DOSEPUMP"

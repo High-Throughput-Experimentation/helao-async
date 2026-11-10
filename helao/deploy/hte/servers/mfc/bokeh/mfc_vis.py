@@ -8,7 +8,7 @@ from helao.helpers import helao_logging as logging
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.ui.shared.palette import SERIES
 from helao.ui.bokeh.vis import Vis
-from helao.deploy.hte.servers.visualizer._live_panel import LivePanel
+from helao.deploy.base.servers.visualizer._live_panel import LivePanel
 from helao.ui.bokeh.vis_subscriber import LiveVisualizer
 
 FWIN = 20

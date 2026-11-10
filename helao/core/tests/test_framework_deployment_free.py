@@ -5,7 +5,14 @@ import re
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
-ROOTS = ["helao/core", "helao/hexagon", "helao/helpers", "helao/ui", "harness"]
+ROOTS = [
+    "helao/core",
+    "helao/hexagon",
+    "helao/helpers",
+    "helao/ui",
+    "harness",
+    "helao/deploy/base",
+]
 FILES = [
     "fast_launcher.py",
     "bokeh_launcher.py",

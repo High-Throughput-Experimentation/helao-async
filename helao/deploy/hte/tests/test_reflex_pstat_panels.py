@@ -8,7 +8,7 @@ BioLogic draws one plot pair per hardware channel. That logic lives in
 
 import numpy as np
 
-from helao.deploy.hte.servers.reflex import _pstat
+from helao.deploy.base.servers.reflex import _pstat
 
 
 def _snap(**cols):
@@ -187,7 +187,7 @@ def test_pstat_panel_ids_are_distinct():
 
 
 def test_declared_columns_come_first_and_in_declared_order():
-    from helao.deploy.hte.servers.reflex._pstat import plottable_columns
+    from helao.deploy.base.servers.reflex._pstat import plottable_columns
 
     snapshot = {"Ewe_V": [1.0], "t_s": [0.0]}
     assert plottable_columns(snapshot, ["t_s", "Ewe_V", "I_A"]) == ["t_s", "Ewe_V"]
@@ -196,14 +196,17 @@ def test_declared_columns_come_first_and_in_declared_order():
 def test_a_column_the_panel_never_declared_is_still_offered():
     """A technique reporting something the panel does not know about should be
     plottable rather than invisible."""
-    from helao.deploy.hte.servers.reflex._pstat import plottable_columns
+    from helao.deploy.base.servers.reflex._pstat import plottable_columns
 
     snapshot = {"t_s": [0.0], "Vm": [1.0]}
     assert plottable_columns(snapshot, ["t_s", "Ewe_V"]) == ["t_s", "Vm"]
 
 
 def test_the_routing_column_is_not_offered_as_an_axis():
-    from helao.deploy.hte.servers.reflex._pstat import CHANNEL_COLUMN, plottable_columns
+    from helao.deploy.base.servers.reflex._pstat import (
+        CHANNEL_COLUMN,
+        plottable_columns,
+    )
 
     snapshot = {"t_s": [0.0], CHANNEL_COLUMN: [0.0]}
     assert plottable_columns(snapshot, ["t_s"]) == ["t_s"]
@@ -211,13 +214,13 @@ def test_the_routing_column_is_not_offered_as_an_axis():
 
 def test_an_empty_snapshot_offers_nothing():
     """Distinct from a mismatch: there is simply no data yet."""
-    from helao.deploy.hte.servers.reflex._pstat import plottable_columns
+    from helao.deploy.base.servers.reflex._pstat import plottable_columns
 
     assert plottable_columns({}, ["t_s", "Ewe_V"]) == []
 
 
 def test_a_stream_sharing_no_column_with_the_panel_still_plots():
-    from helao.deploy.hte.servers.reflex._pstat import plottable_columns
+    from helao.deploy.base.servers.reflex._pstat import plottable_columns
 
     present = plottable_columns({"Vm": [1.0], "Ach_V": [2.0]}, ["t_s", "Ewe_V"])
     assert present == ["Vm", "Ach_V"]
@@ -229,7 +232,7 @@ def test_the_ocv_columns_the_gamry_driver_streams_resolve_to_its_default_axes():
     columns beyond the two this panel plots."""
     from helao.deploy.hte.servers.gamry.dtaq import DTAQ_OCV
     from helao.deploy.hte.servers.gamry.reflex import gamry_vis
-    from helao.deploy.hte.servers.reflex._pstat import axis_defaults, plottable_columns
+    from helao.deploy.base.servers.reflex._pstat import axis_defaults, plottable_columns
 
     snapshot = {key: [0.0] for key in DTAQ_OCV.output_keys}
     present = plottable_columns(snapshot, gamry_vis.COLUMNS)

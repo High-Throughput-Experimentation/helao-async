@@ -19,7 +19,6 @@
   "power_supply_server",
   "sample_server",
   "spec_server",
-  "sync_server",
   "syringe_server",
   "tec_server"
 ]

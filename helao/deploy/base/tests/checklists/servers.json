@@ -1,0 +1,10 @@
+{
+  "_description": "Manifest of base's action-server modules, split verbatim from helao/deploy/hte/tests/checklists/servers.json on 2026-11-10.",
+  "servers": [
+    {
+      "module": "sync_server.py",
+      "keys": ["DB"],
+      "representative_key": "DB"
+    }
+  ]
+}

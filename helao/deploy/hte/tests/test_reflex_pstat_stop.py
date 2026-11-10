@@ -29,7 +29,7 @@ from bokeh.document import Document
 from helao.core.error import ErrorCodes
 from helao.ui.shared import palette
 from helao.ui.reflex.state import make_panel_state
-from helao.deploy.hte.servers.reflex import _pstat, _pstat_panel
+from helao.deploy.base.servers.reflex import _pstat, _pstat_panel
 
 SERV_KEY = "PSTAT"
 SERVERS = {SERV_KEY: {"host": "127.0.0.1", "port": 8004}}

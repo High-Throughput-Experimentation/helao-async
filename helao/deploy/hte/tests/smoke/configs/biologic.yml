@@ -37,7 +37,7 @@ servers:
     host: 127.0.0.1
     port: 5001
     group: visualizer
-    deployment: hte
+    deployment: base
     bokeh: action_visualizer
     params:
       doc_name: 'BIOLOGIC Visualizer'

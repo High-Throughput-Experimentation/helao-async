@@ -28,9 +28,18 @@ import importlib
 
 import pytest
 
+from helao.helpers import server_modules
 from helao.helpers.launcher_bootstrap import app_module_path
 
 from helao.helpers.config_loader import install_global_config, read_validated_config
+
+
+def _owner(module: str) -> str:
+    """hte for instrument servers, base for the framework services hte configs launch."""
+    owner = server_modules.locate(module, "app", own="hte")[0]
+    assert owner is not None, module
+    return owner
+
 
 #: (module, config prefix, server key) -- one representative station per module.
 #: Measured by loading each station config and calling makeApp; every one of
@@ -77,7 +86,7 @@ def test_module_builds_under_its_station_config(
     from helao.hexagon.app.action_host import ActionHost
 
     install_global_config(read_validated_config(config)[0])
-    mod = importlib.import_module(app_module_path("hte", module))
+    mod = importlib.import_module(app_module_path(_owner(module), module))
     app = mod.makeApp(server_key)
 
     # `title`, not `server_key`: a legacy BaseAPI has no `server_key` attribute
@@ -104,7 +113,7 @@ def test_windows_only_module_fails_the_way_we_recorded(
     BUILDS should grow to claim it.
     """
     with pytest.raises(BaseException) as exc:
-        importlib.import_module(app_module_path("hte", module))
+        importlib.import_module(app_module_path(_owner(module), module))
     assert expected in str(
         exc.value
     ), f"{module} raised {exc.value!r}, not {expected!r}"
@@ -123,7 +132,7 @@ def test_the_orchestrator_builds_a_native_OrchHost() -> None:
     from helao.hexagon.app.orch_host import OrchHost
 
     install_global_config(read_validated_config("adss3")[0])
-    mod = importlib.import_module("helao.deploy.hte.servers.orchestrator.async_orch2")
+    mod = importlib.import_module("helao.deploy.base.servers.orchestrator.async_orch2")
     app = mod.makeApp("ORCH")
     assert isinstance(app, OrchHost), f"orchestrator built a {type(app).__name__}"
     assert app.title == "ORCH"

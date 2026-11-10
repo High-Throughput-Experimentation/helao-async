@@ -10,7 +10,7 @@ Host-level keys every server accepts: see `docs/config-schema.md` ("Group conven
 
 The modules here read no params of the `reflex:` server. They read two things from the config:
 
-- the `host` and `port` of the monitored or controlled action server (`helao/deploy/hte/servers/reflex/_pstat.py:172`, `helao/deploy/hte/servers/reflex/_pstat_panel.py:138`, `helao/deploy/hte/servers/sample/reflex/sample_vis.py:109`);
+- the `host` and `port` of the monitored or controlled action server (`helao/deploy/base/servers/reflex/_pstat.py:172`, `helao/deploy/base/servers/reflex/_pstat_panel.py:138`, `helao/deploy/hte/servers/sample/reflex/sample_vis.py:109`);
 - for the control panels, keys of that action server's `params:`, through the same shared code as the Bokeh panels.
 
 ### Control panels: params read from the controlled server

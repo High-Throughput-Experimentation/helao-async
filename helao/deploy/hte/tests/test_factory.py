@@ -81,7 +81,7 @@ def test_orchestrator_exposes_loaded_modules(installed_config):
     not on the shared registrar: a registrar test would still pass if the host
     stopped calling it.
     """
-    from helao.deploy.hte.servers.orchestrator.async_orch2 import makeApp
+    from helao.deploy.base.servers.orchestrator.async_orch2 import makeApp
 
     app = makeApp("ORCH")
     routes = {r.path for r in app.routes}  # type: ignore[attr-defined]

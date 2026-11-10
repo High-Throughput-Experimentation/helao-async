@@ -118,7 +118,7 @@ def test_discovery_search_order_puts_configured_deployment_first():
         config_loader.CONFIG = {"deployment": "test"}
         order = deployment_search_order()
         assert order[0] == "test"
-        assert "hte" in order
+        assert "base" in order
     finally:
         config_loader.CONFIG = saved
 

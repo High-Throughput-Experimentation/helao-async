@@ -14,7 +14,7 @@ import reflex as rx
 
 from helao.ui.reflex import plots
 from helao.ui.reflex.state import ActionVisState
-from helao.deploy.hte.servers.reflex._action import (
+from helao.deploy.base.servers.reflex._action import (
     CURRENT_PATTERN,
     MUTED_TEXT,
     VOLTAGE_PATTERN,

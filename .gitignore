@@ -22,6 +22,7 @@ ntpLastSync.txt
 # external deployment
 helao/deploy/*
 !helao/deploy/__init__.py
+!helao/deploy/base/
 !helao/deploy/hte/
 !helao/deploy/test/
 

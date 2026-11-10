@@ -408,7 +408,9 @@ def test_shim_exposes_makebokehapp():
     import importlib
     import inspect
 
-    m = importlib.import_module("helao.deploy.hte.servers.operator.standalone_operator")
+    m = importlib.import_module(
+        "helao.deploy.base.servers.operator.standalone_operator"
+    )
     assert hasattr(m, "makeBokehApp")
     params = list(inspect.signature(m.makeBokehApp).parameters)
     assert params == ["doc", "confPrefix", "server_key", "helao_repo_root"], params

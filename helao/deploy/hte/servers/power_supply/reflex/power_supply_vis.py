@@ -22,7 +22,7 @@ import reflex as rx
 
 from helao.ui.reflex import plots
 from helao.ui.reflex.state import ActionVisState
-from helao.deploy.hte.servers.reflex._action import (
+from helao.deploy.base.servers.reflex._action import (
     MUTED_TEXT,
     X_COLUMN,
     latest_action_uuid,

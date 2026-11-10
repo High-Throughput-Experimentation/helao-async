@@ -2,5 +2,5 @@
 
 Houses reusable Bokeh UI components (for example the plate alignment
 panel) consumed by visualizer apps under
-:mod:`helao.deploy.hte.servers.visualizer`.
+:mod:`helao.deploy.base.servers.visualizer`.
 """

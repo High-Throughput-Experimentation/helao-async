@@ -443,7 +443,7 @@ def test_finish_yml_route_drops_a_process_path(tmp_path, monkeypatch):
     number it happens to emit today), against a stub syncer standing in for
     the driver BaseAPI would otherwise construct in its own startup event.
     """
-    from helao.deploy.hte.servers.sync import sync_server
+    from helao.deploy.base.servers.sync import sync_server
     from helao.helpers import config_loader
 
     exp_dir = _tree(tmp_path)

@@ -16,8 +16,8 @@ import asyncio
 import numpy as np
 import reflex as rx
 
-from helao.deploy.hte.servers.reflex._action import MUTED_TEXT, latest_action_uuid
-from helao.deploy.hte.servers.reflex._spectra import (
+from helao.deploy.base.servers.reflex._action import MUTED_TEXT, latest_action_uuid
+from helao.deploy.base.servers.reflex._spectra import (
     channel_columns,
     downsample,
     latest_spectrum,

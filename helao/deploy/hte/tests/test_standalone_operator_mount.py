@@ -34,7 +34,7 @@ async def _cancel_new_tasks(before):
 
 @pytest.mark.asyncio
 async def test_standalone_operator_document_mounts_the_operator(real_config):
-    operator = import_module("helao.deploy.hte.servers.operator.standalone_operator")
+    operator = import_module("helao.deploy.base.servers.operator.standalone_operator")
     before = asyncio.all_tasks()
     doc = Document()
     try:

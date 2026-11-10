@@ -269,7 +269,7 @@ def makeApp(server_key) -> ActionHost:
         ``enqueued: 0``). This is deliberately folded into an existing response
         rather than given a route of its own: ``/tasks`` is already what an
         operator polls, and the frozen endpoint checklist for this module
-        (``helao/deploy/hte/tests/checklists/sync_server.json``) pins the route
+        (``helao/deploy/base/tests/checklists/sync_server.json``) pins the route
         set, so a new route needs an entry in ``checklists/_additions.json``.
 
         ``quarantined`` lists records the syncer has stopped retrying (sync quarantine spec); POST ``/finish_yml`` with a listed ``yml`` to release one.

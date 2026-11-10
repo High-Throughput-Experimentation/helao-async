@@ -22,7 +22,7 @@ servers:
     port: 5001
     group: visualizer
     bokeh: action_visualizer
-    deployment: hte
+    deployment: base
     params:
       doc_name: 'PSTAT Visualizer'
       launch_browser: true

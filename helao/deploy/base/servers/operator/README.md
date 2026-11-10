@@ -16,7 +16,7 @@ All keys are optional.
 
 | key | req | type | default | meaning / allowed values | read at |
 |---|---|---|---|---|---|
-| `orch_key` | no | str | `None` | Server key of the orchestrator to drive. When absent, the first `group: orchestrator` server in the config is used; with none, startup raises `ValueError`. A key that is not in `servers` raises `KeyError`. | `helao/deploy/hte/servers/operator/standalone_operator.py:31`, `helao/ui/shared/operator/orch_backend.py:59` |
+| `orch_key` | no | str | `None` | Server key of the orchestrator to drive. When absent, the first `group: orchestrator` server in the config is used; with none, startup raises `ValueError`. A key that is not in `servers` raises `KeyError`. | `helao/deploy/base/servers/operator/standalone_operator.py:31`, `helao/ui/shared/operator/orch_backend.py:59` |
 | `poll_interval` | no | float (s) | `5.0` | Orchestrator poll interval of the remote backend. | `standalone_operator.py:32`, `orch_backend.py:63` |
 | `plate_api` | no | str | `None` | Only the value `HTEPlateAPI` has an effect: it builds the shared plate-API client (needs the `HELAO_CREDENTIALS` environment variable, see `helao/helpers/plate_api.py`). Any other value leaves it unset. | `helao/ui/bokeh/operator.py:251` |
 | `seqspec_parser_path` | no | str (file path) | `None` | Python file defining a `SpecParser`. Unset, missing, or failing to import disables the sequence-spec tab (a warning is logged). | `helao/ui/bokeh/operator.py:379`, `helao/ui/shared/operator/spec_parser.py:44` |

@@ -18,7 +18,7 @@ Read from the host server's own `params:`. The `group: visualizer` table in `doc
 | `limit_vis` | no | list of string (or string) | `[]` | Only the listed action-server keys get panels. A bare string is tested as a substring of the server key; write a list. | `helao/ui/bokeh/vis_subscriber.py:111`, `:119` |
 | `update_rate` | no | number (s) | `0.001` (action), `0.5` (live) | Minimum seconds between WebSocket reads of each mounted panel. | `helao/ui/bokeh/vis_subscriber.py:387` (action), `:373` (live), `:215` |
 
-Each host mounts the panel named by one key of the monitored server: `action_visualizer` mounts `action_vis`, `live_visualizer` mounts `live_vis`, `control_visualizer` mounts `control_vis` (`helao/deploy/hte/servers/visualizer/_vis_host.py:51`).
+Each host mounts the panel named by one key of the monitored server: `action_visualizer` mounts `action_vis`, `live_visualizer` mounts `live_vis`, `control_visualizer` mounts `control_vis` (`helao/deploy/base/servers/visualizer/_vis_host.py:51`).
 
 ### `data_browser` (`bokeh:` value)
 | key | req | type | default | meaning / allowed values | read at |
@@ -40,8 +40,8 @@ All three motion panels also read an optional `warn_above_mm` (`{axis: mm}`) fro
 ### Live panels: params read from the monitored server
 | module | reads from the monitored server | meaning | read at |
 |---|---|---|---|
-| `pressure_vis` (`action_vis` / `live_vis`) | `dev_ai` (dict) | Sorted keys are the analog-input channels plotted and tabled. | `helao/deploy/hte/servers/visualizer/pressure_vis.py:62` |
-| `temp_vis` (`action_vis` / `live_vis`) | `dev_monitor` (dict) | Sorted keys are the temperature channels plotted. | `helao/deploy/hte/servers/visualizer/temp_vis.py:50` |
+| `pressure_vis` (`action_vis` / `live_vis`) | `dev_ai` (dict) | Sorted keys are the analog-input channels plotted and tabled. | `helao/deploy/base/servers/visualizer/pressure_vis.py:62` |
+| `temp_vis` (`action_vis` / `live_vis`) | `dev_monitor` (dict) | Sorted keys are the temperature channels plotted. | `helao/deploy/base/servers/visualizer/temp_vis.py:50` |
 
 `_vis_host.py` and `_live_panel.py` are helpers and read no params.
 

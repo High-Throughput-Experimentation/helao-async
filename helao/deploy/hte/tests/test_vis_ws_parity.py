@@ -49,7 +49,7 @@ of `run_unit_tests.py`.
 import asyncio
 import importlib
 
-from helao.helpers.server_modules import import_path, module_file
+from helao.helpers.server_modules import import_path, locate, module_file
 
 import pytest
 from bokeh.document import Document
@@ -113,7 +113,9 @@ async def _decoded_data(numeric: dict, strings: dict, action_name: str) -> objec
 
 
 def _import(modname):
-    return importlib.import_module(import_path(module_file("hte", modname, "bokeh")))
+    owner = locate(modname, "bokeh", own="hte")[0]  # shared panels live in base
+    assert owner is not None, modname
+    return importlib.import_module(import_path(module_file(owner, modname, "bokeh")))
 
 
 # --- anti-vacuity guard -----------------------------------------------------
@@ -125,8 +127,9 @@ def test_targeted_module_set_matches_disk_and_is_documented():
     silently dropped."""
     from pathlib import Path
 
-    servers = Path("helao/deploy/hte/servers")
-    files = [*servers.glob("visualizer/*.py"), *servers.glob("*/bokeh/*.py")]
+    hte = Path("helao/deploy/hte/servers")
+    base = Path("helao/deploy/base/servers")
+    files = [*base.glob("visualizer/*.py"), *hte.glob("*/bokeh/*.py")]
     found = {p.stem for p in files if "def add_points" in p.read_text(encoding="utf-8")}
     assert len(found) == 11, found
     excluded = {"sample_vis", "spec_vis"}

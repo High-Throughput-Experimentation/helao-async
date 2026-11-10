@@ -12,7 +12,7 @@ Host-level keys every server accepts: see docs/config-schema.md ("Group conventi
 
 ### `async_orch2` (`fast:`)
 
-`makeApp` passes no params to anything itself (`helao/deploy/hte/servers/orchestrator/async_orch2.py:44`); every key it honours is read by `OrchHost` and is covered by the host-level docs. Station configs commonly use `params: {}`.
+`makeApp` passes no params to anything itself (`helao/deploy/base/servers/orchestrator/async_orch2.py:44`); every key it honours is read by `OrchHost` and is covered by the host-level docs. Station configs commonly use `params: {}`.
 
 Unused keys seen in configs:
 - `enable_op`: deprecated and ignored; the operator runs as a separate `group: operator` server (`helao/helpers/config_loader.py:170`).

@@ -15,8 +15,8 @@ import reflex as rx
 
 from helao.ui.shared.palette import reflex_header_class, reflex_table_class
 from helao.ui.reflex.state import ActionVisState, assign
-from helao.deploy.hte.servers.reflex._action import latest_action_uuid
-from helao.deploy.hte.servers.reflex._samples import (
+from helao.deploy.base.servers.reflex._action import latest_action_uuid
+from helao.deploy.base.servers.reflex._samples import (
     SAMPLE_COLUMNS,
     SAMPLE_TYPES,
     tables_for,

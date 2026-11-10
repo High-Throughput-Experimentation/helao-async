@@ -49,10 +49,10 @@ def test_unknown_module_raises(tmp_path):
         lb.resolve_app_deployment({"group": "action"}, "nope", str(cfg), LOG)
 
 
-def test_app_module_path_for_real_hte_server():
-    assert lb.app_module_path("hte", "gamry_server2").endswith(".gamry_server2")
+def test_app_module_path_for_real_base_server():
+    assert lb.app_module_path("base", "sync_server").endswith(".sync_server")
 
 
 def test_app_module_path_missing_raises():
     with pytest.raises(FileNotFoundError, match="no_such_module"):
-        lb.app_module_path("hte", "no_such_module")
+        lb.app_module_path("base", "no_such_module")

@@ -8,7 +8,7 @@ value the Bokeh module answers to, so a station needs no config change.
 
 __all__ = ["WS_PATH", "STATE_BASE", "COLUMNS", "AXIS_MAP", "build", "panel_id"]
 
-from helao.deploy.hte.servers.reflex._pstat_panel import make_pstat_panel
+from helao.deploy.base.servers.reflex._pstat_panel import make_pstat_panel
 
 WS_PATH = "ws_data"
 

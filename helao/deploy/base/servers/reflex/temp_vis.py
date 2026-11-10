@@ -8,7 +8,7 @@ the driver publishes but the config omits is still visible.
 
 __all__ = ["WS_PATH", "STATE_BASE", "Y_LABEL", "build", "panel_id"]
 
-from helao.deploy.hte.servers.reflex._live import make_live_panel
+from helao.deploy.base.servers.reflex._live import make_live_panel
 
 WS_PATH = "ws_live"
 Y_LABEL = "Temperature (C)"

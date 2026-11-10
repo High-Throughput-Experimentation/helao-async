@@ -35,7 +35,7 @@ from typing import Any
 
 import pytest
 
-from helao.deploy.hte.servers.sync.sync_server import (
+from helao.deploy.base.servers.sync.sync_server import (
     SWEEP_PARAM,
     sweep_pending,
     wait_until_listening,
@@ -251,7 +251,7 @@ def _world(tmp_path, params=None):
 @pytest.fixture(autouse=True)
 def _port_already_bound(monkeypatch):
     """No test here binds a port; the startup sweep would wait out its timeout."""
-    from helao.deploy.hte.servers.sync import sync_server
+    from helao.deploy.base.servers.sync import sync_server
 
     async def bound(*a, **k):
         return True
@@ -284,7 +284,7 @@ def _make_app(installed_config, params=None) -> Any:
     carries ``# type: ignore[attr-defined]`` on those assignments. Widening here
     keeps that concession in one place instead of on a dozen assertions.
     """
-    from helao.deploy.hte.servers.sync import sync_server
+    from helao.deploy.base.servers.sync import sync_server
 
     installed_config(params)
     return sync_server.makeApp("DB")
@@ -535,7 +535,7 @@ def test_wait_until_listening_waits_for_a_late_bind_then_times_out():
 def test_the_startup_sweep_waits_for_the_port_before_sweeping():
     import inspect
 
-    from helao.deploy.hte.servers.sync import sync_server
+    from helao.deploy.base.servers.sync import sync_server
 
     src = inspect.getsource(sync_server.makeApp)
     body = src[src.index("async def _startup_sweep") :]

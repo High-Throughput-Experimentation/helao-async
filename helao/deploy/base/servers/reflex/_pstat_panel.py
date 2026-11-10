@@ -14,13 +14,13 @@ from helao.ui.shared.palette import REFLEX_PSTAT_STOP_CLASS
 from helao.ui.reflex import plots
 from helao.ui.reflex.ingest import get_registry
 from helao.ui.reflex.state import ActionVisState, assign
-from helao.deploy.hte.servers.reflex._action import (
+from helao.deploy.base.servers.reflex._action import (
     MUTED_TEXT,
     X_COLUMN,
     latest_action_uuid,
     segment_trace_groups,
 )
-from helao.deploy.hte.servers.reflex._pstat import (
+from helao.deploy.base.servers.reflex._pstat import (
     axis_defaults,
     channels_in,
     plottable_columns,
@@ -49,7 +49,7 @@ def world_config() -> dict:
     the fallback for a process that has not started ingest yet, so a stop
     button pressed on a freshly opened page still has an address to dispatch
     to. Empty when neither exists, which
-    :func:`~helao.deploy.hte.servers.reflex._pstat.server_address` turns into a
+    :func:`~helao.deploy.base.servers.reflex._pstat.server_address` turns into a
     visible "no address" rather than a dispatch to ``None``.
     """
     registry = get_registry()

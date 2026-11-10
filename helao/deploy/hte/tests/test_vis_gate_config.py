@@ -51,7 +51,9 @@ def test_gate_bokeh_entries_name_hte_modules_with_no_routing_key():
     for scfg in bokeh_entries.values():
         assert "deployment" not in scfg
         assert "bokeh_port" not in scfg  # bokeh servers use host/port
-        mod = import_module(f"helao.deploy.hte.servers.{scfg['group']}.{scfg['bokeh']}")
+        mod = import_module(
+            f"helao.deploy.base.servers.{scfg['group']}.{scfg['bokeh']}"
+        )
         assert callable(mod.makeBokehApp)
 
 
@@ -77,22 +79,29 @@ def test_gate_config_ws_sources_present():
 
 
 _SERVERS = os.path.join(_REPO_ROOT, "helao", "deploy", "hte", "servers")
-_VIS_MODULES = [
-    ".".join(
-        (
-            "helao",
-            "deploy",
-            "hte",
-            "servers",
-            *os.path.relpath(p, _SERVERS)[:-3].split(os.sep),
+_BASE_SERVERS = os.path.join(_REPO_ROOT, "helao", "deploy", "base", "servers")
+
+
+def _dotted(deployment: str, root: str, paths: list[str]) -> list[str]:
+    return [
+        ".".join(
+            (
+                "helao",
+                "deploy",
+                deployment,
+                "servers",
+                *os.path.relpath(p, root)[:-3].split(os.sep),
+            )
         )
-    )
-    for p in sorted(
-        glob.glob(os.path.join(_SERVERS, "visualizer", "*.py"))
-        + glob.glob(os.path.join(_SERVERS, "*", "bokeh", "*.py"))
-    )
-    if not p.endswith("__init__.py")
-]
+        for p in sorted(paths)
+        if not p.endswith("__init__.py")
+    ]
+
+
+# the shared visualizers live in base; each instrument's panels stay in hte
+_VIS_MODULES = _dotted(
+    "base", _BASE_SERVERS, glob.glob(os.path.join(_BASE_SERVERS, "visualizer", "*.py"))
+) + _dotted("hte", _SERVERS, glob.glob(os.path.join(_SERVERS, "*", "bokeh", "*.py")))
 
 
 def test_vis_module_set_nonempty():

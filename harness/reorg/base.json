@@ -1,0 +1,10 @@
+{
+ "scan": ["helao", "harness", "*.py"],
+ "moves": [
+  ["helao/deploy/hte/servers/orchestrator", "helao/deploy/base/servers/orchestrator"],
+  ["helao/deploy/hte/servers/operator", "helao/deploy/base/servers/operator"],
+  ["helao/deploy/hte/servers/visualizer", "helao/deploy/base/servers/visualizer"],
+  ["helao/deploy/hte/servers/sync", "helao/deploy/base/servers/sync"],
+  ["helao/deploy/hte/servers/reflex", "helao/deploy/base/servers/reflex"]
+ ]
+}

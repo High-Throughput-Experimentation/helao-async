@@ -94,5 +94,5 @@ def test_import_path_is_dotted_from_helao(root):
     assert sm.import_path(f, root) == "helao.deploy.alpha.servers.gamry.bokeh.gamry_vis"
 
 
-def test_real_deploy_root_holds_hte_and_test():
-    assert {"hte", "test"} <= set(sm.deployments())
+def test_real_deploy_root_holds_base_and_test():
+    assert {"base", "test"} <= set(sm.deployments())

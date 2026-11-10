@@ -30,7 +30,7 @@ servers:
     host: 127.0.0.1
     port: 8010
     group: action
-    deployment: hte
+    deployment: base
     fast: sync_server
     params:
       aws_profile: default

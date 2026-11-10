@@ -51,7 +51,7 @@ def _hermetic_aws(monkeypatch):
 @pytest.fixture(autouse=True)
 def _port_already_bound(monkeypatch):
     """No test here binds a port; keep any startup sweep from waiting it out."""
-    from helao.deploy.hte.servers.sync import sync_server
+    from helao.deploy.base.servers.sync import sync_server
 
     async def bound(*a, **k):
         return True
@@ -244,7 +244,7 @@ def _install_config(tmp_path, monkeypatch, fast):
 
 
 def _make_hte(tmp_path, monkeypatch):
-    from helao.deploy.hte.servers.sync import sync_server
+    from helao.deploy.base.servers.sync import sync_server
 
     _install_config(tmp_path, monkeypatch, "sync_server")
     return sync_server.makeApp("SYNC")

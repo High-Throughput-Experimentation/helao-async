@@ -63,7 +63,7 @@ servers:
     host: 127.0.0.1
     port: 5031
     group: visualizer
-    deployment: hte
+    deployment: base
     bokeh: action_visualizer
     params:
       doc_name: 'BIOLOGIC eclib2 Visualizer'

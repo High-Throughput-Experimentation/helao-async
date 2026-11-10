@@ -1,0 +1,9 @@
+[
+  {
+    "module": "sync_server.py",
+    "path": "/write_off",
+    "method": "post",
+    "date": "2026-10-15",
+    "why": "operator write-off of an experiment parked for a process group that can never complete (sync write-off spec)"
+  }
+]

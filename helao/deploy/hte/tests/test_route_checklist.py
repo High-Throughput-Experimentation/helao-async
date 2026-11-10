@@ -38,30 +38,19 @@ from typing import Optional
 
 import pytest
 
-from harness.endpoints import (
-    diff_route_sets,
-    extract_routes,
-    filter_allowed_additions,
-    filter_allowed_param_additions,
-)
-from harness.freeze import load_manifest
-from helao.helpers.server_modules import module_file
+from harness import route_gate
+from harness.endpoints import extract_routes
 
 OUT = Path(__file__).resolve().parent / "checklists"
 
 #: (module filename, representative server_key), read from the frozen manifest.
-SERVERS: list[tuple[str, Optional[str]]] = [
-    (e["module"], e["representative_key"]) for e in load_manifest(OUT)
-]
-assert len(SERVERS) == 23
+SERVERS: list[tuple[str, Optional[str]]] = route_gate.load_servers(OUT)
+assert len(SERVERS) == 22
 
 
 def hte_module(filename: str) -> Path:
     """The hte action module file for ``filename`` (``andor_server.py``)."""
-    path = module_file("hte", Path(filename).stem, "app")
-    if path is None:
-        raise FileNotFoundError(f"hte has no action module {filename!r}")
-    return path
+    return route_gate.module_path("hte", filename)
 
 
 ADDITIONS_PATH = OUT / "_additions.json"
@@ -77,19 +66,16 @@ PARAM_ADDITIONS_PATH = OUT / "_param_additions.json"
 #: retirements (SAMPLE ``convert_v1DB``, HTEdata ``get_rcp_plateid``,
 #: 2026-10-23) took 168 down to 166.
 FROZEN_ACTION_TOTAL = 166
-FROZEN_PRIVATE_TOTAL = 79
+FROZEN_PRIVATE_TOTAL = 71
+#: 79 before sync_server's 8 private routes moved with it to helao/deploy/base (2026-11-10).
 
 
 def _load_additions() -> list[dict]:
-    return json.loads(ADDITIONS_PATH.read_text(encoding="utf-8"))
-
-
-def _additions_for(module: str) -> list[dict]:
-    return [a for a in _load_additions() if a["module"] == module]
+    return route_gate.load_additions(OUT)
 
 
 def _load_param_additions() -> list[dict]:
-    return json.loads(PARAM_ADDITIONS_PATH.read_text(encoding="utf-8"))
+    return route_gate.load_param_additions(OUT)
 
 
 def _param_additions_for(module: str) -> list[dict]:
@@ -97,16 +83,8 @@ def _param_additions_for(module: str) -> list[dict]:
 
 
 def _missing_module_checklists(directory: Path) -> list[str]:
-    """Modules in ``SERVERS`` with no frozen checklist in ``directory``.
-
-    ``_*.json`` never counts: ``_additions.json`` and the other underscore
-    records are not module checklists. Neither is ``servers.json``, which is
-    the module-to-server_key manifest -- which is why this answers by NAME
-    rather than by count. Two non-checklists in the same directory is two
-    deletions a bare count would absorb.
-    """
-    present = {p.name for p in directory.glob("*.json") if not p.name.startswith("_")}
-    return [m for m, _ in SERVERS if (Path(m).stem + ".json") not in present]
+    """Modules in ``SERVERS`` with no frozen checklist in ``directory`` (by name)."""
+    return route_gate.missing_module_checklists(SERVERS, directory)
 
 
 def test_the_checklist_directory_is_actually_populated() -> None:
@@ -143,31 +121,15 @@ def test_the_population_guard_notices_one_deleted_module_checklist(
 def test_module_matches_its_frozen_checklist(
     module: str, server_key: Optional[str]
 ) -> None:
-    checklist = OUT / (Path(module).stem + ".json")
-    frozen = json.loads(checklist.read_text(encoding="utf-8"))
-    current = extract_routes(hte_module(module), server_key=server_key)
-    diffs, _allowed = filter_allowed_additions(
-        diff_route_sets(frozen, current), _additions_for(module)
-    )
-    diffs, _allowed_params = filter_allowed_param_additions(
-        diffs, _param_additions_for(module)
-    )
-    assert (
-        diffs == []
-    ), f"{module}: {len(diffs)} route diff(s) against {checklist.name}\n" + json.dumps(
+    diffs = route_gate.module_diffs("hte", OUT, module, server_key)
+    assert diffs == [], f"{module}: {len(diffs)} route diff(s)\n" + json.dumps(
         diffs, indent=2
     )
 
 
 def test_every_addition_entry_is_well_formed() -> None:
     """An entry without `why` is a bypass nobody can review in a diff."""
-    for entry in _load_additions():
-        missing = {"module", "path", "method", "date", "why"} - set(entry)
-        assert not missing, f"{entry} is missing {sorted(missing)}"
-        assert entry["why"].strip(), f"{entry['path']} has an empty `why`"
-        assert entry["module"] in {
-            m for m, _ in SERVERS
-        }, f"{entry['module']} is not an hte action module"
+    assert route_gate.malformed_additions(OUT, SERVERS) == []
 
 
 def test_the_gate_covers_the_whole_measured_surface() -> None:
@@ -187,32 +149,14 @@ def test_the_gate_covers_the_whole_measured_surface() -> None:
     steps: it leaves no record of what moved, and it cannot distinguish an
     intended addition from an accidental deletion that happens to net out.
     """
-    action = private = 0
-    for module, _ in SERVERS:
-        for route in json.loads(
-            (OUT / (Path(module).stem + ".json")).read_text(encoding="utf-8")
-        ):
-            if "action" in route["tags"]:
-                action += 1
-            elif "private" in route["tags"]:
-                private += 1
+    action, private = route_gate.frozen_totals(OUT, SERVERS)
     assert (action, private) == (
         FROZEN_ACTION_TOTAL,
         FROZEN_PRIVATE_TOTAL,
     ), f"frozen record measures {action} action / {private} private"
 
-    by_module = dict(SERVERS)
-    resolved = 0
-    for entry in _load_additions():
-        current = extract_routes(
-            hte_module(entry["module"]), server_key=by_module[entry["module"]]
-        )
-        for route in current:
-            if (route["path"], route["method"]) == (entry["path"], entry["method"]):
-                resolved += 1
-    assert resolved == len(
-        _load_additions()
-    ), f"{len(_load_additions()) - resolved} listed addition(s) resolve to no route"
+    gone = route_gate.unresolved_additions("hte", OUT, SERVERS)
+    assert not gone, f"listed addition(s) resolve to no route: {gone}"
 
 
 def test_no_addition_entry_is_stale() -> None:
@@ -223,16 +167,10 @@ def test_no_addition_entry_is_stale() -> None:
     Nothing else would catch that: the gate would be green, and the hole
     would be invisible because it is green.
     """
-    by_module = dict(SERVERS)
-    for entry in _load_additions():
-        current = extract_routes(
-            hte_module(entry["module"]), server_key=by_module[entry["module"]]
-        )
-        present = {(r["path"], r["method"]) for r in current}
-        assert (entry["path"], entry["method"]) in present, (
-            f"{entry['path']} ({entry['method']}) is listed in _additions.json "
-            f"but no longer exists in {entry['module']}; remove the entry"
-        )
+    gone = route_gate.unresolved_additions("hte", OUT, SERVERS)
+    assert (
+        not gone
+    ), f"listed in _additions.json but no longer exist: {gone}; remove the entry"
 
 
 def test_every_param_addition_entry_is_well_formed() -> None:
@@ -310,5 +248,5 @@ def test_frozen_at_b7c_list_is_present_and_complete():
     cdir = preflight._checklist_dir("hte")
     assert cdir is not None
     names = preflight._frozen_checklists(cdir)
-    assert len(names) == 23, sorted(names)
+    assert len(names) == 22, sorted(names)
     assert [n for n in names if not (cdir / f"{n}.json").exists()] == []
