@@ -1616,3 +1616,22 @@ def test_progress_descriptors_appear_with_an_active_slot_and_only_change_with_it
     group._render_strips(s, frame(4, seq={"uuid": "S"}, experiments=run2), 108.0, "t")
     assert s.exp_progress is not first
     assert s.act_progress["items"] == [] and "progress" not in str(s.exp_spec).lower()
+
+
+def test_page_title_sits_in_the_nav_heading_not_below_it():
+    import reflex as rx
+
+    from helao.ui.reflex import app
+
+    html = str(app._page("Server group", rx.text("body"), "/group"))
+    assert '"HELAO dashboard - Server group"' in html
+    assert html.count("Server group") == 1  # no second heading under the nav
+
+
+def test_top_nav_links_use_the_menu_buttons_font_size():
+    """Data/Admin are size-2 ghost buttons; the plain links must match them."""
+    from helao.ui.reflex import app
+
+    nav = str(app._nav())
+    for text, _ in app.NAV_LINKS:
+        assert f'size:"2"}},"{text}")' in nav, text
