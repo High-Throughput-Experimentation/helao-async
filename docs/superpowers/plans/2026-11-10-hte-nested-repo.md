@@ -46,6 +46,28 @@ The non-OQ STOP points still apply: private-repo uncommitted work, taken ports, 
 
 ---
 
+## Preflight rulings (binding; 2026-11-10)
+
+A pre-execution scan found these defects in the task text below. Each ruling overrides the task text it names. Every task brief that a ruling touches must follow it.
+
+- **R1 (T11, T12; spec §5.1 "full history").** `--subdirectory-filter` drops everything before `34eb48ba`, when `hte`'s files lived in the old framework layout (`helao/servers/action/...`). Derive each current `hte` file's earlier paths from `git log --follow --name-status`. Run `git filter-repo` with `--path` for `helao/deploy/hte/` plus every earlier path, and `--path-rename` mapping each one into the deployment root. Never pull in a framework file that did not become part of `hte`. The check stays: equal `--follow` counts on sampled files, including `servers/gamry/gamry_server2.py` (83).
+- **R2 (T8).** Mutation 2 must be able to fail. `test_update_replay_…` asserts that the recorded configs are re-read and their packages installed after `ensure_hte`, not only the call count. Add a direct test for `_recorded_paths_exist`.
+- **R3 (T7 mutation 3).** Give the fixture a `.pyc` outside `__pycache__/`, so that mutation can fail.
+- **R4 (T1 Step 6).** Delete the `servers.json` entry as a text edit, so the diff shows only removed lines. Never re-serialize a frozen JSON.
+- **R5 (T1 Step 7, T3).** Move the `sync_server.py` docstring fix (`deploy/hte` mention, ~line 272) from T3 into T1, so `test_framework_deployment_free` is green at the end of T1.
+- **R6 (T6).** Do not re-solve the pinned files. Delete the moved packages' own lines as a text edit, then prove the edited pinned set still solves with the per-platform dry run. Unrelated versions must not move. Transitive dependencies left behind are accepted.
+- **R7 (Global Constraints, T11 to T13).** Carve-out: subagents may run index-writing git commands (`merge`, `checkout`, `reset`, `filter-repo`, `commit`) **only** in scratch clones under the job's `tmp/`. Never in the real parent, `hte` or private repos, and never `push`. Every push and every commit to a real repo stays with the controller.
+- **R8 (T5, T6).** A package moved into an `hte` server folder keeps its version: copy the exact pin from `requirements_pinned_*.txt` / `helao_pinned_*.yml` into that folder's file as `==` (pip) or `=` (conda).
+- **R9 (T1 to T4).** The config-pin test covers the parent and `hte` from T1, and must be green at the end of each task. T4 extends it to the private repos. The T2 and T3 sweeps are scoped the same way. Never leave a red test or an xfail between tasks.
+- **R10 (T9).** Move `test_the_hte_pair_carries_the_panel_sources_too` along with the other four `hte` reflex-gate cases. "Move" means deleted from the parent and added in `hte`: never a verbatim copy left in both.
+- **R11 (T9).** `test_the_contract_probe_is_not_vacuous` moves to `hte`; it is not deleted.
+- **R12 (T2; spec §2).** The `base`-only tests stay in the parent: the `_pstat` / `_pstat_panel` cases of `test_reflex_pstat_panels.py` and `test_reflex_pstat_stop.py`, and the `async_orch2` build case. Only their `hte`-dependent cases move.
+- **R13 (T13).** Environment exports do not persist between tool calls. Write the `insteadOf` redirect into a script, or pass `git -c url.<local>.insteadOf=<github url>` on every command. Never clone the real GitHub URL before T14.
+- **R14 (T9).** The framework assertion `FOLLOWUP_CEILING_S >= 30*60` stays in the parent. Only the `hte` parts of the ceiling test move.
+- **R15 (T1).** `base`'s route gate reuses `hte`'s gate logic, including its anti-vacuity guards, through a shared parent helper. Never a weaker copy.
+
+Out of scope, reported separately: three tracked parent files already name a private deployment. They are `helao/core/drivers/data/analysis_driver.py:1451`, `helao/core/tests/test_analysis_recovery.py` and `.graphifyignore:4`.
+
 ## Global Constraints
 
 Every task's requirements include this section.
