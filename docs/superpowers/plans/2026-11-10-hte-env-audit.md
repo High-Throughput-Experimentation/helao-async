@@ -24,13 +24,13 @@ Scan limits: dynamic imports and string-loaded plug-ins are invisible to the AST
 | botocore | dev-linux, dev-win | `botocore` | none | unused | root (stays) | 1.40.61 (L54) | 1.40.61 (L52) | no importer found by the AST scan or grep; transitive of boto3 |
 | colorama | dev-linux, dev-win | `colorama` | framework | framework | root | 0.4.6 (L68) | 0.4.6 (L66) |  |
 | colorlog | dev-linux, dev-win | `colorlog` | framework | framework | root | 6.12.0 (L69) | 6.12.0 (L67) |  |
-| comtypes | dev-win | `UNMAPPED` | none | shared-with-private | root (stays) | absent | 1.4.16 (L69) | UNMAPPED on Linux (win-only, not installed); import `comtypes` matched by grep. imported by hte code AND by private zones: stays in root (controller ruling, same reasoning as OQ-4); the hte server folders that already declare it keep their declarations unchanged |
+| comtypes | dev-win | `UNMAPPED` | hte-server:biologic, hte-server:gamry, private | shared-with-private | root (stays) | absent | 1.4.16 (L69) | UNMAPPED on Linux (win-only, not installed); import `comtypes` matched by grep. imported by hte code AND by private zones: stays in root (controller ruling, same reasoning as OQ-4); the hte server folders that already declare it keep their declarations unchanged |
 | docformatter | dev-linux, dev-win | `docformatter` | none | tooling | root | 1.7.8 (L80) | 1.7.8 (L77) | tool |
 | fastapi | dev-linux, dev-win | `fastapi` | base, framework, hte-server:biologic, hte-server:cam, hte-server:co2sensor, hte-server:galil_io, hte-server:galil_motion, hte-server:gamry, hte-server:mfc, hte-server:nidaqmx, hte-server:o2sensor, hte-server:pal, hte-server:sample, hte-server:spec, hte-server:tec, hte-server:xafs, hte-shared, private, test | framework | root | 0.162.0 (L87) | 0.162.0 (L84) |  |
 | filelock | dev-linux, dev-win | `filelock` | framework, private | framework | root | 4.2.4 (L91) | 4.2.4 (L88) |  |
 | fsspec | dev-linux, dev-win | `fsspec` | none | unused | root (stays) | 2026.9.0 (L105) | 2026.9.0 (L102) | no importer found by the AST scan or grep; transitive of s3fs |
 | git | dev-linux, dev-win | `UNMAPPED` | none | tooling | root | 2.56.0 (L107) | 2.56.0 (L103) | tool (conda binary) |
-| h5py | dev-linux, dev-win | `h5py` | private | private-only | root (stays) | absent | absent |  |
+| h5py | dev-linux, dev-win | `h5py` | private | private-only | root (stays) | absent | absent | pre-existing pinned-file gap: in both dev ymls, absent from both pinned ymls; out of scope |
 | httpx | dev-linux, dev-win | `httpx` | framework, hte-server:pdu, hte-server:xafs, private | framework | root | 0.28.1 (L123) | 0.28.1 (L115) |  |
 | ipykernel | dev-linux, dev-win | `ipykernel`, `ipykernel_launcher` | none | tooling | root | 7.4.0 (L129) | 7.4.0 (L121) | tool |
 | ipympl | dev-linux, dev-win | `ipympl` | none | unused | root (stays) | 0.10.0 (L130) | 0.10.0 (L122) | no importer found by the AST scan or grep; notebook widget, no importer |
@@ -38,7 +38,7 @@ Scan limits: dynamic imports and string-loaded plug-ins are invisible to the AST
 | itables | dev-linux, dev-win | `itables`, `itables_for_dash` | none | unused | root (stays) | 2.9.1 (L135) | 2.9.1 (L127) | no importer found by the AST scan or grep; notebook widget, no importer |
 | joblib | dev-linux, dev-win | `joblib` | none | unused | root (stays) | 1.6.0 (L140) | 1.6.0 (L132) | no importer found by the AST scan or grep; transitive of scikit-learn |
 | jupyterlab | dev-linux, dev-win | `jupyterlab` | none | tooling | root | 4.6.4 (L153) | 4.6.4 (L145) | tool |
-| matplotlib | dev-linux, dev-win | `__pycache__`, `matplotlib`, `mpl_toolkits`, `pylab` | hte-shared, private | shared-with-private | root (stays) | 3.11.2 (L264) | 3.11.2 (L222) | scan import names include a `__pycache__` artefact. imported by hte code AND by private zones: stays in root (controller ruling, same reasoning as OQ-4); the hte server folders that already declare it keep their declarations unchanged |
+| matplotlib | dev-linux, dev-win | `__pycache__`, `matplotlib`, `mpl_toolkits`, `pylab` | hte-shared, private | shared-with-private | root (stays) | 3.11.2 (L264) | 3.11.2 (L222) | scan import names include a `__pycache__` artefact. Imported by hte-shared code (a processor library) and by private zones: stays in root (controller ruling, same reasoning as OQ-4) |
 | mendeleev | dev-linux, dev-win | `mendeleev` | framework, private | framework | root | 0.16.2 (L269) | 0.16.2 (L227) |  |
 | mpltern | dev-linux, dev-win | `mpltern` | none | unused | root (stays) | 1.0.5 (L275) | 1.0.5 (L230) | no importer found by the AST scan or grep; no importer |
 | msgspec | dev-linux, dev-win | `msgspec` | framework | framework | root | 0.22.0 (L277) | 0.22.0 (L232) |  |
@@ -61,7 +61,7 @@ Scan limits: dynamic imports and string-loaded plug-ins are invisible to the AST
 | pydantic-settings | dev-linux, dev-win | `pydantic_settings` | framework | framework | root | 2.16.1 (L350) | 2.16.1 (L295) |  |
 | pydasher | requirements.txt | `pydasher` | framework | framework | root | 0.1.0 (L9) | 0.1.0 (L9) |  |
 | pyfiglet | dev-linux, dev-win | `pyfiglet` | framework | framework | root | 1.0.4 (L351) | 1.0.4 (L296) |  |
-| pyft232 | requirements.txt | `ft232` | none | hte-server:kinesis | hte/servers/kinesis/requirements.txt (already declared; tighten to pin; remove from root) | 0.12 (L10) | 0.12 (L10) | import name `ft232`, loaded dynamically by pylablib (the hte instrument-env test says so); matched by hand |
+| pyft232 | requirements.txt | `ft232` | via pylablib: hte-server:kinesis, private | shared-with-private | root (stays) | 0.12 (L10) | 0.12 (L10) | run-time dependency of pylablib: `site-packages/pylablib/core/devio/comm_backend.py:761` does `import ft232`, and `devices/Thorlabs/kinesis.py:35` notes FTDI connectivity via pyft232. The conda-forge pylablib does not depend on pyft232, and a private zone imports `pylablib.devices.Thorlabs` with no folder env, so root is its only source. Kinesis folder: tighten to `pyft232==0.12`, root unchanged |
 | pyftdi | dev-linux, dev-win | `pyftdi` | none | unused | root (stays) | 0.55.4 (L352) | 0.55.4 (L297) | no importer found by the AST scan or grep; no importer |
 | pylablib | dev-linux, dev-win | `pylablib` | hte-server:kinesis, private | shared-with-private | root (stays) | 1.4.2 (L354) | 1.4.2 (L299) | imported by hte code AND by private zones: stays in root (controller ruling, same reasoning as OQ-4); the hte server folders that already declare it keep their declarations unchanged |
 | pymecom | requirements.txt | `UNMAPPED` | none | hte-server:tec | hte/servers/tec/requirements.txt (already declared; tighten to pin; remove from root) | URL (unversioned) (L35) | URL (unversioned) (L35) | import name `mecom`, imported by tec/mecom_driver.py; matched by hand |
@@ -96,19 +96,22 @@ Scan limits: dynamic imports and string-loaded plug-ins are invisible to the AST
 | xy | requirements.txt | `reflex_xy`, `xy` | framework | framework | root | 0.0.8 (L34) | 0.0.8 (L34) |  |
 | zeromq | dev-linux, dev-win | `UNMAPPED` | none | tooling | root | 4.3.5 (L485) | 4.3.5 (L412) | tool / libzmq for pyzmq |
 
-Counts (83 packages): framework 36, unused 19, tooling 14, shared-with-private 6, private-only 5, hte-server:pal 1, hte-server:kinesis 1, hte-server:tec 1, hte-shared 0, base 0. `base` is 0 because every package used by `base` is also used by `framework`. Destinations: root 80, hte server folders 3.
+Counts (83 packages): framework 36, unused 19, tooling 14, shared-with-private 7, private-only 5, hte-server:pal 1, hte-server:tec 1, hte-shared 0, base 0. `base` is 0 because every package used by `base` is also used by `framework`. Destinations: root 81, hte server folders 2.
 
 UNMAPPED after hand resolution: none. The seven raw `UNMAPPED` rows were comtypes (win-only, not installed on Linux; matched by grep), git, nodejs, python, uv, zeromq (tools, not Python distributions) and pymecom (import name `mecom`; matched by hand).
 
 ## Moves
 
-Only three packages leave the root env. Each moves into the server folder that imports it and keeps its exact pin (R8). Where the folder already lists the package more loosely, Task 6 tightens the folder's entry to the pin ("already listed" adds nothing new, but the version still follows R8). Task 6 removes the root line and the pinned lines below as text edits and never re-solves (R6).
+Only two packages leave the root env: paramiko (pal) and pymecom (tec). Each moves into the server folder that imports it and keeps its exact pin (R8). Task 6 removes the root line and the pinned lines below as text edits and never re-solves (R6).
 
 | package | folder file | folder entry today | folder entry after Task 6 | root line to remove | pinned lines to remove (linux / win) |
 |---|---|---|---|---|---|
 | paramiko | `hte/servers/pal/environment.yml` (conda) | `paramiko=3` | tighten to `paramiko=3.5.1` | `helao_dev_linux-64.yml` and `helao_dev_win-64.yml`: `  - paramiko=3` | `helao_pinned_linux-64.yml` L314 `paramiko=3.5.1` / `helao_pinned_win-64.yml` L264 `paramiko=3.5.1` |
-| pyft232 | `hte/servers/kinesis/requirements.txt` (pip) | `pyft232` | tighten to `pyft232==0.12` | `requirements.txt`: `pyft232` | `requirements_pinned_linux-64.txt` L10 `pyft232==0.12` / `requirements_pinned_win-64.txt` L10 `pyft232==0.12` |
 | pymecom | `hte/servers/tec/requirements.txt` (pip) | the pyMeCom archive URL | unchanged; the pinned files carry the same URL and no version | `requirements.txt`: `https://github.com/meerstetter/pyMeCom/archive/master.zip` | `requirements_pinned_linux-64.txt` L35 / `requirements_pinned_win-64.txt` L35, the same URL line |
+
+Optional consistency edit (no root change): kinesis folder `hte/servers/kinesis/requirements.txt` `pyft232` -> `pyft232==0.12` (pin from `requirements_pinned_*.txt` L10). pyft232 itself stays in root.
+
+Run-time and lazy import check for the movers (installed env plus repo scan, including private zones): paramiko is imported in the repo only by `pal_transport.py` (hte-server:pal). Installed packages that import it do so only behind optional extras (fsspec sftp/ssh, pooch sftp, plumbum ssh, `zmq.ssh` and `jupyter_client.ssh` tunnels), none of which any repo zone uses, and no installed distribution requires it unconditionally. `mecom` (pymecom) is imported only by `tec/mecom_driver.py`; no installed distribution requires it and no string-based load of it exists. Neither is loaded dynamically by a root package that a non-hte zone imports, so both can move.
 
 Stay in root, nothing deleted: all `framework`, `tooling`, `unused`, `private-only` and `shared-with-private` rows. The hte server folders that already declare comtypes, nidaqmx, pylablib, pyvisa, pyserial keep those declarations unchanged. The brief's assumption that comtypes moves to `environment_win-64.yml` is dropped.
 
@@ -118,7 +121,8 @@ hte-shared packages: 0; the `helao_env.py` deployment-root rule and the deployme
 
 ## Notes
 
-- Rule for packages imported by hte and by any private zone (matplotlib, pyserial, comtypes, nidaqmx, pylablib, pyvisa): they stay in root, because moving them would starve private stations' envs.
+- Packages imported by hte and by any private zone (matplotlib, pyserial, comtypes, nidaqmx, pylablib, pyvisa), and pyft232 (a run-time dependency of pylablib), stay in root, because moving them would starve private stations' envs.
 - The 19 `unused` packages stay in root; removing packages is out of scope. `pyvisa-py` in particular has no importer because it is pyvisa's run-time backend (pyvisa loads it when no VISA runtime is found), so it must stay with pyvisa.
+- `h5py` is absent from both pinned ymls although it is in both dev ymls: a pre-existing pinned-file gap, out of scope.
 - `pytest-asyncio` and `setuptools` are `tooling` and stay.
 - `scikit-learn` is imported only by the `test` deployment; rule 1 keeps it in root.
