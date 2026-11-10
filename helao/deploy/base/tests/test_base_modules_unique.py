@@ -56,11 +56,15 @@ def test_no_config_pins_hte_for_a_base_module():
     """OQ-1 (a): an explicit ``deployment: hte`` on a base module is honoured
     unchecked by the launcher and imports a module that no longer exists.
 
-    Scope: configs of the tracked deployments (base, hte, test). The private
-    deployments' configs are added when their imports are updated."""
+    Scope: every deployment folder present under helao/deploy, nested
+    repositories included."""
     bad = []
-    for dep in ("base", "hte", "test"):
-        for cfg in sorted((sm.DEPLOY_ROOT / dep).glob("**/configs/*.yml")):
+    scanned = {}
+    deps = sorted(p.name for p in sm.DEPLOY_ROOT.iterdir() if p.is_dir())
+    for dep in deps:
+        cfgs = sorted((sm.DEPLOY_ROOT / dep).glob("**/configs/*.yml"))
+        scanned[dep] = len(cfgs)
+        for cfg in cfgs:
             data = yaml.safe_load(cfg.read_text(encoding="utf-8")) or {}
             servers = data.get("servers") if isinstance(data, dict) else None
             for key, s in (servers or {}).items():
@@ -69,4 +73,6 @@ def test_no_config_pins_hte_for_a_base_module():
                 module = s.get("fast") or s.get("bokeh")
                 if module in MOVED and s.get("deployment") == "hte":
                     bad.append(f"{cfg.relative_to(sm.DEPLOY_ROOT)}:{key}")
+    assert {"base", "hte", "test"} <= scanned.keys(), scanned
+    assert scanned["hte"] and scanned["test"], scanned
     assert not bad, bad
