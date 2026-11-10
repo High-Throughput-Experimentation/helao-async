@@ -31,7 +31,6 @@ EXPERIMENTS = [
     "ECMS_sub_load_solid",
     "ECMS_sub_load_solid_only",
     "ECMS_sub_normal_state",
-    "ECMS_sub_OCV",
     "ECMS_sub_preCA_CO2flow",
     "ECMS_sub_prevacuum_cell",
     "ECMS_sub_pulseCA",
