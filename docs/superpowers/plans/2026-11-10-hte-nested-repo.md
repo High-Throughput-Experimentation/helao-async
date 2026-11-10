@@ -16,6 +16,15 @@
 
 These change behaviour and the spec does not settle them. Tasks that depend on one say **STOP: needs OQ-n** at the step concerned. Each one gives a recommended answer. The task is written for that answer, so a different ruling means editing only the step it names.
 
+**Resolved 2026-11-10 (user rulings): all four take the recommended answer.** The STOP markers for OQ-1 to OQ-4 are therefore cleared, and the steps run as written.
+
+- OQ-1: (a), rewrite pins to `deployment: base`.
+- OQ-2: the recommended rule in Task 8.
+- OQ-3: thin `hte` tests only for the two named-path tests.
+- OQ-4: private-only packages stay in the root env.
+
+The non-OQ STOP points still apply: private-repo uncommitted work, taken ports, the template `.gitignore`, and `hte` changing after extraction.
+
 - **OQ-1: explicit `deployment: hte` pins on moved modules (contradicts §1 "Configs are untouched").** `launcher_bootstrap.resolve_app_deployment` honours an explicit `deployment:` key without checking it. After the move, every config that pins `deployment: hte` on a moved module makes the launcher import `helao.deploy.hte.servers.<role>.<module>`, which no longer exists, and makes preflight gate 2 report `deployment: hte has no servers/...`. Measured pins:
   - `hte`: 2 station configs (`configs/biologicole.yml`, `configs/biologiceclib2.yml`, server `ACTVIS`) and 17 smoke canaries in `tests/smoke/configs/` (`sync.yml` `SYNC`, and `ACTVIS` in `co2`, `co2gold`, `tec`, `tecgold`, `biologic`, `biologicgold`, `gamry`, `gamrygold`, `spec`, `specgold`, `galilio`, `galiliogold`, `powersupply`, `ni`, `mfc`, `mfcgold`);
   - Deployment-A: 1 entry; Deployment-B: 2 files; Deployment-C: 1 entry; Deployment-E: 3 entries in 1 file. The Task 4 scan lists them.
