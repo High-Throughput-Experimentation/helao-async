@@ -264,7 +264,7 @@ def _ecms_seq_initiation(recirc, cali=False, ecsa=False, **p):
                     "MS_equilibrium_time": p["MS_equilibrium_time"],
                     "SamplingMode": p["SamplingMode"],
                 },
-                from_global_exp_params={"Ewe_V__mean_final": "ref_offset__V"}
+                from_global_exp_params={"Ewe_V__mean_final": "previous_ocv__V"}
             )
     epm.add("ECMS_sub_normal_state", {})
     if recirc:
