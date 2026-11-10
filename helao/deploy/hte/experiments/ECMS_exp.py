@@ -823,7 +823,8 @@ def ECMS_sub_CV(
 
     Args:
         WE_versus: ``"ref"``, ``"rhe"`` or ``"ocv"``. ``"ocv"`` passes the
-            potentials through a supplied previous_ocv__V.
+            potentials through and measures OCV first: the effective
+            ``versus_OCV`` is ``versus_OCV or WE_versus == "ocv"``.
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH (used in RHE conversion).
         OCV_duration__s: OCV measurement time (s); used only when versus_OCV.
@@ -859,8 +860,7 @@ def ECMS_sub_CV(
             WE_versus,
             ref_offset__V,
             pH,
-            ref_type,measures OCV first: the effective
-            ``versus_OCV`` is ``versus_OCV or WE_versus == "ocv"``
+            ref_type,
             ocv_value=previous_ocv__V,
         ),
         "Vapex2__V": _ecms_vs_ref(
