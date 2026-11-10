@@ -81,4 +81,4 @@ family carries a pickled `ActionModel` on `ws_status` and a pickled `DataPackage
 - This checklist complements (does not replace) the per-server static endpoint checklists in
   `helao/deploy/<deployment>/tests/checklists/<module>.json`, which are AST-derived and unaffected by
   the drift described above.
-- `_member_surface.md` is grep-derived and likewise unaffected.
+- `hte`'s `tests/checklists/_member_surface.md` is grep-derived and likewise unaffected.
