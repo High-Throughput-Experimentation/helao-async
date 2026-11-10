@@ -806,7 +806,6 @@ def ECMS_sub_CV(
     ref_type: str = "leakless",
     pH: float = 6.8,
     SamplingMode: str = "SamplingModeFast",
-    versus_OCV: bool = False,
     OCV_duration__s: float = 0.0,
     OCV_acquisition_period__s: float = 0.1,
     WE_potential_init__V: float = 0.0,
@@ -878,9 +877,7 @@ def ECMS_sub_CV(
         "AcqInterval__s": SampleRate,
         "IErange": IErange,
         "SamplingMode": SamplingMode,
-        "versus_OCV": versus_OCV or resolve_we_versus(WE_versus) == "ocv",
-        "OCV_duration__s": OCV_duration__s,
-        "OCV_acquisition_period__s": OCV_acquisition_period__s,
+        "versus_OCV": False,
     }
     _ecms_pstat(apm, "run_CV", params, ["CV"])
     apm.add(ORCH_server, "wait", {"waittime": MS_equilibrium_time})
