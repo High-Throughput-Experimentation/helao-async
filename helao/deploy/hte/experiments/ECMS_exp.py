@@ -183,7 +183,7 @@ def _ecms_mfc(
     apm.add(_ECMS_MFC[device], then, {"device_name": device}, asc.no_wait)
 
 
-def _ecms_vs_ref(V, WE_versus, ref_offset__V, pH, ref_type):
+def _ecms_vs_ref(V, WE_versus, ref_offset__V, pH, ref_type, ocv_value=0.0):
     """Convert a WE potential to volts vs the reference electrode (arithmetic verbatim).
 
     ``"ocv"`` passes the potential through: the Gamry endpoint applies it relative
@@ -195,7 +195,7 @@ def _ecms_vs_ref(V, WE_versus, ref_offset__V, pH, ref_type):
     if WE_versus == "rhe":
         return V - 1.0 * ref_offset__V - 0.059 * pH - ref_offset(ref_type)
     if WE_versus == "ocv":
-        return V - 1.0 * ref_offset__V
+        return V - 1.0 * ref_offset__V + ocv_value
     raise ValueError(f"WE_versus must be one of ref, rhe, ocv; got {WE_versus!r}")
 
 
@@ -227,7 +227,7 @@ def _ecms_pstat(apm, endpoint, params, technique, to_global_params=[]):
             ProcessContrib.samples_in,
             ProcessContrib.samples_out,
         ],
-        to_global_params=to_global_params
+        to_global_params=to_global_params,
     )
 
 
@@ -301,6 +301,7 @@ def ECMS_sub_load_liquid(
     Returns:
         List of planned actions for the orchestrator.
     """
+
     apm = ActionPlanMaker()
     _ecms_add_liquid(
         apm,
@@ -611,7 +612,7 @@ def ECMS_sub_OCV(
             "IErange": IErange,
         },
         "OCV",
-        to_global_params=["Ewe_V__mean_final"]
+        to_global_params=["Ewe_V__mean_final"],
     )
     return apm.planned_actions
 
@@ -806,8 +807,6 @@ def ECMS_sub_CV(
     ref_type: str = "leakless",
     pH: float = 6.8,
     SamplingMode: str = "SamplingModeFast",
-    OCV_duration__s: float = 0.0,
-    OCV_acquisition_period__s: float = 0.1,
     WE_potential_init__V: float = 0.0,
     WE_potential_apex1__V: float = -1.0,
     WE_potential_apex2__V: float = -0.5,
@@ -818,16 +817,15 @@ def ECMS_sub_CV(
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
     MS_equilibrium_time: float = 90.0,
+    previous_ocv__V: float = 0.0,
 ) -> list:
     """Run a CV experiment then wait for the MS signal to equilibrate.
 
     Args:
         WE_versus: ``"ref"``, ``"rhe"`` or ``"ocv"``. ``"ocv"`` passes the
-            potentials through and measures OCV first: the effective
-            ``versus_OCV`` is ``versus_OCV or WE_versus == "ocv"``.
+            potentials through a supplied previous_ocv__V.
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH (used in RHE conversion).
-        versus_OCV: Measure OCV first and apply potentials relative to it.
         OCV_duration__s: OCV measurement time (s); used only when versus_OCV.
         WE_potential_init__V: Initial potential (V).
         WE_potential_apex1__V: Apex 1 potential (V).
@@ -849,14 +847,21 @@ def ECMS_sub_CV(
     apm = ActionPlanMaker()
     params = {
         "Vinit__V": _ecms_vs_ref(
-            WE_potential_init__V, WE_versus, ref_offset__V, pH, ref_type
+            WE_potential_init__V,
+            WE_versus,
+            ref_offset__V,
+            pH,
+            ref_type,
+            ocv_value=previous_ocv__V,
         ),
         "Vapex1__V": _ecms_vs_ref(
             WE_potential_apex1__V,
             WE_versus,
             ref_offset__V,
             pH,
-            ref_type,
+            ref_type,measures OCV first: the effective
+            ``versus_OCV`` is ``versus_OCV or WE_versus == "ocv"``
+            ocv_value=previous_ocv__V,
         ),
         "Vapex2__V": _ecms_vs_ref(
             WE_potential_apex2__V,
@@ -864,6 +869,7 @@ def ECMS_sub_CV(
             ref_offset__V,
             pH,
             ref_type,
+            ocv_value=previous_ocv__V,
         ),
         "Vfinal__V": _ecms_vs_ref(
             WE_potential_final__V,
@@ -871,13 +877,13 @@ def ECMS_sub_CV(
             ref_offset__V,
             pH,
             ref_type,
+            ocv_value=previous_ocv__V,
         ),
         "ScanRate__V_s": ScanRate_V_s,
         "Cycles": Cycles,
         "AcqInterval__s": SampleRate,
         "IErange": IErange,
         "SamplingMode": SamplingMode,
-        "versus_OCV": False,
     }
     _ecms_pstat(apm, "run_CV", params, ["CV"])
     apm.add(ORCH_server, "wait", {"waittime": MS_equilibrium_time})
