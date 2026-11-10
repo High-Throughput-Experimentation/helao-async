@@ -18,6 +18,7 @@ _CONFIG: dict = {"log_dir": None}
 MAX_ROWS = 2000
 TICK_MS = 1000
 LEVEL_CHOICES = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "ALERT"]
+TIME_ZONE_CHOICES = ["UTC", "local"]
 
 
 def configure_logs(world_cfg: dict, server_key: str) -> None:
@@ -40,7 +41,8 @@ def _refresh(state) -> None:
     source = state._frozen if state.paused else state._all
     servers = set(state.selected) or None
     state.rows = log_tail.to_rows(
-        log_tail.filter_records(source, servers, state.min_level, state.text)
+        log_tail.filter_records(source, servers, state.min_level, state.text),
+        local=state.local_time,
     )
 
 
@@ -116,6 +118,11 @@ def _toggle_server(state, server: str, on: bool) -> None:
     _refresh(state)
 
 
+def _set_time_zone(state, value: str) -> None:
+    state.local_time = value == "local"
+    _refresh(state)
+
+
 def _toggle_pause(state) -> None:
     state.paused = not state.paused
     if state.paused:
@@ -136,6 +143,7 @@ class LogsState(rx.State):
     min_level: str = "INFO"
     text: str = ""
     paused: bool = False
+    local_time: bool = False
 
     @rx.event(background=True)
     async def start(self):
@@ -158,6 +166,10 @@ class LogsState(rx.State):
     @rx.event
     def toggle_server(self, server: str, on: bool):
         _toggle_server(self, server, on)
+
+    @rx.event
+    def set_time_zone(self, value: str):
+        _set_time_zone(self, value)
 
     @rx.event
     def toggle_pause(self):
@@ -216,6 +228,11 @@ def logs_page() -> rx.Component:
             rx.input(
                 placeholder="search", value=LogsState.text, on_change=LogsState.set_text
             ),
+            rx.select(
+                TIME_ZONE_CHOICES,
+                value=rx.cond(LogsState.local_time, "local", "UTC"),
+                on_change=LogsState.set_time_zone,
+            ),
             rx.button(
                 rx.cond(LogsState.paused, "Resume", "Pause"),
                 on_click=LogsState.toggle_pause,
@@ -226,7 +243,9 @@ def logs_page() -> rx.Component:
         rx.table.root(
             rx.table.header(
                 rx.table.row(
-                    rx.table.column_header_cell("time (UTC)"),
+                    rx.table.column_header_cell(
+                        rx.cond(LogsState.local_time, "time (local)", "time (UTC)")
+                    ),
                     rx.table.column_header_cell("level"),
                     rx.table.column_header_cell("server"),
                     rx.table.column_header_cell("message"),

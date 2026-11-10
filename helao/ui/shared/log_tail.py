@@ -236,9 +236,23 @@ def filter_records(records, servers, min_level: str, text: str) -> list:
     ]
 
 
-def to_rows(records) -> list:
+def _ts_text(ts: str, local: bool) -> str:
+    """UTC ISO stamp as-is, or shifted to the machine's local zone with its offset."""
+    if not local:
+        return ts
+    try:
+        return (
+            datetime.fromisoformat(ts).astimezone().isoformat(timespec="microseconds")
+        )
+    except ValueError:
+        return ts  # unparsable: show the raw stamp rather than drop the row
+
+
+def to_rows(records, local: bool = False) -> list:
     """Newest-first ``[ts, level, server, msg, color, key]`` rows for the table.
 
+    ``local`` shifts ``ts`` to the local zone for display only; sorting and the
+    duplicate key still use the stored UTC stamp.
     ``key`` is the record's duplicate key, so a row the page has expanded stays
     expanded as newer rows push it down.
     """
@@ -253,7 +267,7 @@ def to_rows(records) -> list:
             server = f"{server} \u00b7 {lg}"
         rows.append(
             [
-                _s(r.get("ts")),
+                _ts_text(_s(r.get("ts")), local),
                 level,
                 server,
                 msg,
