@@ -36,7 +36,7 @@ export PYTHONPATH=<repo root>          # absolute; a relative "." breaks child p
 python launch.py goldenhex             # SIM answers after ~30-60s; do not shorten the wait
 python -c "from harness import openapi_capture as oc; \
   oc.capture_to_file('http://127.0.0.1:8002', \
-  'helao/deploy/hte/tests/checklists/_baseapi_system_surface.json')"
+  'helao/hexagon/tests/checklists/_baseapi_system_surface.json')"
 ```
 
 `launch.py` spawns a bare `python`, so the env must be on `PATH` — invoking it by absolute
@@ -79,6 +79,6 @@ family carries a pickled `ActionModel` on `ws_status` and a pickled `DataPackage
 ## Notes
 
 - This checklist complements (does not replace) the per-server static endpoint checklists in
-  `helao/deploy/hte/tests/checklists/<module>.json`, which are AST-derived and unaffected by
+  `helao/deploy/<deployment>/tests/checklists/<module>.json`, which are AST-derived and unaffected by
   the drift described above.
 - `_member_surface.md` is grep-derived and likewise unaffected.

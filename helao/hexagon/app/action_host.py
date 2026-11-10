@@ -1078,7 +1078,7 @@ class ActionHost(HelaoFastAPI):
         """Register the eleven server-specific private routes.
 
         The set and their methods come from
-        ``checklists/_baseapi_system_surface.json``, captured live — not from
+        ``helao/hexagon/tests/checklists/_baseapi_system_surface.json``, captured live — not from
         the markdown checklist, which omitted eight routes and marked five GET.
         """
 
