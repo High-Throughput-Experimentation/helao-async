@@ -31,6 +31,7 @@ EXPERIMENTS = [
     "ECMS_sub_load_solid",
     "ECMS_sub_load_solid_only",
     "ECMS_sub_normal_state",
+    "ECMS_sub_OCV",
     "ECMS_sub_preCA_CO2flow",
     "ECMS_sub_prevacuum_cell",
     "ECMS_sub_pulseCA",
@@ -585,19 +586,18 @@ def ECMS_sub_electrolyte_recirculation_off() -> list:
 
 @experiment(version=1)
 def ECMS_sub_OCV(
-    OCV_duration_s: float = 5.0,
+    OCV_duration__s: float = 5.0,
     OCV_acquisition_period__s: float = 0.05,
     IErange: str = "auto",
 ) -> list:
-    """Run a CA experiment then wait for the MS signal to equilibrate.
+    """Run one OCV and publish its final mean potential as ``Ewe_V__mean_final``.
+
+    The ECSA CVs that follow read it as their ``ref_offset__V``.
 
     Args:
-        OCV_duration_s: OCV duration (s).
+        OCV_duration__s: OCV duration (s).
         OCV_acquisition_period__s: Acquisition interval (s).
         IErange: Gamry current-range setting.
-
-    Raises:
-        ValueError: If ``WE_versus`` is not ``"ref"``, ``"rhe"`` or ``"ocv"``.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -607,7 +607,7 @@ def ECMS_sub_OCV(
         apm,
         "run_OCV",
         {
-            "Tval__s": OCV_duration_s,
+            "Tval__s": OCV_duration__s,
             "AcqInterval__s": OCV_acquisition_period__s,
             "IErange": IErange,
         },
