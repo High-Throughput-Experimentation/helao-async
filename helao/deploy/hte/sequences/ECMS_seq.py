@@ -240,6 +240,14 @@ def _ecms_seq_initiation(recirc, cali=False, ecsa=False, **p):
     else:
         _ecms_seq_gas(epm, p)
     if ecsa:
+        if p["versus_OCV"]:
+            epm.add(
+                "ECMS_sub_OCV",
+                {
+                    "OCV_duration__s": p["OCV_duration__s"],
+                    "OCV_acquisition_period__s": p["OCV_acquisition_period__s"],
+                }
+            )
         for ScanRate in p["ScanRate_V_s_1"]:
             epm.add(
                 "ECMS_sub_CV",
@@ -255,10 +263,8 @@ def _ecms_seq_initiation(recirc, cali=False, ecsa=False, **p):
                     "IErange": p["IErange"],
                     "MS_equilibrium_time": p["MS_equilibrium_time"],
                     "SamplingMode": p["SamplingMode"],
-                    "versus_OCV": p["versus_OCV"],
-                    "OCV_duration__s": p["OCV_duration__s"],
-                    "OCV_acquisition_period__s": p["OCV_acquisition_period__s"],
                 },
+                from_global_exp_params={"Ewe_V__mean_final": "ref_offset__V"}
             )
     epm.add("ECMS_sub_normal_state", {})
     if recirc:

@@ -195,7 +195,7 @@ def _ecms_vs_ref(V, WE_versus, ref_offset__V, pH, ref_type):
     if WE_versus == "rhe":
         return V - 1.0 * ref_offset__V - 0.059 * pH - ref_offset(ref_type)
     if WE_versus == "ocv":
-        return V
+        return V - 1.0 * ref_offset__V
     raise ValueError(f"WE_versus must be one of ref, rhe, ocv; got {WE_versus!r}")
 
 
@@ -206,7 +206,7 @@ def _ecms_ocv_params(WE_versus, OCV_duration__s):
     return {}
 
 
-def _ecms_pstat(apm, endpoint, params, technique):
+def _ecms_pstat(apm, endpoint, params, technique, to_global_params=[]):
     """Query the cell sample, then run one PSTAT technique on it."""
     apm.add(
         SAMPLE_server,
@@ -227,6 +227,7 @@ def _ecms_pstat(apm, endpoint, params, technique):
             ProcessContrib.samples_in,
             ProcessContrib.samples_out,
         ],
+        to_global_params=to_global_params
     )
 
 
@@ -579,6 +580,40 @@ def ECMS_sub_electrolyte_recirculation_off() -> list:
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 0})
 
+    return apm.planned_actions
+
+
+@experiment(version=1)
+def ECMS_sub_OCV(
+    OCV_duration_s: float = 5.0,
+    OCV_acquisition_period__s: float = 0.05,
+    IErange: str = "auto",
+) -> list:
+    """Run a CA experiment then wait for the MS signal to equilibrate.
+
+    Args:
+        OCV_duration_s: OCV duration (s).
+        OCV_acquisition_period__s: Acquisition interval (s).
+        IErange: Gamry current-range setting.
+
+    Raises:
+        ValueError: If ``WE_versus`` is not ``"ref"``, ``"rhe"`` or ``"ocv"``.
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
+    apm = ActionPlanMaker()
+    _ecms_pstat(
+        apm,
+        "run_OCV",
+        {
+            "Tval__s": OCV_duration_s,
+            "AcqInterval__s": OCV_acquisition_period__s,
+            "IErange": IErange,
+        },
+        "OCV",
+        to_global_params=["Ewe_V__mean_final"]
+    )
     return apm.planned_actions
 
 
