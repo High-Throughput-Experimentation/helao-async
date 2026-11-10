@@ -1,4 +1,4 @@
-"""The real hte standalone_operator builds a Bokeh document with the operator UI."""
+"""The real base standalone_operator builds a Bokeh document with the operator UI."""
 
 from __future__ import annotations
 

@@ -65,7 +65,7 @@ from helao.deploy.base.tests.test_live_vis_ws_parity import (
 
 
 def _import(modname):
-    owner = locate(modname, "bokeh", own="hte")[0]  # shared panels live in base
+    owner = locate(modname, "bokeh", own="hte")[0]
     assert owner is not None, modname
     return importlib.import_module(import_path(module_file(owner, modname, "bokeh")))
 

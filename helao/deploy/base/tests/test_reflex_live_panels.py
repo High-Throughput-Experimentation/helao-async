@@ -1,4 +1,4 @@
-"""Tests for the hte deployment's Reflex live panels.
+"""Tests for the shared Reflex live-panel helpers.
 
 The four live visualizers share one shape, so the logic that can be wrong lives
 in ``servers/reflex/_live.py`` and is tested here directly. Nothing that only

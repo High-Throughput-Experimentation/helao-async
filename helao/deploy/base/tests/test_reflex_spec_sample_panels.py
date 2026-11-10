@@ -1,4 +1,4 @@
-"""Tests for the hte deployment's spectrometer and sample panels.
+"""Tests for the shared spectrometer and sample panel helpers.
 
 These two are the odd ones. ``spec_vis`` renders a whole spectrum per packet
 rather than a time series, and ``sample_vis`` is not a chart at all -- it polls

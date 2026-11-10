@@ -1,4 +1,4 @@
-"""Tests for the hte deployment's Reflex action panels.
+"""Tests for the shared Reflex action-panel helpers.
 
 ``ws_data`` panels are per-action rather than continuous, so the logic that can
 be wrong is about action boundaries and cell selection. It lives in

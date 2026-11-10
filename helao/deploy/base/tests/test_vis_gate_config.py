@@ -1,6 +1,6 @@
 """Gate-config checks for the bokeh-hosting config, `goldenhexvis.yml`. It names
-the hte bokeh modules directly (no routing key); it resolves, validates, and
-import-resolves, and every hte visualizer module imports without hardware/vendor
+the bokeh modules directly (no routing key); it resolves, validates, and
+import-resolves, and every base visualizer module imports without hardware/vendor
 runtime."""
 
 import glob
@@ -43,8 +43,8 @@ def test_gate_configs_validate():
 
 
 def test_gate_bokeh_entries_name_hte_modules_with_no_routing_key():
-    """Every bokeh server names its hte module directly: no `deployment` key, no
-    `bokeh_port`, and the module resolves under helao.deploy.hte and exposes
+    """Every bokeh server names its base module directly: no `deployment` key, no
+    `bokeh_port`, and the module resolves under helao.deploy.base and exposes
     makeBokehApp. (The retired routing keys are the ratchet's business.)"""
     bokeh_entries = _bokeh_entries(_load())
     assert set(bokeh_entries) == {"OPERATOR", "LIVE", "ACTVIS"}
