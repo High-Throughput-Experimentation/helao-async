@@ -259,4 +259,5 @@ def logs_page() -> rx.Component:
         ),
         on_mount=LogsState.start,
         width="100%",
+        padding_x="1em",
     )
