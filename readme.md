@@ -1,6 +1,6 @@
 # HELAO-async
 
-HELAO-async is Caltech HTE group's instrument control software following [HELAO](https://doi.org/10.26434/chemrxiv-2021-kr87t) design principles. This repository contains instrument drivers, API server configurations, experiment sequences, and models. As of version 2025.07.07, it no longer depends on the [HELAO-core](https://github.com/High-Throughput-Experimentation/helao-core) package.
+HELAO-async is Caltech HTE group's instrument control software following [HELAO](https://doi.org/10.26434/chemrxiv-2021-kr87t) design principles. This repository contains the framework (models, server hosts, orchestrator, operator and visualizer UIs, data syncer), the shared framework services in `helao/deploy/base`, and the `test` deployment of simulators and demos. The HTE group's instrument drivers, station configs, experiments and sequences live in the public [`hte` deployment](https://github.com/High-Throughput-Experimentation/helao-hte-deployment), which the setup scripts install into `helao/deploy/hte` (see [Deployments](#deployments)). As of version 2025.07.07, it no longer depends on the [HELAO-core](https://github.com/High-Throughput-Experimentation/helao-core) package.
 
 ## Requirements
 
@@ -22,7 +22,7 @@ From a miniconda prompt or PowerShell with an active conda profile:
     cd helao-async
     bash setup_env.sh
 
-`setup_env` clones the `hte` deployment (https://github.com/High-Throughput-Experimentation/helao-hte-deployment) into `helao/deploy/hte` when it is missing, and `update_env` pulls it whenever it is a git repo, not only when a config uses it.
+`setup_env` also installs the public `hte` deployment into `helao/deploy/hte`; see [Deployments](#deployments).
 
 `setup_env` creates the `helao` env from `helao_dev_<platform>.yml` if it is missing, activates it and checks that `helao` is the active env, installs `requirements.txt` with `uv pip install`, and sets `PYTHONPATH` (the repo root) and `HELAOLAUNCH` in the env. With no arguments that is the whole install: the base env from the root env files. For a station, add its config prefixes (`setup_env.bat <prefix> ...` / `bash setup_env.sh <prefix> ...`) to also install the packages its servers need and record the prefixes for later `update_env` runs.
 
@@ -36,6 +36,32 @@ An env built before 2026-10-16 has no `uv`, so `setup_env` fails at the uv step.
     python repin_envs.py --write    # rewrite the pinned files
 
 Private deployments may ship their own env files and setup scripts; see each deployment's readme.
+
+## Deployments
+
+Each folder under `helao/deploy/` is a deployment: configs, server folders, drivers, experiments and sequences for one group of instruments. `launch.py` finds a config by its prefix in any of them.
+
+| deployment | where it lives | how it gets there |
+| --- | --- | --- |
+| `base` | tracked in this repo | framework services every group launches (orchestrator, operator, visualizers, data syncer, shared Reflex panels) |
+| `test` | tracked in this repo | simulators and demo configs; runs without hardware |
+| `hte` | its own public repo, [helao-hte-deployment](https://github.com/High-Throughput-Experimentation/helao-hte-deployment) | cloned in place by `setup_env` / `update_env` |
+| private deployments | their own git repos, nested in place | cloned by hand; `.gitignore` keeps them out of this repo |
+
+`hte` is a plain nested git repo, not a submodule. The parent repo ignores `helao/deploy/hte`, so commit `hte` changes inside that folder with its own git (`git -C helao/deploy/hte ...`).
+
+### Automatic `hte` install and update
+
+`setup_env` and `update_env` manage `helao/deploy/hte` before they install anything:
+
+- **Missing `hte`:** cloned from `https://github.com/High-Throughput-Experimentation/helao-hte-deployment.git`. A run with no prefix clones it. A run whose config prefix is not found in any present deployment (an `hte` station config such as `eche10`) clones it, then looks the prefix up again. A no-argument `update_env` clones it before replaying the recorded station prefixes.
+- **`hte` is a git repo:** always pulled with `git pull --ff-only`, whatever the configs. Tracked files that are missing from the clone (for example after checking out an older parent commit) are restored first. If the pull fails (local edits in the way, a diverged branch, no network), the run stops only when a requested config uses `hte` or a prefix was not found; otherwise it warns and carries on.
+- **`hte` is a plain folder** (left over from a checkout made before the split): the new repo is cloned first. The old folder is then moved to `STATES/hte_leftover_<time>/`, and its file list is written to `STATES/hte_leftover_<time>.txt`. Nothing is deleted; remove the archive once you have copied out anything you need.
+- **Server packages:** when a station config uses `hte` servers, `setup_env <prefix>` installs the packages listed in those server folders' `environment.yml` / `requirements.txt`, like any other deployment.
+
+Any git failure leaves `helao/deploy/hte` as it was. To install `hte` by hand, move a leftover folder aside, then run:
+
+    git clone https://github.com/High-Throughput-Experimentation/helao-hte-deployment.git helao/deploy/hte
 
 ## Usage
 
