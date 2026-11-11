@@ -21,9 +21,9 @@ servers:
     params:
       heartbeat_interval: 3
     prefinish_experiment_hooks:
-      append_params: ["*"]
+      sim_append_params: ["*"]
     prefinish_sequence_hooks:
-      append_params: ["*"]
+      sim_append_params: ["*"]
   SIM:
     host: 127.0.0.1
     port: 8002
@@ -32,7 +32,7 @@ servers:
     live_vis: wssim_live_vis
     params: {}
     prefinish_hooks:
-      hlo_to_csv: ["*"]
+      sim_hlo_to_csv: ["*"]
   SYNC:
     host: 127.0.0.1
     port: 8010

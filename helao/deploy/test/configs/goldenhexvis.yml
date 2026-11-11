@@ -21,9 +21,9 @@ servers:
     fast: async_orch2
     params: {}
     prefinish_experiment_hooks:
-      append_params: ["*"]
+      sim_append_params: ["*"]
     prefinish_sequence_hooks:
-      append_params: ["*"]
+      sim_append_params: ["*"]
   OPERATOR:
     host: 127.0.0.1
     port: 5001
@@ -41,7 +41,7 @@ servers:
     live_vis: wssim_live_vis
     params: {}
     prefinish_hooks:
-      hlo_to_csv: ["*"]
+      sim_hlo_to_csv: ["*"]
   LIVE:
     host: 127.0.0.1
     port: 5002

@@ -33,7 +33,7 @@ def _act_yml(root: str) -> dict:
 async def test_new_key_by_exact_action_name_runs_hlo_to_csv():
     root = tempfile.mkdtemp(prefix="helao_prefinish_")
     names = await _run_one_action(
-        root, prefinish_hooks={"hlo_to_csv": ["acquire_data"]}
+        root, prefinish_hooks={"sim_hlo_to_csv": ["acquire_data"]}
     )
     assert any(n.endswith(".csv") for n in names), names
 
@@ -42,7 +42,7 @@ async def test_new_key_by_exact_action_name_runs_hlo_to_csv():
 async def test_new_key_for_another_action_name_does_not_run():
     root = tempfile.mkdtemp(prefix="helao_prefinish_")
     names = await _run_one_action(
-        root, prefinish_hooks={"hlo_to_csv": ["not_this_action"]}
+        root, prefinish_hooks={"sim_hlo_to_csv": ["not_this_action"]}
     )
     assert not any(n.endswith(".csv") for n in names), names
 

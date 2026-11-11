@@ -40,10 +40,3 @@ def test_unknown_panel_still_raises_module_not_found():
 def test_unknown_visualizer_still_raises_module_not_found():
     with pytest.raises(ModuleNotFoundError, match="no_such_vis"):
         vis_subscriber.import_vis_class("no_such_vis")
-
-
-def test_existing_hte_twin_resolves_per_stack():
-    panel = discovery.resolve_panel_module("gamry_vis")
-    assert ".reflex." in panel.__name__
-    cls = vis_subscriber.import_vis_class("gamry_vis")
-    assert ".reflex." not in cls.__module__

@@ -530,7 +530,7 @@ def test_a_panel_module_may_declare_a_socket_the_config_key_does_not_imply():
     ingest for a path nothing is feeding."""
     from helao.ui.reflex.app import panel_targets
 
-    # nidaqmx_vis declares WS_PATH = "ws_data" but is placed under live_vis
+    # oersim_panel declares WS_PATH = "ws_data" but is placed under live_vis
     # here, which is the shape that matters.
     cfg = {
         "servers": {
@@ -538,7 +538,7 @@ def test_a_panel_module_may_declare_a_socket_the_config_key_does_not_imply():
                 "host": "h",
                 "port": 1,
                 "group": "action",
-                "live_vis": "nidaqmx_vis",
+                "live_vis": "oersim_panel",
             }
         }
     }

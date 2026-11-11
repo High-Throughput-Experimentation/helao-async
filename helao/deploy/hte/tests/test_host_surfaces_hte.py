@@ -1,14 +1,11 @@
 """hte's share of two parent sweeps whose roots named hte (spec §2, OQ-3)."""
 
+import ast
 from pathlib import Path
 
 import pytest
 
 from helao.hexagon.tests.test_driver_host_surface import scan
-from helao.hexagon.tests.test_external_composition_contract import (
-    _registrar_module,
-    _registrar_reads,
-)
 
 HTE = Path(__file__).resolve().parents[1]
 
@@ -29,6 +26,32 @@ def test_no_forbidden_host_read_in_hte():
 def test_the_hte_scan_sees_every_measured_read():
     _, reads, files = scan(_sources())
     assert reads >= 29 and len(files) >= 14, (reads, len(files))  # measured 2026-11-10
+
+
+def _registrar_module(stem):
+    return next((HTE / "servers").glob(f"*/{stem}.py"), Path(stem))
+
+
+def _registrar_reads(module_stem: str) -> set[str]:
+    path = _registrar_module(module_stem)
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    fn = next(
+        (
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and n.name.endswith("dyn_endpoints")
+        ),
+        None,
+    )
+    assert fn is not None, f"{module_stem} exports no *_dyn_endpoints registrar"
+    return {
+        node.attr
+        for node in ast.walk(fn)
+        if isinstance(node, ast.Attribute)
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "app"
+    }
 
 
 #: Every ``app.<attr>`` an hte ``*_dyn_endpoints`` registrar reads, by module.

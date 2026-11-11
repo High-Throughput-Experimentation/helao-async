@@ -73,6 +73,8 @@ def test_no_config_pins_hte_for_a_base_module():
                 module = s.get("fast") or s.get("bokeh")
                 if module in MOVED and s.get("deployment") == "hte":
                     bad.append(f"{cfg.relative_to(sm.DEPLOY_ROOT)}:{key}")
-    assert {"base", "hte", "test"} <= scanned.keys(), scanned
-    assert scanned["hte"] and scanned["test"], scanned
+    assert {"base", "test"} <= scanned.keys(), scanned
+    assert scanned["test"], scanned
+    if "hte" in scanned:  # a nested deployment: checked only when present
+        assert scanned["hte"], scanned
     assert not bad, bad

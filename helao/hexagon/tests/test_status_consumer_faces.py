@@ -76,14 +76,14 @@ def test_ws_path_override_edge():
     This is the edge that makes the normalizers non-uniform: the key says which *page*
     a panel belongs on, the module says which *socket* it reads. A panel
     declared under ``live_vis`` while reading ``ws_data`` exists in a private
-    deployment today; ``nidaqmx_vis`` is used here because it is a tracked
+    deployment today; ``oersim_panel`` is used here because it is a tracked
     module carrying the divergent ``WS_PATH``, driven with the key default
     the divergent case supplies.
     """
     # module says ws_data, key default says ws_live -> module wins
-    assert declared_ws_path("nidaqmx_vis", "ws_live") == "ws_data"
+    assert declared_ws_path("oersim_panel", "ws_live") == "ws_data"
     # ...and the opposite direction, so the assertion is not one-sided
-    assert declared_ws_path("mfc_vis", "ws_data") == "ws_live"
+    assert declared_ws_path("wssim_panel", "ws_data") == "ws_live"
     # an unresolvable module keeps the key's default rather than raising
     assert declared_ws_path("no_such_panel_module", "ws_live") == "ws_live"
 
@@ -91,7 +91,7 @@ def test_ws_path_override_edge():
     # routing by the key default alone would hand ws_data frames to the
     # ws_live normalizer, which drops them silently.
     key_default_normalizer = NORMALIZERS["ws_live"]
-    declared_normalizer = NORMALIZERS[declared_ws_path("nidaqmx_vis", "ws_live")]
+    declared_normalizer = NORMALIZERS[declared_ws_path("oersim_panel", "ws_live")]
     assert declared_normalizer is not key_default_normalizer
 
     data_msg = asyncio.run(wf.roundtrip("ws_data", "base_api"))[1]

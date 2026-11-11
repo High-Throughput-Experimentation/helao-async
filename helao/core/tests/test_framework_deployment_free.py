@@ -71,11 +71,26 @@ def test_framework_names_no_deployment():
     assert not hits, "\n".join(hits)
 
 
+def _docstrings(tree: ast.AST) -> set[int]:
+    return {
+        id(n.body[0].value)
+        for n in ast.walk(tree)
+        if isinstance(
+            n, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+        )
+        and n.body
+        and isinstance(n.body[0], ast.Expr)
+        and isinstance(n.body[0].value, ast.Constant)
+    }
+
+
 def test_parent_tests_do_not_read_hte_by_path():
-    """Tests that need hte live in hte (spec §2). Text mentions are allowed;
-    a path or import a test would execute is not."""
+    """Tests that need hte live in hte (spec §2). Catches quoted path literals
+    (string constants, not docstrings or comments) that name an hte subtree or
+    ``hte/<name>``. It is a tripwire, not the gate: the real gate is running the
+    parent suites on a tree with helao/deploy/hte deleted."""
     pat = re.compile(
-        r"""["'][^"']*deploy[/\\]hte[/\\](configs|tests|servers|experiments|sequences)"""
+        r"""deploy[/\\]hte[/\\](configs|tests|servers|experiments|sequences)|^hte/\w+$"""
     )
     allowed = {"helao/core/tests/test_palette.py"}  # SWEEP_EXEMPT_SITES (OQ-3)
     hits = []
@@ -90,7 +105,14 @@ def test_parent_tests_do_not_read_hte_by_path():
             rel = p.relative_to(REPO).as_posix()
             if rel in allowed:
                 continue
-            for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
-                if pat.search(line) or re.search(r"""["']hte/\w+["']""", line):
-                    hits.append(f"{rel}:{i}")
+            tree = ast.parse(p.read_text(encoding="utf-8"))
+            docs = _docstrings(tree)
+            for n in ast.walk(tree):
+                if (
+                    isinstance(n, ast.Constant)
+                    and isinstance(n.value, str)
+                    and id(n) not in docs
+                    and pat.search(n.value)
+                ):
+                    hits.append(f"{rel}:{n.lineno}")
     assert not hits, "\n".join(hits)

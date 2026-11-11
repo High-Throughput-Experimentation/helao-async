@@ -17,9 +17,9 @@ servers:
     fast: async_orch2
     params: {}
     prefinish_experiment_hooks:
-      append_params: ["*"]
+      sim_append_params: ["*"]
     prefinish_sequence_hooks:
-      append_params: ["*"]
+      sim_append_params: ["*"]
   OPERATOR:
     group: operator
     bokeh: standalone_operator
@@ -49,7 +49,7 @@ servers:
         cell_valve: 2
         purge_valve: 3
     prefinish_hooks:
-      hlo_to_csv: ["*"]
+      sim_hlo_to_csv: ["*"]
   LIVE:
     host: 127.0.0.1
     port: 5002

@@ -13,7 +13,10 @@ from helao.helpers.premodels import Experiment, Sequence
 from helao.helpers.yml_tools import yml_load
 
 SYNC = {"host": "127.0.0.1", "port": 8010, "group": "action", "fast": "sync_server"}
-ORCH = {"group": "orchestrator", "prefinish_experiment_hooks": {"append_params": ["*"]}}
+ORCH = {
+    "group": "orchestrator",
+    "prefinish_experiment_hooks": {"sim_append_params": ["*"]},
+}
 
 
 def _orch(root, servers=None, **kw) -> MicroOrch:
@@ -143,7 +146,7 @@ async def test_start_loads_hooks_from_world_orchestrator_entry(tmp_path, monkeyp
     monkeypatch.setattr(orch.dispatcher, "serve", no_serve)
     assert orch.experiment_hooks.cfg == {}
     await orch.start()
-    assert list(orch.experiment_hooks.cfg) == ["append_params"]
+    assert list(orch.experiment_hooks.cfg) == ["sim_append_params"]
     assert orch.sequence_hooks.cfg == {}
 
 

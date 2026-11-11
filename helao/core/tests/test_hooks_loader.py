@@ -60,9 +60,27 @@ def test_path_form_with_postprocess_meta_processor_is_wrapped(tmp_path):
     assert isinstance(hook, MetaProcessorHook)
 
 
-def test_hte_processors_resolve_by_bare_name():
-    assert isinstance(import_hook("hlo_to_csv"), HloPostProcessorHook)
-    assert isinstance(import_hook("append_params"), MetaProcessorHook)
+def test_test_deployment_processors_resolve_by_bare_name():
+    assert isinstance(import_hook("sim_hlo_to_csv"), HloPostProcessorHook)
+    assert isinstance(import_hook("sim_append_params"), MetaProcessorHook)
+
+
+def test_sim_append_params_marks_experiment_and_sequence_params():
+    import types
+
+    class Experiment:
+        experiment_params: dict = {}
+
+    class Sequence:
+        sequence_params: dict = {}
+
+    cls = import_hook("sim_append_params").cls
+    exp, seq = Experiment(), Sequence()
+    exp.experiment_params, seq.sequence_params = {}, {}
+    cls(exp, types.SimpleNamespace()).process()
+    cls(seq, types.SimpleNamespace()).process()
+    assert exp.experiment_params == {"appended_exp_param": "yes"}
+    assert seq.sequence_params == {"appended_seq_param": "yes"}
 
 
 def test_every_deployment_processor_imports_and_wraps():
@@ -138,35 +156,35 @@ def test_non_hook_class_raises(tmp_path):
 def test_load_hook_set_refuses_hlo_processor_outside_action_level():
     with pytest.raises(HookConfigError) as ei:
         load_hook_set(
-            {"hlo_to_csv": {"*": None}}, phase="prefinish", level="experiment"
+            {"sim_hlo_to_csv": {"*": None}}, phase="prefinish", level="experiment"
         )
-    assert "hlo_to_csv" in str(ei.value) and "experiment" in str(ei.value)
+    assert "sim_hlo_to_csv" in str(ei.value) and "experiment" in str(ei.value)
 
 
 def test_load_hook_set_refuses_prefinish_hook_in_postfinish_phase():
     with pytest.raises(HookConfigError) as ei:
         load_hook_set(
-            {"append_params": {"*": None}}, phase="postfinish", level="sequence"
+            {"sim_append_params": {"*": None}}, phase="postfinish", level="sequence"
         )
-    assert "append_params" in str(ei.value)
+    assert "sim_append_params" in str(ei.value)
 
 
 def test_load_hook_set_builds_one_instance_per_hook():
     hs = load_hook_set(
-        {"append_params": {"*": None}, "hlo_to_csv": {"acq": None}},
+        {"sim_append_params": {"*": None}, "sim_hlo_to_csv": {"acq": None}},
         phase="prefinish",
         level="action",
     )
     assert isinstance(hs, HookSet)
-    assert list(hs.hooks) == ["append_params", "hlo_to_csv"]
-    assert hs.select("acq")[1][1] is hs.hooks["hlo_to_csv"]
+    assert list(hs.hooks) == ["sim_append_params", "sim_hlo_to_csv"]
+    assert hs.select("acq")[1][1] is hs.hooks["sim_hlo_to_csv"]
 
 
 def test_load_hook_set_hooks_keys_match_cfg_keys():
     """Controller ruling #2: HookSet.select indexes self.hooks[hook_name]
     without a guard, so load_hook_set must build hooks with exactly the
     keys of the normalized cfg -- no more, no fewer."""
-    cfg: HookMap = {"append_params": {"*": None}, "hlo_to_csv": {"acq": None}}
+    cfg: HookMap = {"sim_append_params": {"*": None}, "sim_hlo_to_csv": {"acq": None}}
     hs = load_hook_set(cfg, phase="prefinish", level="action")
     assert set(hs.hooks) == set(hs.cfg)
 

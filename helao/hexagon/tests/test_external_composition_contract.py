@@ -151,35 +151,3 @@ def test_the_sweep_is_not_vacuous() -> None:
         f"{len(deployments)} external deployment(s) present but the sweep found "
         "no action modules -- the ratchet is passing over nothing."
     )
-
-
-# ---------------------------------------------------------------------------
-# The registrar contract (the pins live with the deployment that owns the
-# registrar: helao/deploy/hte/tests/test_host_surfaces_hte.py)
-# ---------------------------------------------------------------------------
-
-
-def _registrar_module(stem: str) -> Path:
-    return next(DEPLOY.glob(f"*/servers/*/{stem}.py"), Path(stem))
-
-
-def _registrar_reads(module_stem: str) -> set[str]:
-    path = _registrar_module(module_stem)
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    fn = next(
-        (
-            n
-            for n in ast.walk(tree)
-            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and n.name.endswith("dyn_endpoints")
-        ),
-        None,
-    )
-    assert fn is not None, f"{module_stem} exports no *_dyn_endpoints registrar"
-    return {
-        node.attr
-        for node in ast.walk(fn)
-        if isinstance(node, ast.Attribute)
-        and isinstance(node.value, ast.Name)
-        and node.value.id == "app"
-    }

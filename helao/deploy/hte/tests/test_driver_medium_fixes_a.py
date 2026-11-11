@@ -11,9 +11,6 @@ import types
 
 import pytest
 
-# pymecom lives in the tec server env; the base env may lack it
-pytest.importorskip("mecom")
-
 from helao.core.drivers.helao_driver import DriverResponseType
 from helao.core.error import ErrorCodes
 from helao.deploy.hte.servers.nidaqmx.nidaqmx_driver import cNIMAX
@@ -21,7 +18,6 @@ from helao.deploy.hte.servers.mfc.alicat_driver import MfcConstConcExec
 from helao.deploy.hte.servers.syringe.legato_driver import KDS100
 from helao.deploy.hte.servers.cam import axiscam_driver
 from helao.deploy.hte.servers.cam.axiscam_driver import AxisCam, AxisCamExec
-from helao.deploy.hte.servers.tec.mecom_driver import MeerstetterTEC
 
 
 @pytest.mark.asyncio
@@ -149,6 +145,9 @@ def test_legato_send_sync_skips_cycle_when_lock_held():
 
 
 def test_mecom_set_temp_accepts_int_setpoint():
+    pytest.importorskip("mecom")  # pymecom lives in the tec server env
+    from helao.deploy.hte.servers.tec.mecom_driver import MeerstetterTEC
+
     d = MeerstetterTEC.__new__(MeerstetterTEC)
     d.channel, d.address = 1, 2
     calls = []

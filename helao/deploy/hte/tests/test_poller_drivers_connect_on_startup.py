@@ -15,13 +15,9 @@ import types
 
 import pytest
 
-# pymecom lives in the tec server env; the base env may lack it
-pytest.importorskip("mecom")
-
 from helao.core.drivers.helao_driver import DriverResponse
 import helao.deploy.hte.servers.o2sensor.cm0134_driver as cm0134
 import helao.deploy.hte.servers.co2sensor.sprintir_driver as sprintir
-import helao.deploy.hte.servers.tec.mecom_driver as mecom_driver
 
 
 class _Inst:
@@ -87,7 +83,16 @@ class _Session:
         return 1
 
 
-def test_tec_opens_on_connect(monkeypatch):
+@pytest.fixture
+def mecom_driver():
+    """pymecom lives in the tec server env; only the tec tests need it."""
+    pytest.importorskip("mecom")
+    import helao.deploy.hte.servers.tec.mecom_driver as module
+
+    return module
+
+
+def test_tec_opens_on_connect(monkeypatch, mecom_driver):
     monkeypatch.setattr(mecom_driver, "MeCom", _Session)
     drv = mecom_driver.MeerstetterTEC(config={"channel": 1, "port": "COM3"})
     assert drv._session is None  # construction opens nothing
@@ -95,7 +100,7 @@ def test_tec_opens_on_connect(monkeypatch):
     assert drv._session is not None and drv.address == 1
 
 
-def test_tec_with_a_missing_port_fails_once_without_raising(monkeypatch):
+def test_tec_with_a_missing_port_fails_once_without_raising(monkeypatch, mecom_driver):
     calls = []
 
     def refuse(serialport, timeout):
@@ -110,13 +115,13 @@ def test_tec_with_a_missing_port_fails_once_without_raising(monkeypatch):
     assert len(calls) == 1
 
 
-def test_the_host_connects_the_tec():
+def test_the_host_connects_the_tec(mecom_driver):
     assert mecom_driver.MeerstetterTEC.connect_on_startup is True
 
 
 @pytest.mark.asyncio
 async def test_tec_poller_raises_while_disconnected_and_the_loop_survives(
-    monkeypatch, caplog
+    monkeypatch, caplog, mecom_driver
 ):
     """Pre-settled exception: ``get_data()`` re-attempts the open and raises.
 
@@ -153,7 +158,7 @@ async def test_tec_poller_raises_while_disconnected_and_the_loop_survives(
 
 
 def test_tec_host_starts_and_shuts_down_after_a_raising_connect(
-    monkeypatch, tmp_path, caplog
+    monkeypatch, tmp_path, caplog, mecom_driver
 ):
     """The one host-level proof that a formerly constructor-connect driver tears down.
 

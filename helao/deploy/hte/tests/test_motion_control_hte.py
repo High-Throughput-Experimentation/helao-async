@@ -95,12 +95,6 @@ def adss3_motor():
 
 
 @pytest.fixture(scope="module")
-def hispec_motor():
-    """A two-axis letter-keyed station."""
-    return _hte_server("hispec.yml", "MOTOR")
-
-
-@pytest.fixture(scope="module")
 def eche10_kmotor():
     """A single-axis reciprocal-schema station; move_limit_mm is 3.0 here."""
     return _hte_server("eche10.yml", "KMOTOR")
@@ -250,9 +244,10 @@ def test_a_shipped_hte_axis_speed_is_configured():
     # axis at its configured default speed needs longer than that for a long
     # travel, so the follow-up quit mid-move and the readout never settled.
     #
-    # The slowest configured axis across the shipped hte motion stations sets
-    # the bar; the parent's test_the_followup_ceiling_covers_the_drivers_move_wait_cap
-    # holds the framework side (the ceiling against the driver's 30-minute cap).
+    # Only the hte half lives here: the shipped configs declare at least one axis
+    # speed (the value is printed, nothing compares it). The framework half, the
+    # ceiling against the driver's 30-minute cap, is the parent's
+    # test_the_followup_ceiling_covers_the_drivers_move_wait_cap.
     slowest_mm_per_s = None
     for path in sorted(glob.glob(HTE_CONFIG_GLOB)):
         with open(path, encoding="utf-8") as handle:

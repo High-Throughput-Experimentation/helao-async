@@ -149,7 +149,7 @@ async def test_an_action_writes_its_meta_and_data_files() -> None:
 
 @pytest.mark.asyncio
 async def test_a_bare_named_post_processor_runs_and_emits_its_file() -> None:
-    """``prefinish_hooks: {hlo_to_csv: ['*']}`` -- a NAME, not a path.
+    """``prefinish_hooks: {sim_hlo_to_csv: ['*']}`` -- a NAME, not a path.
 
     The bare-name form is what production configs use, and it resolves
     against a deployment's ``processors/`` directory. A path-only loader
@@ -163,7 +163,7 @@ async def test_a_bare_named_post_processor_runs_and_emits_its_file() -> None:
     """
     names = await _run_one_action(
         tempfile.mkdtemp(prefix="helao_postproc_"),
-        prefinish_hooks={"hlo_to_csv": ["*"]},
+        prefinish_hooks={"sim_hlo_to_csv": ["*"]},
     )
     assert any(
         n.endswith(".csv") for n in names

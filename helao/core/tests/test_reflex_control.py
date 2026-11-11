@@ -30,7 +30,7 @@ WORLD = {
         "NI": {
             "host": "127.0.0.1",
             "port": 8006,
-            "control_vis": "nidaqmx_control",
+            "control_vis": "sim_grouped_control",
             "params": {
                 "dev_pump": {"PeriPump1": "line9"},
                 "dev_gasvalve": {"CO2": "line0"},
