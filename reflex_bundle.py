@@ -932,8 +932,7 @@ def build_bundle(
     if not (shutil.which("bun") or shutil.which("node")):
         raise SystemExit(
             "no JavaScript runtime on PATH. The frontend build needs `bun` or "
-            "`node`; install one into the helao environment "
-            "(`conda install -n helao bun`) and try again."
+            "`node`; install bun on PATH and try again."
         )
     config_prefix = config_prefix or os.path.splitext(os.path.basename(config_arg))[0]
     source_app = os.path.join(repo_root, APP_DIR)

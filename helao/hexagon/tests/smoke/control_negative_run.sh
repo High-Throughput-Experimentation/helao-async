@@ -9,12 +9,9 @@ set -u
 PREFIX="${1:-controlneg}"
 REPO="$(cd "$(dirname "$0")/../../../.." && pwd)"
 cd "$REPO" || exit 2
-# One interpreter spelling for every call. `conda run --no-capture-output` is
-# the default for the same reason conc_run.sh needs it: conda's capture buffer
-# can fill during a verbose startup and stall launch.py before it writes the
-# pid pickle, leaving a half-up group. HELAO_PY overrides it with a direct
-# env python where one is on hand (faster, and no capture layer at all).
-PY="${HELAO_PY:-conda run --no-capture-output -n helao python}"
+# One interpreter spelling for every call; HELAO_PY overrides it.
+# Run with the helao env activated (`source activate_helao.sh`).
+PY="${HELAO_PY:-python}"
 ROOT="${2:-$($PY -c "
 from helao.helpers.config_loader import read_config
 print(read_config('$PREFIX')['root'])" | tail -1)}"

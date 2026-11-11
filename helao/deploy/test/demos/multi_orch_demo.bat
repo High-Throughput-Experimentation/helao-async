@@ -1,7 +1,7 @@
 @echo off
 set TERMGUI=%windir%\System32\cmd.exe
 set SLEEPCMD=%windir%\System32\timeout.exe
-call conda activate helao
+call "%~dp0..\..\..\..\activate_helao.bat"
 start %TERMGUI% /k ("%HELAOLAUNCH%" "demo0" "actionvis")
 %SLEEPCMD% /t 35 /nobreak
 python multi_orch_demo_helper.py demo0 50

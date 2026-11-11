@@ -12,8 +12,8 @@ requires-python = ">=3.14"
 # [build-system]: this repo is not pip-installable, it runs off PYTHONPATH
 # (set into the pixi env by setup_env.sh / setup_env.bat).
 #
-# The authoritative dependency lists are the base pixi.toml
-# (its pixi.lock pins them), which build the `helao` env. Duplicating them
+# The authoritative dependency list is the base pixi.toml (its pixi.lock
+# pins it), which builds the `helao` env. Duplicating them
 # here would create a second source of truth that silently drifts. (pyMeCom,
 # which is not on PyPI, is installed from a GitHub archive URL listed in the
 # hte tec server folder's requirements.txt.)

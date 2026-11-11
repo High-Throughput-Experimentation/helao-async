@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 TERMGUI=/usr/bin/alacritty
-CONDA_DIR=$(echo $CONDA_EXE | xargs -0 dirname | xargs -0 dirname)
-source $CONDA_DIR/etc/profile.d/conda.sh
-conda activate helao
+source "$(dirname "$0")/../../../../activate_helao.sh"
 $TERMGUI -e $HELAOLAUNCH demo0 actionvis &
 sleep 35
 python multi_orch_demo_helper.py demo0 50

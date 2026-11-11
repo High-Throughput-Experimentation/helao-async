@@ -64,15 +64,15 @@ MicroOrch talks straight to the action servers over RPC):
 ```bash
 # OER simulation: brings up CPSIM:8002, GPSIM:8003
 ./helao.sh demo0
-conda run -n helao python -m helao.deploy.test.runners.oersim_runner
+python -m helao.deploy.test.runners.oersim_runner
 
 # websocket simulator + ORCH waits: brings up ORCH:8001, SIM:8002
 ./helao.sh test
-conda run -n helao python -m helao.deploy.test.runners.simulatews_runner
+python -m helao.deploy.test.runners.simulatews_runner
 
 # orchestrator-primitive scheduling: needs ORCH:8001
 ./helao.sh test
-conda run -n helao python -m helao.deploy.test.runners.test_runner
+python -m helao.deploy.test.runners.test_runner
 ```
 
 Each runner ends by calling `orch.zip_runs(...)`, writing a `.zip` of every

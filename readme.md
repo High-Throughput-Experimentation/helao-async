@@ -26,9 +26,9 @@ From a terminal (Windows: cmd or PowerShell):
 
 `setup_env` installs pixi if it is missing, creates the host workspace `.helao-env/` from the tracked `pixi.toml` and `pixi.lock` (base env, installed straight from the lock), then composes the station's server packages into it and runs `pixi install`. With no arguments that is the whole install: the base env. For a station, add its config prefixes (`setup_env.bat <prefix> ...` / `bash setup_env.sh <prefix> ...`) to also install the packages its servers need and record the prefixes for later `update_env` runs.
 
-To pick up changed env files later, run `update_env.bat` / `bash update_env.sh`. With no arguments it replays the recorded station prefixes. A host moving from the old conda env must run `setup_env <prefix> ...` once: its record lived in the conda env.
+To pick up changed env files later, run `update_env.bat` / `bash update_env.sh`. With no arguments it replays the recorded station prefixes. A host moving from the old conda env must run `setup_env <prefix> ...` once: the record is `<root>/STATES/setup_env_prefixes.json`, and only the `HELAO_STATION_PREFIXES` pointer to it lived in the conda env.
 
-`pixi.lock` pins every base package for `linux-64` and `win-64` (a third `linux-64-cuda` platform lets CUDA hosts share those pins); to move the pins, run `pixi update` in the repo root and commit the lock. A lock merge conflict is resolved by re-locking (`.gitattributes` marks it `merge=binary`).
+`pixi.lock` pins every base package for `linux-64` and `win-64` (CUDA hosts take theirs from the lock's own `linux-64-cuda` section, solved separately, so they can differ from `linux-64`); to move the pins, run `pixi update` in the repo root and commit the lock. A lock merge conflict is resolved by re-locking (`.gitattributes` marks it `merge=binary`).
 
 If the checkout is on a `noexec` mount, run `pixi config set --global detached-environments true` once before `setup_env`; pixi then keeps the env under `~/.cache` instead of `.helao-env/.pixi`.
 

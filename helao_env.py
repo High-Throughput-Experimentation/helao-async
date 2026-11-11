@@ -671,7 +671,8 @@ def main(argv=None) -> int:
                 print(
                     "no station configs given or recorded: base env only. A "
                     "host moving from conda must run setup_env <config prefix> "
-                    "... once; its old record lived in the conda env."
+                    "... once; the record is <root>/STATES/setup_env_prefixes.json, only its "
+                    "HELAO_STATION_PREFIXES pointer lived in the conda env."
                 )
         folders: set[Path] = set()
         for cfg in configs:

@@ -14,7 +14,7 @@ Usage::
 Three things about running it that are not obvious, all of them learned by
 getting them wrong first:
 
-* **The conda environment must be on ``PATH``, not merely the interpreter.**
+* **The helao environment must be activated so its tools are on ``PATH``, not merely the interpreter.**
   ``launch.py`` spawns its children as a bare ``python``, so invoking it by
   absolute path starts a launcher that reports success while every child dies
   on ``ModuleNotFoundError``. This script puts the running interpreter's
