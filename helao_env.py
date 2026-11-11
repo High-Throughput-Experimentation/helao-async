@@ -211,19 +211,40 @@ def _warn(msg: str) -> None:
 
 
 def _rmtree_force(path: Path) -> None:
-    """rmtree that clears read-only bits (git packs on Windows); never swallows."""
+    """rmtree that clears read-only bits (git packs on Windows); never swallows.
+
+    Only entries inside ``path`` are chmod-ed (bits are added, never reset), a
+    symlinked ``path`` is unlinked rather than followed, and every failure is an
+    EnvSetupError naming the folder.
+    """
+    path = Path(path)
+    hand = f"cannot remove {path}; delete it by hand"
+
+    def inside(q: Path) -> bool:
+        return q == path or path in q.parents
 
     def onexc(func, p, exc):  # noqa: ARG001
+        p = Path(p)
         try:
-            for q in (Path(p).parent, Path(p)):  # unlink needs a writable parent
-                if q.exists() and not q.is_symlink():
-                    os.chmod(q, stat.S_IRWXU)
-            func(p)
-        except OSError as e:
-            raise EnvSetupError(f"cannot remove {path}; delete it by hand") from e
+            for q in (p.parent, p):  # unlink needs a writable parent
+                if inside(q) and q.exists() and not q.is_symlink():
+                    os.chmod(q, os.stat(q).st_mode | stat.S_IRWXU)
+            if p.is_symlink() or p.is_file():
+                os.unlink(p)
+            elif p.is_dir():
+                shutil.rmtree(p)
+        except Exception as e:
+            raise EnvSetupError(hand) from e
 
-    if Path(path).is_symlink() or Path(path).exists():
+    if path.is_symlink():
+        try:
+            os.unlink(path)
+        except OSError as e:
+            raise EnvSetupError(hand) from e
+    elif path.exists():
         shutil.rmtree(path, onexc=onexc)
+    if path.is_symlink() or path.exists():
+        raise EnvSetupError(hand)
 
 
 def _leftover_files(root: Path) -> list[Path]:

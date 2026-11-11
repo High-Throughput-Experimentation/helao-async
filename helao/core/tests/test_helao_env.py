@@ -757,3 +757,37 @@ def test_rmtree_force_raises_when_it_cannot_remove(tmp_path, monkeypatch):
     finally:
         monkeypatch.undo()
         d.chmod(0o700)
+
+
+def test_rmtree_force_leaves_the_parent_mode_alone(tmp_path):
+    parent = tmp_path / "p"
+    parent.mkdir()
+    parent.chmod(0o775)
+    top = parent / "t"
+    top.mkdir()
+    (top / "f").write_text("x", encoding="utf-8")
+    top.chmod(0o000)
+    he._rmtree_force(top)
+    assert not top.exists() and (parent.stat().st_mode & 0o777) == 0o775
+
+
+def test_rmtree_force_handles_an_unreadable_subdir(tmp_path):
+    top = tmp_path / "t"
+    (top / "sub").mkdir(parents=True)
+    (top / "sub" / "f").write_text("x", encoding="utf-8")
+    (top / "sub").chmod(0o000)
+    he._rmtree_force(top)  # never TypeError; here the chmod lets it succeed
+    assert not top.exists()
+
+
+def test_rmtree_force_unlinks_a_symlinked_top_and_keeps_the_target(tmp_path):
+    tmp_path.chmod(0o775)
+    target = tmp_path / "target"
+    target.mkdir()
+    (target / "keep.txt").write_text("k", encoding="utf-8")
+    link = tmp_path / ".hte-clone.tmp"
+    link.symlink_to(target)
+    he._rmtree_force(link)
+    assert not link.is_symlink() and not link.exists()
+    assert (target / "keep.txt").is_file()
+    assert (tmp_path.stat().st_mode & 0o777) == 0o775
