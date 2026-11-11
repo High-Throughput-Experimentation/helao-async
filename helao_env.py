@@ -293,7 +293,9 @@ def hte_state(deploy_root: Path = DEPLOY_ROOT, repo_root: Path = REPO_ROOT) -> s
         )
     if not hte.resolve().is_relative_to(root):
         raise EnvSetupError(f"{hte} is outside {repo_root}; not touching it")
-    ls = _git_out(root, "ls-files", "--error-unmatch", str(hte.resolve()))
+    ls = _git_out(
+        root, "ls-files", "--error-unmatch", str(hte.resolve().relative_to(root))
+    )
     if ls.returncode == 0:
         return "tracked"
     if ls.returncode == 1:
@@ -310,14 +312,19 @@ def ensure_hte(
 ) -> str:
     """Pull hte if it is a clone, clone it if missing, replace a leftover with a clone.
 
-    A leftover is what a parent pull leaves after the split: __pycache__ plus any
-    station-local files. A replacement clones first into a scratch folder beside
-    the checkout (outside helao/deploy, which launchers glob), sets the leftover
-    aside, logs every non-cache file in it to stderr and
-    STATES/hte_leftover_<time>.txt, swaps the clone in, then removes the set-aside
-    copy. Any failure puts the leftover back. A stranded set-aside copy makes
-    this raise, which blocks every run that needs hte until an operator removes
-    it; main() warns and continues for runs that do not need hte.
+    A clone first gets its deleted tracked files restored (a parent checkout
+    that still tracks hte empties it); modified and untracked files are never
+    touched. A leftover is what a parent pull leaves after the split:
+    __pycache__ plus any station-local files. A replacement clones first into a
+    scratch folder beside the checkout (outside helao/deploy, which launchers
+    glob), moves the leftover to STATES/hte_leftover_<time>/ (never deleted: it
+    may hold untracked and ignored station files), logs every non-cache file in
+    it to stderr and STATES/hte_leftover_<time>.txt, then swaps the clone in. Any
+    failure puts the leftover back. The archive move is a plain rename, so if
+    STATES is on another filesystem it fails closed and hte is left untouched.
+    A stranded .hte-leftover.tmp from an older run makes this raise, which
+    blocks every run that needs hte until an operator inspects it; main() warns
+    and continues for runs that do not need hte.
     A failed clone or pull (non-fast-forward, local edits in the way) raises and
     leaves the existing folder as it was.
     """
@@ -332,7 +339,7 @@ def ensure_hte(
     state = hte_state(deploy_root, repo_root)
     if state == "tracked":
         return "tracked"
-    if fresh.exists():
+    if fresh.exists() or fresh.is_symlink():
         if dry_run:
             print(f"+ rm -r {fresh}  # stale scratch clone", flush=True)
         else:
@@ -346,45 +353,74 @@ def ensure_hte(
         runner = _dry_runner
 
     if state == "repo":
+        gone = _git_out(hte, "ls-files", "-z", "--deleted")
+        if gone.returncode != 0:
+            raise subprocess.CalledProcessError(
+                gone.returncode, gone.args, gone.stdout, gone.stderr
+            )
+        names = [n for n in gone.stdout.split("\0") if n]
+        if names:
+            print(
+                f"{'would restore' if dry_run else 'restoring'} {len(names)} deleted "
+                f"tracked file(s) in {hte} (a parent checkout that tracks hte empties it)",
+                flush=True,
+            )
+            if not dry_run:
+                subprocess.run(
+                    [
+                        "git",
+                        "--literal-pathspecs",
+                        "-C",
+                        str(hte),
+                        "checkout",
+                        "--pathspec-from-file=-",
+                        "--pathspec-file-nul",
+                    ],
+                    input="\0".join(names),
+                    text=True,
+                    check=True,
+                )
         runner(["git", "-C", str(hte), "pull", "--ff-only"])
         return "pulled"
     if state == "missing":
         runner(["git", "clone", url, str(hte)])
         return "cloned"
+    stamp = time.strftime("%Y%m%d_%H%M%S")
+    states = repo_root / "STATES"
+    archive = states / f"hte_leftover_{stamp}"
     if dry_run:
         runner(["git", "clone", url, str(fresh)])
-        print(f"+ mv {hte} {aside}", flush=True)
+        print(f"+ mv {hte} {archive}", flush=True)
         for p in _leftover_files(hte):
-            _warn(f"would remove leftover {p}")
+            _warn(f"would archive leftover {p}")
         print(f"+ mv {fresh} {hte}", flush=True)
-        print(f"+ rm -r {aside}", flush=True)
         return "replaced"
+    if archive.exists():
+        raise EnvSetupError(f"{archive} already exists; run again in a second")
     try:
         runner(["git", "clone", url, str(fresh)])
     except BaseException:
         _rmtree_force(fresh)
         raise
     try:
-        hte.rename(aside)
+        states.mkdir(exist_ok=True)
+        hte.rename(archive)
     except BaseException:  # nothing moved: only the scratch clone to drop
         _rmtree_force(fresh)
         raise
     try:
-        files = [hte / p.relative_to(aside) for p in _leftover_files(aside)]
+        files = [hte / p.relative_to(archive) for p in _leftover_files(archive)]
         for p in files:
-            _warn(f"removing leftover {p}")
-        states = repo_root / "STATES"
-        states.mkdir(exist_ok=True)
-        stamp = time.strftime("%Y%m%d_%H%M%S")
+            _warn(f"archiving leftover {p}")
         (states / f"hte_leftover_{stamp}.txt").write_text(
             "".join(f"{p}\n" for p in files), encoding="utf-8"
         )
         fresh.rename(hte)
     except BaseException:
-        aside.rename(hte)  # put the leftover back before anything else
+        archive.rename(hte)  # put the leftover back before anything else
         _rmtree_force(fresh)
         raise
-    _rmtree_force(aside)
+    print(f"hte leftover archived to {archive} (file list: {archive}.txt)", flush=True)
     return "replaced"
 
 

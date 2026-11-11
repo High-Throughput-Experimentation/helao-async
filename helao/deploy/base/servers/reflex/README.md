@@ -1,6 +1,6 @@
 # reflex
 
-Reflex panel modules for the `hte` deployment: the Reflex counterparts of the Bokeh panels in `../visualizer/`. They answer to the same `action_vis` / `live_vis` / `control_vis` keys. A station gains them by adding a `reflex:` server entry; no per-server config change is needed.
+Reflex panel modules shared by every deployment: the Reflex counterparts of the Bokeh panels in `../visualizer/`. They answer to the same `action_vis` / `live_vis` / `control_vis` keys. A station gains them by adding a `reflex:` server entry; no per-server config change is needed.
 
 ## Vendor software
 No vendor software beyond the env files.

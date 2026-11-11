@@ -466,14 +466,20 @@ def test_ensure_hte_logs_and_replaces_a_leftover(tmp_path, remote, capsys):
     (left / "configs").mkdir()
     (left / "configs" / "station_local.yml").write_text("x: 1\n", encoding="utf-8")
     assert _REAL_ENSURE_HTE(deploy, tmp_path, url=str(bare)) == "replaced"
-    err = capsys.readouterr().err
+    cap = capsys.readouterr()
+    err = cap.err
     assert "station_local.yml" in err
     assert "a.cpython-314.pyc" not in err and "b.pyc" not in err
     assert (left / ".git").exists() and not (
         left / "configs" / "station_local.yml"
     ).exists()
-    assert not list(tmp_path.glob(".hte-*.tmp"))
     (listing,) = (tmp_path / "STATES").glob("hte_leftover_*.txt")
+    archive = listing.with_suffix("")  # same stamp, no .txt
+    assert (archive / "configs" / "station_local.yml").read_text(
+        encoding="utf-8"
+    ) == "x: 1\n"
+    assert str(archive) in cap.out
+    assert not list(tmp_path.glob(".hte-*.tmp"))
     text = listing.read_text(encoding="utf-8")
     assert "station_local.yml" in text and ".pyc" not in text
 
@@ -493,10 +499,10 @@ def test_ensure_hte_dry_run_changes_nothing(tmp_path, remote, capsys):
         "git clone",
         "mv " + str(deploy / "hte"),
         "mv " + str(tmp_path / ".hte-clone"),
-        "rm -r",
     )
     order = [out.index(m) for m in marks]
     assert order == sorted(order) and "git clone" in out
+    assert "STATES" in out and not (tmp_path / "STATES").exists()
 
 
 def test_ensure_hte_leaves_a_tracked_folder_alone(tmp_path, remote):
@@ -679,6 +685,76 @@ def test_a_failed_rename_restores_the_leftover(tmp_path, remote, monkeypatch, vi
 
     monkeypatch.setattr(Path, "rename", boom)
     with pytest.raises(PermissionError):
+        _REAL_ENSURE_HTE(deploy, tmp_path, url=str(bare))
+    _assert_intact(tmp_path, deploy)
+
+
+def _clone_repo(tmp_path, bare):
+    deploy = tmp_path / "deploy"
+    deploy.mkdir()
+    subprocess.run(
+        ["git", "clone", str(bare), str(deploy / "hte")],
+        check=True,
+        capture_output=True,
+    )
+    return deploy
+
+
+def test_a_repo_clone_gets_its_deleted_tracked_files_back(tmp_path, remote, capsys):
+    bare, _ = remote
+    deploy = _clone_repo(tmp_path, bare)
+    hte = deploy / "hte"
+    (hte / "README.md").unlink()
+    (hte / "servers" / "__init__.py").unlink()
+    assert _REAL_ENSURE_HTE(deploy, tmp_path, url=str(bare)) == "pulled"
+    assert (hte / "README.md").read_text(encoding="utf-8") == "v1\n"
+    assert (hte / "servers" / "__init__.py").is_file()
+    assert "restoring 2 deleted" in capsys.readouterr().out
+
+
+def test_restore_leaves_modified_and_untracked_files_alone(tmp_path, remote):
+    bare, _ = remote
+    deploy = _clone_repo(tmp_path, bare)
+    hte = deploy / "hte"
+    (hte / "servers" / "__init__.py").unlink()
+    (hte / "README.md").write_text("edited\n", encoding="utf-8")
+    (hte / "mine.txt").write_text("keep", encoding="utf-8")
+    _REAL_ENSURE_HTE(deploy, tmp_path, url=str(bare))
+    assert (hte / "servers" / "__init__.py").is_file()
+    assert (hte / "README.md").read_text(encoding="utf-8") == "edited\n"
+    assert (hte / "mine.txt").read_text(encoding="utf-8") == "keep"
+
+
+def test_dry_run_reports_the_restore_and_changes_nothing(tmp_path, remote, capsys):
+    bare, _ = remote
+    deploy = _clone_repo(tmp_path, bare)
+    (deploy / "hte" / "README.md").unlink()
+    _REAL_ENSURE_HTE(deploy, tmp_path, url=str(bare), dry_run=True)
+    assert "would restore 1 deleted" in capsys.readouterr().out
+    assert not (deploy / "hte" / "README.md").exists()
+
+
+def test_a_dangling_scratch_symlink_is_removed(tmp_path, remote):
+    bare, _ = remote
+    deploy = _replace_ready(tmp_path)
+    (tmp_path / ".hte-clone.tmp").symlink_to(tmp_path / "nowhere")
+    assert _REAL_ENSURE_HTE(deploy, tmp_path, url=str(bare)) == "replaced"
+    assert not list(tmp_path.glob(".hte-*.tmp"))
+    assert (deploy / "hte" / ".git").exists()
+
+
+def test_a_cross_device_archive_fails_closed(tmp_path, remote, monkeypatch):
+    bare, _ = remote
+    deploy = _replace_ready(tmp_path)
+    real = Path.rename
+
+    def boom(self, target):
+        if self.name == "hte" and "STATES" in str(target):
+            raise OSError("EXDEV")
+        return real(self, target)
+
+    monkeypatch.setattr(Path, "rename", boom)
+    with pytest.raises(OSError):
         _REAL_ENSURE_HTE(deploy, tmp_path, url=str(bare))
     _assert_intact(tmp_path, deploy)
 

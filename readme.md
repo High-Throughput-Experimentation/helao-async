@@ -22,7 +22,7 @@ From a miniconda prompt or PowerShell with an active conda profile:
     cd helao-async
     bash setup_env.sh
 
-`setup_env` clones the `hte` deployment (https://github.com/High-Throughput-Experimentation/helao-hte-deployment) into `helao/deploy/hte` when it is missing, and `update_env` pulls it when a station config uses it.
+`setup_env` clones the `hte` deployment (https://github.com/High-Throughput-Experimentation/helao-hte-deployment) into `helao/deploy/hte` when it is missing, and `update_env` pulls it whenever it is a git repo, not only when a config uses it.
 
 `setup_env` creates the `helao` env from `helao_dev_<platform>.yml` if it is missing, activates it and checks that `helao` is the active env, installs `requirements.txt` with `uv pip install`, and sets `PYTHONPATH` (the repo root) and `HELAOLAUNCH` in the env. With no arguments that is the whole install: the base env from the root env files. For a station, add its config prefixes (`setup_env.bat <prefix> ...` / `bash setup_env.sh <prefix> ...`) to also install the packages its servers need and record the prefixes for later `update_env` runs.
 
@@ -68,12 +68,14 @@ See the launch section of [CLAUDE.md](CLAUDE.md) for the flags, and for what hap
 ## Upgrading a station across the `hte` split (2026-11)
 
 1. Stop the group (`CTRL-x`). Otherwise the hot-reload watcher sees a pull that deletes every `hte` module.
-2. Run `git -C <repo> status --short helao/deploy/hte`. Local edits to tracked `hte` files make `git pull` refuse; copy them out first (`update.sh`/`update.bat` discard them with `reset --hard`).
+2. Run `git -C <repo> status --short --ignored helao/deploy/hte`. Local edits to tracked `hte` files make `git pull` refuse; copy them out first (`update.sh`/`update.bat` discard them with `reset --hard`). Untracked and ignored station files in the folder are not lost: `update_env` archives the whole leftover under `<root>/STATES/hte_leftover_<time>/` (file list in `hte_leftover_<time>.txt` beside it).
 3. Pull the parent **and every private deployment repo** (`update.bat`/`update.sh` do both). A private repo still pinning `deployment: hte` on a framework service, or importing `helao.deploy.hte.servers.reflex`, breaks until it is pulled too.
-4. Run `update_env` (no arguments replays the recorded configs). It logs and removes the leftover `helao/deploy/hte` folder and clones the new repo.
+4. Run `update_env` (no arguments replays the recorded configs). It logs the leftover `helao/deploy/hte` folder, moves it to `STATES/hte_leftover_<time>/` and clones the new repo. If `update_env` fails before it reaches `hte`, do this by hand: move the leftover folder aside, then run `git clone https://github.com/High-Throughput-Experimentation/helao-hte-deployment.git helao/deploy/hte`.
 5. Relaunch. The Reflex bundle rebuilds once, because its module paths changed.
 
-Rollback: `git revert` the cutover commit. A station that already cloned `hte` keeps working, because the path is ignored either way.
+Rollback: move the `hte` clone aside first (for example to `STATES/`), then pull the revert: the revert re-tracks `hte` and overwrites the clone. Rolling forward again empties the clone; `update_env` restores it.
+
+Switching branches or commits: `switch.sh`, `switch.bat` and `reset_unstable.bat` pass through `main`, which still tracks `hte` until the next release. Checking out a commit that tracks `hte` empties the `hte` clone (its tracked files are deleted). Run `update_env` afterwards: it restores the deleted tracked files and leaves modified and untracked files alone.
 
 ## Development notes
 
