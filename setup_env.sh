@@ -1,26 +1,24 @@
 #!/usr/bin/env bash
-HA_DIR=$(readlink -f $0 | xargs -0 dirname)
-CONDA_DIR=$(echo $CONDA_EXE | xargs -0 dirname | xargs -0 dirname)
-source $CONDA_DIR/etc/profile.d/conda.sh
-if [[ ! $(conda env list | grep "^helao.*envs/helao$") ]]
-then
-    echo "'helao' conda environment was not found, creating it now..."
-    conda env create --solver=rattler -f "$HA_DIR/helao_dev_linux-64.yml" -n helao || exit 1
+# Create or update the helao pixi environment, then install the packages of
+# the given station config prefixes. update_env.sh runs this with mode update.
+HA_DIR=$(dirname "$(readlink -f "$0")")
+MODE=${HELAO_ENV_MODE:-setup}
+PIXI=$(command -v pixi || true)
+[ -z "$PIXI" ] && [ -x "$HOME/.pixi/bin/pixi" ] && PIXI="$HOME/.pixi/bin/pixi"
+if [ -z "$PIXI" ]; then
+    echo "pixi not found; installing it to ~/.pixi ..."
+    curl -fsSL https://pixi.sh/install.sh | bash || exit 1
+    PIXI="$HOME/.pixi/bin/pixi"
 fi
-echo ""
-echo ""
-echo "setting PYTHONPATH in 'helao' conda environment vars"
-conda activate helao
-if [ "$CONDA_DEFAULT_ENV" != "helao" ] || [[ "$CONDA_PREFIX" != */envs/helao ]]
-then
-    echo "ERROR: expected conda env 'helao', got '$CONDA_DEFAULT_ENV' ($CONDA_PREFIX)" >&2
-    exit 1
+WS="$HA_DIR/.helao-env"
+if [ ! -f "$WS/pixi.toml" ]; then
+    mkdir -p "$WS" || exit 1
+    cp "$HA_DIR/pixi.toml" "$HA_DIR/pixi.lock" "$WS/" || exit 1
 fi
-uv pip install --python "$CONDA_PREFIX/bin/python" -r "$HA_DIR/requirements.txt" || exit 1
-PYTHONPATH="$HA_DIR" python "$HA_DIR/helao_env.py" setup "$@" || exit 1
-conda env config vars set PYTHONPATH=$HA_DIR > /dev/null
-conda env config vars set HELAOLAUNCH="$HA_DIR/helao.sh" > /dev/null
-chmod +x $HA_DIR/helao.sh
-conda deactivate
+# Run helao_env.py in the env. pixi installs it from the lock on first use, and
+# the env's location is pixi's business (detached-environments may move it).
+PIXI="$PIXI" "$PIXI" run --frozen --manifest-path "$WS/pixi.toml" \
+    python "$HA_DIR/helao_env.py" "$MODE" "$@" || exit 1
+chmod +x "$HA_DIR/helao.sh"
 echo ""
-echo "'helao' environment setup is complete"
+echo "'helao' environment $MODE is complete"

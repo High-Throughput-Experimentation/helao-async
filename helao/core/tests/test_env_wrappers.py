@@ -129,3 +129,40 @@ def test_helao_sh_falls_back_to_conda_with_a_warning(repo, tmp_path):
 def test_helao_sh_without_any_env_says_run_setup_env(repo, tmp_path):
     r = _run([str(repo / "helao.sh"), "x"], _env(tmp_path, []), repo)
     assert r.returncode != 0 and "setup_env" in r.stderr
+
+
+def _stub_pixi_run(bindir: Path, log: Path) -> Path:
+    """pixi stub: logs its args; `run` exits with the code in <log>.rc if present."""
+    return _exe(
+        bindir / "pixi",
+        f'echo "$@" >> "{log}"\n'
+        f'if [ "$1" = run ] && [ -f "{log}.rc" ]; then exit "$(cat "{log}.rc")"; fi\n',
+    )
+
+
+def test_setup_env_copies_base_once_then_runs_helao_env_in_the_env(repo, tmp_path):
+    log = tmp_path / "pixi.log"
+    bindir = tmp_path / "bin"
+    _stub_pixi_run(bindir, log)
+    env = _env(tmp_path, [bindir])
+    r = _run([str(repo / "setup_env.sh"), "demo1"], env, repo)
+    assert r.returncode == 0, r.stderr
+    ws = repo / ".helao-env"
+    assert (ws / "pixi.toml").read_text() == "[workspace]\n"  # copied base
+    assert (ws / "pixi.lock").read_text() == "version: 6\n"
+    run = f"run --frozen --manifest-path {ws / 'pixi.toml'} python {repo / 'helao_env.py'}"
+    assert log.read_text().splitlines() == [f"{run} setup demo1"]
+    (ws / "pixi.toml").write_text("[workspace]\n# composed\n", encoding="utf-8")
+    r = _run([str(repo / "update_env.sh")], env, repo)
+    assert r.returncode == 0, r.stderr
+    assert (ws / "pixi.toml").read_text().endswith("# composed\n")  # not re-copied
+    assert log.read_text().splitlines()[-1] == f"{run} update"
+
+
+def test_setup_env_stops_when_helao_env_fails(repo, tmp_path):
+    log = tmp_path / "pixi.log"
+    bindir = tmp_path / "bin"
+    _stub_pixi_run(bindir, log)
+    Path(f"{log}.rc").write_text("2", encoding="utf-8")
+    r = _run([str(repo / "setup_env.sh"), "x"], _env(tmp_path, [bindir]), repo)
+    assert r.returncode != 0 and "complete" not in r.stdout
