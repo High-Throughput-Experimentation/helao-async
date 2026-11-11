@@ -36,9 +36,30 @@ def init_colorama() -> None:
 
 
 def load_alert_config(config: dict) -> dict:
-    """The email/webhook alert settings named by ``alert_config_path``, else ``{}``."""
+    """The email/webhook alert settings named by ``alert_config_path``, else ``{}``.
+
+    Fails soft: a missing file (an unmounted share) or a non-mapping document
+    warns on stderr and gives ``{}``, so servers start without alerts instead of
+    crashing. ``yml_load`` would parse a missing path's text as YAML (a str).
+    The logger does not exist yet, hence stderr.
+    """
     path = config.get("alert_config_path")
-    return yml_load(path) if path else {}
+    if not path:
+        return {}
+    if not os.path.isfile(path):
+        print(
+            f"WARNING: alert_config_path {path} not found; alerts disabled",
+            file=sys.stderr,
+        )
+        return {}
+    alert = yml_load(path)
+    if not isinstance(alert, dict):
+        print(
+            f"WARNING: alert_config_path {path} is not a mapping; alerts disabled",
+            file=sys.stderr,
+        )
+        return {}
+    return alert
 
 
 def launcher_bootstrap(conf_arg: str, server_key: str):
