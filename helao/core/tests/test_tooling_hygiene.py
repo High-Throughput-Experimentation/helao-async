@@ -50,13 +50,6 @@ def test_test_configs_carry_no_user_home_root():
     assert not bad, bad
 
 
-def test_smoke_canary_configs_carry_no_alert_config_path():
-    cfgs = list((REPO / "helao/deploy/hte/tests/smoke/configs").glob("*.yml"))
-    assert cfgs
-    bad = [c.name for c in cfgs if "alert_config_path" in c.read_text(encoding="utf-8")]
-    assert not bad, bad
-
-
 def test_launch_unit_gate_failure_exits_nonzero():
     src = (REPO / "launch.py").read_text(encoding="utf-8")
     assert "if run_all_unit_tests() != 0:\n            sys.exit(1)" in src

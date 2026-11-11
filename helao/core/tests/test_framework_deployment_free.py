@@ -69,3 +69,28 @@ def _hits(path: Path) -> list[str]:
 def test_framework_names_no_deployment():
     hits = [h for f in _py_files() for h in _hits(f)]
     assert not hits, "\n".join(hits)
+
+
+def test_parent_tests_do_not_read_hte_by_path():
+    """Tests that need hte live in hte (spec §2). Text mentions are allowed;
+    a path or import a test would execute is not."""
+    pat = re.compile(
+        r"""["'][^"']*deploy[/\\]hte[/\\](configs|tests|servers|experiments|sequences)"""
+    )
+    allowed = {"helao/core/tests/test_palette.py"}  # SWEEP_EXEMPT_SITES (OQ-3)
+    hits = []
+    for root in (
+        "helao/core/tests",
+        "helao/hexagon/tests",
+        "harness/tests",
+        "helao/deploy/base/tests",
+        "helao/deploy/test/tests",
+    ):
+        for p in (REPO / root).rglob("*.py"):
+            rel = p.relative_to(REPO).as_posix()
+            if rel in allowed:
+                continue
+            for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+                if pat.search(line) or re.search(r"""["']hte/\w+["']""", line):
+                    hits.append(f"{rel}:{i}")
+    assert not hits, "\n".join(hits)

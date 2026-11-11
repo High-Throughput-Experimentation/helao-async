@@ -1,7 +1,7 @@
 """Validate every tracked deployment config against the HelaoConfig schema.
 
 Guards the 3b invariant: the typed config model must accept every config the
-launchers can be pointed at (helao/deploy/{hte,test}/configs/*.yml). Baseline
+launchers can be pointed at (helao/deploy/test/configs/*.yml). Baseline
 evidence 2026-07-10: 25/25 pass. Any future failure here is a schema/config
 divergence that would break the launch-time validation path.
 """
@@ -23,7 +23,7 @@ def _repo_root() -> str:
 def config_validation_unit_test() -> bool:
     reporter = TestReporter("config_validation")
     root = _repo_root()
-    for deployment in ("hte", "test"):
+    for deployment in ("test",):
         paths = sorted(
             glob(os.path.join(root, "helao", "deploy", deployment, "configs", "*.yml"))
         )

@@ -1,4 +1,4 @@
-"""Gate configs for the Reflex server in two deployments (test and hte)."""
+"""Gate configs for the Reflex server in the test deployment (hte's are in its own tests)."""
 
 import os
 
@@ -8,11 +8,8 @@ _REPO_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
 _CONFIGS = os.path.join(_REPO_ROOT, "helao", "deploy", "test", "configs")
-_HTE_CONFIGS = os.path.join(_REPO_ROOT, "helao", "deploy", "hte", "configs")
 _HEX = os.path.join(_CONFIGS, "goldenhexreflex.yml")
 _LEGACY = os.path.join(_CONFIGS, "goldenreflex.yml")
-_HTE_HEX = os.path.join(_HTE_CONFIGS, "htehexreflex.yml")
-_HTE_LEGACY = os.path.join(_HTE_CONFIGS, "htereflex.yml")
 
 
 def _load(path):
@@ -21,7 +18,7 @@ def _load(path):
     return read_config(path)
 
 
-@pytest.mark.parametrize("path", [_HEX, _HTE_HEX])
+@pytest.mark.parametrize("path", [_HEX])
 def test_gate_config_validates(path):
     import types
 
@@ -34,7 +31,7 @@ def test_gate_config_validates(path):
     assert validateConfig(pidd, conf, _REPO_ROOT) is True
 
 
-@pytest.mark.parametrize("path", [_HEX, _HTE_HEX])
+@pytest.mark.parametrize("path", [_HEX])
 def test_gate_config_preflights_clean(path):
     """Each gate config preflights with no findings."""
     from helao.hexagon import preflight
@@ -42,7 +39,7 @@ def test_gate_config_preflights_clean(path):
     assert preflight.preflight_config(path) == []
 
 
-@pytest.mark.parametrize("path", [_HEX, _HTE_HEX])
+@pytest.mark.parametrize("path", [_HEX])
 def test_the_reflex_key_still_names_the_bundle_not_a_module(path):
     """The rejected alternative, pinned. `reflex:`'s value is read by
     `resolve_bundle`/`build_reflex_bundle.py` as a directory name; making it a
@@ -52,7 +49,7 @@ def test_the_reflex_key_still_names_the_bundle_not_a_module(path):
     assert _load(path)["servers"]["UI"]["reflex"] == reflex_bundle.APP_NAME
 
 
-@pytest.mark.parametrize("path", [_HEX, _HTE_HEX])
+@pytest.mark.parametrize("path", [_HEX])
 def test_the_backend_port_is_reserved_by_the_gate_config(path):
     """A reflex server claims `port` and `port + 1`; nothing else in this
     config may hold either, and preflight is what enforces it. The backend
@@ -77,15 +74,4 @@ def test_both_configs_carry_the_ws_sources_the_panels_need(path):
     assert servers["SIM"]["live_vis"] == "wssim_panel"
     assert servers["CPSIM"]["action_vis"] == "oersim_panel"
     assert servers["GPSIM"]["live_vis"] == "gpsim_panel"
-    assert servers["UI"]["params"]["pages"] == ["live", "action"]
-
-
-@pytest.mark.parametrize("path", [_HTE_HEX, _HTE_LEGACY])
-def test_the_hte_pair_carries_the_panel_sources_too(path):
-    """Same rendering-gate requirement for the hte dev pair, whose panels are
-    the hte ones resolved from `live_vis`/`action_vis` (the sources are the
-    test deployment's simulators pointed at hte column names)."""
-    servers = _load(path)["servers"]
-    assert servers["CO2SENSOR"]["live_vis"] == "co2_vis"
-    assert servers["GAMRY"]["action_vis"] == "gamry_vis"
     assert servers["UI"]["params"]["pages"] == ["live", "action"]

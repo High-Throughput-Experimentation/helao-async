@@ -11,6 +11,9 @@ import types
 
 import pytest
 
+# pymecom lives in the tec server env; the base env may lack it
+pytest.importorskip("mecom")
+
 from helao.core.drivers.helao_driver import DriverResponseType
 from helao.core.error import ErrorCodes
 from helao.deploy.hte.servers.nidaqmx.nidaqmx_driver import cNIMAX

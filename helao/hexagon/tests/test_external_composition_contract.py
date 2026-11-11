@@ -154,38 +154,17 @@ def test_the_sweep_is_not_vacuous() -> None:
 
 
 # ---------------------------------------------------------------------------
-# The registrar contract
+# The registrar contract (the pins live with the deployment that owns the
+# registrar: helao/deploy/hte/tests/test_host_surfaces_hte.py)
 # ---------------------------------------------------------------------------
 
-#: Every ``app.<attr>`` an hte ``*_dyn_endpoints`` registrar reads, by module.
-#: These functions are exported, and at least one is composed by a deployment
-#: outside this repo (through ``overlay_dyn_endpoints``), so the attribute set
-#: is a published interface: a consumer stubs exactly these.
-#:
-#: Changing one is allowed. Changing one *silently* is what B5 did, and what
-#: cost a private repo a red suite that nothing here reported. Update the entry
-#: in the same commit, and treat the diff as the list of consumers to warn.
-REGISTRAR_CONTRACT: Final[dict[str, set[str]]] = {
-    "gamry_server2": {
-        "action",
-        "driver",
-        "executors",
-        "post",
-        "server",
-        "server_params",
-        "stop_executor",
-    },
-}
 
-
-def _hte_module(stem: str) -> Path:
-    return next(
-        (REPO_ROOT / "helao/deploy/hte/servers").glob(f"*/{stem}.py"), Path(stem)
-    )
+def _registrar_module(stem: str) -> Path:
+    return next(DEPLOY.glob(f"*/servers/*/{stem}.py"), Path(stem))
 
 
 def _registrar_reads(module_stem: str) -> set[str]:
-    path = _hte_module(module_stem)
+    path = _registrar_module(module_stem)
     tree = ast.parse(path.read_text(encoding="utf-8"))
     fn = next(
         (
@@ -204,22 +183,3 @@ def _registrar_reads(module_stem: str) -> set[str]:
         and isinstance(node.value, ast.Name)
         and node.value.id == "app"
     }
-
-
-@pytest.mark.parametrize("module_stem", sorted(REGISTRAR_CONTRACT))
-def test_registrar_reads_exactly_the_pinned_attributes(module_stem: str) -> None:
-    expected = REGISTRAR_CONTRACT[module_stem]
-    actual = _registrar_reads(module_stem)
-    assert actual == expected, (
-        f"{module_stem}'s registrar now reads {sorted(actual)}, pinned as "
-        f"{sorted(expected)}. This function is composed by a deployment outside "
-        "this repo, which stubs exactly this set -- added: "
-        f"{sorted(actual - expected)}, removed: {sorted(expected - actual)}."
-    )
-
-
-def test_the_contract_probe_is_not_vacuous() -> None:
-    """A typo'd module stem would make the pin above assert over nothing."""
-    for stem in REGISTRAR_CONTRACT:
-        assert (_hte_module(stem)).exists(), f"{stem} is pinned but has no module"
-        assert _registrar_reads(stem), f"{stem}'s registrar reads no app attributes"

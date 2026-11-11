@@ -2,7 +2,7 @@ from pathlib import Path
 
 from harness.hte_collisions import scan_collisions
 
-HTE = Path(__file__).resolve().parents[2] / "helao/deploy/hte"
+HTE = Path(__file__).resolve().parents[1]
 EXP = HTE / "experiments"
 SEQ = HTE / "sequences"
 

@@ -15,6 +15,9 @@ import types
 
 import pytest
 
+# pymecom lives in the tec server env; the base env may lack it
+pytest.importorskip("mecom")
+
 from helao.core.drivers.helao_driver import DriverResponse
 import helao.deploy.hte.servers.o2sensor.cm0134_driver as cm0134
 import helao.deploy.hte.servers.co2sensor.sprintir_driver as sprintir

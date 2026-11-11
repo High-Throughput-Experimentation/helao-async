@@ -26,7 +26,7 @@ from helao.hexagon.ports.hardware import DriverHostPort
 
 REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 ROOTS: Final[tuple[str, ...]] = (
-    "helao/deploy/hte",
+    "helao/deploy/base",
     "helao/hexagon/adapters/native",
     "helao/core/drivers",
 )
@@ -132,8 +132,8 @@ def test_no_forbidden_host_read() -> None:
 
 def test_the_scan_sees_every_measured_read() -> None:
     _, reads, files = scan(_source_files())
-    # floor dropped by one read/file when the legacy galil_motion_driver was deleted
-    assert reads >= 30 and len(files) >= 15, (reads, len(files))
+    # the 29 reads / 14 files of hte moved to helao/deploy/hte/tests/test_host_surfaces_hte.py (2026-11-10)
+    assert reads >= 1 and len(files) >= 1, (reads, len(files))
 
 
 def test_allowed_set_is_the_ten_members() -> None:

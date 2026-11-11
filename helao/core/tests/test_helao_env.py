@@ -69,24 +69,12 @@ def test_unknown_prefix(root):
         he.resolve_config("nope", root)
 
 
-def test_server_folders_of_a_real_hte_config():
-    cfg = (
-        he.resolve_config("hte/anec")
-        if (he.DEPLOY_ROOT / "hte/configs/anec.yml").exists()
-        else None
-    )
-    if cfg is None:
-        pytest.skip("anec config not present")
-    folders = {f.name for f in he.server_folders(cfg)}
-    assert {"gamry", "nidaqmx", "galil_motion"} <= folders
-
-
 def test_unresolvable_module_names_the_server(tmp_path, monkeypatch):
     cfg = tmp_path / "x.yml"
     cfg.write_text(
         "root: " + str(tmp_path) + "\nservers:\n  BAD:\n    host: 127.0.0.1\n"
         "    port: 9999\n    group: action\n    fast: no_such_module\n"
-        "    deployment: hte\n",
+        "    deployment: test\n",
         encoding="utf-8",
     )
     with pytest.raises(he.EnvSetupError, match="BAD"):
@@ -230,7 +218,7 @@ def test_main_missing_tool_exits_2(monkeypatch, capsys):
 
     monkeypatch.setattr(he, "_run", boom)
     monkeypatch.setattr(he, "install", lambda folders, **kw: boom(["x"]))
-    assert he.main(["setup", "hte/anec"]) == 2
+    assert he.main(["setup", "test/goldenreflex"]) == 2
     assert "error:" in capsys.readouterr().err
 
 

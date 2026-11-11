@@ -3,18 +3,10 @@
 from __future__ import annotations
 
 import re
-import shutil
 
 import pytest
 
 from helao.hexagon import preflight
-from helao.helpers.config_loader import read_config
-
-# hte canary configs (P3a/P3e) were relocated out of helao/deploy/hte/configs/
-# into this centralized, hte-only directory; bare-prefix resolution (which
-# globs helao/deploy/*/configs/) no longer finds them, so they must be passed
-# by full path.
-SMOKE_CONFIGS = preflight.REPO_ROOT / "helao/deploy/hte/tests/smoke/configs"
 
 
 def test_config_sanity_duplicate_hostport():
@@ -291,16 +283,7 @@ def test_a_checklist_that_existed_at_b7c_and_is_gone_fails(tmp_path, monkeypatch
     assert len(issues) == 1 and "gamry_server2" in issues[0] and notes == []
 
 
-KNOWN_STATION_CONFIGS = [
-    "adss3",
-    "anec",
-    "ccsi2",
-    "clad",
-    "eche10",
-    "ecms3",
-    "hispec",
-    "test",
-]
+KNOWN_STATION_CONFIGS = ["test"]
 
 
 @pytest.mark.parametrize("prefix", KNOWN_STATION_CONFIGS)
@@ -311,25 +294,9 @@ def test_every_station_config_preflights_with_resolved_servers(prefix, capsys):
     assert m and int(m.group(1)) >= 1, out
 
 
-@pytest.mark.parametrize("prefix", ["htereflex", "htehexreflex"])
-def test_the_reflex_configs_pin_ws_simulator_to_test(prefix):
-    """D-B7c.5 / §2.4: with Deployment-A checked out, sorted order would pick its
-    ws_simulator. The pin is the explicit key, so assert the key, not the resolution."""
-    cfg = read_config(prefix)
-    entries = [s for s in cfg["servers"].values() if s.get("fast") == "ws_simulator"]
-    assert len(entries) == 4 and all(s.get("deployment") == "test" for s in entries)
-    issues, resolved = preflight._module_resolution(cfg)
-    assert issues == []
-    assert {
-        resolved[k]
-        for k, s in cfg["servers"].items()
-        if s.get("fast") == "ws_simulator"
-    } == {"test"}
-
-
 #: Deployments whose checklists live centrally, and which this public repo may
 #: name because it tracks them.
-PUBLIC_DEPLOYMENTS = ("hte", "test")
+PUBLIC_DEPLOYMENTS = ("base", "hte", "test")
 
 
 def _a_nested_deployment_with_checklists() -> str | None:
@@ -355,9 +322,9 @@ def _a_nested_deployment_with_checklists() -> str | None:
 def test_checklist_dir_prefers_private_in_repo_then_central():
     """A deployment's checklists live in its own tree
     (helao/deploy/<dep>/tests/checklists). Unknown/None -> None."""
-    hte = preflight._checklist_dir("hte")
-    assert hte is not None and hte.parts[-3:] == ("hte", "tests", "checklists")
-    assert "deploy" in hte.parts and "hexagon" not in hte.parts
+    base = preflight._checklist_dir("base")
+    assert base is not None and base.parts[-3:] == ("base", "tests", "checklists")
+    assert "deploy" in base.parts and "hexagon" not in base.parts
 
     nested = _a_nested_deployment_with_checklists()
     if nested is not None:  # only when such a nested repo is checked out
@@ -368,35 +335,6 @@ def test_checklist_dir_prefers_private_in_repo_then_central():
 
     assert preflight._checklist_dir(None) is None
     assert preflight._checklist_dir("no_such_deployment") is None
-
-
-def test_a_scratch_copy_of_a_config_still_exercises_the_checklist_gate(
-    tmp_path, monkeypatch
-):
-    """P4f's silent-pass trap, closed by D-B7c.5, as a positive control.
-
-    `_config_deployment` infers the deployment from the config's PATH, so a
-    scratch copy has none. Gate 3 no longer depends on it: it looks up the
-    OWNING deployment gate 2 resolved (here the explicit `deployment: hte`), so
-    identical bytes are checked identically in-tree and out. With the checklist
-    set emptied, both report the same real finding.
-    """
-    src = SMOKE_CONFIGS / "gamry.yml"
-    scratch = tmp_path / src.name
-    shutil.copy2(src, scratch)
-
-    assert preflight._config_deployment(str(src)) == "hte"
-    assert preflight._config_deployment(str(scratch)) is None
-    assert preflight.preflight_config(str(src)) == []
-    assert preflight.preflight_config(str(scratch)) == []
-
-    empty = tmp_path / "checklists"
-    empty.mkdir()
-    (empty / "_at_b7c.json").write_text('["gamry_server2"]', encoding="utf-8")
-    monkeypatch.setattr(preflight, "_checklist_dir", lambda deployment: empty)
-    for config in (src, scratch):
-        found = preflight.preflight_config(str(config))
-        assert len(found) == 1 and "frozen endpoint checklist" in found[0], found
 
 
 def test_claimed_addresses_agrees_with_the_launcher_on_reflex():
