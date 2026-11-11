@@ -8,8 +8,12 @@ git fetch --prune --all && git reset --hard && git pull
 cd "helao/deploy" || exit
 
 for dir in */; do
-    # Check if the directory is not "test" and not "hte"
-    if [[ "$dir" != "test/" && "$dir" != "hte/" && "$dir" != "__pycache__/" ]]; then
+    # test/ and base/ are tracked here; every other deployment is its own git repo
+    if [[ "$dir" != "test/" && "$dir" != "base/" && "$dir" != "__pycache__/" ]]; then
+        if [[ ! -e "$dir/.git" ]]; then
+            echo "--- skipping ${dir%/}: not a git repo (run update_env to clone or replace it) ---"
+            continue
+        fi
         echo "--- updating ${dir%/} ---"
         cd "$dir" || exit
         git pull

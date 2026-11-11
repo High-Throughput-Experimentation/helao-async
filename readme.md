@@ -22,6 +22,8 @@ From a miniconda prompt or PowerShell with an active conda profile:
     cd helao-async
     bash setup_env.sh
 
+`setup_env` clones the `hte` deployment (https://github.com/High-Throughput-Experimentation/helao-hte-deployment) into `helao/deploy/hte` when it is missing, and `update_env` pulls it when a station config uses it.
+
 `setup_env` creates the `helao` env from `helao_dev_<platform>.yml` if it is missing, activates it and checks that `helao` is the active env, installs `requirements.txt` with `uv pip install`, and sets `PYTHONPATH` (the repo root) and `HELAOLAUNCH` in the env. With no arguments that is the whole install: the base env from the root env files. For a station, add its config prefixes (`setup_env.bat <prefix> ...` / `bash setup_env.sh <prefix> ...`) to also install the packages its servers need and record the prefixes for later `update_env` runs.
 
 To pick up changed env files later, run `update_env.bat` / `bash update_env.sh`. It does the same, after a `conda env update` from the yml; with no arguments it replays the recorded station prefixes, or updates the base env only when none are recorded.
@@ -58,10 +60,20 @@ See the launch section of [CLAUDE.md](CLAUDE.md) for the flags, and for what hap
 | setup_env.bat / setup_env.sh | create the `helao` env if missing, install `requirements.txt` with uv, set `PYTHONPATH` and `HELAOLAUNCH` |
 | update_env.bat / update_env.sh | as `setup_env`, plus `conda env update` from the yml (adds `uv` to an older env) |
 | repin_envs.py | regenerate the pinned yml and requirements files from fresh solves |
-| update.bat / update.sh | **discards uncommitted changes to tracked files** in `helao-async` (`git reset --hard`), then pulls; `update.bat` does the same in every nested deployment repo, `update.sh` only pulls them (`hte` and `test` are skipped) |
+| update.bat / update.sh | **discards uncommitted changes to tracked files** in `helao-async` (`git reset --hard`), then pulls; `update.bat` resets and pulls every nested deployment repo; `update.sh` pulls them; `test` and `base` are tracked here and skipped; a deployment folder without `.git` is skipped with a message |
 | switch.bat / switch.sh | **force-deletes the local `unstable` and re-creates it from the remote first** (unpushed commits on it are lost), then switches `helao-async` and every nested deployment repo to a branch; nested repos fall back to their default branch, `helao-async` does not; `switch <deploy-folder> <branch>` switches one nested repo |
 | reset_unstable.bat | windows: re-create the local `unstable` from the remote; **discards uncommitted changes and unpushed `unstable` commits** |
 | hipy.bat | windows: activate `helao`, set `PYTHONPATH`, start ipython |
+
+## Upgrading a station across the `hte` split (2026-11)
+
+1. Stop the group (`CTRL-x`). Otherwise the hot-reload watcher sees a pull that deletes every `hte` module.
+2. Run `git -C <repo> status --short helao/deploy/hte`. Local edits to tracked `hte` files make `git pull` refuse; copy them out first (`update.sh`/`update.bat` discard them with `reset --hard`).
+3. Pull the parent **and every private deployment repo** (`update.bat`/`update.sh` do both). A private repo still pinning `deployment: hte` on a framework service, or importing `helao.deploy.hte.servers.reflex`, breaks until it is pulled too.
+4. Run `update_env` (no arguments replays the recorded configs). It logs and removes the leftover `helao/deploy/hte` folder and clones the new repo.
+5. Relaunch. The Reflex bundle rebuilds once, because its module paths changed.
+
+Rollback: `git revert` the cutover commit. A station that already cloned `hte` keeps working, because the path is ignored either way.
 
 ## Development notes
 
