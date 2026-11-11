@@ -1057,3 +1057,38 @@ def test_resolve_config_raises_config_not_found(tmp_path):
     (tmp_path / "a" / "configs").mkdir(parents=True)
     with pytest.raises(he.ConfigNotFound):
         he.resolve_config("nope", tmp_path)
+
+
+def test_failed_clone_without_a_prefix_warns_and_installs(
+    monkeypatch, tmp_path, capsys
+):
+    cfg = _cfg_file(tmp_path)
+    states = tmp_path / "s.json"
+    states.write_text(json.dumps([str(cfg)]), encoding="utf-8")
+    monkeypatch.setenv(he.ENV_VAR, str(states))
+    err = he.subprocess.CalledProcessError(1, ["git"])
+    calls, installed = _spy(monkeypatch, "missing", use="none", ensure=err)
+    assert he.main(["update"]) == 0
+    assert len(calls) == 1 and installed == [{Path("f")}]
+    assert "hte not updated" in capsys.readouterr().err
+
+
+def test_failed_clone_aborts_when_a_recorded_config_uses_hte(monkeypatch, tmp_path):
+    cfg = _cfg_file(tmp_path)
+    states = tmp_path / "s.json"
+    states.write_text(json.dumps([str(cfg)]), encoding="utf-8")
+    monkeypatch.setenv(he.ENV_VAR, str(states))
+    err = he.subprocess.CalledProcessError(1, ["git"])
+    calls, installed = _spy(monkeypatch, "missing", use="hte", ensure=err)
+    assert he.main(["update"]) == 2
+    assert installed == []
+
+
+def test_update_dry_run_with_a_vanished_hte_config_stops_early(monkeypatch, capsys):
+    calls, installed = _spy(monkeypatch, "missing", use="none")
+    monkeypatch.setattr(he, "_recorded_paths_exist", lambda: False)
+    monkeypatch.setattr(he, "stored_configs", lambda: [])
+    assert he.main(["update", "--dry-run"]) == 0
+    assert calls == [{"dry_run": True}] and installed == []
+    out = capsys.readouterr().out
+    assert "hte: would be pulled" in out and "base env only" not in out

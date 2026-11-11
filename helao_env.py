@@ -315,8 +315,9 @@ def ensure_hte(
     the checkout (outside helao/deploy, which launchers glob), sets the leftover
     aside, logs every non-cache file in it to stderr and
     STATES/hte_leftover_<time>.txt, swaps the clone in, then removes the set-aside
-    copy. Any failure puts the leftover back. A stranded set-aside copy blocks
-    every run until an operator removes it.
+    copy. Any failure puts the leftover back. A stranded set-aside copy makes
+    this raise, which blocks every run that needs hte until an operator removes
+    it; main() warns and continues for runs that do not need hte.
     A failed clone or pull (non-fast-forward, local edits in the way) raises and
     leaves the existing folder as it was.
     """
@@ -633,7 +634,7 @@ def main(argv=None) -> int:
         if (state == "unknown" and (unresolved or hte_used)) or wants_hte(
             state, no_prefix=no_prefix, unresolved=unresolved, uses_hte=hte_used
         ):
-            act(required=unresolved or hte_used or (no_prefix and state != "repo"))
+            act(required=unresolved or hte_used)
         if not configs:
             if a.mode == "setup":
                 print(
