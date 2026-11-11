@@ -433,12 +433,24 @@ def install(
         print(f"# would write {target}:\n{text}", flush=True)
         print(f"+ pixi install --manifest-path {target}", flush=True)
         return manifest
+    names = ("pixi.toml", "pixi.lock", ".seed")
+    before = {
+        n: (workspace / n).read_bytes() for n in names if (workspace / n).is_file()
+    }
     workspace.mkdir(parents=True, exist_ok=True)
     target.write_text(text, encoding="utf-8")
     key = pc.platform_key(manifest)
-    if pc.seed_lock(BASE_LOCK, workspace):
-        print(f"seeded {workspace / 'pixi.lock'} from {BASE_LOCK}", flush=True)
-    runner([_pixi(), "install", "--manifest-path", str(target)])
+    try:
+        if pc.seed_lock(BASE_LOCK, workspace):
+            print(f"seeded {workspace / 'pixi.lock'} from {BASE_LOCK}", flush=True)
+        runner([_pixi(), "install", "--manifest-path", str(target)])
+    except BaseException:  # a failed install leaves the previous workspace intact
+        for n in names:
+            if n in before:
+                (workspace / n).write_bytes(before[n])
+            else:
+                (workspace / n).unlink(missing_ok=True)
+        raise
     for name, want, got in pc.drift(BASE_LOCK, workspace / "pixi.lock", key):
         _warn(
             f"base package {name} {want} -> {got or '(absent)'} "
@@ -473,6 +485,27 @@ def stored_configs(env=os.environ) -> list[Path]:
     return out
 
 
+def states_paths(configs) -> list[Path]:
+    """The states file of each config's root (no writes; warns on no root:)."""
+    from helao.helpers.config_loader import read_config
+
+    out: set[Path] = set()
+    for cfg in configs:
+        root = read_config(str(cfg)).get("root")
+        if not root:
+            _warn(f"{cfg} has no root:, so its prefix is not recorded")
+            continue
+        out.add((REPO_ROOT / root).resolve() / "STATES" / STATES_FILE)
+    return sorted(out)
+
+
+def _write_states(states: Path, cfg) -> None:
+    states.parent.mkdir(parents=True, exist_ok=True)
+    known = set(_load_states(states)) if states.is_file() else set()
+    known.add(str(Path(cfg).resolve()))
+    states.write_text(json.dumps(sorted(known), indent=2), encoding="utf-8")
+
+
 def record(configs) -> list[Path]:
     """Add ``configs`` to <root>/STATES/setup_env_prefixes.json; return every
     states file (those already in HELAO_STATION_PREFIXES plus those written)."""
@@ -485,10 +518,7 @@ def record(configs) -> list[Path]:
             _warn(f"{cfg} has no root:, so its prefix is not recorded")
             continue
         states = (REPO_ROOT / root).resolve() / "STATES" / STATES_FILE
-        states.parent.mkdir(parents=True, exist_ok=True)
-        known = set(_load_states(states)) if states.is_file() else set()
-        known.add(str(Path(cfg).resolve()))
-        states.write_text(json.dumps(sorted(known), indent=2), encoding="utf-8")
+        _write_states(states, cfg)
         files.add(states)
     return sorted(files)
 
@@ -646,11 +676,12 @@ def main(argv=None) -> int:
         folders: set[Path] = set()
         for cfg in configs:
             folders |= server_folders(cfg)
-        if a.prefixes and not a.dry_run:
-            states = record(configs)
-        else:
-            states = _states_files(os.environ)
+        states = _states_files(os.environ)
+        if a.prefixes:  # computed, not written: record() runs after install
+            states = sorted(set(states) | set(states_paths(configs)))
         install(folders, states_files=states, dry_run=a.dry_run)
+        if a.prefixes and not a.dry_run:
+            record(configs)
         for folder in sorted(folders):
             if (folder / "README.md").is_file():
                 print(f"vendor notes: {folder / 'README.md'}")

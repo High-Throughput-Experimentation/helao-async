@@ -324,8 +324,12 @@ def test_install_warns_on_base_drift(tmp_path, monkeypatch, capsys):
     ws = _ws_base(tmp_path, monkeypatch)
     import pixi_compose as pc
 
-    monkeypatch.setattr(pc, "drift", lambda *a: [("numpy", "2.2.6", "2.5.4")])
+    seen = []
+    monkeypatch.setattr(
+        pc, "drift", lambda *a: seen.append(a) or [("numpy", "2.2.6", "2.5.4")]
+    )
     he.install(set(), runner=lambda c: None, workspace=ws)
+    assert seen == [(he.BASE_LOCK, ws / "pixi.lock", "linux-64")]
     assert "base package numpy 2.2.6 -> 2.5.4" in capsys.readouterr().err
 
 
@@ -337,6 +341,80 @@ def test_pixi_lookup_prefers_env_var_then_path(monkeypatch, tmp_path):
     monkeypatch.setattr(he.Path, "home", lambda: tmp_path / "nohome")
     with pytest.raises(he.EnvSetupError, match="pixi not found"):
         he._pixi()
+
+
+def _fake_pixi(d):
+    d.mkdir(parents=True, exist_ok=True)
+    exe = d / "pixi"
+    exe.write_text("#!/bin/sh\n", encoding="utf-8")
+    exe.chmod(0o755)
+    return exe
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="posix exec bit")
+def test_pixi_lookup_finds_path_then_home(monkeypatch, tmp_path):
+    monkeypatch.delenv("PIXI", raising=False)
+    exe = _fake_pixi(tmp_path / "bin")
+    monkeypatch.setenv("PATH", str(tmp_path / "bin"))
+    assert he._pixi() == str(exe)
+    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
+    home = tmp_path / "home"
+    exe2 = _fake_pixi(home / ".pixi" / "bin")
+    monkeypatch.setattr(he.Path, "home", lambda: home)
+    assert he._pixi() == str(exe2)
+
+
+def _station_cfg(tmp_path, monkeypatch):
+    root = tmp_path / "root"
+    cfg = tmp_path / "c.yml"
+    cfg.write_text(f"root: {root}\nservers: {{}}\n", encoding="utf-8")
+    monkeypatch.setattr(he, "resolve_config", lambda x, *a, **k: cfg)
+    monkeypatch.setattr(he, "config_hte_use", lambda c: "none")
+    monkeypatch.delenv(he.ENV_VAR, raising=False)
+    return cfg, root / "STATES" / he.STATES_FILE
+
+
+def test_failed_install_records_nothing_and_success_records(tmp_path, monkeypatch):
+    ws = _ws_base(tmp_path, monkeypatch)
+    monkeypatch.setattr(he, "WORKSPACE", ws)
+    cfg, states = _station_cfg(tmp_path, monkeypatch)
+
+    def fail(cmd):
+        raise subprocess.CalledProcessError(1, cmd)
+
+    monkeypatch.setattr(he, "_run", fail)
+    assert he.main(["setup", "x"]) == 2
+    assert not states.exists()
+    monkeypatch.setattr(he, "_run", lambda cmd: None)
+    assert he.main(["setup", "x"]) == 0
+    assert json.loads(states.read_text(encoding="utf-8")) == [str(cfg.resolve())]
+
+
+def test_dry_run_with_prefix_shows_states_path_and_writes_nothing(
+    tmp_path, monkeypatch, capsys
+):
+    ws = _ws_base(tmp_path, monkeypatch)
+    monkeypatch.setattr(he, "WORKSPACE", ws)
+    _, states = _station_cfg(tmp_path, monkeypatch)
+    assert he.main(["setup", "x", "--dry-run"]) == 0
+    assert str(states) in capsys.readouterr().out
+    assert not states.exists() and not ws.exists()
+
+
+def test_failed_install_restores_the_previous_workspace(tmp_path, monkeypatch):
+    ws = _ws_base(tmp_path, monkeypatch)
+    ws.mkdir()
+    for n in ("pixi.toml", "pixi.lock", ".seed"):
+        (ws / n).write_text(f"A-{n}", encoding="utf-8")
+    he.BASE_LOCK.write_text("version: 6\n# changed parent\n", encoding="utf-8")
+
+    def fail(cmd):
+        raise subprocess.CalledProcessError(1, cmd)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        he.install(set(), runner=fail, workspace=ws)
+    for n in ("pixi.toml", "pixi.lock", ".seed"):
+        assert (ws / n).read_text(encoding="utf-8") == f"A-{n}"
 
 
 import subprocess
@@ -354,6 +432,27 @@ def _no_network_hte(monkeypatch):
 
     monkeypatch.setattr(he, "ensure_hte", refuse)
     monkeypatch.setattr(he, "hte_state", lambda *a, **k: "tracked")
+
+
+_REAL_RUN = he._run
+_REAL_WRITE_STATES = he._write_states
+
+
+@pytest.fixture(autouse=True)
+def _no_real_side_effects(tmp_path, monkeypatch):
+    """No test may run a real command or write a states file outside tmp_path."""
+
+    def refuse(cmd, *a, **k):
+        raise AssertionError(f"real command in test: {cmd}")
+
+    def guarded(states, cfg):
+        if tmp_path not in Path(states).resolve().parents:
+            raise AssertionError(f"states write outside tmp_path: {states}")
+        _REAL_WRITE_STATES(states, cfg)
+
+    monkeypatch.setattr(he, "WORKSPACE", tmp_path / "ws")
+    monkeypatch.setattr(he, "_run", refuse)
+    monkeypatch.setattr(he, "_write_states", guarded)
 
 
 def _git(*args, cwd):
@@ -789,7 +888,7 @@ def test_a_stale_scratch_clone_is_removed_and_the_run_continues(
 def test_files_written_during_the_clone_are_logged(tmp_path, remote, monkeypatch):
     bare, _ = remote
     deploy = _replace_ready(tmp_path)
-    real = he._run
+    real = _REAL_RUN
 
     def clone_then_write(cmd):
         real(cmd)
