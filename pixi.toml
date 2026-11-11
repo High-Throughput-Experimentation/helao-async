@@ -2,6 +2,7 @@
 name = "helao"
 channels = ["conda-forge"]
 platforms = ["linux-64", "win-64"]
+requires-pixi = ">=0.84.2"
 
 [dependencies]
 aioboto3 = "*"
@@ -90,7 +91,6 @@ pyft232 = "*"
 uuid7 = "*"
 reflex = "*"
 xy = { version = "*", extras = ["reflex"] }
-mecom = { url = "https://github.com/meerstetter/pyMeCom/archive/master.zip" }
 
 [target.linux-64.activation.env]
 PYTHONPATH = "$PIXI_PROJECT_ROOT"

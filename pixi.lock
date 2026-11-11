@@ -511,7 +511,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/widgetsnbextension-4.0.16-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/xyzservices-2026.9.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/zipp-4.1.2-pyh5ded981_0.conda
-      - pypi: direct+https://github.com/meerstetter/pyMeCom/archive/master.zip
       - pypi: https://files.pythonhosted.org/packages/02/c3/253a89ee03fc9b9682f1541728eb66db7db22148cd94f89ab22528cd1e1b/deprecation-2.1.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/04/52/73e789772f97dd7d04d14c4e3bab2b8ea0829776a6ea044ad727cf26d0a6/pydasher-0.1.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/0a/f9/3b018f6eec88a35f3cce2103015cb1918b66cc8316ff5c2510ff1c19cb26/hightime-1.0.0-py3-none-any.whl
@@ -970,7 +969,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/zlib-1.3.2-hfd05255_3.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/zlib-ng-2.3.3-h0261ad2_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/zstd-1.5.7-h534d264_7.conda
-      - pypi: direct+https://github.com/meerstetter/pyMeCom/archive/master.zip
       - pypi: https://files.pythonhosted.org/packages/02/c3/253a89ee03fc9b9682f1541728eb66db7db22148cd94f89ab22528cd1e1b/deprecation-2.1.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/04/52/73e789772f97dd7d04d14c4e3bab2b8ea0829776a6ea044ad727cf26d0a6/pydasher-0.1.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/0a/f9/3b018f6eec88a35f3cce2103015cb1918b66cc8316ff5c2510ff1c19cb26/hightime-1.0.0-py3-none-any.whl
@@ -12623,11 +12621,6 @@ packages:
     - zstd >=1.5.7,<1.6.0a0
   size: 387535
   timestamp: 1786599623274
-- pypi: direct+https://github.com/meerstetter/pyMeCom/archive/master.zip
-  name: mecom
-  version: '1.1'
-  requires_dist:
-  - pyserial>=3.4
 - pypi: https://files.pythonhosted.org/packages/02/c3/253a89ee03fc9b9682f1541728eb66db7db22148cd94f89ab22528cd1e1b/deprecation-2.1.0-py2.py3-none-any.whl
   name: deprecation
   version: 2.1.0
