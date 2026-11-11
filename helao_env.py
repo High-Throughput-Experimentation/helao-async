@@ -21,14 +21,15 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent
 DEPLOY_ROOT = REPO_ROOT / "helao" / "deploy"
 ENV_VAR = "HELAO_STATION_PREFIXES"
 STATES_FILE = "setup_env_prefixes.json"
-#: The one place the hte deployment's remote is named (spec §3).
 HTE_DIR = "hte"
+#: The one place the hte deployment's remote is named (spec §3).
 HTE_URL = "https://github.com/High-Throughput-Experimentation/helao-hte-deployment.git"
 
 
@@ -208,22 +209,46 @@ def _warn(msg: str) -> None:
     print(f"warning: {msg}", file=sys.stderr)
 
 
+def _git_out(repo_root: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", "-C", str(repo_root), *args], capture_output=True, text=True
+    )
+
+
 def hte_state(deploy_root: Path = DEPLOY_ROOT, repo_root: Path = REPO_ROOT) -> str:
-    """What the hte deployment folder is: its own clone, part of this checkout, a leftover, or absent.
+    """What the hte folder is: its own clone, part of this checkout, leftover or absent.
 
     "tracked" is every checkout before the split: the folder has no .git but
-    this repo tracks it, so it is the deployment, not a leftover.
+    this repo tracks it, so it is the deployment, not a leftover. Anything that
+    stops git from answering raises, so a folder is never called a leftover
+    on a guess.
     """
     hte = Path(deploy_root) / HTE_DIR
+    if hte.is_symlink() or (hte.exists() and not hte.is_dir()):
+        raise EnvSetupError(f"{hte} is a symlink or not a directory; not touching it")
     if (hte / ".git").exists():
         return "repo"
     if not hte.exists():
         return "missing"
-    tracked = subprocess.run(
-        ["git", "-C", str(repo_root), "ls-files", "--error-unmatch", str(hte)],
-        capture_output=True,
-    )
-    return "tracked" if tracked.returncode == 0 else "leftover"
+    stray = [
+        k for k in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE") if k in os.environ
+    ]
+    if stray:
+        raise EnvSetupError(f"{', '.join(stray)} set; cannot tell if {hte} is tracked")
+    root = Path(repo_root).resolve()
+    top = _git_out(root, "rev-parse", "--show-toplevel")
+    if top.returncode != 0 or Path(top.stdout.strip()).resolve() != root:
+        raise EnvSetupError(
+            f"{repo_root} is not a git checkout root; not touching {hte}"
+        )
+    if not hte.resolve().is_relative_to(root):
+        raise EnvSetupError(f"{hte} is outside {repo_root}; not touching it")
+    ls = _git_out(root, "ls-files", "--error-unmatch", str(hte.resolve()))
+    if ls.returncode == 0:
+        return "tracked"
+    if ls.returncode == 1:
+        return "leftover"
+    raise subprocess.CalledProcessError(ls.returncode, ls.args, ls.stdout, ls.stderr)
 
 
 def ensure_hte(
@@ -236,9 +261,11 @@ def ensure_hte(
     """Pull hte if it is a clone, clone it if missing, replace a leftover with a clone.
 
     A leftover is what a parent pull leaves after the split: __pycache__ plus any
-    station-local files. Every non-cache file is logged before the folder is
-    removed (user ruling), so nothing disappears unrecorded. A git refusal
-    (local edits in the way) raises CalledProcessError and changes nothing.
+    station-local files. A replacement clones first into a scratch folder beside
+    the checkout (outside helao/deploy, which launchers glob), logs every
+    non-cache file to stderr and STATES/hte_leftover_<time>.txt, then swaps.
+    A failed clone or pull (non-fast-forward, local edits in the way) raises and
+    leaves the existing folder as it was.
     """
     hte = Path(deploy_root) / HTE_DIR
     state = hte_state(deploy_root, repo_root)
@@ -252,20 +279,51 @@ def ensure_hte(
         runner = _dry_runner
 
     if state == "repo":
-        runner(["git", "-C", str(hte), "pull"])
+        runner(["git", "-C", str(hte), "pull", "--ff-only"])
         return "pulled"
-    verdict = "cloned"
-    if state == "leftover":
-        for p in sorted(hte.rglob("*")):
-            if p.is_file() and "__pycache__" not in p.parts and p.suffix != ".pyc":
-                _warn(f"removing leftover {p}")
-        if dry_run:
-            print(f"+ rm -r {hte}", flush=True)
-        else:
-            shutil.rmtree(hte)
-        verdict = "replaced"
-    runner(["git", "clone", url, str(hte)])
-    return verdict
+    if state == "missing":
+        runner(["git", "clone", url, str(hte)])
+        return "cloned"
+    files = [
+        p
+        for p in sorted(hte.rglob("*"))
+        if p.is_file() and "__pycache__" not in p.parts and p.suffix != ".pyc"
+    ]
+    if dry_run:
+        for p in files:
+            _warn(f"would remove leftover {p}")
+        runner(["git", "clone", url, str(hte)])
+        print(f"+ rm -r {hte}", flush=True)
+        return "replaced"
+    repo_root = Path(repo_root)
+    fresh, aside = repo_root / ".hte-clone.tmp", repo_root / ".hte-leftover.tmp"
+    if aside.exists():
+        raise EnvSetupError(
+            f"{aside} exists from an earlier run; inspect and remove it"
+        )
+    shutil.rmtree(fresh, ignore_errors=True)
+    try:
+        runner(["git", "clone", url, str(fresh)])
+    except BaseException:
+        shutil.rmtree(fresh, ignore_errors=True)
+        raise
+    for p in files:
+        _warn(f"removing leftover {p}")
+    states = repo_root / "STATES"
+    states.mkdir(exist_ok=True)
+    stamp = time.strftime("%Y%m%d_%H%M%S")
+    (states / f"hte_leftover_{stamp}.txt").write_text(
+        "".join(f"{p}\n" for p in files), encoding="utf-8"
+    )
+    hte.rename(aside)
+    try:
+        fresh.rename(hte)
+    except BaseException:
+        aside.rename(hte)
+        shutil.rmtree(fresh, ignore_errors=True)
+        raise
+    shutil.rmtree(aside)
+    return "replaced"
 
 
 def install(folders, runner=_run, dry_run: bool = False) -> list[list[str]]:

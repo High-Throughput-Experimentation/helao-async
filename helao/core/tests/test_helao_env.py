@@ -369,7 +369,7 @@ _REAL_HTE_STATE = he.hte_state
 def _no_network_hte(monkeypatch):
     """No test may clone or pull the real hte remote; opt in by calling _REAL_*."""
 
-    def refuse(**kw):
+    def refuse(*a, **kw):
         raise AssertionError("ensure_hte called without a test stub")
 
     monkeypatch.setattr(he, "ensure_hte", refuse)
@@ -469,6 +469,7 @@ def test_ensure_hte_pulls_an_existing_repo_and_never_deletes_it(tmp_path, remote
 
 def test_ensure_hte_logs_and_replaces_a_leftover(tmp_path, remote, capsys):
     bare, _ = remote
+    _git("init", "-b", "main", cwd=tmp_path)
     deploy = tmp_path / "deploy"
     left = deploy / "hte"
     (left / "servers" / "__pycache__").mkdir(parents=True)
@@ -483,10 +484,15 @@ def test_ensure_hte_logs_and_replaces_a_leftover(tmp_path, remote, capsys):
     assert (left / ".git").exists() and not (
         left / "configs" / "station_local.yml"
     ).exists()
+    assert not list(tmp_path.glob(".hte-*.tmp"))
+    (listing,) = (tmp_path / "STATES").glob("hte_leftover_*.txt")
+    text = listing.read_text(encoding="utf-8")
+    assert "station_local.yml" in text and ".pyc" not in text
 
 
 def test_ensure_hte_dry_run_changes_nothing(tmp_path, remote, capsys):
     bare, _ = remote
+    _git("init", "-b", "main", cwd=tmp_path)
     deploy = tmp_path / "deploy"
     (deploy / "hte").mkdir(parents=True)
     (deploy / "hte" / "keep.txt").write_text("k", encoding="utf-8")
@@ -528,3 +534,111 @@ def test_a_local_edit_that_conflicts_makes_the_pull_refuse(tmp_path, remote):
     assert (deploy / "hte" / "README.md").read_text(
         encoding="utf-8"
     ) == "station edit\n"
+
+
+def _leftover(tmp_path):
+    deploy = tmp_path / "deploy"
+    (deploy / "hte").mkdir(parents=True)
+    (deploy / "hte" / "station_only.yml").write_text("x: 1\n", encoding="utf-8")
+    return deploy
+
+
+def test_a_non_repo_root_raises_and_deletes_nothing(tmp_path, remote):
+    bare, _ = remote  # tmp_path is deliberately not a git repo
+    deploy = _leftover(tmp_path)
+    with pytest.raises(he.EnvSetupError):
+        _REAL_ENSURE_HTE(deploy, tmp_path, url=str(bare))
+    assert (deploy / "hte" / "station_only.yml").is_file()
+
+
+def test_a_stray_git_dir_raises_and_deletes_nothing(tmp_path, remote, monkeypatch):
+    """A GIT_DIR naming another repo makes git call a tracked folder untracked."""
+    bare, _ = remote
+    _git("init", "-b", "main", cwd=tmp_path)
+    deploy = _leftover(tmp_path)
+    _git("add", "-A", cwd=tmp_path / "deploy")
+    _git("commit", "-m", "track", cwd=tmp_path)
+    other = tmp_path.parent / (tmp_path.name + "_other")
+    other.mkdir()
+    _git("init", "-b", "main", cwd=other)
+    monkeypatch.setenv("GIT_DIR", str(other / ".git"))
+    with pytest.raises(he.EnvSetupError):
+        _REAL_ENSURE_HTE(deploy, tmp_path, url=str(bare))
+    assert (deploy / "hte" / "station_only.yml").is_file()
+
+
+def test_a_corrupt_index_raises_and_deletes_nothing(tmp_path, remote):
+    bare, _ = remote
+    _git("init", "-b", "main", cwd=tmp_path)
+    deploy = _leftover(tmp_path)
+    (tmp_path / ".git" / "index").write_bytes(b"garbage")
+    with pytest.raises(subprocess.CalledProcessError):
+        _REAL_ENSURE_HTE(deploy, tmp_path, url=str(bare))
+    assert (deploy / "hte" / "station_only.yml").is_file()
+
+
+def test_a_deploy_root_outside_the_repo_raises(tmp_path, remote):
+    bare, _ = remote
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    _git("init", "-b", "main", cwd=parent)
+    deploy = _leftover(tmp_path)  # tmp_path/deploy is outside tmp_path/parent
+    with pytest.raises(he.EnvSetupError):
+        _REAL_ENSURE_HTE(deploy, parent, url=str(bare))
+    assert (deploy / "hte" / "station_only.yml").is_file()
+
+
+def test_a_failed_clone_leaves_the_leftover_and_no_scratch(tmp_path, remote):
+    _git("init", "-b", "main", cwd=tmp_path)
+    deploy = _leftover(tmp_path)
+    with pytest.raises(subprocess.CalledProcessError):
+        _REAL_ENSURE_HTE(deploy, tmp_path, url=str(tmp_path / "nope.git"))
+    assert (deploy / "hte" / "station_only.yml").is_file()
+    assert not list(tmp_path.glob(".hte-*.tmp"))
+
+
+@pytest.mark.parametrize("rebase", ["false", "true"])
+def test_a_diverged_pull_refuses_and_leaves_no_partial_merge(
+    tmp_path, remote, monkeypatch, rebase
+):
+    bare, src = remote
+    for k, v in {"NAME": "t", "EMAIL": "t@example.invalid"}.items():
+        monkeypatch.setenv(f"GIT_AUTHOR_{k}", v)
+        monkeypatch.setenv(f"GIT_COMMITTER_{k}", v)
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "pull.rebase")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", rebase)
+    deploy = tmp_path / "deploy"
+    deploy.mkdir()
+    hte = deploy / "hte"
+    subprocess.run(
+        ["git", "clone", str(bare), str(hte)], check=True, capture_output=True
+    )
+    (hte / "README.md").write_text("station\n", encoding="utf-8")
+    _git("commit", "-am", "station", cwd=hte)
+    _push(src, "README.md", "upstream\n")
+    with pytest.raises(subprocess.CalledProcessError):
+        _REAL_ENSURE_HTE(deploy, tmp_path, url=str(bare))
+    g = hte / ".git"
+    assert not (g / "MERGE_HEAD").exists()
+    assert not (g / "rebase-merge").exists() and not (g / "rebase-apply").exists()
+    assert (hte / "README.md").read_text(encoding="utf-8") == "station\n"
+
+
+def test_a_symlink_or_file_hte_is_refused(tmp_path):
+    deploy = tmp_path / "deploy"
+    deploy.mkdir()
+    real = tmp_path / "real"
+    real.mkdir()
+    link = deploy / "hte"
+    link.symlink_to(real)
+    with pytest.raises(he.EnvSetupError):
+        _REAL_HTE_STATE(deploy, tmp_path)
+    link.unlink()
+    link.symlink_to(tmp_path / "dangling")
+    with pytest.raises(he.EnvSetupError):
+        _REAL_HTE_STATE(deploy, tmp_path)
+    link.unlink()
+    link.write_text("x", encoding="utf-8")
+    with pytest.raises(he.EnvSetupError):
+        _REAL_HTE_STATE(deploy, tmp_path)
