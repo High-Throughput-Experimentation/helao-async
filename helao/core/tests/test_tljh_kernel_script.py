@@ -53,6 +53,7 @@ def _stubs(tmp_path: Path) -> dict:
     _exe(
         tmp_path / "stub/pixi",
         f'printf "%s\\n" "$@" >> {tmp_path}/pixi.log; echo --- >> {tmp_path}/pixi.log\n'
+        '[ -z "$PIXI_FAIL" ] || exit 1\n'
         f'echo "export CONDA_PREFIX={detached}"\n'
         f'echo "export PATH=\\"{detached}/bin:$PATH\\""\n'
         'echo "export PYTHONPATH=/repo"\n',
@@ -144,6 +145,17 @@ def test_kernel_script_default_workspace_is_next_to_tools(tmp_path):
         (st["tljh"] / "share/jupyter/kernels/helao-y/kernel.json").read_text()
     )
     assert shlex.quote(str(repo / ".helao-env/activate-default.sh")) in spec["argv"][2]
+
+
+@needs_unshare
+def test_kernel_script_failed_hook_leaves_no_tmp_file(tmp_path):
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "pixi.toml").write_text("", encoding="utf-8")
+    st = _stubs(tmp_path)
+    r = _run(SCRIPT, {**st["env"], "PIXI_FAIL": "1"}, str(ws), "default")
+    assert r.returncode != 0
+    assert not list(ws.glob("activate-default.sh*"))
 
 
 def test_kernel_script_refuses_without_sudo(tmp_path):

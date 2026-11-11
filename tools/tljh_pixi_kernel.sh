@@ -45,7 +45,7 @@ sudo -u "$SUDO_USER" -H "$PIXI" shell-hook --frozen --shell bash \
     -e "$ENV_NAME" --manifest-path "$WORKSPACE/pixi.toml" > "$ACTIVATE.tmp"
 # shell-hook froze the caller's PATH (sudo's secure_path); keep only the env's dirs
 # and append the PATH of whoever sources the script
-python3 -P - "$ACTIVATE.tmp" "$PATH" <<'PYEOF'
+python3 -I - "$ACTIVATE.tmp" "$PATH" <<'PYEOF'
 import sys
 path_file, caller = sys.argv[1], sys.argv[2]
 with open(path_file, encoding="utf-8") as f:
@@ -74,10 +74,10 @@ bash -c "source $QACT && python -c 'import ipykernel, sys; print(\"activation ok
 ENV_PY=$(bash -c "source $QACT && command -v python" | tail -n1) || die "no python after sourcing $ACTIVATE"
 
 # 2. kernelspec (root-owned, world-readable)
-"$ENV_PY" -P -m ipykernel install --prefix "$TLJH_PREFIX" \
+"$ENV_PY" -I -m ipykernel install --prefix "$TLJH_PREFIX" \
     --name "$KERNEL_NAME" --display-name "$DISPLAY_NAME" >/dev/null
 SPEC="$TLJH_PREFIX/share/jupyter/kernels/$KERNEL_NAME/kernel.json"
-"$ENV_PY" -P - "$SPEC" "$ACTIVATE" <<'EOF'
+"$ENV_PY" -I - "$SPEC" "$ACTIVATE" <<'EOF'
 import json, shlex, sys
 spec_path, activate = sys.argv[1], sys.argv[2]
 with open(spec_path, encoding="utf-8") as f:
