@@ -38,7 +38,6 @@ dependencies:
   - orjson
   - pandas
   - panel
-  - paramiko=3
   - pip
   - plotly
   - psutil

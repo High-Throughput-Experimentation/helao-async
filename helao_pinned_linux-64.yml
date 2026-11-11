@@ -311,7 +311,6 @@ dependencies:
   - panel-material-ui=0.16.6
   - pango=1.58.2
   - param=2.4.2
-  - paramiko=3.5.1
   - parso=0.8.7
   - pathspec=1.1.1
   - patsy=1.0.3

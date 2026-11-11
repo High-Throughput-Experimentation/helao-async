@@ -1,4 +1,4 @@
 channels:
   - conda-forge
 dependencies:
-  - paramiko=3
+  - paramiko=3.5.1
