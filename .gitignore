@@ -97,3 +97,5 @@ graphify-out/
 
 /STATES/
 /.hte-*.tmp
+.helao-env/
+.pixi/
