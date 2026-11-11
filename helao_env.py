@@ -18,6 +18,7 @@ import json
 import os
 import platform
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -209,6 +210,30 @@ def _warn(msg: str) -> None:
     print(f"warning: {msg}", file=sys.stderr)
 
 
+def _rmtree_force(path: Path) -> None:
+    """rmtree that clears read-only bits (git packs on Windows); never swallows."""
+
+    def onexc(func, p, exc):  # noqa: ARG001
+        try:
+            for q in (Path(p).parent, Path(p)):  # unlink needs a writable parent
+                if q.exists() and not q.is_symlink():
+                    os.chmod(q, stat.S_IRWXU)
+            func(p)
+        except OSError as e:
+            raise EnvSetupError(f"cannot remove {path}; delete it by hand") from e
+
+    if Path(path).is_symlink() or Path(path).exists():
+        shutil.rmtree(path, onexc=onexc)
+
+
+def _leftover_files(root: Path) -> list[Path]:
+    return [
+        p
+        for p in sorted(root.rglob("*"))
+        if p.is_file() and "__pycache__" not in p.parts and p.suffix != ".pyc"
+    ]
+
+
 def _git_out(repo_root: Path, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["git", "-C", str(repo_root), *args], capture_output=True, text=True
@@ -262,15 +287,31 @@ def ensure_hte(
 
     A leftover is what a parent pull leaves after the split: __pycache__ plus any
     station-local files. A replacement clones first into a scratch folder beside
-    the checkout (outside helao/deploy, which launchers glob), logs every
-    non-cache file to stderr and STATES/hte_leftover_<time>.txt, then swaps.
+    the checkout (outside helao/deploy, which launchers glob), sets the leftover
+    aside, logs every non-cache file in it to stderr and
+    STATES/hte_leftover_<time>.txt, swaps the clone in, then removes the set-aside
+    copy. Any failure puts the leftover back. A stranded set-aside copy blocks
+    every run until an operator removes it.
     A failed clone or pull (non-fast-forward, local edits in the way) raises and
     leaves the existing folder as it was.
     """
     hte = Path(deploy_root) / HTE_DIR
+    repo_root = Path(repo_root)
+    fresh, aside = repo_root / ".hte-clone.tmp", repo_root / ".hte-leftover.tmp"
+    if aside.exists():
+        raise EnvSetupError(
+            f"{aside} exists from an earlier run and may hold the only copy of "
+            "station files; inspect it, then remove it"
+        )
     state = hte_state(deploy_root, repo_root)
     if state == "tracked":
         return "tracked"
+    if fresh.exists():
+        if dry_run:
+            print(f"+ rm -r {fresh}  # stale scratch clone", flush=True)
+        else:
+            _warn(f"removing stale scratch clone {fresh}")
+            _rmtree_force(fresh)
     if dry_run:
 
         def _dry_runner(cmd, env=None):  # noqa: ARG001
@@ -284,45 +325,40 @@ def ensure_hte(
     if state == "missing":
         runner(["git", "clone", url, str(hte)])
         return "cloned"
-    files = [
-        p
-        for p in sorted(hte.rglob("*"))
-        if p.is_file() and "__pycache__" not in p.parts and p.suffix != ".pyc"
-    ]
     if dry_run:
-        for p in files:
+        runner(["git", "clone", url, str(fresh)])
+        print(f"+ mv {hte} {aside}", flush=True)
+        for p in _leftover_files(hte):
             _warn(f"would remove leftover {p}")
-        runner(["git", "clone", url, str(hte)])
-        print(f"+ rm -r {hte}", flush=True)
+        print(f"+ mv {fresh} {hte}", flush=True)
+        print(f"+ rm -r {aside}", flush=True)
         return "replaced"
-    repo_root = Path(repo_root)
-    fresh, aside = repo_root / ".hte-clone.tmp", repo_root / ".hte-leftover.tmp"
-    if aside.exists():
-        raise EnvSetupError(
-            f"{aside} exists from an earlier run; inspect and remove it"
-        )
-    shutil.rmtree(fresh, ignore_errors=True)
     try:
         runner(["git", "clone", url, str(fresh)])
     except BaseException:
-        shutil.rmtree(fresh, ignore_errors=True)
+        _rmtree_force(fresh)
         raise
-    for p in files:
-        _warn(f"removing leftover {p}")
-    states = repo_root / "STATES"
-    states.mkdir(exist_ok=True)
-    stamp = time.strftime("%Y%m%d_%H%M%S")
-    (states / f"hte_leftover_{stamp}.txt").write_text(
-        "".join(f"{p}\n" for p in files), encoding="utf-8"
-    )
-    hte.rename(aside)
     try:
+        hte.rename(aside)
+    except BaseException:  # nothing moved: only the scratch clone to drop
+        _rmtree_force(fresh)
+        raise
+    try:
+        files = [hte / p.relative_to(aside) for p in _leftover_files(aside)]
+        for p in files:
+            _warn(f"removing leftover {p}")
+        states = repo_root / "STATES"
+        states.mkdir(exist_ok=True)
+        stamp = time.strftime("%Y%m%d_%H%M%S")
+        (states / f"hte_leftover_{stamp}.txt").write_text(
+            "".join(f"{p}\n" for p in files), encoding="utf-8"
+        )
         fresh.rename(hte)
     except BaseException:
-        aside.rename(hte)
-        shutil.rmtree(fresh, ignore_errors=True)
+        aside.rename(hte)  # put the leftover back before anything else
+        _rmtree_force(fresh)
         raise
-    shutil.rmtree(aside)
+    _rmtree_force(aside)
     return "replaced"
 
 

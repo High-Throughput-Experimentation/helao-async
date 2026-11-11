@@ -500,7 +500,15 @@ def test_ensure_hte_dry_run_changes_nothing(tmp_path, remote, capsys):
     assert (deploy / "hte" / "keep.txt").is_file() and not (
         deploy / "hte" / ".git"
     ).exists()
-    assert "git clone" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    marks = (
+        "git clone",
+        "mv " + str(deploy / "hte"),
+        "mv " + str(tmp_path / ".hte-clone"),
+        "rm -r",
+    )
+    order = [out.index(m) for m in marks]
+    assert order == sorted(order) and "git clone" in out
 
 
 def test_ensure_hte_leaves_a_tracked_folder_alone(tmp_path, remote):
@@ -642,3 +650,110 @@ def test_a_symlink_or_file_hte_is_refused(tmp_path):
     link.write_text("x", encoding="utf-8")
     with pytest.raises(he.EnvSetupError):
         _REAL_HTE_STATE(deploy, tmp_path)
+
+
+def _replace_ready(tmp_path):
+    _git("init", "-b", "main", cwd=tmp_path)
+    return _leftover(tmp_path)
+
+
+def _assert_intact(tmp_path, deploy):
+    assert (deploy / "hte" / "station_only.yml").read_text(encoding="utf-8") == "x: 1\n"
+    assert not list(tmp_path.glob(".hte-*.tmp"))
+
+
+def test_a_failed_states_write_restores_the_leftover(tmp_path, remote, monkeypatch):
+    bare, _ = remote
+    deploy = _replace_ready(tmp_path)
+    real = Path.write_text
+
+    def boom(self, *a, **k):
+        if self.name.startswith("hte_leftover_"):
+            raise PermissionError("denied")
+        return real(self, *a, **k)
+
+    monkeypatch.setattr(Path, "write_text", boom)
+    with pytest.raises(PermissionError):
+        _REAL_ENSURE_HTE(deploy, tmp_path, url=str(bare))
+    _assert_intact(tmp_path, deploy)
+
+
+@pytest.mark.parametrize("victim", ["hte", ".hte-clone.tmp"])
+def test_a_failed_rename_restores_the_leftover(tmp_path, remote, monkeypatch, victim):
+    bare, _ = remote
+    deploy = _replace_ready(tmp_path)
+    real = Path.rename
+
+    def boom(self, target):
+        if self.name == victim:
+            raise PermissionError("denied")
+        return real(self, target)
+
+    monkeypatch.setattr(Path, "rename", boom)
+    with pytest.raises(PermissionError):
+        _REAL_ENSURE_HTE(deploy, tmp_path, url=str(bare))
+    _assert_intact(tmp_path, deploy)
+
+
+def test_rmtree_force_deletes_a_read_only_tree(tmp_path):
+    d = tmp_path / "t" / "pack"
+    d.mkdir(parents=True)
+    (d / "f").write_text("x", encoding="utf-8")
+    (d / "f").chmod(0o444)
+    d.chmod(0o500)
+    he._rmtree_force(tmp_path / "t")
+    assert not (tmp_path / "t").exists()
+
+
+def test_a_stranded_leftover_aside_blocks_every_run(tmp_path, remote):
+    bare, _ = remote
+    deploy = _replace_ready(tmp_path)
+    aside = tmp_path / ".hte-leftover.tmp"
+    aside.mkdir()
+    (aside / "only_copy.yml").write_text("k", encoding="utf-8")
+    with pytest.raises(he.EnvSetupError, match="hte-leftover.tmp"):
+        _REAL_ENSURE_HTE(deploy, tmp_path, url=str(bare))
+    assert (aside / "only_copy.yml").is_file()
+    assert (deploy / "hte" / "station_only.yml").is_file()
+
+
+def test_a_stale_scratch_clone_is_removed_and_the_run_continues(
+    tmp_path, remote, capsys
+):
+    bare, _ = remote
+    deploy = _replace_ready(tmp_path)
+    (tmp_path / ".hte-clone.tmp").mkdir()
+    (tmp_path / ".hte-clone.tmp" / "junk").write_text("j", encoding="utf-8")
+    assert _REAL_ENSURE_HTE(deploy, tmp_path, url=str(bare)) == "replaced"
+    assert "stale scratch clone" in capsys.readouterr().err
+    assert not list(tmp_path.glob(".hte-*.tmp"))
+    assert (deploy / "hte" / ".git").exists()
+
+
+def test_files_written_during_the_clone_are_logged(tmp_path, remote, monkeypatch):
+    bare, _ = remote
+    deploy = _replace_ready(tmp_path)
+    real = he._run
+
+    def clone_then_write(cmd, env=None):
+        real(cmd, env)
+        (deploy / "hte" / "late.yml").write_text("late", encoding="utf-8")
+
+    _REAL_ENSURE_HTE(deploy, tmp_path, url=str(bare), runner=clone_then_write)
+    (listing,) = (tmp_path / "STATES").glob("hte_leftover_*.txt")
+    assert "late.yml" in listing.read_text(encoding="utf-8")
+
+
+def test_rmtree_force_raises_when_it_cannot_remove(tmp_path, monkeypatch):
+    d = tmp_path / "t" / "pack"
+    d.mkdir(parents=True)
+    (d / "f").write_text("x", encoding="utf-8")
+    d.chmod(0o500)
+    monkeypatch.setattr(os, "chmod", lambda *a, **k: None)  # cannot clear the bit
+    try:
+        with pytest.raises(he.EnvSetupError, match="by hand"):
+            he._rmtree_force(tmp_path / "t")
+        assert (d / "f").is_file()
+    finally:
+        monkeypatch.undo()
+        d.chmod(0o700)

@@ -95,3 +95,6 @@ INST_hlo_*/
 
 # knowledge-graph build artifacts (graphify)
 graphify-out/
+
+/STATES/
+/.hte-*.tmp
