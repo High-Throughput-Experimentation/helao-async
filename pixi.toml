@@ -94,7 +94,7 @@ pydasher = "*"
 pyft232 = "*"
 uuid7 = "*"
 reflex = "*"
-xy = { version = "*", extras = ["reflex"] }
+xy = { version = "==0.0.8", extras = ["reflex"] }
 
 [target.linux-64.activation.env]
 PYTHONPATH = "$PIXI_PROJECT_ROOT"
