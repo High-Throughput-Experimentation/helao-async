@@ -438,9 +438,9 @@ def install(
         n: (workspace / n).read_bytes() for n in names if (workspace / n).is_file()
     }
     workspace.mkdir(parents=True, exist_ok=True)
-    target.write_text(text, encoding="utf-8")
-    key = pc.platform_key(manifest)
     try:
+        target.write_text(text, encoding="utf-8")
+        key = pc.platform_key(manifest)
         if pc.seed_lock(BASE_LOCK, workspace):
             print(f"seeded {workspace / 'pixi.lock'} from {BASE_LOCK}", flush=True)
         runner([_pixi(), "install", "--manifest-path", str(target)])

@@ -17,17 +17,12 @@ $PY helao/hexagon/tests/smoke/safe_root.py check-temp "$ROOT" || exit 2
 rm -rf "$ROOT"
 
 echo "[conc_run] launching $PREFIX (log: $LAUNCHLOG)"
-# --no-capture-output: stream launch.py's stdout straight to the file. With
-# conda's default output capture, a slow+verbose orch startup (e.g. the ~30s
-# SIM status-subscribe backoff) can fill conda's capture buffer and stall
-# launch.py before it writes STATES/pids_<prefix>_.pck, leaving a half-up
-# group the driver can't reach.
 nohup $PY launch.py "$PREFIX" --no-hot-reload > "$LAUNCHLOG" 2>&1 &
 LAUNCH_PID=$!
 
 # Wait for the orch to actually SERVE over HTTP. Probe ONLY with curl (one
 # tiny process per poll) — do NOT spawn `python` per iteration: each
-# is a full interpreter + conda activation, and hammering it every 2s during
+# is a full interpreter, and hammering it every 2s during
 # the CPU-sensitive multi-server startup starves the group so badly that
 # launch.py tears it down (observed: SIM shut down ~3s in and the orch never
 # finished its SIM status-subscribe, so the driver's HTTP call was refused).

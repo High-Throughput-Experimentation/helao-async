@@ -7,7 +7,9 @@ set "_HELAO_WS=%~dp0.helao-env\pixi.toml"
 set "_HELAO_PIXI="
 for /f "delims=" %%P in ('where pixi 2^>nul') do if not defined _HELAO_PIXI set "_HELAO_PIXI=%%P"
 if not defined _HELAO_PIXI if exist "%USERPROFILE%\.pixi\bin\pixi.exe" set "_HELAO_PIXI=%USERPROFILE%\.pixi\bin\pixi.exe"
+set "_HELAO_LOCK=%~dp0.helao-env\pixi.lock"
 if not exist "%_HELAO_WS%" goto :conda
+if not exist "%_HELAO_LOCK%" goto :conda
 if not defined _HELAO_PIXI (
     echo ERROR: %_HELAO_WS% exists but pixi is not on PATH or in %%USERPROFILE%%\.pixi\bin; run setup_env.bat to install it 1>&2
     exit /b 1

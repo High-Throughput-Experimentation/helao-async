@@ -25,8 +25,8 @@ echo "[control_negative] launching $PREFIX (log: $LAUNCHLOG)"
 nohup $PY launch.py "$PREFIX" --no-hot-reload > "$LAUNCHLOG" 2>&1 &
 LAUNCH_PID=$!
 
-# Probe with curl only -- one tiny process per poll. Spawning `conda run
-# python` every 2 s during startup starves the group badly enough that
+# Probe with curl only -- one tiny process per poll. Spawning `python`
+# every 2 s during startup starves the group badly enough that
 # launch.py tears it down. The IO sim is what this check actually drives, and
 # action servers launch before the orchestrator (LAUNCH_ORDER), so probing it
 # is both sufficient and the earliest honest signal.

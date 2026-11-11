@@ -312,6 +312,11 @@ def test_seed_copies_when_absent_or_parent_changed(tmp_path):
     _lock(parent, "2.3.0")
     assert pc.seed_lock(parent, ws) is True  # parent changed
     assert "numpy-2.3.0" in (ws / "pixi.lock").read_text(encoding="utf-8")
+    new_sha = hashlib.sha256(parent.read_bytes()).hexdigest()
+    assert (ws / ".seed").read_text(encoding="utf-8").strip() == new_sha
+    (ws / "pixi.lock").unlink()  # host lock gone, .seed still matches
+    assert pc.seed_lock(parent, ws) is True
+    assert (ws / "pixi.lock").read_bytes() == parent.read_bytes()
 
 
 def test_seed_keeps_a_cuda_key_present_in_the_parent(tmp_path):

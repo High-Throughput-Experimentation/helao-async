@@ -13,6 +13,10 @@ if [ -z "$PIXI" ]; then
 fi
 WS="$HA_DIR/.helao-env"
 CREATED=0
+if [ "$MODE" = update ] && { [ ! -f "$WS/pixi.toml" ] || [ ! -f "$WS/pixi.lock" ]; }; then
+    echo "no pixi env yet on this host; run setup_env <config prefix> ... first (a host moving from conda must name its prefixes once)" >&2
+    exit 1
+fi
 if [ ! -f "$WS/pixi.toml" ] || [ ! -f "$WS/pixi.lock" ]; then
     mkdir -p "$WS" || exit 1
     CREATED=1

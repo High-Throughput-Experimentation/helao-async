@@ -39,6 +39,26 @@ def repo(tmp_path):
     return r
 
 
+def _workspace(repo: Path, lock: bool = True) -> None:
+    ws = repo / ".helao-env"
+    ws.mkdir(exist_ok=True)
+    (ws / "pixi.toml").write_text("", encoding="utf-8")
+    if lock:
+        (ws / "pixi.lock").write_text("", encoding="utf-8")
+
+
+def _stub_conda(bindir: Path) -> Path:
+    return _exe(
+        bindir / "conda",
+        'case "$1" in\n'
+        '  env) echo "helao   /x/miniforge3/envs/helao";;\n'
+        '  shell.bash) echo "conda() { export CONDA_STUB=\\"\\$*\\"; export PATH=\\"'
+        + str(Path(sys.executable).parent)
+        + ':\\$PATH\\"; }";;\n'
+        "esac\n",
+    )
+
+
 def _stub_pixi(bindir: Path, log: Path) -> Path:
     # shell-hook prints an activation that marks itself and puts a python on PATH
     py = bindir / "envpy"
@@ -69,8 +89,7 @@ def _env(tmp_path, path_dirs, home=None):
 
 
 def test_helao_sh_activates_with_pixi_and_passes_args(repo, tmp_path):
-    (repo / ".helao-env").mkdir()
-    (repo / ".helao-env" / "pixi.toml").write_text("", encoding="utf-8")
+    _workspace(repo)
     log = tmp_path / "pixi.log"
     bindir = tmp_path / "bin"
     _stub_pixi(bindir, log)
@@ -93,8 +112,7 @@ def test_helao_sh_activates_with_pixi_and_passes_args(repo, tmp_path):
 
 
 def test_activate_finds_pixi_in_home_bin(repo, tmp_path):
-    (repo / ".helao-env").mkdir()
-    (repo / ".helao-env" / "pixi.toml").write_text("", encoding="utf-8")
+    _workspace(repo)
     home = tmp_path / "home"
     _stub_pixi(home / ".pixi" / "bin", tmp_path / "pixi.log")
     r = _run([str(repo / "helao.sh"), "x"], _env(tmp_path, [], home=home), repo)
@@ -102,8 +120,7 @@ def test_activate_finds_pixi_in_home_bin(repo, tmp_path):
 
 
 def test_activate_without_pixi_names_it(repo, tmp_path):
-    (repo / ".helao-env").mkdir()
-    (repo / ".helao-env" / "pixi.toml").write_text("", encoding="utf-8")
+    _workspace(repo)
     r = _run([str(repo / "helao.sh"), "x"], _env(tmp_path, []), repo)
     assert r.returncode != 0
     assert "pixi" in r.stderr and "setup_env" in r.stderr
@@ -124,6 +141,38 @@ def test_helao_sh_falls_back_to_conda_with_a_warning(repo, tmp_path):
     assert r.returncode == 0, r.stderr
     assert "still on conda" in r.stderr
     assert (tmp_path / "out.txt").read_text() == repr((["x"], None, "activate helao"))
+
+
+def test_pixi_wins_over_conda_when_both_exist(repo, tmp_path):
+    bindir = tmp_path / "bin"
+    _stub_pixi(bindir, tmp_path / "pixi.log")
+    _stub_conda(bindir)
+    _workspace(repo)
+    r = _run([str(repo / "helao.sh"), "x"], _env(tmp_path, [bindir]), repo)
+    assert r.returncode == 0, r.stderr
+    assert (tmp_path / "out.txt").read_text() == repr((["x"], "1", None))
+
+
+def test_toml_without_lock_is_not_a_workspace(repo, tmp_path):
+    bindir = tmp_path / "bin"
+    _stub_pixi(bindir, tmp_path / "pixi.log")
+    _stub_conda(bindir)
+    _workspace(repo, lock=False)
+    r = _run([str(repo / "helao.sh"), "x"], _env(tmp_path, [bindir]), repo)
+    assert r.returncode == 0, r.stderr
+    assert "still on conda" in r.stderr
+    assert (tmp_path / "out.txt").read_text() == repr((["x"], None, "activate helao"))
+
+
+def test_update_env_refuses_without_a_workspace(repo, tmp_path):
+    log = tmp_path / "pixi.log"
+    bindir = tmp_path / "bin"
+    _stub_pixi_run(bindir, log)
+    r = _run([str(repo / "update_env.sh")], _env(tmp_path, [bindir]), repo)
+    assert r.returncode != 0
+    assert "no pixi env yet on this host; run setup_env" in r.stderr
+    assert not (repo / ".helao-env" / "pixi.toml").exists()
+    assert not log.exists()
 
 
 def test_helao_sh_without_any_env_says_run_setup_env(repo, tmp_path):

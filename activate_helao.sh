@@ -5,9 +5,10 @@
 # over (spec 2026-11-11-pixi-env-design.md, "Transition fallback").
 _helao_dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 _helao_ws="$_helao_dir/.helao-env/pixi.toml"
+_helao_lock="$_helao_dir/.helao-env/pixi.lock"
 _helao_pixi=$(command -v pixi || true)
 [ -z "$_helao_pixi" ] && [ -x "$HOME/.pixi/bin/pixi" ] && _helao_pixi="$HOME/.pixi/bin/pixi"
-if [ -f "$_helao_ws" ]; then
+if [ -f "$_helao_ws" ] && [ -f "$_helao_lock" ]; then
     if [ -z "$_helao_pixi" ]; then
         echo "ERROR: $_helao_ws exists but pixi is not on PATH or in ~/.pixi/bin; run setup_env.sh to install it" >&2
         return 1

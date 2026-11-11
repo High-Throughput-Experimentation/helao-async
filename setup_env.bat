@@ -14,6 +14,8 @@ if not exist "%PIXI%" (echo ERROR: pixi install failed; install pixi from https:
 :havepixi
 set "WS=%HA_DIR%\.helao-env"
 set CREATED=
+if /i "%HELAO_ENV_MODE%"=="update" if not exist "%WS%\pixi.toml" goto :noenv
+if /i "%HELAO_ENV_MODE%"=="update" if not exist "%WS%\pixi.lock" goto :noenv
 if exist "%WS%\pixi.toml" if exist "%WS%\pixi.lock" goto :haveenv
 if not exist "%WS%" mkdir "%WS%" || exit /b 1
 set CREATED=1
@@ -25,9 +27,12 @@ set RC=%ERRORLEVEL%
 if "%RC%"=="0" goto :ok
 if defined CREATED (
     del /q "%WS%\pixi.toml" "%WS%\pixi.lock" "%WS%\.seed" 2>nul
-    echo setup failed; removed the new .helao-env manifest so helao.sh keeps using the previous environment
+    echo setup failed; removed the new .helao-env manifest so helao.bat keeps using the previous environment
 )
 exit /b %RC%
+:noenv
+echo no pixi env yet on this host; run setup_env ^<config prefix^> ... first (a host moving from conda must name its prefixes once) 1>&2
+exit /b 1
 :ok
 echo.
 echo 'helao' environment %HELAO_ENV_MODE% is complete
