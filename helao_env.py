@@ -3,12 +3,16 @@
     python helao_env.py setup  <prefix|deployment/prefix|path> ...
     python helao_env.py update [<prefix> ...]
 
-Called by setup_env/update_env after the base env exists. A prefix resolves
-against every helao/deploy/*/configs/; a prefix found in several deployments is
-asked about on a terminal and is an error without one. The resolved config paths
-are recorded in <root>/STATES/setup_env_prefixes.json per config root, and the
-conda env var HELAO_STATION_PREFIXES lists those files, so a later update with
-no arguments reinstalls the same set.
+Called by setup_env/update_env with the base pixi env's python. The host
+workspace <repo>/.helao-env/pixi.toml is composed from the tracked base
+pixi.toml plus the env files of the configs' server folders
+(pixi_compose.py), its lock is seeded from the tracked pixi.lock, and
+`pixi install` applies it. A prefix resolves against every
+helao/deploy/*/configs/; one found in several deployments is asked about on
+a terminal and is an error without one. Resolved config paths are recorded
+in <root>/STATES/setup_env_prefixes.json per config root; the env var
+HELAO_STATION_PREFIXES (set by the env's activation) lists those files, so a
+later update with no arguments reinstalls the same set.
 """
 
 from __future__ import annotations
@@ -21,7 +25,6 @@ import shutil
 import stat
 import subprocess
 import sys
-import tempfile
 import time
 from pathlib import Path
 
@@ -32,6 +35,9 @@ STATES_FILE = "setup_env_prefixes.json"
 HTE_DIR = "hte"
 #: The one place the hte deployment's remote is named (spec §3).
 HTE_URL = "https://github.com/High-Throughput-Experimentation/helao-hte-deployment.git"
+WORKSPACE = REPO_ROOT / ".helao-env"
+BASE_MANIFEST = REPO_ROOT / "pixi.toml"
+BASE_LOCK = REPO_ROOT / "pixi.lock"
 
 
 class EnvSetupError(Exception):
@@ -134,39 +140,25 @@ def platform_tag() -> str:
     return "linux-aarch64" if machine in ("aarch64", "arm64") else "linux-64"
 
 
-def merge_environment(folders) -> dict | None:
-    """One conda env spec from every folder's environment.yml, then
-    environment_<platform>.yml (union, order kept)."""
-    channels: list[str] = []
-    deps: list[str] = []
-    pip: list[str] = []
-    for folder in sorted(folders):
-        for name in ("environment.yml", f"environment_{platform_tag()}.yml"):
-            f = Path(folder) / name
-            if not f.is_file():
-                continue
-            data = _yaml().load(f.read_text(encoding="utf-8")) or {}
-            channels += [c for c in data.get("channels", []) if c not in channels]
-            for d in data.get("dependencies", []):
-                if isinstance(d, dict):
-                    pip += [p for p in d.get("pip", []) if p not in pip]
-                elif d not in deps:
-                    deps.append(d)
-    if not deps and not pip:
-        return None
-    return {
-        "channels": channels or ["conda-forge"],
-        "dependencies": deps + ([{"pip": pip}] if pip else []),
-    }
+def _pixi() -> str:
+    """The pixi executable: $PIXI, then PATH, then ~/.pixi/bin."""
+    if os.environ.get("PIXI"):
+        return os.environ["PIXI"]
+    found = shutil.which("pixi")
+    if found:
+        return found
+    exe = "pixi.exe" if sys.platform == "win32" else "pixi"
+    home = Path.home() / ".pixi" / "bin" / exe
+    if home.is_file():
+        return str(home)
+    raise EnvSetupError(
+        "pixi not found on PATH or in ~/.pixi/bin; run setup_env to install it"
+    )
 
 
-def _conda() -> str:
-    return os.environ.get("CONDA_EXE", "conda")
-
-
-def _run(cmd: list[str], env: dict | None = None) -> None:
+def _run(cmd: list[str]) -> None:
     print("+ " + " ".join(cmd), flush=True)
-    subprocess.run(cmd, check=True, env=env)
+    subprocess.run(cmd, check=True)
 
 
 def pip_env_overrides(folder) -> dict[str, str]:
@@ -192,22 +184,6 @@ def pip_env_overrides(folder) -> dict[str, str]:
         (str(k).upper() if win else str(k)): "" if v is None else str(v)
         for k, v in data.items()
     }
-
-
-def _child_env(over: dict[str, str]) -> dict[str, str] | None:
-    """os.environ plus expanded overrides; an empty value unsets the variable."""
-    if not over:
-        return None
-    subs = {"{prefix}": sys.prefix, "{PATH}": os.environ.get("PATH", "")}
-    env = dict(os.environ)
-    for k, v in over.items():
-        for a, b in subs.items():
-            v = v.replace(a, b)
-        env[k] = v
-    for k, v in over.items():
-        if v == "":
-            env.pop(k, None)
-    return env
 
 
 def _warn(msg: str) -> None:
@@ -424,53 +400,51 @@ def ensure_hte(
     return "replaced"
 
 
-def install(folders, runner=_run, dry_run: bool = False) -> list[list[str]]:
-    """Conda first (one merged update), then uv per folder requirements.txt.
+def install(
+    folders, states_files=(), runner=None, dry_run: bool = False, workspace=None
+) -> dict:
+    """Compose <workspace>/pixi.toml, seed its lock, run `pixi install`, and
+    warn about base packages the station's additions moved."""
+    import tomllib
 
-    A folder's pip_env_<platform>.yml overrides reach only that folder's uv
-    command; the runner is called ``runner(cmd, env)`` (env None = inherit).
-    """
-    cmds: list[list[str]] = []
-    overs: list[dict] = []
-    env = merge_environment(folders)
-    tmpdir = Path(tempfile.mkdtemp())
+    import tomli_w
+
+    import pixi_compose as pc
+
+    runner = runner or _run
+    workspace = Path(workspace or WORKSPACE)
+    tag = platform_tag()
+    base = tomllib.loads(BASE_MANIFEST.read_text(encoding="utf-8"))
     try:
-        if env is not None:
-            tmp = tmpdir / "station_env.yml"
-            with open(tmp, "w", encoding="utf-8") as fh:
-                _yaml().dump(env, fh)
-            cmds.append(
-                [
-                    _conda(),
-                    "env",
-                    "update",
-                    "--solver=rattler",
-                    "--prefix",
-                    sys.prefix,
-                    "-f",
-                    str(tmp),
-                ]
-            )
-            overs.append({})
-        for folder in sorted(folders):
-            req = Path(folder) / "requirements.txt"
-            over = pip_env_overrides(folder)  # also warns on a stray pip_env file
-            if req.is_file():
-                cmds.append(
-                    ["uv", "pip", "install", "--python", sys.executable, "-r", str(req)]
-                )
-                overs.append(over)
-        for cmd, over in zip(cmds, overs):
-            if dry_run:
-                note = "".join(f"  [env {k}={v}]" for k, v in over.items())
-                print("+ " + " ".join(cmd) + note, flush=True)
-                if cmd is cmds[0] and env is not None:
-                    print(f"  conda dependencies: {env['dependencies']}", flush=True)
-            else:
-                runner(cmd, _child_env(over))
-    finally:
-        shutil.rmtree(tmpdir, ignore_errors=True)
-    return cmds
+        manifest = pc.compose(
+            base,
+            folders,
+            tag,
+            REPO_ROOT,
+            states_files,
+            pip_env_for=pip_env_overrides,
+            warn=_warn,
+        )
+    except pc.ComposeError as exc:
+        raise EnvSetupError(str(exc)) from exc
+    text = tomli_w.dumps(manifest)
+    target = workspace / "pixi.toml"
+    if dry_run:
+        print(f"# would write {target}:\n{text}", flush=True)
+        print(f"+ pixi install --manifest-path {target}", flush=True)
+        return manifest
+    workspace.mkdir(parents=True, exist_ok=True)
+    target.write_text(text, encoding="utf-8")
+    key = pc.platform_key(manifest)
+    if pc.seed_lock(BASE_LOCK, workspace):
+        print(f"seeded {workspace / 'pixi.lock'} from {BASE_LOCK}", flush=True)
+    runner([_pixi(), "install", "--manifest-path", str(target)])
+    for name, want, got in pc.drift(BASE_LOCK, workspace / "pixi.lock", key):
+        _warn(
+            f"base package {name} {want} -> {got or '(absent)'} "
+            "(forced by station packages)"
+        )
+    return manifest
 
 
 def _states_files(env) -> list[Path]:
@@ -499,12 +473,12 @@ def stored_configs(env=os.environ) -> list[Path]:
     return out
 
 
-def record(configs, runner=_run) -> list[Path]:
-    """Add ``configs`` to <root>/STATES/setup_env_prefixes.json; point the env var."""
+def record(configs) -> list[Path]:
+    """Add ``configs`` to <root>/STATES/setup_env_prefixes.json; return every
+    states file (those already in HELAO_STATION_PREFIXES plus those written)."""
     from helao.helpers.config_loader import read_config
 
     files = set(_states_files(os.environ))
-    written: list[Path] = []
     for cfg in configs:
         root = read_config(str(cfg)).get("root")
         if not root:
@@ -516,22 +490,7 @@ def record(configs, runner=_run) -> list[Path]:
         known.add(str(Path(cfg).resolve()))
         states.write_text(json.dumps(sorted(known), indent=2), encoding="utf-8")
         files.add(states)
-        if states not in written:
-            written.append(states)
-    if written:
-        runner(
-            [
-                _conda(),
-                "env",
-                "config",
-                "vars",
-                "set",
-                "--prefix",
-                sys.prefix,
-                f"{ENV_VAR}={os.pathsep.join(sorted(map(str, files)))}",
-            ]
-        )
-    return written
+    return sorted(files)
 
 
 _PANEL_KEYS = ("action_vis", "live_vis", "control_vis")
@@ -674,22 +633,24 @@ def main(argv=None) -> int:
         if not configs:
             if a.mode == "setup":
                 print(
-                    "no config prefix given: base env only (root helao_dev_*.yml "
-                    "and requirements.txt). Add config prefixes to setup_env to "
-                    "also install a station's server packages."
+                    "no config prefix given: base env only (pixi.toml). Add "
+                    "config prefixes to setup_env to also install a station's "
+                    "server packages."
                 )
             else:
                 print(
-                    "no station configs given or recorded: base env only. Run "
-                    "setup_env <config prefix> ... to install a station's packages."
+                    "no station configs given or recorded: base env only. A "
+                    "host moving from conda must run setup_env <config prefix> "
+                    "... once; its old record lived in the conda env."
                 )
-            return 0
         folders: set[Path] = set()
         for cfg in configs:
             folders |= server_folders(cfg)
-        install(folders, dry_run=a.dry_run)
         if a.prefixes and not a.dry_run:
-            record(configs)
+            states = record(configs)
+        else:
+            states = _states_files(os.environ)
+        install(folders, states_files=states, dry_run=a.dry_run)
         for folder in sorted(folders):
             if (folder / "README.md").is_file():
                 print(f"vendor notes: {folder / 'README.md'}")
