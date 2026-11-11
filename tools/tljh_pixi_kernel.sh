@@ -29,37 +29,63 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 [ "$(id -u)" -eq 0 ] || die "run with sudo"
 [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ] || die "run via sudo from your own account (SUDO_USER is unset or root)"
 USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
-PIXI=${PIXI:-$USER_HOME/.pixi/bin/pixi}
-[ -x "$PIXI" ] || die "pixi not found at $PIXI (set PIXI=/path/to/pixi)"
+# pixi: $PIXI, else whatever $SUDO_USER's login shell finds, else the installer's default
+if [ -z "${PIXI:-}" ]; then
+    PIXI=$(sudo -u "$SUDO_USER" -H bash -lc 'command -v pixi' 2>/dev/null | tail -n1 || true)
+    [ -n "$PIXI" ] && [ -x "$PIXI" ] || PIXI=$USER_HOME/.pixi/bin/pixi
+fi
+[ -x "$PIXI" ] || die "pixi not found at $PIXI (run: sudo PIXI=/path/to/pixi bash tools/tljh_pixi_kernel.sh)"
 [ -f "$WORKSPACE/pixi.toml" ] || die "no pixi.toml in $WORKSPACE"
 [ -d "$TLJH_PREFIX/share/jupyter/kernels" ] || die "TLJH kernels dir missing: $TLJH_PREFIX/share/jupyter/kernels"
 
 # 1. activation script, generated as the workspace owner so pixi never writes root-owned files
 ACTIVATE="$WORKSPACE/activate-$ENV_NAME.sh"
+trap 'rm -f "$ACTIVATE.tmp"' EXIT
 sudo -u "$SUDO_USER" -H "$PIXI" shell-hook --frozen --shell bash \
     -e "$ENV_NAME" --manifest-path "$WORKSPACE/pixi.toml" > "$ACTIVATE.tmp"
+# shell-hook froze the caller's PATH (sudo's secure_path); keep only the env's dirs
+# and append the PATH of whoever sources the script
+python3 -P - "$ACTIVATE.tmp" "$PATH" <<'PYEOF'
+import sys
+path_file, caller = sys.argv[1], sys.argv[2]
+with open(path_file, encoding="utf-8") as f:
+    lines = f.read().split("\n")
+hit = False
+for i, line in enumerate(lines):
+    if line.startswith("export PATH="):
+        val = line[len("export PATH="):].strip().strip("\"'")
+        if not val.endswith(":" + caller):
+            sys.exit(f"ERROR: PATH line in {path_file} does not end with the caller PATH: {line}")
+        lines[i] = f'export PATH="{val[: -len(caller) - 1]}:$PATH"'
+        hit = True
+if not hit:
+    sys.exit(f"ERROR: no 'export PATH=' line in {path_file}")
+with open(path_file, "w", encoding="utf-8") as f:
+    f.write("\n".join(lines))
+PYEOF
 mv "$ACTIVATE.tmp" "$ACTIVATE"
 chown "$SUDO_USER":"$(stat -c %G "$WORKSPACE")" "$ACTIVATE"
 chmod 0644 "$ACTIVATE"
 
 # the kernel must start for a hub user, not just for you
-bash -c "source '$ACTIVATE' && python -c 'import ipykernel, sys; print(\"activation ok:\", sys.executable)'" \
+QACT=$(printf %q "$ACTIVATE")
+bash -c "source $QACT && python -c 'import ipykernel, sys; print(\"activation ok:\", sys.executable)'" \
     || die "sourcing $ACTIVATE did not give a working python"
-ENV_PY=$(bash -c "source '$ACTIVATE' && command -v python") || die "no python after sourcing $ACTIVATE"
+ENV_PY=$(bash -c "source $QACT && command -v python" | tail -n1) || die "no python after sourcing $ACTIVATE"
 
 # 2. kernelspec (root-owned, world-readable)
-"$ENV_PY" -m ipykernel install --prefix "$TLJH_PREFIX" \
+"$ENV_PY" -P -m ipykernel install --prefix "$TLJH_PREFIX" \
     --name "$KERNEL_NAME" --display-name "$DISPLAY_NAME" >/dev/null
 SPEC="$TLJH_PREFIX/share/jupyter/kernels/$KERNEL_NAME/kernel.json"
-"$ENV_PY" - "$SPEC" "$ACTIVATE" <<'EOF'
-import json, sys
+"$ENV_PY" -P - "$SPEC" "$ACTIVATE" <<'EOF'
+import json, shlex, sys
 spec_path, activate = sys.argv[1], sys.argv[2]
 with open(spec_path, encoding="utf-8") as f:
     spec = json.load(f)
 # bash gets {connection_file} as $0; exec keeps signals (interrupt/restart) on the kernel
 spec["argv"] = [
     "/bin/bash", "-c",
-    f"source '{activate}' && exec python -m ipykernel_launcher -f \"$0\"",
+    f"source {shlex.quote(activate)} && exec python -m ipykernel_launcher -f \"$0\"",
     "{connection_file}",
 ]
 with open(spec_path, "w", encoding="utf-8") as f:
