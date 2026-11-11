@@ -27,6 +27,9 @@ REPO_ROOT = Path(__file__).resolve().parent
 DEPLOY_ROOT = REPO_ROOT / "helao" / "deploy"
 ENV_VAR = "HELAO_STATION_PREFIXES"
 STATES_FILE = "setup_env_prefixes.json"
+#: The one place the hte deployment's remote is named (spec §3).
+HTE_DIR = "hte"
+HTE_URL = "https://github.com/High-Throughput-Experimentation/helao-hte-deployment.git"
 
 
 class EnvSetupError(Exception):
@@ -201,6 +204,70 @@ def _child_env(over: dict[str, str]) -> dict[str, str] | None:
     return env
 
 
+def _warn(msg: str) -> None:
+    print(f"warning: {msg}", file=sys.stderr)
+
+
+def hte_state(deploy_root: Path = DEPLOY_ROOT, repo_root: Path = REPO_ROOT) -> str:
+    """What the hte deployment folder is: its own clone, part of this checkout, a leftover, or absent.
+
+    "tracked" is every checkout before the split: the folder has no .git but
+    this repo tracks it, so it is the deployment, not a leftover.
+    """
+    hte = Path(deploy_root) / HTE_DIR
+    if (hte / ".git").exists():
+        return "repo"
+    if not hte.exists():
+        return "missing"
+    tracked = subprocess.run(
+        ["git", "-C", str(repo_root), "ls-files", "--error-unmatch", str(hte)],
+        capture_output=True,
+    )
+    return "tracked" if tracked.returncode == 0 else "leftover"
+
+
+def ensure_hte(
+    deploy_root: Path = DEPLOY_ROOT,
+    repo_root: Path = REPO_ROOT,
+    url: str = HTE_URL,
+    runner=_run,
+    dry_run: bool = False,
+) -> str:
+    """Pull hte if it is a clone, clone it if missing, replace a leftover with a clone.
+
+    A leftover is what a parent pull leaves after the split: __pycache__ plus any
+    station-local files. Every non-cache file is logged before the folder is
+    removed (user ruling), so nothing disappears unrecorded. A git refusal
+    (local edits in the way) raises CalledProcessError and changes nothing.
+    """
+    hte = Path(deploy_root) / HTE_DIR
+    state = hte_state(deploy_root, repo_root)
+    if state == "tracked":
+        return "tracked"
+    if dry_run:
+
+        def _dry_runner(cmd, env=None):  # noqa: ARG001
+            print("+ " + " ".join(cmd), flush=True)
+
+        runner = _dry_runner
+
+    if state == "repo":
+        runner(["git", "-C", str(hte), "pull"])
+        return "pulled"
+    verdict = "cloned"
+    if state == "leftover":
+        for p in sorted(hte.rglob("*")):
+            if p.is_file() and "__pycache__" not in p.parts and p.suffix != ".pyc":
+                _warn(f"removing leftover {p}")
+        if dry_run:
+            print(f"+ rm -r {hte}", flush=True)
+        else:
+            shutil.rmtree(hte)
+        verdict = "replaced"
+    runner(["git", "clone", url, str(hte)])
+    return verdict
+
+
 def install(folders, runner=_run, dry_run: bool = False) -> list[list[str]]:
     """Conda first (one merged update), then uv per folder requirements.txt.
 
@@ -248,10 +315,6 @@ def install(folders, runner=_run, dry_run: bool = False) -> list[list[str]]:
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
     return cmds
-
-
-def _warn(msg: str) -> None:
-    print(f"warning: {msg}", file=sys.stderr)
 
 
 def _states_files(env) -> list[Path]:

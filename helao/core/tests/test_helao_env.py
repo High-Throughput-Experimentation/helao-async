@@ -357,3 +357,174 @@ def test_gpsim_folder_brings_pytorch_and_gpytorch():
     env = he.merge_environment(he.server_folders(cfg))
     assert env is not None
     assert {"pytorch-cpu", "gpytorch"} <= set(env["dependencies"])
+
+
+import subprocess
+
+_REAL_ENSURE_HTE = he.ensure_hte
+_REAL_HTE_STATE = he.hte_state
+
+
+@pytest.fixture(autouse=True)
+def _no_network_hte(monkeypatch):
+    """No test may clone or pull the real hte remote; opt in by calling _REAL_*."""
+
+    def refuse(**kw):
+        raise AssertionError("ensure_hte called without a test stub")
+
+    monkeypatch.setattr(he, "ensure_hte", refuse)
+    monkeypatch.setattr(he, "hte_state", lambda *a, **k: "tracked")
+
+
+def _git(*args, cwd):
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@example.invalid",
+            "-C",
+            str(cwd),
+            *args,
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+
+@pytest.fixture()
+def remote(tmp_path, monkeypatch):
+    """A bare repo standing in for helao-hte-deployment, plus a work clone to push from.
+
+    Restores the real hte_state, which the autouse fixture stubs: the real
+    ensure_hte calls it through the module global."""
+    monkeypatch.setattr(he, "hte_state", _REAL_HTE_STATE)
+    src = tmp_path / "src"
+    src.mkdir()
+    _git("init", "-b", "main", cwd=src)
+    (src / "servers").mkdir()
+    (src / "servers" / "__init__.py").write_text("", encoding="utf-8")
+    (src / "README.md").write_text("v1\n", encoding="utf-8")
+    _git("add", "-A", cwd=src)
+    _git("commit", "-m", "init", cwd=src)
+    bare = tmp_path / "remote.git"
+    subprocess.run(
+        ["git", "clone", "--bare", str(src), str(bare)], check=True, capture_output=True
+    )
+    _git("remote", "add", "origin", str(bare), cwd=src)
+    return bare, src
+
+
+def _push(src, name, text):
+    (src / name).write_text(text, encoding="utf-8")
+    _git("add", "-A", cwd=src)
+    _git("commit", "-m", name, cwd=src)
+    _git("push", "origin", "main", cwd=src)
+
+
+def test_hte_state_names_all_four_shapes(tmp_path, remote):
+    deploy = tmp_path / "parent" / "helao" / "deploy"
+    deploy.mkdir(parents=True)
+    parent = tmp_path / "parent"
+    _git("init", "-b", "main", cwd=parent)
+    assert _REAL_HTE_STATE(deploy, parent) == "missing"
+    (deploy / "hte").mkdir()
+    (deploy / "hte" / "x.py").write_text("", encoding="utf-8")
+    assert _REAL_HTE_STATE(deploy, parent) == "leftover"
+    _git("add", "-A", cwd=parent)
+    _git("commit", "-m", "track hte", cwd=parent)
+    assert _REAL_HTE_STATE(deploy, parent) == "tracked"
+    (deploy / "hte" / ".git").mkdir()
+    assert _REAL_HTE_STATE(deploy, parent) == "repo"
+
+
+def test_ensure_hte_clones_when_missing(tmp_path, remote):
+    bare, _ = remote
+    deploy = tmp_path / "deploy"
+    deploy.mkdir()
+    assert _REAL_ENSURE_HTE(deploy, tmp_path, url=str(bare)) == "cloned"
+    assert (deploy / "hte" / ".git").exists()
+    assert (deploy / "hte" / "README.md").read_text(encoding="utf-8") == "v1\n"
+
+
+def test_ensure_hte_pulls_an_existing_repo_and_never_deletes_it(tmp_path, remote):
+    bare, src = remote
+    deploy = tmp_path / "deploy"
+    deploy.mkdir()
+    subprocess.run(
+        ["git", "clone", str(bare), str(deploy / "hte")],
+        check=True,
+        capture_output=True,
+    )
+    marker = (
+        deploy / "hte" / "station_local.txt"
+    )  # untracked: survives a pull, not a re-clone
+    marker.write_text("keep", encoding="utf-8")
+    _push(src, "new.txt", "v2\n")
+    assert _REAL_ENSURE_HTE(deploy, tmp_path, url=str(bare)) == "pulled"
+    assert (deploy / "hte" / "new.txt").is_file()
+    assert marker.read_text(encoding="utf-8") == "keep"
+
+
+def test_ensure_hte_logs_and_replaces_a_leftover(tmp_path, remote, capsys):
+    bare, _ = remote
+    deploy = tmp_path / "deploy"
+    left = deploy / "hte"
+    (left / "servers" / "__pycache__").mkdir(parents=True)
+    (left / "servers" / "__pycache__" / "a.cpython-314.pyc").write_bytes(b"\0")
+    (left / "servers" / "b.pyc").write_bytes(b"\0")  # R3: a .pyc outside __pycache__
+    (left / "configs").mkdir()
+    (left / "configs" / "station_local.yml").write_text("x: 1\n", encoding="utf-8")
+    assert _REAL_ENSURE_HTE(deploy, tmp_path, url=str(bare)) == "replaced"
+    err = capsys.readouterr().err
+    assert "station_local.yml" in err
+    assert "a.cpython-314.pyc" not in err and "b.pyc" not in err
+    assert (left / ".git").exists() and not (
+        left / "configs" / "station_local.yml"
+    ).exists()
+
+
+def test_ensure_hte_dry_run_changes_nothing(tmp_path, remote, capsys):
+    bare, _ = remote
+    deploy = tmp_path / "deploy"
+    (deploy / "hte").mkdir(parents=True)
+    (deploy / "hte" / "keep.txt").write_text("k", encoding="utf-8")
+    assert _REAL_ENSURE_HTE(deploy, tmp_path, url=str(bare), dry_run=True) == "replaced"
+    assert (deploy / "hte" / "keep.txt").is_file() and not (
+        deploy / "hte" / ".git"
+    ).exists()
+    assert "git clone" in capsys.readouterr().out
+
+
+def test_ensure_hte_leaves_a_tracked_folder_alone(tmp_path, remote):
+    """Before the cutover the developer's hte has no .git and is tracked: never touch it."""
+    bare, _ = remote
+    parent = tmp_path / "parent"
+    deploy = parent / "helao" / "deploy"
+    (deploy / "hte").mkdir(parents=True)
+    (deploy / "hte" / "x.py").write_text("tracked\n", encoding="utf-8")
+    _git("init", "-b", "main", cwd=parent)
+    _git("add", "-A", cwd=parent)
+    _git("commit", "-m", "track", cwd=parent)
+    assert _REAL_ENSURE_HTE(deploy, parent, url=str(bare)) == "tracked"
+    assert (deploy / "hte" / "x.py").read_text(encoding="utf-8") == "tracked\n"
+    assert not (deploy / "hte" / ".git").exists()
+
+
+def test_a_local_edit_that_conflicts_makes_the_pull_refuse(tmp_path, remote):
+    bare, src = remote
+    deploy = tmp_path / "deploy"
+    deploy.mkdir()
+    subprocess.run(
+        ["git", "clone", str(bare), str(deploy / "hte")],
+        check=True,
+        capture_output=True,
+    )
+    (deploy / "hte" / "README.md").write_text("station edit\n", encoding="utf-8")
+    _push(src, "README.md", "v2\n")
+    with pytest.raises(subprocess.CalledProcessError):
+        _REAL_ENSURE_HTE(deploy, tmp_path, url=str(bare))
+    assert (deploy / "hte" / "README.md").read_text(
+        encoding="utf-8"
+    ) == "station edit\n"

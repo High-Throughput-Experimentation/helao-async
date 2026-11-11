@@ -25,6 +25,8 @@ IMPORT = re.compile(r"helao\.deploy\.hte\b")
 HTE = re.compile(r"""helao\.deploy\.hte\b|deploy[/\\]hte\b|^hte$""")
 # data label on records (``access``), not a deployment reference
 ALLOWED_FIELD = {"access"}
+# env bootstrap: clones/pulls the public hte deployment repo (spec 2026-11-10 §3)
+EXEMPT_FILES = {"helao_env.py"}
 
 
 def _py_files():
@@ -36,6 +38,8 @@ def _py_files():
 
 
 def _hits(path: Path) -> list[str]:
+    if path.name in EXEMPT_FILES and path.parent == REPO:
+        return []
     tree = ast.parse(path.read_text(encoding="utf-8"))
     # resolver tests use the real hte deployment as fixture data
     in_tests = "tests" in path.relative_to(REPO).parts
