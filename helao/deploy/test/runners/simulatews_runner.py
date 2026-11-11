@@ -21,7 +21,7 @@ Prerequisites
 
 Run::
 
-    conda run -n helao python -m helao.deploy.test.runners.simulatews_runner
+    python -m helao.deploy.test.runners.simulatews_runner
 """
 
 from __future__ import annotations

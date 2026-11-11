@@ -12,7 +12,7 @@ def make_manifest() -> ProvenanceManifest:
         config_prefix="golden",
         config_path="/abs/path/golden.yml",
         legacy_git_sha="c3b80003" + "0" * 32,
-        launch_cmd="conda run -n helao python launch.py golden --no-hot-reload",
+        launch_cmd="python launch.py golden --no-hot-reload",
         sequence_name="SIM_websocket_data_seq",
         sequence_params={"wait_time": 2.0},
         capture_timestamp="2026-07-16T12:00:00",

@@ -1990,7 +1990,7 @@ def main():
     Main function to initialize and launch the HELAO application.
     This function performs the following tasks:
     1. Initializes colorama for colored terminal output.
-    2. Checks if the script is running in the 'helao' conda environment.
+    2. Checks if the script is running in the 'helao' environment.
     3. Validates the PYTHONPATH environment variable and retrieves paths for HELAO repositories.
     4. Loads the configuration file based on the provided argument.
     5. Runs the full unit-test suite when ``run_unit_tests: true`` is set in the loaded config.
@@ -2007,7 +2007,7 @@ def main():
     colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
     if os.environ.get("CONDA_DEFAULT_ENV") != "helao":
         print(
-            "launch.py launcher was not called from a 'helao' conda environment.",
+            "launch.py launcher was not called from a 'helao' environment.",
         )
     python_path = os.environ.get("PYTHONPATH")
     if python_path is None:

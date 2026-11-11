@@ -2,7 +2,7 @@
 
 No pytest; run with:
 
-    conda run -n helao python -m helao.core.tests.unit_test_server_keys
+    python -m helao.core.tests.unit_test_server_keys
 """
 
 from helao.helpers.server_keys import (

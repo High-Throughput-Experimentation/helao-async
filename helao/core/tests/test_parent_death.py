@@ -5,7 +5,7 @@ arming works on Linux and no-ops elsewhere, a parent that died before the call
 is detected anyway, and the notification is *not* obeyed when it was really the
 spawning thread that exited or when the launcher detached on purpose.
 
-Run:  conda run -n helao python -m pytest helao/core/tests/test_parent_death.py
+Run:  python -m pytest helao/core/tests/test_parent_death.py
 """
 
 import os

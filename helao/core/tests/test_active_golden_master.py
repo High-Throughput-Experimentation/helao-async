@@ -93,7 +93,7 @@ Reference: ``golden/action/`` (next to this file) holds one
 scenario's root) per scenario. ``run_freeze`` refuses to overwrite a non-empty
 reference and ``_write_baseline`` asserts against it.
 
-Run from the repository root, in the ``helao`` conda env::
+Run from the repository root, in the ``helao`` env::
 
     python helao/core/tests/test_active_golden_master.py            # determinism self-test
     python helao/core/tests/test_active_golden_master.py --check    # the gate

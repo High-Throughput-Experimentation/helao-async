@@ -90,10 +90,10 @@ the only accepted delta. The older ``.omc/artifacts/p5/baseline_S0/``
 reference is retired: it predates the stop-requeue fix (scenario 2) and the
 E-STOP-reaches-drivers change (scenario 7), and this file no longer reads it.
 
-Run (conda env ``helao``; not a pytest module -- run as a script, from the
+Run (``helao`` env; not a pytest module -- run as a script, from the
 repo root, with the repo root on ``PYTHONPATH``)::
 
-    conda run -n helao --no-capture-output python \\
+    python \\
         helao/core/tests/test_orch_dispatch_golden_master.py [--check]
 
 Two modes:

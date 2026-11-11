@@ -37,7 +37,7 @@ supervisors do this), ``AssignProcessToJobObject`` fails with access-denied.
 That is not a reason to refuse to launch an instrument: everything here logs and
 returns, leaving the previous behaviour intact.
 
-**No ``pywin32``.** ``helao_dev_win-64.yml`` ships ``comtypes`` and ``pyserial``
+**No ``pywin32``.** the base ``pixi.toml`` ships ``comtypes`` and ``pyserial``
 and not ``pywin32``, so this uses raw :mod:`ctypes` against ``kernel32`` rather
 than ``win32job``. That keeps it a pure-stdlib addition needing no station
 environment rebuild.

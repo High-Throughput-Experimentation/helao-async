@@ -44,7 +44,7 @@ Prerequisites
 
 Run::
 
-    conda run -n helao python -m helao.deploy.test.runners.test_runner
+    python -m helao.deploy.test.runners.test_runner
 """
 
 from __future__ import annotations

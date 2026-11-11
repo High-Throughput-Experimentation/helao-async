@@ -9,7 +9,7 @@ Real child processes, Linux path (SIGTERM -> GRACEFUL_WAIT): each child is
 spawned with the argv a launched server has, so ``_pid_is_server`` accepts it,
 and takes ``EXIT_DELAY`` seconds to exit on SIGTERM.
 
-Run:  conda run -n helao python -m pytest helao/core/tests/test_launch_parallel_teardown.py
+Run:  python -m pytest helao/core/tests/test_launch_parallel_teardown.py
 """
 
 import logging as _logging
