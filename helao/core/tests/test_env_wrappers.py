@@ -166,3 +166,74 @@ def test_setup_env_stops_when_helao_env_fails(repo, tmp_path):
     Path(f"{log}.rc").write_text("2", encoding="utf-8")
     r = _run([str(repo / "setup_env.sh"), "x"], _env(tmp_path, [bindir]), repo)
     assert r.returncode != 0 and "complete" not in r.stdout
+
+
+def _fail_run(log):
+    Path(f"{log}.rc").write_text("2", encoding="utf-8")
+
+
+def test_failed_first_run_removes_the_new_manifest(repo, tmp_path):
+    log = tmp_path / "pixi.log"
+    bindir = tmp_path / "bin"
+    _stub_pixi_run(bindir, log)
+    _fail_run(log)
+    r = _run([str(repo / "setup_env.sh"), "x"], _env(tmp_path, [bindir]), repo)
+    assert r.returncode == 2
+    assert not (repo / ".helao-env" / "pixi.toml").exists()
+    assert not (repo / ".helao-env" / "pixi.lock").exists()
+    assert "removed the new .helao-env manifest" in r.stdout
+
+
+def test_failed_later_run_keeps_the_workspace(repo, tmp_path):
+    log = tmp_path / "pixi.log"
+    bindir = tmp_path / "bin"
+    _stub_pixi_run(bindir, log)
+    _fail_run(log)
+    ws = repo / ".helao-env"
+    ws.mkdir()
+    (ws / "pixi.toml").write_text("mine\n", encoding="utf-8")
+    (ws / "pixi.lock").write_text("lock\n", encoding="utf-8")
+    r = _run([str(repo / "update_env.sh")], _env(tmp_path, [bindir]), repo)
+    assert r.returncode == 2
+    assert (ws / "pixi.toml").read_text() == "mine\n"
+    assert (ws / "pixi.lock").read_text() == "lock\n"
+
+
+def test_workspace_without_lock_is_reseeded(repo, tmp_path):
+    log = tmp_path / "pixi.log"
+    bindir = tmp_path / "bin"
+    _stub_pixi_run(bindir, log)
+    ws = repo / ".helao-env"
+    ws.mkdir()
+    (ws / "pixi.toml").write_text("stale\n", encoding="utf-8")
+    r = _run([str(repo / "setup_env.sh"), "x"], _env(tmp_path, [bindir]), repo)
+    assert r.returncode == 0, r.stderr
+    assert (ws / "pixi.toml").read_text() == "[workspace]\n"
+    assert (ws / "pixi.lock").read_text() == "version: 6\n"
+    assert log.read_text().startswith("run --frozen")
+
+
+def test_pixi_path_reaches_the_child(repo, tmp_path):
+    log = tmp_path / "pixi.log"
+    bindir = tmp_path / "bin"
+    stub = _exe(bindir / "pixi", f'echo "PIXI=$PIXI" >> "{log}"\n')
+    r = _run([str(repo / "setup_env.sh")], _env(tmp_path, [bindir]), repo)
+    assert r.returncode == 0, r.stderr
+    assert log.read_text().strip() == f"PIXI={stub}"
+
+
+def test_setup_uses_pixi_in_home_bin(repo, tmp_path):
+    log = tmp_path / "pixi.log"
+    home = tmp_path / "home"
+    _stub_pixi_run(home / ".pixi" / "bin", log)
+    r = _run([str(repo / "setup_env.sh"), "x"], _env(tmp_path, [], home=home), repo)
+    assert r.returncode == 0, r.stderr
+    assert log.read_text().startswith("run --frozen")
+
+
+def test_failed_pixi_install_stops_before_the_workspace(repo, tmp_path):
+    bindir = tmp_path / "bin"
+    _exe(bindir / "curl", "exit 6\n")
+    r = _run([str(repo / "setup_env.sh"), "x"], _env(tmp_path, [bindir]), repo)
+    assert r.returncode != 0 and "pixi install failed" in r.stderr
+    assert not (repo / ".helao-env" / "pixi.toml").exists()

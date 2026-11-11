@@ -9,16 +9,28 @@ if [ -z "$PIXI" ]; then
     echo "pixi not found; installing it to ~/.pixi ..."
     curl -fsSL https://pixi.sh/install.sh | bash || exit 1
     PIXI="$HOME/.pixi/bin/pixi"
+    [ -x "$PIXI" ] || { echo "ERROR: pixi install failed; install pixi from https://pixi.sh and rerun setup_env.sh" >&2; exit 1; }
 fi
 WS="$HA_DIR/.helao-env"
-if [ ! -f "$WS/pixi.toml" ]; then
+CREATED=0
+if [ ! -f "$WS/pixi.toml" ] || [ ! -f "$WS/pixi.lock" ]; then
     mkdir -p "$WS" || exit 1
-    cp "$HA_DIR/pixi.toml" "$HA_DIR/pixi.lock" "$WS/" || exit 1
+    CREATED=1
+    cp "$HA_DIR/pixi.lock" "$WS/" || exit 1
+    cp "$HA_DIR/pixi.toml" "$WS/" || exit 1
 fi
 # Run helao_env.py in the env. pixi installs it from the lock on first use, and
 # the env's location is pixi's business (detached-environments may move it).
 PIXI="$PIXI" "$PIXI" run --frozen --manifest-path "$WS/pixi.toml" \
-    python "$HA_DIR/helao_env.py" "$MODE" "$@" || exit 1
+    python "$HA_DIR/helao_env.py" "$MODE" "$@"
+rc=$?
+if [ "$rc" -ne 0 ]; then
+    if [ "$CREATED" = 1 ]; then
+        rm -f "$WS/pixi.toml" "$WS/pixi.lock" "$WS/.seed"
+        echo "setup failed; removed the new .helao-env manifest so helao.sh keeps using the previous environment"
+    fi
+    exit $rc
+fi
 chmod +x "$HA_DIR/helao.sh"
 echo ""
 echo "'helao' environment $MODE is complete"
