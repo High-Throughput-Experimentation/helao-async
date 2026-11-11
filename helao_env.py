@@ -38,6 +38,10 @@ class EnvSetupError(Exception):
     """A config or install step that cannot proceed; the message says why."""
 
 
+class ConfigNotFound(EnvSetupError):
+    """A bare prefix or deployment/prefix that no present deployment holds."""
+
+
 def resolve_config(
     arg: str,
     deploy_root: Path = DEPLOY_ROOT,
@@ -59,7 +63,7 @@ def resolve_config(
     )
     matches.sort()
     if not matches:
-        raise EnvSetupError(f"no config named {arg!r} in any deployment")
+        raise ConfigNotFound(f"no config named {arg!r} in any deployment")
     if len(matches) == 1:
         return matches[0].resolve()
     listing = "\n".join(
@@ -538,11 +542,12 @@ def config_hte_use(config_path: Path, deploy_root: Path = DEPLOY_ROOT) -> str:
 
 
 def wants_hte(state: str, *, no_prefix: bool, unresolved: bool, uses_hte: bool) -> bool:
-    """Spec section 3 "When it acts", with OQ-2's rule for an absent hte."""
-    if state == "tracked":
+    """Spec section 3 "When it acts", with OQ-2: always pull a clone; clone an
+    absent hte when no prefix is given, one is unresolved, or a config uses it."""
+    if state in ("tracked", "unknown"):
         return False
     if state == "repo":
-        return uses_hte
+        return True
     return no_prefix or unresolved or uses_hte
 
 
@@ -557,6 +562,9 @@ def _recorded_paths_exist(env=os.environ) -> bool:
     return True
 
 
+_HTE_ERRORS = (EnvSetupError, subprocess.CalledProcessError, OSError)
+
+
 def main(argv=None) -> int:
     from ruamel.yaml.error import YAMLError
 
@@ -566,36 +574,67 @@ def main(argv=None) -> int:
     p.add_argument("--dry-run", action="store_true")
     a = p.parse_args(argv)
     try:
-        state = hte_state()
+        state, state_err = "unknown", None
+        try:
+            state = hte_state()
+        except _HTE_ERRORS as exc:
+            state_err = exc
+            _warn(f"hte state unknown ({exc}); helao/deploy/hte left alone")
         acted = False
 
-        def act():
-            nonlocal acted, state
-            if not acted:
-                print(f"hte: {ensure_hte(dry_run=a.dry_run)}", flush=True)
-                acted, state = True, hte_state()
+        def act(required: bool) -> None:
+            """Pull/clone hte once. A failure aborts only when ``required``."""
+            nonlocal acted
+            if acted:
+                return
+            acted = True
+            if state == "unknown":
+                if required and state_err is not None:
+                    raise state_err
+                return
+            try:
+                result = ensure_hte(dry_run=a.dry_run)
+            except _HTE_ERRORS as exc:
+                if required:
+                    raise
+                _warn(f"hte not updated ({exc}); continuing without it")
+                return
+            print(f"hte: {'would be ' if a.dry_run else ''}{result}", flush=True)
+
+        def stop_dry() -> int:
+            print("dry run: resolving the configs needs the real hte; stopping here")
+            return 0
 
         if a.prefixes:
             try:
                 configs = [resolve_config(x) for x in a.prefixes]
-            except EnvSetupError:
+            except ConfigNotFound:
                 if not wants_hte(
                     state, no_prefix=False, unresolved=True, uses_hte=False
                 ):
                     raise
-                act()
+                act(required=True)
+                if a.dry_run and state != "unknown":
+                    return stop_dry()
                 configs = [resolve_config(x) for x in a.prefixes]
         elif a.mode == "update":
             if not _recorded_paths_exist() and wants_hte(
                 state, no_prefix=False, unresolved=True, uses_hte=False
             ):
-                act()
+                act(required=True)
+                if a.dry_run and state != "unknown":
+                    return stop_dry()
             configs = stored_configs()
         else:
             configs = []
+        uses = {config_hte_use(c) for c in configs}
+        unresolved, hte_used = "unresolved" in uses, "hte" in uses
+        no_prefix = not a.prefixes
+        if (state == "unknown" and (unresolved or hte_used)) or wants_hte(
+            state, no_prefix=no_prefix, unresolved=unresolved, uses_hte=hte_used
+        ):
+            act(required=unresolved or hte_used or (no_prefix and state != "repo"))
         if not configs:
-            if wants_hte(state, no_prefix=True, unresolved=False, uses_hte=False):
-                act()
             if a.mode == "setup":
                 print(
                     "no config prefix given: base env only (root helao_dev_*.yml "
@@ -608,14 +647,6 @@ def main(argv=None) -> int:
                     "setup_env <config prefix> ... to install a station's packages."
                 )
             return 0
-        uses = {config_hte_use(c) for c in configs}
-        if wants_hte(
-            state,
-            no_prefix=False,
-            unresolved="unresolved" in uses,
-            uses_hte="hte" in uses,
-        ):
-            act()
         folders: set[Path] = set()
         for cfg in configs:
             folders |= server_folders(cfg)

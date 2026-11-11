@@ -843,8 +843,13 @@ def test_config_hte_use_counts_panels(tmp_path):
 def test_wants_hte_truth_table():
     w = he.wants_hte
     assert not w("tracked", no_prefix=True, unresolved=True, uses_hte=True)
-    assert w("repo", no_prefix=False, unresolved=False, uses_hte=True)
-    assert not w("repo", no_prefix=True, unresolved=False, uses_hte=False)
+    assert not w("unknown", no_prefix=True, unresolved=True, uses_hte=True)
+    for kw in (
+        dict(no_prefix=False, unresolved=False, uses_hte=False),
+        dict(no_prefix=True, unresolved=False, uses_hte=False),
+        dict(no_prefix=False, unresolved=False, uses_hte=True),
+    ):
+        assert w("repo", **kw)  # a clone is always pulled
     for s in ("missing", "leftover"):
         assert w(s, no_prefix=True, unresolved=False, uses_hte=False)
         assert w(s, no_prefix=False, unresolved=True, uses_hte=False)
@@ -865,7 +870,7 @@ def test_main_clones_hte_when_a_prefix_only_resolves_after_the_clone(
     monkeypatch.setattr(he, "ensure_hte", lambda **k: calls.append(k) or "cloned")
     cfg = tmp_path / "c.yml"
     cfg.write_text("root: x\nservers: {}\n", encoding="utf-8")
-    answers = iter([he.EnvSetupError("no config named 'eche10'"), cfg])
+    answers = iter([he.ConfigNotFound("no config named 'eche10'"), cfg])
 
     def fake_resolve(arg, *a, **k):
         r = next(answers)
@@ -877,7 +882,7 @@ def test_main_clones_hte_when_a_prefix_only_resolves_after_the_clone(
     monkeypatch.setattr(he, "config_hte_use", lambda c: "hte")
     _stub_install(monkeypatch)
     assert he.main(["setup", "eche10"]) == 0
-    assert len(calls) == 1
+    assert calls == [{"dry_run": False}]
 
 
 def test_main_never_touches_a_tracked_hte(monkeypatch):
@@ -909,7 +914,7 @@ def test_update_replay_clones_hte_then_reinstalls_the_replayed_configs(
     monkeypatch.setattr(he, "install", lambda folders, **k: installed.append(folders))
     monkeypatch.setattr(he, "record", lambda configs, **k: [])
     assert he.main(["update"]) == 0
-    assert len(calls) == 1
+    assert calls == [{"dry_run": False}]
     assert seen == [cfg]
     assert installed == [{folder}]
 
@@ -934,3 +939,121 @@ def test_recorded_paths_exist(monkeypatch, tmp_path):
     )
     assert he._recorded_paths_exist(env([other])) is True
     assert he._recorded_paths_exist({}) is True  # no records: nothing is missing
+
+
+def _cfg_file(tmp_path, name="c.yml"):
+    cfg = tmp_path / name
+    cfg.write_text("root: x\nservers: {}\n", encoding="utf-8")
+    return cfg
+
+
+def _spy(monkeypatch, state, use="none", ensure=None):
+    """Stub the hte seams; returns (ensure calls, installed folder sets)."""
+    calls, installed = [], []
+
+    def fake_ensure(**k):
+        calls.append(k)
+        if ensure:
+            raise ensure
+        return "pulled"
+
+    monkeypatch.setattr(
+        he, "hte_state", state if callable(state) else lambda *a, **k: state
+    )
+    monkeypatch.setattr(he, "ensure_hte", fake_ensure)
+    monkeypatch.setattr(he, "config_hte_use", lambda c: use)
+    monkeypatch.setattr(he, "server_folders", lambda c: {Path("f")})
+    monkeypatch.setattr(he, "install", lambda folders, **k: installed.append(folders))
+    monkeypatch.setattr(he, "record", lambda configs, **k: [])
+    return calls, installed
+
+
+def _resolve_to(monkeypatch, cfg):
+    monkeypatch.setattr(he, "resolve_config", lambda arg, *a, **k: cfg)
+
+
+def test_repo_with_a_non_hte_config_is_still_pulled(monkeypatch, tmp_path):
+    calls, installed = _spy(monkeypatch, "repo", use="none")
+    _resolve_to(monkeypatch, _cfg_file(tmp_path))
+    assert he.main(["setup", "x"]) == 0
+    assert calls == [{"dry_run": False}] and installed == [{Path("f")}]
+
+
+def test_repo_pull_failure_is_tolerated_when_hte_is_not_needed(
+    monkeypatch, tmp_path, capsys
+):
+    err = he.subprocess.CalledProcessError(1, ["git"])
+    calls, installed = _spy(monkeypatch, "repo", use="none", ensure=err)
+    _resolve_to(monkeypatch, _cfg_file(tmp_path))
+    assert he.main(["setup", "x"]) == 0
+    assert installed == [{Path("f")}]
+    assert "hte not updated" in capsys.readouterr().err
+
+
+def test_repo_pull_failure_aborts_when_a_config_needs_hte(monkeypatch, tmp_path):
+    err = he.subprocess.CalledProcessError(1, ["git"])
+    calls, installed = _spy(monkeypatch, "repo", use="hte", ensure=err)
+    _resolve_to(monkeypatch, _cfg_file(tmp_path))
+    assert he.main(["setup", "x"]) == 2
+    assert installed == []
+
+
+def test_no_arg_update_clones_a_missing_hte_for_non_hte_records(monkeypatch, tmp_path):
+    cfg = _cfg_file(tmp_path)
+    states = tmp_path / "s.json"
+    states.write_text(json.dumps([str(cfg)]), encoding="utf-8")
+    monkeypatch.setenv(he.ENV_VAR, str(states))
+    calls, installed = _spy(monkeypatch, "missing", use="none")
+    assert he.main(["update"]) == 0
+    assert calls == [{"dry_run": False}] and installed == [{Path("f")}]
+
+
+def test_unknown_hte_state_degrades_with_a_warning(monkeypatch, tmp_path, capsys):
+    def boom(*a, **k):
+        raise FileNotFoundError("git")
+
+    calls, installed = _spy(monkeypatch, boom, use="none")
+    _resolve_to(monkeypatch, _cfg_file(tmp_path))
+    assert he.main(["setup", "x"]) == 0
+    assert calls == [] and installed == [{Path("f")}]
+    assert "hte state unknown" in capsys.readouterr().err
+
+
+def test_unknown_hte_state_aborts_when_hte_is_needed(monkeypatch, tmp_path):
+    def boom(*a, **k):
+        raise FileNotFoundError("git")
+
+    calls, installed = _spy(monkeypatch, boom, use="unresolved")
+    _resolve_to(monkeypatch, _cfg_file(tmp_path))
+    assert he.main(["setup", "x"]) == 2
+    assert calls == [] and installed == []
+
+
+def test_dry_run_reaches_ensure_hte_and_stops_before_resolving(monkeypatch, capsys):
+    calls, installed = _spy(monkeypatch, "missing")
+
+    def nf(arg, *a, **k):
+        raise he.ConfigNotFound("no config named 'x'")
+
+    monkeypatch.setattr(he, "resolve_config", nf)
+    assert he.main(["setup", "--dry-run", "x"]) == 0
+    assert calls == [{"dry_run": True}] and installed == []
+    out = capsys.readouterr().out
+    assert "hte: would be pulled" in out and "base env only" not in out
+
+
+def test_unrelated_resolve_errors_do_not_clone(monkeypatch):
+    calls, _ = _spy(monkeypatch, "missing")
+
+    def amb(arg, *a, **k):
+        raise he.EnvSetupError("exists in several deployments")
+
+    monkeypatch.setattr(he, "resolve_config", amb)
+    assert he.main(["setup", "x"]) == 2
+    assert calls == []
+
+
+def test_resolve_config_raises_config_not_found(tmp_path):
+    (tmp_path / "a" / "configs").mkdir(parents=True)
+    with pytest.raises(he.ConfigNotFound):
+        he.resolve_config("nope", tmp_path)
