@@ -791,3 +791,146 @@ def test_rmtree_force_unlinks_a_symlinked_top_and_keeps_the_target(tmp_path):
     assert not link.is_symlink() and not link.exists()
     assert (target / "keep.txt").is_file()
     assert (tmp_path.stat().st_mode & 0o777) == 0o775
+
+
+def _tree(tmp_path):
+    for rel in (
+        "own/servers/a/own_server.py",
+        "hte/servers/g/g_server.py",
+        "hte/servers/g/reflex/g_vis.py",
+        "base/servers/orchestrator/async_orch2.py",
+    ):
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_text("", encoding="utf-8")
+    (tmp_path / "own" / "configs").mkdir()
+    return tmp_path
+
+
+def _cfg(root, body):
+    p = root / "own" / "configs" / "c.yml"
+    p.write_text("root: x\nservers:\n" + body, encoding="utf-8")
+    return p
+
+
+def test_config_hte_use_reads_fast_modules(tmp_path):
+    root = _tree(tmp_path)
+    assert (
+        he.config_hte_use(
+            _cfg(root, "  O:\n    group: orchestrator\n    fast: async_orch2\n"), root
+        )
+        == "none"
+    )
+    assert (
+        he.config_hte_use(
+            _cfg(root, "  G:\n    group: action\n    fast: g_server\n"), root
+        )
+        == "hte"
+    )
+    assert (
+        he.config_hte_use(
+            _cfg(root, "  N:\n    group: action\n    fast: nowhere_server\n"), root
+        )
+        == "unresolved"
+    )
+
+
+def test_config_hte_use_counts_panels(tmp_path):
+    root = _tree(tmp_path)
+    body = "  O:\n    group: orchestrator\n    fast: async_orch2\n  UI:\n    group: visualizer\n    reflex: ui\n    action_vis: g_vis\n"
+    assert he.config_hte_use(_cfg(root, body), root) == "hte"
+
+
+def test_wants_hte_truth_table():
+    w = he.wants_hte
+    assert not w("tracked", no_prefix=True, unresolved=True, uses_hte=True)
+    assert w("repo", no_prefix=False, unresolved=False, uses_hte=True)
+    assert not w("repo", no_prefix=True, unresolved=False, uses_hte=False)
+    for s in ("missing", "leftover"):
+        assert w(s, no_prefix=True, unresolved=False, uses_hte=False)
+        assert w(s, no_prefix=False, unresolved=True, uses_hte=False)
+        assert not w(s, no_prefix=False, unresolved=False, uses_hte=False)
+
+
+def _stub_install(monkeypatch):
+    monkeypatch.setattr(he, "server_folders", lambda c: set())
+    monkeypatch.setattr(he, "install", lambda folders, **k: [])
+    monkeypatch.setattr(he, "record", lambda configs, **k: [])
+
+
+def test_main_clones_hte_when_a_prefix_only_resolves_after_the_clone(
+    monkeypatch, tmp_path
+):
+    calls = []
+    monkeypatch.setattr(he, "hte_state", lambda *a, **k: "missing")
+    monkeypatch.setattr(he, "ensure_hte", lambda **k: calls.append(k) or "cloned")
+    cfg = tmp_path / "c.yml"
+    cfg.write_text("root: x\nservers: {}\n", encoding="utf-8")
+    answers = iter([he.EnvSetupError("no config named 'eche10'"), cfg])
+
+    def fake_resolve(arg, *a, **k):
+        r = next(answers)
+        if isinstance(r, Exception):
+            raise r
+        return r
+
+    monkeypatch.setattr(he, "resolve_config", fake_resolve)
+    monkeypatch.setattr(he, "config_hte_use", lambda c: "hte")
+    _stub_install(monkeypatch)
+    assert he.main(["setup", "eche10"]) == 0
+    assert len(calls) == 1
+
+
+def test_main_never_touches_a_tracked_hte(monkeypatch):
+    monkeypatch.setattr(he, "hte_state", lambda *a, **k: "tracked")
+    assert he.main(["setup"]) == 0  # the autouse stub raises if ensure_hte is reached
+
+
+def test_update_replay_clones_hte_then_reinstalls_the_replayed_configs(
+    monkeypatch, tmp_path
+):
+    calls = []
+    cfg = tmp_path / "eche10.yml"  # recorded, but absent until the clone brings it back
+    states = tmp_path / "setup_env_prefixes.json"
+    states.write_text(json.dumps([str(cfg)]), encoding="utf-8")
+    monkeypatch.setenv(he.ENV_VAR, str(states))
+    monkeypatch.setattr(he, "hte_state", lambda *a, **k: "leftover")
+
+    def fake_ensure(**k):
+        calls.append(k)
+        cfg.write_text("root: x\nservers: {}\n", encoding="utf-8")
+        return "replaced"
+
+    monkeypatch.setattr(he, "ensure_hte", fake_ensure)
+    monkeypatch.setattr(he, "_recorded_paths_exist", lambda: False)
+    monkeypatch.setattr(he, "config_hte_use", lambda c: "hte")
+    seen, installed = [], []
+    folder = tmp_path / "servers" / "g"
+    monkeypatch.setattr(he, "server_folders", lambda c: seen.append(c) or {folder})
+    monkeypatch.setattr(he, "install", lambda folders, **k: installed.append(folders))
+    monkeypatch.setattr(he, "record", lambda configs, **k: [])
+    assert he.main(["update"]) == 0
+    assert len(calls) == 1
+    assert seen == [cfg]
+    assert installed == [{folder}]
+
+
+def test_recorded_paths_exist(monkeypatch, tmp_path):
+    deploy = tmp_path / "deploy"
+    (deploy / "hte" / "configs").mkdir(parents=True)
+    there = deploy / "hte" / "configs" / "a.yml"
+    there.write_text("", encoding="utf-8")
+    other = deploy / "own" / "configs" / "x.yml"  # outside hte: never counts
+    monkeypatch.setattr(he, "DEPLOY_ROOT", deploy)
+    states = tmp_path / "s.json"
+
+    def env(paths):
+        states.write_text(json.dumps([str(p) for p in paths]), encoding="utf-8")
+        return {he.ENV_VAR: str(states)}
+
+    assert he._recorded_paths_exist(env([there])) is True
+    assert (
+        he._recorded_paths_exist(env([there, deploy / "hte" / "configs" / "b.yml"]))
+        is False
+    )
+    assert he._recorded_paths_exist(env([other])) is True
+    assert he._recorded_paths_exist({}) is True  # no records: nothing is missing

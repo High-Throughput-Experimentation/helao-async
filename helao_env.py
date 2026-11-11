@@ -493,6 +493,70 @@ def record(configs, runner=_run) -> list[Path]:
     return written
 
 
+_PANEL_KEYS = ("action_vis", "live_vis", "control_vis")
+
+
+def config_hte_use(config_path: Path, deploy_root: Path = DEPLOY_ROOT) -> str:
+    """ "hte" if the config launches an hte server or panel, "unresolved" if a
+    module resolves in no deployment present, else "none"."""
+    from helao.helpers import server_modules
+    from helao.helpers.config_loader import read_config
+
+    path = Path(config_path).resolve()
+    own = path.parents[1].name
+    if own == "hte":
+        return "hte"
+    verdict = "none"
+    for entry in (read_config(str(path)).get("servers") or {}).values():
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("deployment") == "hte":
+            verdict = "hte"
+        wanted = []
+        if entry.get("fast") or entry.get("bokeh"):
+            wanted.append((entry.get("fast") or entry.get("bokeh"), ("app",)))
+        for key in _PANEL_KEYS:
+            v = entry.get(key)
+            for name in v if isinstance(v, list) else [v] if isinstance(v, str) else []:
+                wanted.append((name, ("bokeh", "reflex")))
+        for module, stacks in wanted:
+            try:
+                found = {
+                    d
+                    for s in stacks
+                    for d in server_modules.locate(
+                        module, s, own=own, deploy_root=deploy_root
+                    )[1]
+                }
+            except server_modules.AmbiguousModule:
+                continue  # server_folders reports it with the server key
+            if not found:
+                return "unresolved"
+            if own not in found and "hte" in found:
+                verdict = "hte"
+    return verdict
+
+
+def wants_hte(state: str, *, no_prefix: bool, unresolved: bool, uses_hte: bool) -> bool:
+    """Spec section 3 "When it acts", with OQ-2's rule for an absent hte."""
+    if state == "tracked":
+        return False
+    if state == "repo":
+        return uses_hte
+    return no_prefix or unresolved or uses_hte
+
+
+def _recorded_paths_exist(env=os.environ) -> bool:
+    """False when a recorded config under helao/deploy/hte is gone (the parent pull removed it)."""
+    hte = (DEPLOY_ROOT / "hte").resolve()
+    for states in _states_files(env):
+        if states.is_file():
+            for p in _load_states(states):
+                if Path(p).resolve().is_relative_to(hte) and not Path(p).is_file():
+                    return False
+    return True
+
+
 def main(argv=None) -> int:
     from ruamel.yaml.error import YAMLError
 
@@ -502,13 +566,36 @@ def main(argv=None) -> int:
     p.add_argument("--dry-run", action="store_true")
     a = p.parse_args(argv)
     try:
+        state = hte_state()
+        acted = False
+
+        def act():
+            nonlocal acted, state
+            if not acted:
+                print(f"hte: {ensure_hte(dry_run=a.dry_run)}", flush=True)
+                acted, state = True, hte_state()
+
         if a.prefixes:
-            configs = [resolve_config(x) for x in a.prefixes]
+            try:
+                configs = [resolve_config(x) for x in a.prefixes]
+            except EnvSetupError:
+                if not wants_hte(
+                    state, no_prefix=False, unresolved=True, uses_hte=False
+                ):
+                    raise
+                act()
+                configs = [resolve_config(x) for x in a.prefixes]
         elif a.mode == "update":
+            if not _recorded_paths_exist() and wants_hte(
+                state, no_prefix=False, unresolved=True, uses_hte=False
+            ):
+                act()
             configs = stored_configs()
         else:
             configs = []
         if not configs:
+            if wants_hte(state, no_prefix=True, unresolved=False, uses_hte=False):
+                act()
             if a.mode == "setup":
                 print(
                     "no config prefix given: base env only (root helao_dev_*.yml "
@@ -521,6 +608,14 @@ def main(argv=None) -> int:
                     "setup_env <config prefix> ... to install a station's packages."
                 )
             return 0
+        uses = {config_hte_use(c) for c in configs}
+        if wants_hte(
+            state,
+            no_prefix=False,
+            unresolved="unresolved" in uses,
+            uses_hte="hte" in uses,
+        ):
+            act()
         folders: set[Path] = set()
         for cfg in configs:
             folders |= server_folders(cfg)
