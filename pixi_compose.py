@@ -8,7 +8,9 @@ testable offline. Spec: docs/superpowers/specs/2026-11-11-pixi-env-design.md.
 from __future__ import annotations
 
 import copy
+import hashlib
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -213,3 +215,54 @@ def platform_key(manifest: dict) -> str:
     """Lock platform key of a composed manifest's single platform."""
     (entry,) = manifest["workspace"]["platforms"]
     return entry["name"] if isinstance(entry, dict) else entry
+
+
+def seed_lock(parent_lock: Path, workspace: Path) -> bool:
+    """Copy the parent lock over the host lock when the host has none or the
+    parent changed since the last seed (sha256 kept in ``.seed``). A plain
+    copy: the parent lock already holds every platform key a host uses,
+    including ``<plat>-cuda`` (R10), and pixi re-solves a platform whose
+    virtual packages differ, so a renamed key would lose the pins."""
+    sha = hashlib.sha256(Path(parent_lock).read_bytes()).hexdigest()
+    seed, host = Path(workspace) / ".seed", Path(workspace) / "pixi.lock"
+    if host.is_file() and seed.is_file():
+        if seed.read_text(encoding="utf-8").strip() == sha:
+            return False
+    shutil.copyfile(parent_lock, host)
+    seed.write_text(sha + "\n", encoding="utf-8")
+    return True
+
+
+def _conda_dist(url: str) -> tuple[str, str] | None:
+    fname = url.rsplit("/", 1)[-1]
+    for ext in (".conda", ".tar.bz2"):
+        if fname.endswith(ext):
+            name, version, _build = fname[: -len(ext)].rsplit("-", 2)
+            return name, version
+    return None
+
+
+def lock_versions(lock: Path, platform: str, env: str = "default") -> dict[str, str]:
+    """{package name (lower case): version} of one env and platform in a lock."""
+    data = _yaml().load(Path(lock).read_text(encoding="utf-8")) or {}
+    meta = {p.get("conda") or p.get("pypi"): p for p in data.get("packages") or []}
+    envs = (data.get("environments") or {}).get(env) or {}
+    out: dict[str, str] = {}
+    for ref in (envs.get("packages") or {}).get(platform) or []:
+        url = ref.get("conda") or ref.get("pypi")
+        p = meta.get(url) or {}
+        if "name" in p and "version" in p:
+            out[str(p["name"]).lower()] = str(p["version"])
+        elif ref.get("conda") and (d := _conda_dist(url)):
+            out[d[0].lower()] = d[1]
+    return out
+
+
+def drift(
+    parent_lock: Path, host_lock: Path, key: str
+) -> list[tuple[str, str, str | None]]:
+    """Base packages whose host version differs at lock platform ``key`` (the
+    host's own key, e.g. ``linux-64-cuda``): [(name, parent, host|None)]."""
+    base = lock_versions(parent_lock, key)
+    host = lock_versions(host_lock, key)
+    return sorted((n, v, host.get(n)) for n, v in base.items() if host.get(n) != v)

@@ -256,3 +256,93 @@ def test_compose_does_not_mutate_base(tmp_path):
     f = _folder(tmp_path, "a", environment__yml="dependencies: [pyserial]\n")
     pc.compose(BASE, {f}, "win-64", tmp_path)
     assert BASE == before
+
+
+import hashlib
+
+CH = "https://conda.anaconda.org/conda-forge/linux-64"
+
+
+def _lock(path: Path, numpy: str, extra: str = "") -> Path:
+    path.write_text(
+        f"""version: 7
+platforms:
+- name: linux-64
+  virtual-packages: [__unix=0, __linux=4.18]
+- name: linux-64-cuda
+  subdir: linux-64
+  virtual-packages: [__cuda=12.9, __unix=0, __linux=4.18]
+environments:
+  default:
+    channels:
+    - url: https://conda.anaconda.org/conda-forge/
+    packages:
+      linux-64:
+      - conda: {CH}/numpy-{numpy}-py314h1_0.conda
+      - pypi: https://files.example/uuid7-0.1.0-py3-none-any.whl
+      linux-64-cuda:
+      - conda: {CH}/numpy-{numpy}-py314h1_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/cuda-version-12.9-h1_3.conda
+      - pypi: https://files.example/uuid7-0.1.0-py3-none-any.whl
+{extra}packages:
+- conda: {CH}/numpy-{numpy}-py314h1_0.conda
+  sha256: aa
+- conda: https://conda.anaconda.org/conda-forge/noarch/cuda-version-12.9-h1_3.conda
+  sha256: bb
+- pypi: https://files.example/uuid7-0.1.0-py3-none-any.whl
+  name: uuid7
+  version: 0.1.0
+""",
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_seed_copies_when_absent_or_parent_changed(tmp_path):
+    parent = _lock(tmp_path / "parent.lock", "2.2.6")
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    assert pc.seed_lock(parent, ws) is True
+    assert (ws / "pixi.lock").read_bytes() == parent.read_bytes()
+    sha = hashlib.sha256(parent.read_bytes()).hexdigest()
+    assert (ws / ".seed").read_text(encoding="utf-8").strip() == sha
+    (ws / "pixi.lock").write_text("host-extended", encoding="utf-8")
+    assert pc.seed_lock(parent, ws) is False  # same parent: kept
+    assert (ws / "pixi.lock").read_text(encoding="utf-8") == "host-extended"
+    _lock(parent, "2.3.0")
+    assert pc.seed_lock(parent, ws) is True  # parent changed
+    assert "numpy-2.3.0" in (ws / "pixi.lock").read_text(encoding="utf-8")
+
+
+def test_seed_keeps_a_cuda_key_present_in_the_parent(tmp_path):
+    parent = _lock(tmp_path / "parent.lock", "2.2.6")
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    assert pc.seed_lock(parent, ws) is True
+    host = ws / "pixi.lock"
+    assert pc.lock_versions(host, "linux-64-cuda") == {
+        "numpy": "2.2.6",
+        "uuid7": "0.1.0",
+        "cuda-version": "12.9",
+    }
+    assert pc.drift(parent, host, "linux-64-cuda") == []
+
+
+def test_lock_versions_reads_conda_and_pypi(tmp_path):
+    v = pc.lock_versions(_lock(tmp_path / "l", "2.2.6"), "linux-64")
+    assert v == {"numpy": "2.2.6", "uuid7": "0.1.0"}
+    assert pc.lock_versions(tmp_path / "l", "win-64") == {}
+
+
+def test_drift_lists_changed_and_absent_base_packages(tmp_path):
+    parent = _lock(tmp_path / "p", "2.2.6")
+    same = _lock(tmp_path / "s", "2.2.6")
+    assert pc.drift(parent, same, "linux-64") == []
+    moved = _lock(tmp_path / "m", "2.5.4")
+    assert pc.drift(parent, moved, "linux-64") == [("numpy", "2.2.6", "2.5.4")]
+    gone = tmp_path / "g"
+    gone.write_text(
+        "version: 6\nenvironments:\n  default:\n    packages:\n      linux-64: []\npackages: []\n",
+        encoding="utf-8",
+    )
+    assert ("numpy", "2.2.6", None) in pc.drift(parent, gone, "linux-64")
