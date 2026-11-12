@@ -37,6 +37,21 @@ from .premodels import Action
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
+
+def os_resolver_connector(**kwargs) -> aiohttp.TCPConnector:
+    """An aiohttp ``TCPConnector`` that resolves host names the way the OS does.
+
+    aiohttp silently switches to its c-ares ``AsyncResolver`` whenever ``aiodns``
+    is importable, and c-ares asks the DNS server directly, skipping the
+    operating system's resolver (hosts file, adapter names). A station whose own
+    name is not in DNS then cannot reach its own servers: on anec-03, 2026-11-11,
+    once a dependency pulled ``aiodns`` in, every pre-dispatch HEAD probe failed
+    with ``ClientConnectorDNSError`` while ``requests`` (OS resolver) worked, so
+    no action could run. ``ThreadedResolver`` is ``getaddrinfo`` in a thread.
+    """
+    return aiohttp.TCPConnector(resolver=aiohttp.ThreadedResolver(), **kwargs)
+
+
 # ---------------------------------------------------------------------------
 # Module-level RPC client cache shared by every async_private_dispatcher call.
 #
@@ -217,7 +232,7 @@ async def async_action_dispatcher(
     response = None
 
     while not success and retry_count < retries:
-        conn = aiohttp.TCPConnector(
+        conn = os_resolver_connector(
             force_close=True, enable_cleanup_closed=True, limit=1000
         )
         try:
@@ -370,7 +385,7 @@ async def async_private_dispatcher(
     response = None
 
     while not success and retry_count < retries:
-        conn = aiohttp.TCPConnector(
+        conn = os_resolver_connector(
             force_close=True, enable_cleanup_closed=True, limit=1000
         )
         try:
@@ -547,7 +562,7 @@ async def check_endpoint(url: str) -> int:
     Returns:
         The HTTP status code returned by the server.
     """
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(connector=os_resolver_connector()) as session:
         async with session.head(url) as resp:
             return resp.status
 
