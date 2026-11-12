@@ -16,6 +16,7 @@ import io
 import json
 import os
 import re
+import threading
 import time
 from base64 import b64decode
 from enum import Enum
@@ -1907,14 +1908,23 @@ class BokehOperator:
                 )
 
     def callback_clicked_pmplot(self, event, sender):
-        """On a double-tap on the plate map, snap the marker to the nearest sample."""
+        """On a double-tap on the plate map, snap the marker to the nearest sample.
+
+        The platemap lookup is a blocking plate-API call, so it runs in a worker
+        thread; the snap is applied on the document's next tick.
+        """
         LOGGER.info(f"DOUBLE TAP PMplot: {event.x}, {event.y}")
-        # get coordinates of doubleclick
-        platex = event.x
-        platey = event.y
-        # transform to nearest sample point
-        PMnum = self.get_samples([platex], [platey], sender)
-        self.get_sample_infos(PMnum, sender)
+        platex, platey = event.x, event.y
+        plate_id = self._input_plate_id(sender)
+        if plate_id is None:
+            self.get_sample_infos([None], sender)
+            return
+        self._fetch_then(
+            partial(self.dataAPI.get_platemap_plateid, plate_id),
+            lambda pmdata: self.get_sample_infos(
+                self._samples_from_pm([platex], [platey], pmdata), sender
+            ),
+        )
 
     def callback_changed_plateid(self, attr, old, new, sender):
         """Refresh plate map and elements when the ``plate_id`` text input changes."""
@@ -2781,6 +2791,26 @@ cb_obj.stylesheets = [
             x, y, size=5, color=None, alpha=0.5, line_color=BODY_TEXT, name="PMplot"
         )
 
+    def _fetch_then(self, fetch, apply):
+        """Run blocking *fetch* in a worker thread; *apply* its result on the
+        document's next tick.
+
+        Bokeh widget callbacks run on the server's event loop and cannot be
+        coroutines, so a plate-API call made inline stalls every session on
+        this server. Widgets are read before the thread starts and written only
+        in *apply*, on the loop, so the thread never touches a Bokeh model.
+        """
+
+        def _work():
+            try:
+                result = fetch()
+            except Exception:
+                LOGGER.exception("plate API lookup failed")
+                return
+            self.vis.doc.add_next_tick_callback(partial(apply, result))
+
+        threading.Thread(target=_work, name="operator-plate-api", daemon=True).start()
+
     def get_pm(self, plateid: int, sender):
         """Look up the plate map for ``plateid`` and trigger a plate-map redraw."""
         if self.dataAPI is None:
@@ -2789,19 +2819,15 @@ cb_obj.stylesheets = [
         private_input, param_input = self.find_param_private_input(sender)
         if private_input is None or param_input is None:
             return False
-
-        # pmdata = json.loads(self.dataAPI.get_platemap_plateid(plateid))
-        pmdata = self.dataAPI.get_platemap_plateid(plateid)
-        if len(pmdata) == 0:
-            self.vis.doc.add_next_tick_callback(
-                partial(self.update_error, "no pm found")
-            )
-
         plot_mpmap = self.find_plot(private_input, "PlateMap")
-        if plot_mpmap is not None:
-            self.vis.doc.add_next_tick_callback(
-                partial(self.update_pm_plot, plot_mpmap, pmdata)
-            )
+
+        def _apply(pmdata):
+            if len(pmdata) == 0:
+                self.update_error("no pm found")
+            if plot_mpmap is not None:
+                self.update_pm_plot(plot_mpmap, pmdata)
+
+        self._fetch_then(partial(self.dataAPI.get_platemap_plateid, plateid), _apply)
 
     def xy_to_sample(self, xy, pmapxy):
         """Return the index of the entry in ``pmapxy`` closest to ``xy``, or ``None`` if empty."""
@@ -2812,32 +2838,26 @@ cb_obj.stylesheets = [
         else:
             return None
 
-    def get_samples(self, X, Y, sender):
-        """Return the indices of plate-map entries closest to each ``(X[i], Y[i])`` pair."""
-        # X and Y are vectors
+    def _input_plate_id(self, sender):
+        """The ``solid_plate_id`` input's value as an int, or ``None``."""
         if self.dataAPI is None:
-            return [None]
-
+            return None
         private_input, param_input = self.find_param_private_input(sender)
         if private_input is None or param_input is None:
-            return False
-
+            return None
         input_plate_id = self.find_input(param_input, "solid_plate_id")
+        if input_plate_id is None:
+            return None
+        try:
+            return int(input_plate_id.value)
+        except (TypeError, ValueError):
+            return None
 
-        if input_plate_id is not None:
-            # pmdata = json.loads(self.dataAPI.get_platemap_plateid(input_plate_id.value))
-            try:
-                plate_id = int(input_plate_id.value)
-            except ValueError:
-                return [None]
-            pmdata = self.dataAPI.get_platemap_plateid(plate_id)
-
-            xyarr = np.array((X, Y)).T
-            pmxy = np.array([[col["x"], col["y"]] for col in pmdata])
-            samples = list(np.apply_along_axis(self.xy_to_sample, 1, xyarr, pmxy))
-            return samples
-        else:
-            return [None]
+    def _samples_from_pm(self, X, Y, pmdata):
+        """Indices of the plate-map entries nearest each ``(X[i], Y[i])``."""
+        xyarr = np.array((X, Y)).T
+        pmxy = np.array([[col["x"], col["y"]] for col in pmdata])
+        return list(np.apply_along_axis(self.xy_to_sample, 1, xyarr, pmxy))
 
     def get_elements_plateid(self, plateid: int, sender):
         """Populate the ``elements`` widget with the element list for ``plateid``."""
@@ -2851,17 +2871,22 @@ cb_obj.stylesheets = [
         input_elements = self.find_input(private_input, "elements")
 
         if input_elements is not None:
-            elements = self.dataAPI.get_elements_plateid(
-                plateid,
-                multielementink_concentrationinfo_bool=False,
-                print_key_or_keyword="screening_print_id",
-                exclude_elements_list=[""],
-                return_defaults_if_none=False,
+
+            def _apply(elements):
+                if elements is not None:
+                    self.update_input_value(input_elements, ",".join(elements))
+
+            self._fetch_then(
+                partial(
+                    self.dataAPI.get_elements_plateid,
+                    plateid,
+                    multielementink_concentrationinfo_bool=False,
+                    print_key_or_keyword="screening_print_id",
+                    exclude_elements_list=[""],
+                    return_defaults_if_none=False,
+                ),
+                _apply,
             )
-            if elements is not None:
-                self.vis.doc.add_next_tick_callback(
-                    partial(self.update_input_value, input_elements, ",".join(elements))
-                )
 
     def find_plot(self, inputs, name):
         """Return the Bokeh ``figure`` in ``inputs`` whose title equals ``name``, or ``None``."""

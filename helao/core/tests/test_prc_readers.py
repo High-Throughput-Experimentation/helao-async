@@ -124,3 +124,38 @@ def test_a_record_copied_outside_a_runs_tree_is_indexed_once(tmp_path):
         len(loader.experiments) == 1
     ), loader.experiments.experiment_localpath.tolist()
     assert len(loader.actions) == 1, loader.actions.action_localpath.tolist()
+
+
+PRC_B = "0__06a5a2d6-0000-7019-8000-000000000002__XRDS_exp-prc.yml"
+BODY_B = "process_uuid: 06a5a2d6-0000-7019-8000-000000000002\ntechnique_name: XRDS\n"
+
+
+def test_a_sequence_directory_indexes_only_its_own_mirrored_processes(tmp_path):
+    """A legacy RUNS_* sequence DIRECTORY mirrors itself, not its day folder.
+
+    Mirroring the parent pulled every sibling sequence's processes from the same
+    PROCESSES/<week>/<day> folder into the loader, so re-analysing one sequence
+    enqueued (and failed) its neighbours' processes as well.
+    """
+    from helao.core.drivers.data.loaders.localfs import LocalLoader
+
+    seq = tmp_path / "RUNS_SYNCED" / "26.05" / "0203" / "181056__XRFS_noStandards__Ba"
+    exp = seq / "260203.181056__exp"
+    exp.mkdir(parents=True)
+    (seq / "260203.181056000000-seq.yml").write_text(
+        "sequence_name: XRFS_noStandards\n", encoding="utf-8"
+    )
+    (exp / "260203.181056000000-exp.yml").write_text(
+        "experiment_name: XRFS_sub_noStandards\n", encoding="utf-8"
+    )
+    day = tmp_path / "PROCESSES" / "26.05" / "0203"
+    own = day / "181056__XRFS_noStandards__Ba" / "260203.181056__exp"
+    own.mkdir(parents=True)
+    (own / PRC_A).write_text(BODY_A, encoding="utf-8")
+    sibling = day / "140048__XRDS_generic_scan__CuYO" / "260203.140048__exp"
+    sibling.mkdir(parents=True)
+    (sibling / PRC_B).write_text(BODY_B, encoding="utf-8")
+
+    prc_paths = LocalLoader(str(seq))._yml_paths["prc"]
+    assert len(prc_paths) == 1, f"expected only the sequence's own process: {prc_paths}"
+    assert prc_paths[0].endswith(PRC_A)

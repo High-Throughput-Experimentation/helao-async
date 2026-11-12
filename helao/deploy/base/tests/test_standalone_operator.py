@@ -376,6 +376,8 @@ def test_plate_callbacks_noop_when_plate_api_disabled():
     unconditionally, so selecting a sequence with a ``solid_plate_id`` param
     crashed with ``'NoneType' object has no attribute 'get_platemap_plateid'``.
     """
+    from types import SimpleNamespace
+
     from bokeh.document import Document
     from bokeh.models import TextInput
 
@@ -394,7 +396,8 @@ def test_plate_callbacks_noop_when_plate_api_disabled():
 
     # and the plate-data helpers bail out instead of dereferencing None
     assert op.get_pm(6284, plate_input) is False
-    assert op.get_samples([0.0], [0.0], plate_input) == [None]
+    assert op._input_plate_id(plate_input) is None
+    op.callback_clicked_pmplot(SimpleNamespace(x=0.0, y=0.0), plate_input)
     assert op.get_elements_plateid(6284, plate_input) is False
     assert op.get_sample_infos([0], plate_input) is False
     op.callback_changed_plateid("value", "", "6284", plate_input)
@@ -1817,3 +1820,39 @@ def test_the_sample_list_load_button_shares_its_parameter_cell():
 
     op.cleanup_session(None)
     print("test_the_sample_list_load_button_shares_its_parameter_cell PASS")
+
+
+def test_plate_lookup_runs_in_a_thread_and_applies_on_the_next_tick():
+    """Bokeh callbacks run on the server's loop: a plate-API call made inline
+    stalled every session. The fetch runs in a worker thread; its result
+    reaches the widgets only through the document's next-tick queue."""
+    import threading
+    from functools import partial
+    from types import SimpleNamespace
+
+    from bokeh.document import Document
+
+    from helao.ui.bokeh.operator import BokehOperator
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    seen, scheduled, applied = [], [], []
+    queued = threading.Event()
+
+    def _fetch(plateid):
+        seen.append(threading.get_ident())
+        return [{"x": 1.0, "y": 2.0}]
+
+    def _next_tick(cb):
+        scheduled.append(cb)
+        queued.set()
+
+    op.dataAPI = SimpleNamespace(get_platemap_plateid=_fetch)
+    op.vis.doc.add_next_tick_callback = _next_tick
+
+    op._fetch_then(partial(op.dataAPI.get_platemap_plateid, 6284), applied.append)
+
+    assert queued.wait(5), "the result never reached the next-tick queue"
+    assert seen and seen[0] != threading.get_ident()
+    assert not applied, "applied outside the document's next tick"
+    scheduled[0]()
+    assert applied == [[{"x": 1.0, "y": 2.0}]]

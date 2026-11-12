@@ -17,10 +17,11 @@ __all__ = [
 ]
 
 import asyncio
+import functools
+import json
 from uuid import uuid4
 
-import aiohttp
-import requests
+import httpx
 import zmq
 
 from helao.core.error import ErrorCodes
@@ -37,12 +38,64 @@ from .premodels import Action
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
+
+def _client_kwargs(timeout: httpx.Timeout) -> dict:
+    """Keyword arguments shared by every inter-server httpx client.
+
+    ``trust_env=False``: station servers talk to each other directly. httpx
+    otherwise honours ``HTTP_PROXY``/``ALL_PROXY`` from the environment and
+    would send a station's own-host calls through a proxy. httpx resolves
+    host names with the OS resolver (``getaddrinfo``), so a station whose own
+    name is not in DNS still reaches its servers; aiohttp switched to c-ares
+    whenever ``aiodns`` was importable and broke exactly that on anec-03
+    (2026-11-11).
+
+    The SSL context is built once: httpx loads certifi for every new client
+    (~4 ms, on the event loop), and a client is made per dispatch attempt and
+    per probed endpoint.
+    """
+    return {"timeout": timeout, "trust_env": False, "verify": _ssl_context()}
+
+
+@functools.cache
+def _ssl_context():
+    return httpx.create_ssl_context()
+
+
+def _json_body(payload) -> dict:
+    """``content``/``headers`` for a JSON POST, encoded as aiohttp encoded it.
+
+    httpx's own ``json=`` uses ``allow_nan=False`` and raises ``ValueError`` on
+    a NaN or Inf before sending; the action and experiment payloads can carry
+    them, and the servers (Starlette ``json.loads``) accept them.
+    """
+    return {
+        "content": json.dumps(payload).encode(),
+        "headers": {"Content-Type": "application/json"},
+    }
+
+
+def _connect_budget(timeout: float) -> httpx.Timeout:
+    """Bounded connect, unbounded read/write/pool.
+
+    No total timeout. A blocking action holds its POST open for the whole
+    action -- an eche10 xy traverse to the reference position is 688399
+    counts at 10000 counts/s, 69 s, against what used to be a 60 s total --
+    and when the clock won, the dispatcher re-POSTed a *running* action. The
+    server queued the duplicate behind the original and ran it, both records
+    landed in the same action directory, and the second overwrote the first.
+    Nothing on disk showed it. The connect budget stays bounded so an
+    unreachable server still fails fast.
+    """
+    return httpx.Timeout(None, connect=timeout)
+
+
 # ---------------------------------------------------------------------------
 # Module-level RPC client cache shared by every async_private_dispatcher call.
 #
 # DEALER sockets are persistent and concurrent-safe (id-correlated futures
 # inside RPCClient), so one cached client per peer is both cheaper than
-# spinning aiohttp sessions and avoids the aiohttp connector teardown churn.
+# opening an HTTP client per call.
 # Process-level cleanup is the OS's job; callers that want graceful shutdown
 # (e.g. test harnesses) can invoke ``aclose_all_rpc_clients()``.
 # ---------------------------------------------------------------------------
@@ -63,20 +116,17 @@ _RPC_PROBE_TIMEOUT = 3.0
 
 
 def _query_safe(params: dict) -> dict:
-    """Coerce a params dict into values aiohttp/yarl accept as query values.
+    """Coerce a params dict into query values every HTTP path encodes the same way.
 
-    aiohttp's query-string encoder (yarl) accepts only ``str``/``int``/``float``
-    and raises ``TypeError: Invalid variable type`` on anything else -- notably
-    a ``bool`` action param such as ``external_trigger`` (``ANDOR/acquire``),
-    which otherwise crashes the HTTP-fallback POST and gets swallowed by the
-    retry loop as an escalating-sleep "hang". Map ``bool`` -> ``"true"``/
-    ``"false"`` (FastAPI parses these back to ``bool`` on the server, and the
-    action envelope's ``action_params`` -- which carries the real typed value
-    and wins in ``_build_action_from_kwargs`` -- is unaffected), drop ``None``
-    (yarl rejects it too; the endpoint default / envelope supplies it), and pass
-    ``str``/``int``/``float`` through unchanged. Non-scalar values (list/dict)
-    are left as-is: those belong in the action envelope body, not the query
-    string, so they are out of scope for this coercion.
+    Map ``bool`` -> ``"true"``/``"false"`` (FastAPI parses these back to
+    ``bool``; the action envelope's ``action_params``, which carries the real
+    typed value and wins in ``_build_action_from_kwargs``, is unaffected).
+    Drop ``None``: httpx would send it as an empty string, which FastAPI
+    rejects for a typed param, and the endpoint default / envelope supplies
+    it. ``str``/``int``/``float`` pass through. Non-scalar values (list/dict)
+    are left as-is: they belong in the action envelope body, not the query
+    string. (Originally for aiohttp/yarl, which raised ``TypeError`` on a
+    ``bool`` such as ``ANDOR/acquire``'s ``external_trigger``.)
     """
     safe: dict = {}
     for key, val in (params or {}).items():
@@ -202,60 +252,43 @@ async def async_action_dispatcher(
     success = False
     retry_count = 0
 
-    # No total timeout. A blocking action holds its POST open for the whole
-    # action -- an eche10 xy traverse to the reference position is 688399
-    # counts at 10000 counts/s, 69 s, against what used to be a 60 s total --
-    # and when the clock won, the dispatcher re-POSTed a *running* action. The
-    # server queued the duplicate behind the original and ran it, both records
-    # landed in the same action directory, and the second overwrote the first.
-    # Nothing on disk showed it. The connect budget stays bounded so an
-    # unreachable server still fails fast.
-    client_timeout = aiohttp.ClientTimeout(
-        total=None, connect=timeout, sock_connect=timeout
-    )
+    client_timeout = _connect_budget(timeout)  # see _connect_budget
     error_code = ErrorCodes.unspecified
     response = None
 
     while not success and retry_count < retries:
-        conn = aiohttp.TCPConnector(
-            force_close=True, enable_cleanup_closed=True, limit=1000
-        )
         try:
-            async with aiohttp.ClientSession(
-                timeout=client_timeout, connector=conn
-            ) as session:
-                async with session.post(
-                    url,
-                    params=_query_safe(params),
-                    json={"action": A.as_dict()},
-                    headers={"X-Helao-Dispatch-Id": dispatch_id},
-                ) as resp:
-                    if resp.status != 200:
-                        # Status BEFORE body, as in async_private_dispatcher:
-                        # an unhandled endpoint exception comes back as
-                        # text/plain and decoding it first raises
-                        # ContentTypeError, which loses the server's own error
-                        # message and misreports a 500 as a transport failure.
-                        error_code = ErrorCodes.http
-                        response = None
-                        detail = (await resp.text())[:500]
-                        LOGGER.error(
-                            f"{A.action_server.server_name}/{A.action_name} POST request "
-                            f"returned status {resp.status}: '{detail}', error={error_code}"
-                        )
-                        success = False
-                        # Terminal, not retried. The server answered, so it
-                        # saw the request: a 404 or a 422 fails identically
-                        # five times, and a 500 may have raised *after* the
-                        # action session opened. The caller pauses the orch on
-                        # a non-none error code, which is the right response to
-                        # both.
-                        break
-                    else:
-                        response = await resp.json()
-                        error_code = ErrorCodes.none
-                        success = True
-        except (aiohttp.ClientConnectorError, aiohttp.ServerTimeoutError):
+            # A fresh client per attempt: its connection closes with it, as
+            # aiohttp's force_close connector did.
+            async with httpx.AsyncClient(**_client_kwargs(client_timeout)) as session:
+                body = _json_body({"action": A.as_dict()})
+                body["headers"]["X-Helao-Dispatch-Id"] = dispatch_id
+                resp = await session.post(url, params=_query_safe(params), **body)
+                if resp.status_code != 200:
+                    # Status BEFORE body: an unhandled endpoint exception
+                    # comes back as text/plain, and decoding it as JSON first
+                    # loses the server's own error message and misreports a
+                    # 500 as a transport failure.
+                    error_code = ErrorCodes.http
+                    response = None
+                    detail = resp.text[:500]
+                    LOGGER.error(
+                        f"{A.action_server.server_name}/{A.action_name} POST request "
+                        f"returned status {resp.status_code}: '{detail}', error={error_code}"
+                    )
+                    success = False
+                    # Terminal, not retried. The server answered, so it saw
+                    # the request: a 404 or a 422 fails identically five
+                    # times, and a 500 may have raised *after* the action
+                    # session opened. The caller pauses the orch on a
+                    # non-none error code, which is the right response to
+                    # both.
+                    break
+                else:
+                    response = resp.json()
+                    error_code = ErrorCodes.none
+                    success = True
+        except (httpx.ConnectError, httpx.ConnectTimeout):
             # Connect-phase only: the request never reached the server, so
             # re-sending it cannot duplicate an action.
             retry_count += 1
@@ -278,8 +311,6 @@ async def async_action_dispatcher(
             )
             response = None
             break
-        finally:
-            await conn.close()
     if not success:
         LOGGER.error(
             f"{A.action_server.server_name}/{A.action_name} async_action_dispatcher could not decide response: '{response}')",
@@ -355,60 +386,42 @@ async def async_private_dispatcher(
     success = False
     retry_count = 0
 
-    # No total timeout. A blocking action holds its POST open for the whole
-    # action -- an eche10 xy traverse to the reference position is 688399
-    # counts at 10000 counts/s, 69 s, against what used to be a 60 s total --
-    # and when the clock won, the dispatcher re-POSTed a *running* action. The
-    # server queued the duplicate behind the original and ran it, both records
-    # landed in the same action directory, and the second overwrote the first.
-    # Nothing on disk showed it. The connect budget stays bounded so an
-    # unreachable server still fails fast.
-    client_timeout = aiohttp.ClientTimeout(
-        total=None, connect=timeout, sock_connect=timeout
-    )
+    client_timeout = _connect_budget(timeout)  # see _connect_budget
     error_code = ErrorCodes.unspecified
     response = None
 
     while not success and retry_count < retries:
-        conn = aiohttp.TCPConnector(
-            force_close=True, enable_cleanup_closed=True, limit=1000
-        )
         try:
-            async with aiohttp.ClientSession(
-                timeout=client_timeout, connector=conn
-            ) as session:
-                async with session.post(
-                    url,
-                    params=_query_safe(params_dict),
-                    json=json_dict,
-                ) as resp:
-                    if resp.status != 200:
-                        # Status BEFORE body. FastAPI returns an unhandled
-                        # endpoint exception as text/plain, so decoding first
-                        # raised ContentTypeError ("Attempt to decode JSON with
-                        # unexpected mimetype") and the 500 arrived at the
-                        # generic except arm as if it were transport noise --
-                        # logged as a traceback with a 30 s retry sleep, with
-                        # the server's actual error message thrown away.
-                        error_code = ErrorCodes.http
-                        response = None
-                        detail = (await resp.text())[:500]
-                        LOGGER.error(
-                            f"{server_key}/{private_action} POST request returned "
-                            f"status {resp.status}: '{detail}'"
-                        )
-                        success = False
-                        # Counted, like the exception branch below. A non-200
-                        # is not transport noise that will pass on its own —
-                        # without this the loop condition never changes and
-                        # the call spins forever on a 404 or a 422.
-                        retry_count += 1
-                        if retry_count < retries:
-                            await asyncio.sleep(retry_count * timeout / 2)
-                    else:
-                        response = await resp.json()
-                        error_code = ErrorCodes.none
-                        success = True
+            async with httpx.AsyncClient(**_client_kwargs(client_timeout)) as session:
+                resp = await session.post(
+                    url, params=_query_safe(params_dict), **_json_body(json_dict)
+                )
+                if resp.status_code != 200:
+                    # Status BEFORE body. FastAPI returns an unhandled
+                    # endpoint exception as text/plain, so decoding first
+                    # failed and the 500 arrived at the generic except arm as
+                    # if it were transport noise -- logged as a traceback with
+                    # a 30 s retry sleep, with the server's actual error
+                    # message thrown away.
+                    error_code = ErrorCodes.http
+                    response = None
+                    detail = resp.text[:500]
+                    LOGGER.error(
+                        f"{server_key}/{private_action} POST request returned "
+                        f"status {resp.status_code}: '{detail}'"
+                    )
+                    success = False
+                    # Counted, like the exception branch below. A non-200 is
+                    # not transport noise that will pass on its own -- without
+                    # this the loop condition never changes and the call spins
+                    # forever on a 404 or a 422.
+                    retry_count += 1
+                    if retry_count < retries:
+                        await asyncio.sleep(retry_count * timeout / 2)
+                else:
+                    response = resp.json()
+                    error_code = ErrorCodes.none
+                    success = True
         except Exception:
             retry_count += 1
             retry_wait = retry_count * timeout / 2
@@ -418,8 +431,6 @@ async def async_private_dispatcher(
             )
             await asyncio.sleep(retry_wait)
             response = None
-        finally:
-            await conn.close()
     if not success:
         LOGGER.error(
             f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{response}')",
@@ -474,7 +485,7 @@ def private_dispatcher(
     """Synchronous variant of :func:`async_private_dispatcher`.
 
     Tries a synchronous ZMQ REQ-socket RPC call first and falls back to
-    blocking :mod:`requests` HTTP if the RPC call fails.
+    blocking :mod:`httpx` HTTP if the RPC call fails.
 
     Args:
         server_key: Logging identifier for the destination server.
@@ -513,29 +524,31 @@ def private_dispatcher(
     # --- HTTP fallback (legacy path) ------------------------------------
     url = f"http://{server_host}:{server_port}/{private_action}"
 
-    with requests.Session() as session:
-        with session.post(
+    # requests' ``timeout=`` bounded connect and each read; httpx's scalar
+    # Timeout does the same (plus write/pool). A connection failure still
+    # raises to the caller, as it did before (requests).
+    with httpx.Client(**_client_kwargs(httpx.Timeout(timeout))) as session:
+        resp = session.post(
             url,
             params=_query_safe(params_dict),
             json=json_dict,
-            timeout=timeout,
-        ) as resp:
-            error_code = ErrorCodes.http
-            try:
-                response = resp.json()
-                if resp.status_code == 200:
-                    error_code = ErrorCodes.none
-                else:
-                    LOGGER.error(
-                        f"{server_key}/{private_action} POST request returned status {resp.status_code}: '{response}')"
-                    )
-            except Exception:
+        )
+        error_code = ErrorCodes.http
+        try:
+            response = resp.json()
+            if resp.status_code == 200:
+                error_code = ErrorCodes.none
+            else:
                 LOGGER.error(
-                    f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}')",
-                    exc_info=True,
+                    f"{server_key}/{private_action} POST request returned status {resp.status_code}: '{response}')"
                 )
-                response = None
-            return response, error_code
+        except Exception:
+            LOGGER.error(
+                f"{server_key}/{private_action} async_private_dispatcher could not decide response: '{resp}')",
+                exc_info=True,
+            )
+            response = None
+        return response, error_code
 
 
 async def check_endpoint(url: str) -> int:
@@ -547,9 +560,12 @@ async def check_endpoint(url: str) -> int:
     Returns:
         The HTTP status code returned by the server.
     """
-    async with aiohttp.ClientSession() as session:
-        async with session.head(url) as resp:
-            return resp.status
+    # aiohttp's defaults (300 s total, 30 s connect). httpx's own 5 s default
+    # would fail a dispatch whenever a busy server answered slowly.
+    timeout = httpx.Timeout(300, connect=30)
+    async with httpx.AsyncClient(**_client_kwargs(timeout)) as session:
+        resp = await session.head(url)
+        return resp.status_code
 
 
 async def endpoints_available(req_list: list) -> tuple:
@@ -557,8 +573,7 @@ async def endpoints_available(req_list: list) -> tuple:
 
     Each URL is HEAD-requested via :func:`check_endpoint`; the HTTP status
     is classified into ``success``, ``client error``, ``server error``,
-    ``no success``, ``cert failure``, ``could not connect``, or
-    ``timeout``.
+    ``no success``, ``could not connect``, or ``timeout``.
 
     Args:
         req_list: Endpoint URLs to probe.
@@ -585,12 +600,14 @@ async def endpoints_available(req_list: list) -> tuple:
                 states.append("server error")
             else:
                 states.append("no success")
-        except aiohttp.ClientSSLError:
-            states.append("cert failure")
-        except aiohttp.ClientConnectionError:
+        except (httpx.ConnectError, httpx.ConnectTimeout):
             states.append("could not connect")
-        except asyncio.TimeoutError:
+        except httpx.TimeoutException:
             states.append("timeout")
+        except httpx.TransportError:
+            # Dropped mid-request (e.g. RemoteProtocolError), which aiohttp
+            # reported as a connection error too.
+            states.append("could not connect")
         responses.append(isavail)
     if not all(responses):
         badinds = [i for i, v in enumerate(responses) if not v]

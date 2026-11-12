@@ -736,7 +736,10 @@ class SolidSampleAPI(SampleModelAPI):
         """Return the legacy platemap entry list for each sample's plate."""
         pmlist = []
         for sample in samples:
-            pmmap = self.legacyAPI.get_platemap_plateid(plateid=sample.plate_id)
+            # Blocking plate-API/S3 fetch: off the action server's event loop.
+            pmmap = await asyncio.to_thread(
+                self.legacyAPI.get_platemap_plateid, plateid=sample.plate_id
+            )
             if not pmmap:
                 LOGGER.error("invalid plate_id")
             pmlist.append(pmmap)
@@ -751,7 +754,10 @@ class SolidSampleAPI(SampleModelAPI):
         """Return ``[x, y]`` coordinates per sample from the legacy platemap."""
         xylist = []
         for sample in samples:
-            pmdata = self.legacyAPI.get_platemap_plateid(plateid=sample.plate_id)
+            # Blocking plate-API/S3 fetch: off the action server's event loop.
+            pmdata = await asyncio.to_thread(
+                self.legacyAPI.get_platemap_plateid, plateid=sample.plate_id
+            )
             if (sample.sample_no - 1) >= len(pmdata) or (sample.sample_no - 1) < 0:
                 LOGGER.warning(
                     f"get_xy: invalid sample no '{sample.sample_no}' on plate {sample.plate_id}"
@@ -794,7 +800,10 @@ class SolidSampleAPI(SampleModelAPI):
             if sample.machine_name == "legacy":
                 # verify legacy sample by getting its xy coordinates; an empty
                 # map means the lookup failed, not that the sample is invalid
-                pmdata = self.legacyAPI.get_platemap_plateid(plateid=sample.plate_id)
+                # Blocking plate-API/S3 fetch: off the action server's event loop.
+                pmdata = await asyncio.to_thread(
+                    self.legacyAPI.get_platemap_plateid, plateid=sample.plate_id
+                )
                 xylist = await self.get_samples_xy(samples=[sample]) if pmdata else None
                 if not pmdata:
                     LOGGER.warning(

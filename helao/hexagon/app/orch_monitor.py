@@ -25,7 +25,7 @@ background tasks are started.
 
 import asyncio
 
-import aiohttp
+import httpx
 
 from helao.core.error import ErrorCodes
 from helao.helpers import helao_logging as logging
@@ -80,7 +80,7 @@ class ServerMonitor:
                         if response is not None and error_code == ErrorCodes.none:
                             success = True
                             break
-                    except aiohttp.client_exceptions.ClientConnectorError:
+                    except httpx.ConnectError:
                         LOGGER.error(
                             f"failed to subscribe to {serv_key} at {serv_addr}:{serv_port}, trying again in 2 seconds",
                             exc_info=True,
@@ -149,7 +149,7 @@ class ServerMonitor:
                         status_summary[serv_key] = (status_str, driver_status)
                     else:
                         status_summary[serv_key] = ("unreachable", "unknown")
-                except aiohttp.client_exceptions.ClientConnectorError:
+                except httpx.ConnectError:
                     status_summary[serv_key] = ("unreachable", "unknown")
         return status_summary
 
