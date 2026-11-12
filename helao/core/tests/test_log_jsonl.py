@@ -1,6 +1,7 @@
 """JSONL record serialization (spec §1)."""
 
 import json
+from datetime import datetime, timezone
 import logging
 import sys
 
@@ -22,8 +23,11 @@ def _rec(msg="hello", level=logging.INFO, exc=None, **extra):
 
 def test_schema_keys_and_values():
     doc = json.loads(record_to_json(_rec(), 7))
+    assert _instant(doc["ts"]) == datetime(
+        2026, 10, 26, 7, 33, 20, 123456, tzinfo=timezone.utc
+    )
     assert doc == {
-        "ts": "2026-10-26T07:33:20.123456Z",
+        "ts": doc["ts"],
         "level": "INFO",
         "server": "PSTAT",
         "logger": "PSTAT",
@@ -38,7 +42,25 @@ def test_schema_keys_and_values():
 
 def test_offset_shifts_ts():
     doc = json.loads(record_to_json(_rec(), 1, offset_seconds=2.5))
-    assert doc["ts"] == "2026-10-26T07:33:22.623456Z"
+    assert _instant(doc["ts"]) == datetime(
+        2026, 10, 26, 7, 33, 22, 623456, tzinfo=timezone.utc
+    )
+
+
+def test_ts_is_local_time_with_its_offset():
+    """Operators read the station's clock; the offset keeps it unambiguous."""
+    doc = json.loads(record_to_json(_rec(), 1))
+    ts = datetime.fromisoformat(doc["ts"])
+    local = datetime(2026, 10, 26, 7, 33, 20, 123456, tzinfo=timezone.utc).astimezone()
+    assert ts.utcoffset() == local.utcoffset()
+    assert ts.replace(tzinfo=None) == local.replace(tzinfo=None)
+    assert not doc["ts"].endswith("Z")
+
+
+def _instant(ts: str) -> datetime:
+    dt = datetime.fromisoformat(ts)
+    assert dt.tzinfo is not None, f"{ts!r} has no UTC offset"
+    return dt
 
 
 def test_exc_present_only_with_traceback():
@@ -515,3 +537,13 @@ def test_launchers_export_the_server_key_before_any_helao_import():
         assert setter is not None, name
         assert "os.environ['HELAO_SERVER_KEY'] = sys.argv[2]" in ast.unparse(tree), name
         assert first_helao is None or setter < first_helao, name
+
+
+def test_console_time_is_local_with_its_offset():
+    from helao.helpers.helao_logging import NtpOffsetFormatter
+
+    rec = _rec()
+    text = NtpOffsetFormatter("%(asctime)s").format(rec)
+    shown = datetime.fromisoformat(text)
+    assert shown.utcoffset() is not None, text
+    assert shown.timestamp() == pytest.approx(rec.created, abs=0.001)

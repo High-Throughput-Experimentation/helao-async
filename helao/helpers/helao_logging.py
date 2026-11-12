@@ -280,17 +280,15 @@ class NtpOffsetFormatter(logging.Formatter):
 
     def formatTime(self, record, datefmt=None) -> str:
         """Return the record's creation time shifted by the configured offset."""
-        # Convert the record's timestamp (seconds since epoch) to a UTC datetime
-        ct = datetime.fromtimestamp(record.created, tz=self.tz)
-        # Apply the desired offset
-        dt = ct + self.offset
+        # Zone resolved per record, not once at startup, so a DST change
+        # mid-run is reflected.
+        utc = datetime.fromtimestamp(record.created, tz=timezone.utc) + self.offset
+        dt = utc if self.tz is timezone.utc else utc.astimezone()
 
         if datefmt:
             return dt.strftime(datefmt)
-        else:
-            # If no datefmt is specified, use a default ISO8601-like format with offset
-            t = dt.strftime(self.default_time_format)
-            return self.default_msec_format % (t, record.msecs)
+        # 2026-11-12 14:18:53.097-08:00: local time with its UTC offset.
+        return dt.isoformat(sep=" ", timespec="milliseconds")
 
 
 class ColoredNtpOffsetFormatter(NtpOffsetFormatter, ColoredFormatter):

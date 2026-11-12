@@ -33,7 +33,7 @@ def _s(x) -> str:
 
 
 def _note(msg: str) -> dict:
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    ts = datetime.now().astimezone().isoformat(timespec="microseconds")
     return {
         "ts": ts,
         "level": "WARNING",
@@ -216,7 +216,7 @@ def merge(old: list, new: list, keep: int) -> list:
             continue
         seen.add(key)
         out.append(r)
-    out.sort(key=lambda r: _s(r.get("ts")))
+    out.sort(key=lambda r: _instant(_s(r.get("ts"))))
     return out[-keep:]
 
 
@@ -236,23 +236,30 @@ def filter_records(records, servers, min_level: str, text: str) -> list:
     ]
 
 
-def _ts_text(ts: str, local: bool) -> str:
-    """UTC ISO stamp as-is, or shifted to the machine's local zone with its offset."""
-    if not local:
-        return ts
+def _instant(ts: str) -> float:
+    """Sort key: seconds since the epoch. Stamps are local-with-offset since
+    2026-11-12 and UTC "...Z" before, so the strings do not sort by time."""
     try:
-        return (
-            datetime.fromisoformat(ts).astimezone().isoformat(timespec="microseconds")
-        )
+        return datetime.fromisoformat(ts).timestamp()
+    except ValueError:
+        return float("-inf")
+
+
+def _ts_text(ts: str, local: bool) -> str:
+    """The stamp in the machine's local zone or in UTC, offset shown either way."""
+    try:
+        dt = datetime.fromisoformat(ts)
     except ValueError:
         return ts  # unparsable: show the raw stamp rather than drop the row
+    dt = dt.astimezone() if local else dt.astimezone(timezone.utc)
+    return dt.isoformat(timespec="microseconds")
 
 
 def to_rows(records, local: bool = False) -> list:
     """Newest-first ``[ts, level, server, msg, color, key]`` rows for the table.
 
-    ``local`` shifts ``ts`` to the local zone for display only; sorting and the
-    duplicate key still use the stored UTC stamp.
+    ``local`` shows ``ts`` in the local zone, otherwise UTC; sorting and the
+    duplicate key use the stored stamp.
     ``key`` is the record's duplicate key, so a row the page has expanded stays
     expanded as newer rows push it down.
     """
