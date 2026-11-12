@@ -230,7 +230,15 @@ class LocalLoader:
             process_dir = self.target.replace(state_dir, "PROCESSES").replace(
                 ".zip", ""
             )
+        elif os.path.isdir(self.target):
+            # A directory target mirrors itself, as a zip does. Mirroring its
+            # PARENT pulled the whole PROCESSES/<week>/<day> folder in, i.e.
+            # every sibling sequence's processes from that day: re-analysing
+            # one legacy RUNS_SYNCED sequence directory enqueued (and failed)
+            # its neighbours' processes too (2,053 on note1, 2026-11-11).
+            process_dir = self.target.replace(state_dir, "PROCESSES")
         else:
+            # A file target (a -seq.yml) sits inside the sequence directory.
             process_dir = os.path.dirname(self.target).replace(state_dir, "PROCESSES")
         if is_legacy_path(self.target):
             check_dirs = [f"{self.target.replace(state_dir, x)}" for x in states] + [
