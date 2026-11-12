@@ -188,7 +188,7 @@ class RetireState(rx.State):
             if hit:
                 err = f"batch conversion in flight: {hit}"
             else:
-                client = api.get_client()
+                client = await api.aget_client()
                 inv = await retire_logic.inventory(client, root, u, _cb)
         except asyncio.CancelledError:
             async with self:
@@ -263,7 +263,7 @@ class RetireState(rx.State):
             result = None
             error = ""
             try:
-                client = api.get_client()
+                client = await api.aget_client()
             except Exception as exc:
                 LOGGER.warning(f"retire could not get a client: {exc!r}")
                 error = f"{exc}; no files were moved"

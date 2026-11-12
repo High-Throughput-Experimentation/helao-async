@@ -79,6 +79,7 @@ __all__ = [
     "ACT_COLS",
 ]
 
+import asyncio
 import os
 import threading
 from typing import Optional
@@ -2564,7 +2565,7 @@ class OperatorPlateState(rx.State):
                 self.error = f"'{raw}' is not a plate id"
             return
         try:
-            pmdata = api.get_platemap_plateid(plateid)
+            pmdata = await asyncio.to_thread(api.get_platemap_plateid, plateid)
         except Exception as exc:
             LOGGER.warning(f"operator could not load plate {plateid}: {exc}")
             async with self:

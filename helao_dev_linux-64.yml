@@ -2,9 +2,7 @@ name: helao
 channels:
   - conda-forge
 dependencies:
-  - aioboto3
   - aiofiles
-  - aiohttp
   - anyio
   - anywidget
   - asyncua
@@ -49,7 +47,6 @@ dependencies:
   - pyfiglet>=1
   - pyftdi
   - pylablib
-  - pymodbus
   - pyright
   - pyserial
   - pytest-asyncio
@@ -63,7 +60,6 @@ dependencies:
   - pyzstd
   - requests
   - ruamel.yaml
-  - s3fs
   - scikit-learn
   - scipy
   - setuptools<82

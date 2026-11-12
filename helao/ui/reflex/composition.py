@@ -31,7 +31,12 @@ import reflex as rx
 
 from helao.helpers import helao_logging as logging
 from helao.ui.reflex import plots
-from helao.ui.reflex.plate_photo import PlatePhotoState, photo_adjust, photo_select
+from helao.ui.reflex.plate_photo import (
+    PlatePhotoState,
+    list_photos,
+    photo_adjust,
+    photo_select,
+)
 from helao.ui.shared import platemap
 from helao.ui.shared.composition import api, grouping, interp, model
 from helao.ui.shared.composition import ternary as _ternary
@@ -112,7 +117,7 @@ async def load_records(plate_id: int) -> Loaded:
     exceptions: one unreadable HLO out of several hundred must be counted and
     reported, not allowed to abort the load.
     """
-    client = api.get_client()
+    client = await api.aget_client()
     items = await api.search_processes(client, plate_id)
     uuids = sorted({str(item.get("sequence_uuid") or "") for item in items})
     sequences = await api.fetch_sequences(client, uuids)
@@ -622,12 +627,13 @@ class CompositionState(PlatePhotoState, rx.State):
                 self.error = f"plate {plate_id} could not be loaded: {exc}"
                 self.status = ""
             return
-        rows, note = platemap_for(plate_id)
+        rows, note = await asyncio.to_thread(platemap_for, plate_id)
+        photos_found = await asyncio.to_thread(list_photos, plate_id)
         async with self:
             self._records = loaded.records
             self._pm_rows = rows
             self.platemap_note = note
-            self._load_photos(plate_id)
+            self._load_photos(plate_id, photos_found)
             self.run_use_options = grouping.run_use_options(loaded.records)
             self.run_use_choice = grouping.ALL
             self.sequence_choice = grouping.ALL
@@ -921,7 +927,7 @@ class CompositionState(PlatePhotoState, rx.State):
             return
         try:
             series = await api.fetch_spectrum(
-                api.get_client(),
+                (await api.aget_client()),
                 record.spectrum_action_uuid,
                 record.spectrum_file_name,
             )

@@ -43,6 +43,31 @@ def _plate_api():
     return platemap.plate_api_for_config(world_config())
 
 
+def list_photos(plate_id: int) -> tuple[list, str]:
+    """``(photos, note)`` for *plate_id*: its wafer-photo underlays, or none
+    and why. Never raises.
+
+    Blocking (a plate-API lookup), so pages call it through
+    ``asyncio.to_thread``.
+    """
+    plate_api = _plate_api()
+    if plate_api is None:
+        return [], "no plate API is configured, so there is no wafer photo to show"
+    if getattr(plate_api, "loader", None) is None:
+        return [], (
+            "wafer photos need credentials; set HELAO_CREDENTIALS to a "
+            "readable environment file"
+        )
+    try:
+        photos = plate_photo.underlays_for(plate_api, plate_id)
+    except Exception as exc:
+        LOGGER.warning(f"could not list plate {plate_id}'s wafer photos: {exc}")
+        return [], f"plate {plate_id}'s wafer photos could not be listed: {exc}"
+    if not photos:
+        return [], NO_PHOTOS_NOTE
+    return photos, ""
+
+
 class PlatePhotoState(rx.State, mixin=True):
     """Which wafer photo, if any, the plate map draws underneath."""
 
@@ -63,41 +88,16 @@ class PlatePhotoState(rx.State, mixin=True):
             f"_redraw_photo"
         )
 
-    def _load_photos(self, plate_id: int) -> None:
-        """List *plate_id*'s wafer photos. Never raises.
+    def _load_photos(self, plate_id: int, found: tuple | None = None) -> None:
+        """Show *plate_id*'s wafer photos. Never raises.
 
-        Called from each page's ``retrieve`` inside its state lock, beside
-        ``platemap_for``. ``lookup_plate`` is a blocking call, as
-        ``platemap_for``'s is, so the lock costs nothing extra: the event loop
-        is blocked either way.
+        Pages fetch with :func:`list_photos` in a worker thread before taking
+        their state lock and pass the result as *found*; without it the
+        (blocking) lookup runs here.
         """
+        photos, note = list_photos(plate_id) if found is None else found
         self.photo_choice = PHOTO_OFF
-        self.photo_options = [PHOTO_OFF]
-        self.photo_note = ""
-        self._photos = []
-        plate_api = _plate_api()
-        if plate_api is None:
-            self.photo_note = (
-                "no plate API is configured, so there is no wafer photo to show"
-            )
-            return
-        if getattr(plate_api, "loader", None) is None:
-            self.photo_note = (
-                "wafer photos need credentials; set HELAO_CREDENTIALS to a "
-                "readable environment file"
-            )
-            return
-        try:
-            photos = plate_photo.underlays_for(plate_api, plate_id)
-        except Exception as exc:
-            LOGGER.warning(f"could not list plate {plate_id}'s wafer photos: {exc}")
-            self.photo_note = (
-                f"plate {plate_id}'s wafer photos could not be listed: {exc}"
-            )
-            return
-        if not photos:
-            self.photo_note = NO_PHOTOS_NOTE
-            return
+        self.photo_note = note
         self._photos = photos
         self.photo_options = [PHOTO_OFF] + [u.label for u in photos]
 

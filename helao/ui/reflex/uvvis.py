@@ -10,11 +10,13 @@ nm statistics.
 
 from __future__ import annotations
 
+import asyncio
 from typing import ClassVar
 
 import reflex as rx
 
 from helao.helpers import helao_logging as logging
+from helao.ui.reflex.plate_photo import list_photos
 from helao.ui.reflex import spectra_page
 from helao.ui.reflex.composition import parse_plate_id, platemap_for
 from helao.ui.reflex.spectra_page import SpectraPageState
@@ -97,19 +99,20 @@ class UvvisState(SpectraPageState, rx.State):
         async with self:
             self.status = f"finding plate {plate_id}'s R_UVVIS runs..."
         try:
-            records = await uvvis.records_for_plate(api.get_client(), plate_id)
+            records = await uvvis.records_for_plate((await api.aget_client()), plate_id)
         except Exception as exc:
             LOGGER.warning(f"uvvis could not list plate {plate_id}: {exc}")
             async with self:
                 self.error = f"plate {plate_id} could not be listed: {exc}"
                 self.status = ""
             return
-        rows, note = platemap_for(plate_id)
+        rows, note = await asyncio.to_thread(platemap_for, plate_id)
+        photos_found = await asyncio.to_thread(list_photos, plate_id)
         async with self:
             self._records = records
             self._pm_rows = rows
             self.platemap_note = note
-            self._load_photos(plate_id)
+            self._load_photos(plate_id, photos_found)
             run_ids = sorted({r.run_id for r in records if r.run_id}, reverse=True)
             self._runs = {uvvis.run_label(run_id): run_id for run_id in run_ids}
             self.run_options = list(self._runs)
@@ -141,7 +144,7 @@ class UvvisState(SpectraPageState, rx.State):
                 self.status = "nothing matches this run and run_use"
                 return
             self.status = f"loading {len(chosen)} spectra..."
-        await self._load_and_draw(chosen, api.get_client())
+        await self._load_and_draw(chosen, (await api.aget_client()))
 
 
 def build_page():

@@ -18,61 +18,33 @@ HTTP layer rather than binding a socket, so they are fast and hermetic.
 import asyncio
 from unittest.mock import patch
 
+import httpx
 import pytest
 
 from helao.core.error import ErrorCodes
 from helao.helpers import dispatcher
 
 
-class _FakeResponse:
-    def __init__(self, status, counter):
-        self.status = status
-        self._counter = counter
+def _counting_client(status, counter):
+    """An ``httpx.AsyncClient`` factory whose transport answers ``status``."""
+    real = httpx.AsyncClient
 
-    async def json(self):
-        return {"detail": "Not Found"}
+    def _handler(request):
+        counter[0] += 1
+        return httpx.Response(status, json={"detail": "Not Found"})
 
-    async def __aenter__(self):
-        self._counter[0] += 1
-        return self
+    def _client(*args, **kwargs):
+        return real(*args, transport=httpx.MockTransport(_handler), **kwargs)
 
-    async def __aexit__(self, *exc):
-        return False
-
-
-class _FakeSession:
-    def __init__(self, status, counter, **kwargs):
-        self._status = status
-        self._counter = counter
-
-    def post(self, *args, **kwargs):
-        return _FakeResponse(self._status, self._counter)
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *exc):
-        return False
-
-
-class _FakeConnector:
-    def __init__(self, *args, **kwargs):
-        pass
-
-    async def close(self):
-        return None
+    return _client
 
 
 def _run_private(status, retries):
     """Call the private dispatcher against a server replying ``status``."""
     counter = [0]
 
-    def _session(*args, **kwargs):
-        return _FakeSession(status, counter, **kwargs)
-
     with (
-        patch.object(dispatcher.aiohttp, "ClientSession", _session),
-        patch.object(dispatcher.aiohttp, "TCPConnector", _FakeConnector),
+        patch.object(httpx, "AsyncClient", _counting_client(status, counter)),
         # No RPC peer, so the call takes the HTTP fallback under test. `new=`
         # with a coroutine function, not `side_effect=`: the target is async,
         # and a sync Mock raises when the dispatcher awaits it.
@@ -154,12 +126,8 @@ def test_an_rpc_handler_error_is_not_resent_over_http():
     async def _client(*args, **kwargs):
         return _RaisingClient()
 
-    def _session(*args, **kwargs):
-        return _FakeSession(200, counter, **kwargs)
-
     with (
-        patch.object(dispatcher.aiohttp, "ClientSession", _session),
-        patch.object(dispatcher.aiohttp, "TCPConnector", _FakeConnector),
+        patch.object(httpx, "AsyncClient", _counting_client(200, counter)),
         patch.object(dispatcher, "_get_rpc_client", new=_client),
         patch.object(dispatcher.asyncio, "sleep", new=_no_sleep),
     ):
@@ -187,9 +155,6 @@ def test_status_packages_post_once_per_call(method):
 
     counter = [0]
 
-    def _session(*args, **kwargs):
-        return _FakeSession(500, counter, **kwargs)
-
     host = SimpleNamespace(
         actionservermodel=SimpleNamespace(get_fastapi_json=lambda **kw: {}),
         server_cfg={"host": "127.0.0.1", "port": 8003},
@@ -200,8 +165,7 @@ def test_status_packages_post_once_per_call(method):
     if method == "send_nbstatuspackage":
         kwargs["actionmodel"] = SimpleNamespace(as_dict=lambda: {})
     with (
-        patch.object(dispatcher.aiohttp, "ClientSession", _session),
-        patch.object(dispatcher.aiohttp, "TCPConnector", _FakeConnector),
+        patch.object(httpx, "AsyncClient", _counting_client(500, counter)),
         patch.object(dispatcher, "_get_rpc_client", new=_no_rpc),
         patch.object(dispatcher.asyncio, "sleep", new=_no_sleep),
     ):

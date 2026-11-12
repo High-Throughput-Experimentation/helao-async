@@ -15,11 +15,13 @@ and averaging a Cu edge with a Co edge means nothing. Element has no ``All``.
 
 from __future__ import annotations
 
+import asyncio
 from typing import ClassVar
 
 import reflex as rx
 
 from helao.helpers import helao_logging as logging
+from helao.ui.reflex.plate_photo import list_photos
 from helao.ui.reflex import spectra_page
 from helao.ui.reflex.composition import (
     _kept_or_first,
@@ -181,19 +183,20 @@ class XafsState(SpectraPageState, rx.State):
         async with self:
             self.status = f"finding plate {plate_id}'s XAFS sequences..."
         try:
-            records = await xafs.records_for_plate(api.get_client(), plate_id)
+            records = await xafs.records_for_plate((await api.aget_client()), plate_id)
         except Exception as exc:
             LOGGER.warning(f"xafs could not list plate {plate_id}: {exc}")
             async with self:
                 self.error = f"plate {plate_id} could not be listed: {exc}"
                 self.status = ""
             return
-        rows, note = platemap_for(plate_id)
+        rows, note = await asyncio.to_thread(platemap_for, plate_id)
+        photos_found = await asyncio.to_thread(list_photos, plate_id)
         async with self:
             self._records = records
             self._pm_rows = rows
             self.platemap_note = note
-            self._load_photos(plate_id)
+            self._load_photos(plate_id, photos_found)
             self.run_use_options = grouping.run_use_options(records)
             self.run_use_choice = (
                 DEFAULT_RUN_USE
@@ -230,7 +233,7 @@ class XafsState(SpectraPageState, rx.State):
             use_s3 = self.read_s3
             x, y = self.x_choice, self.y_choice
             self._base = []
-        client = api.get_client()
+        client = await api.aget_client()
         local_root = "" if use_s3 else str(world_config().get("root") or "")
 
         async def _fetch(records, progress):
