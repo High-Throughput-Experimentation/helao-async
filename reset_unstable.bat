@@ -1,5 +1,5 @@
 @echo off
-call conda activate helao
+call "%~dp0activate_helao.bat"
 
 echo resetting helao-async and pulling updates
 cd /d "%~dp0" || (pause & exit /b 1)

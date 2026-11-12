@@ -86,36 +86,7 @@ def _env(folder: Path, text: str) -> None:
     (folder / "environment.yml").write_text(text, encoding="utf-8")
 
 
-def test_merge_unions_channels_deps_and_pip(tmp_path):
-    a, b = tmp_path / "a", tmp_path / "b"
-    _env(a, "channels: [conda-forge]\ndependencies: [pyserial, {pip: [x==1]}]\n")
-    _env(
-        b,
-        "channels: [conda-forge, other]\ndependencies: [pyserial, pyvisa=1.13, {pip: [x==2]}]\n",
-    )
-    env = he.merge_environment({a, b})
-    assert env is not None
-    assert env["channels"] == ["conda-forge", "other"]
-    assert env["dependencies"][:2] == ["pyserial", "pyvisa=1.13"]
-    assert env["dependencies"][-1] == {"pip": ["x==1", "x==2"]}  # both pins kept
-
-
-def test_merge_none_when_no_env_files(tmp_path):
-    assert he.merge_environment({tmp_path}) is None
-
-
-def test_install_runs_conda_once_then_uv_per_folder(tmp_path):
-    a, b = tmp_path / "a", tmp_path / "b"
-    _env(a, "dependencies: [pyserial]\n")
-    b.mkdir()
-    (b / "requirements.txt").write_text("nidaqmx\n", encoding="utf-8")
-    cmds = []
-    he.install({a, b}, runner=lambda c, e=None: cmds.append(c))
-    assert [c[1:3] for c in cmds] == [["env", "update"], ["pip", "install"]]
-    assert cmds[1][-1] == str(b / "requirements.txt")
-
-
-def test_record_creates_states_and_merges(tmp_path, monkeypatch):
+def test_record_creates_states_and_returns_every_states_file(tmp_path, monkeypatch):
     root = tmp_path / "rel_root"
     cfg1 = tmp_path / "c1.yml"
     cfg1.write_text(f"root: {root}\nservers: {{}}\n", encoding="utf-8")
@@ -124,16 +95,12 @@ def test_record_creates_states_and_merges(tmp_path, monkeypatch):
     other = tmp_path / "other_states.json"
     other.write_text("[]", encoding="utf-8")
     monkeypatch.setenv(he.ENV_VAR, str(other))
-    calls = []
-    he.record([cfg1], runner=calls.append)
-    files = he.record([cfg2], runner=calls.append)
-    data = json.loads((root / "STATES" / he.STATES_FILE).read_text(encoding="utf-8"))
-    assert data == sorted([str(cfg1.resolve()), str(cfg2.resolve())])
-    assert files == [root / "STATES" / he.STATES_FILE]
+    he.record([cfg1])
+    files = he.record([cfg2])
     mine = root / "STATES" / he.STATES_FILE
-    assert calls[-1][-1] == f"{he.ENV_VAR}=" + os.pathsep.join(
-        sorted([str(other), str(mine)])
-    )
+    data = json.loads(mine.read_text(encoding="utf-8"))
+    assert data == sorted([str(cfg1.resolve()), str(cfg2.resolve())])
+    assert files == sorted([other, mine])
 
 
 def test_relative_root_resolves_against_repo_root(tmp_path, monkeypatch):
@@ -141,7 +108,7 @@ def test_relative_root_resolves_against_repo_root(tmp_path, monkeypatch):
     monkeypatch.delenv(he.ENV_VAR, raising=False)
     cfg = tmp_path / "c.yml"
     cfg.write_text("root: rel_root\nservers: {}\n", encoding="utf-8")
-    he.record([cfg], runner=lambda cmd: None)
+    he.record([cfg])
     assert (tmp_path / "rel_root" / "STATES" / he.STATES_FILE).is_file()
 
 
@@ -158,18 +125,26 @@ def test_stored_configs_skips_missing_files_and_configs(tmp_path, capsys):
     assert "gone.yml" in err and "missing.json" in err
 
 
-def test_main_update_without_anything_is_a_hint(monkeypatch, capsys):
+def test_main_update_without_records_tells_a_migrating_host_to_pass_prefixes(
+    monkeypatch, capsys
+):
     monkeypatch.delenv(he.ENV_VAR, raising=False)
+    seen = []
+    monkeypatch.setattr(he, "install", lambda folders, **k: seen.append((folders, k)))
     assert he.main(["update"]) == 0
-    assert "setup_env" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "setup_env <config prefix>" in out and "conda" in out
+    assert seen == [(set(), {"states_files": [], "dry_run": False})]
 
 
-def test_main_setup_without_prefixes_is_base_only(monkeypatch, capsys):
+def test_main_setup_without_prefixes_installs_base_only(monkeypatch, capsys):
     calls = []
-    monkeypatch.setattr(he, "install", lambda *a, **k: calls.append("install"))
-    monkeypatch.setattr(he, "record", lambda *a, **k: calls.append("record"))
+    monkeypatch.setattr(
+        he, "install", lambda folders, **k: calls.append(("install", folders))
+    )
+    monkeypatch.setattr(he, "record", lambda *a, **k: calls.append(("record",)))
     assert he.main(["setup"]) == 0
-    assert calls == []
+    assert calls == [("install", set())]
     assert "no config prefix given" in capsys.readouterr().out
 
 
@@ -209,7 +184,7 @@ def test_record_malformed_states_json_raises_env_error(tmp_path, monkeypatch):
     cfg.write_text(f"root: {root}\nservers: {{}}\n", encoding="utf-8")
     monkeypatch.delenv(he.ENV_VAR, raising=False)
     with pytest.raises(he.EnvSetupError, match=he.STATES_FILE):
-        he.record([cfg], runner=lambda cmd: None)
+        he.record([cfg])
 
 
 def test_main_missing_tool_exits_2(monkeypatch, capsys):
@@ -220,18 +195,6 @@ def test_main_missing_tool_exits_2(monkeypatch, capsys):
     monkeypatch.setattr(he, "install", lambda folders, **kw: boom(["x"]))
     assert he.main(["setup", "test/goldenreflex"]) == 2
     assert "error:" in capsys.readouterr().err
-
-
-def test_install_removes_tmp_dir_and_dry_run_prints_plus_form(
-    tmp_path, monkeypatch, capsys
-):
-    a = tmp_path / "a"
-    _env(a, "dependencies: [pyserial]\n")
-    seen = []
-    he.install({a}, runner=lambda cmd, env=None: seen.append(Path(cmd[-1]).parent))
-    assert not seen[0].exists()
-    he.install({a}, dry_run=True)
-    assert capsys.readouterr().out.startswith("+ ")
 
 
 def test_main_malformed_yaml_config_exits_2(tmp_path, capsys):
@@ -254,19 +217,6 @@ def test_yml_beats_py_within_one_deployment(tmp_path):
     assert he.resolve_config("both", tmp_path).name == "both.yml"
 
 
-def test_platform_file_merged_only_for_matching_platform(tmp_path, monkeypatch):
-    a = tmp_path / "a"
-    _env(a, "dependencies: [base]\n")
-    (a / "environment_win-64.yml").write_text("dependencies: [winonly]\n", "utf-8")
-    (a / "environment_linux-64.yml").write_text("dependencies: [linonly]\n", "utf-8")
-    monkeypatch.setattr(he, "platform_tag", lambda: "win-64")
-    assert he.merge_environment({a})["dependencies"] == ["base", "winonly"]
-    monkeypatch.setattr(he, "platform_tag", lambda: "linux-64")
-    assert he.merge_environment({a})["dependencies"] == ["base", "linonly"]
-    monkeypatch.setattr(he, "platform_tag", lambda: "osx-64")
-    assert he.merge_environment({a})["dependencies"] == ["base"]
-
-
 def _pip_folder(root: Path, name: str, over: str | None) -> Path:
     f = root / name
     f.mkdir()
@@ -276,38 +226,13 @@ def _pip_folder(root: Path, name: str, over: str | None) -> Path:
     return f
 
 
-def test_pip_env_reaches_only_its_folder_and_expands(tmp_path, monkeypatch):
-    monkeypatch.setattr(he, "platform_tag", lambda: "linux-64")
-    monkeypatch.setenv("PATH", "/orig")
-    monkeypatch.setenv("FC_LD", "keepme")
-    monkeypatch.delenv("CC", raising=False)
-    a = _pip_folder(tmp_path, "a", 'CC: gcc\nFC_LD: ""\nPATH: "{prefix}/bin;{PATH}"\n')
-    b = _pip_folder(tmp_path, "b", None)
-    _env(tmp_path / "c", "dependencies: [pyserial]\n")
-    calls = []
-    he.install({a, b, tmp_path / "c"}, runner=lambda c, e=None: calls.append((c, e)))
-    by_dir = {
-        Path(c[-1]).parent.name if c[1] == "pip" else "conda": e for c, e in calls
-    }
-    assert by_dir["conda"] is None and by_dir["b"] is None
-    env = by_dir["a"]
-    assert env["CC"] == "gcc"
-    assert "FC_LD" not in env  # empty string unsets, even if set in os.environ
-    assert env["PATH"] == f"{sys.prefix}/bin;/orig"
-    assert "CC" not in os.environ and os.environ["FC_LD"] == "keepme"
-    assert os.environ["PATH"] == "/orig"
-
-
 def test_pip_env_without_requirements_warns_and_is_ignored(
     tmp_path, monkeypatch, capsys
 ):
     monkeypatch.setattr(he, "platform_tag", lambda: "linux-64")
     (tmp_path / "pip_env_linux-64.yml").write_text("CC: gcc\n", encoding="utf-8")
-    (tmp_path / "environment.yml").write_text("dependencies: [x]\n", "utf-8")
-    he.install({tmp_path}, dry_run=True)
-    cap = capsys.readouterr()
-    assert "requirements.txt" in cap.err
-    assert "CC" not in cap.out.replace("conda dependencies", "")
+    assert he.pip_env_overrides(tmp_path) == {}
+    assert "requirements.txt" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("body", ["- a\n- b\n", "CC: [gcc]\n", "CC: {a: b}\n"])
@@ -330,21 +255,166 @@ def test_pip_env_keys_uppercased_on_windows(tmp_path, monkeypatch):
     assert he.pip_env_overrides(f) == {"PATH": "x"}
 
 
-def test_dry_run_shows_templates_and_conda_deps(tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr(he, "platform_tag", lambda: "linux-64")
-    a = _pip_folder(tmp_path, "a", "CC: gcc\nPATH: '{prefix}\\Library;{PATH}'\n")
-    _env(a, "dependencies: [pyserial]\n")
-    he.install({a}, dry_run=True)
-    out = capsys.readouterr().out
-    assert "CC=gcc" in out and "PATH={prefix}\\Library;{PATH}" in out
-    assert "['pyserial']" in out
+def test_gpsim_folder_brings_pytorch_cpu_and_gpytorch():
+    import tomllib
 
+    import pixi_compose as pc
 
-def test_gpsim_folder_brings_pytorch_and_gpytorch():
     cfg = he.resolve_config("test/demo1")
-    env = he.merge_environment(he.server_folders(cfg))
-    assert env is not None
-    assert {"pytorch-cpu", "gpytorch"} <= set(env["dependencies"])
+    base = tomllib.loads(he.BASE_MANIFEST.read_text(encoding="utf-8"))
+    deps = pc.compose(base, he.server_folders(cfg), "linux-64", he.REPO_ROOT)[
+        "dependencies"
+    ]
+    assert {"pytorch-cpu", "gpytorch"} <= set(deps)
+
+
+def _ws_base(tmp_path, monkeypatch):
+    base = tmp_path / "pixi.toml"
+    base.write_text(
+        '[workspace]\nname = "helao"\nchannels = ["conda-forge"]\n'
+        'platforms = ["linux-64", "win-64"]\n[dependencies]\npython = "3.14.*"\n',
+        encoding="utf-8",
+    )
+    lock = tmp_path / "pixi.lock"
+    lock.write_text("version: 6\nenvironments: {}\npackages: []\n", encoding="utf-8")
+    monkeypatch.setattr(he, "BASE_MANIFEST", base)
+    monkeypatch.setattr(he, "BASE_LOCK", lock)
+    monkeypatch.setattr(he, "platform_tag", lambda: "linux-64")
+    monkeypatch.setenv("PIXI", "/opt/fake/pixi")
+    return tmp_path / "ws"
+
+
+def test_install_writes_manifest_seeds_lock_and_runs_pixi(tmp_path, monkeypatch):
+    import tomllib
+
+    ws = _ws_base(tmp_path, monkeypatch)
+    f = tmp_path / "srv"
+    _env(f, "dependencies: [pyserial]\n")
+    cmds = []
+    he.install(
+        {f}, states_files=[tmp_path / "s.json"], runner=cmds.append, workspace=ws
+    )
+    m = tomllib.loads((ws / "pixi.toml").read_text(encoding="utf-8"))
+    assert m["dependencies"]["pyserial"] == "*"
+    assert m["activation"]["env"]["HELAO_STATION_PREFIXES"] == str(tmp_path / "s.json")
+    assert (ws / "pixi.lock").is_file() and (ws / ".seed").is_file()
+    assert cmds == [
+        ["/opt/fake/pixi", "install", "--manifest-path", str(ws / "pixi.toml")]
+    ]
+
+
+def test_install_dry_run_prints_and_writes_nothing(tmp_path, monkeypatch, capsys):
+    ws = _ws_base(tmp_path, monkeypatch)
+    he.install(set(), dry_run=True, runner=lambda c: pytest.fail("ran"), workspace=ws)
+    out = capsys.readouterr().out
+    assert "[dependencies]" in out and "pixi install --manifest-path" in out
+    assert not ws.exists()
+
+
+def test_install_reports_compose_conflicts_as_env_errors(tmp_path, monkeypatch):
+    ws = _ws_base(tmp_path, monkeypatch)
+    a, b = tmp_path / "a", tmp_path / "b"
+    _env(a, "dependencies: [pyvisa=1.13]\n")
+    _env(b, "dependencies: [pyvisa=1.14]\n")
+    with pytest.raises(he.EnvSetupError, match="pyvisa"):
+        he.install({a, b}, runner=lambda c: None, workspace=ws)
+
+
+def test_install_warns_on_base_drift(tmp_path, monkeypatch, capsys):
+    ws = _ws_base(tmp_path, monkeypatch)
+    import pixi_compose as pc
+
+    seen = []
+    monkeypatch.setattr(
+        pc, "drift", lambda *a: seen.append(a) or [("numpy", "2.2.6", "2.5.4")]
+    )
+    he.install(set(), runner=lambda c: None, workspace=ws)
+    assert seen == [(he.BASE_LOCK, ws / "pixi.lock", "linux-64")]
+    assert "base package numpy 2.2.6 -> 2.5.4" in capsys.readouterr().err
+
+
+def test_pixi_lookup_prefers_env_var_then_path(monkeypatch, tmp_path):
+    monkeypatch.setenv("PIXI", "/x/pixi")
+    assert he._pixi() == "/x/pixi"
+    monkeypatch.delenv("PIXI")
+    monkeypatch.setenv("PATH", str(tmp_path))
+    monkeypatch.setattr(he.Path, "home", lambda: tmp_path / "nohome")
+    with pytest.raises(he.EnvSetupError, match="pixi not found"):
+        he._pixi()
+
+
+def _fake_pixi(d):
+    d.mkdir(parents=True, exist_ok=True)
+    exe = d / "pixi"
+    exe.write_text("#!/bin/sh\n", encoding="utf-8")
+    exe.chmod(0o755)
+    return exe
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="posix exec bit")
+def test_pixi_lookup_finds_path_then_home(monkeypatch, tmp_path):
+    monkeypatch.delenv("PIXI", raising=False)
+    exe = _fake_pixi(tmp_path / "bin")
+    monkeypatch.setenv("PATH", str(tmp_path / "bin"))
+    assert he._pixi() == str(exe)
+    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
+    home = tmp_path / "home"
+    exe2 = _fake_pixi(home / ".pixi" / "bin")
+    monkeypatch.setattr(he.Path, "home", lambda: home)
+    assert he._pixi() == str(exe2)
+
+
+def _station_cfg(tmp_path, monkeypatch):
+    root = tmp_path / "root"
+    cfg = tmp_path / "c.yml"
+    cfg.write_text(f"root: {root}\nservers: {{}}\n", encoding="utf-8")
+    monkeypatch.setattr(he, "resolve_config", lambda x, *a, **k: cfg)
+    monkeypatch.setattr(he, "config_hte_use", lambda c: "none")
+    monkeypatch.delenv(he.ENV_VAR, raising=False)
+    return cfg, root / "STATES" / he.STATES_FILE
+
+
+def test_failed_install_records_nothing_and_success_records(tmp_path, monkeypatch):
+    ws = _ws_base(tmp_path, monkeypatch)
+    monkeypatch.setattr(he, "WORKSPACE", ws)
+    cfg, states = _station_cfg(tmp_path, monkeypatch)
+
+    def fail(cmd):
+        raise subprocess.CalledProcessError(1, cmd)
+
+    monkeypatch.setattr(he, "_run", fail)
+    assert he.main(["setup", "x"]) == 2
+    assert not states.exists()
+    monkeypatch.setattr(he, "_run", lambda cmd: None)
+    assert he.main(["setup", "x"]) == 0
+    assert json.loads(states.read_text(encoding="utf-8")) == [str(cfg.resolve())]
+
+
+def test_dry_run_with_prefix_shows_states_path_and_writes_nothing(
+    tmp_path, monkeypatch, capsys
+):
+    ws = _ws_base(tmp_path, monkeypatch)
+    monkeypatch.setattr(he, "WORKSPACE", ws)
+    _, states = _station_cfg(tmp_path, monkeypatch)
+    assert he.main(["setup", "x", "--dry-run"]) == 0
+    assert str(states) in capsys.readouterr().out
+    assert not states.exists() and not ws.exists()
+
+
+def test_failed_install_restores_the_previous_workspace(tmp_path, monkeypatch):
+    ws = _ws_base(tmp_path, monkeypatch)
+    ws.mkdir()
+    for n in ("pixi.toml", "pixi.lock", ".seed"):
+        (ws / n).write_text(f"A-{n}", encoding="utf-8")
+    he.BASE_LOCK.write_text("version: 6\n# changed parent\n", encoding="utf-8")
+
+    def fail(cmd):
+        raise subprocess.CalledProcessError(1, cmd)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        he.install(set(), runner=fail, workspace=ws)
+    for n in ("pixi.toml", "pixi.lock", ".seed"):
+        assert (ws / n).read_text(encoding="utf-8") == f"A-{n}"
 
 
 import subprocess
@@ -362,6 +432,27 @@ def _no_network_hte(monkeypatch):
 
     monkeypatch.setattr(he, "ensure_hte", refuse)
     monkeypatch.setattr(he, "hte_state", lambda *a, **k: "tracked")
+
+
+_REAL_RUN = he._run
+_REAL_WRITE_STATES = he._write_states
+
+
+@pytest.fixture(autouse=True)
+def _no_real_side_effects(tmp_path, monkeypatch):
+    """No test may run a real command or write a states file outside tmp_path."""
+
+    def refuse(cmd, *a, **k):
+        raise AssertionError(f"real command in test: {cmd}")
+
+    def guarded(states, cfg):
+        if tmp_path not in Path(states).resolve().parents:
+            raise AssertionError(f"states write outside tmp_path: {states}")
+        _REAL_WRITE_STATES(states, cfg)
+
+    monkeypatch.setattr(he, "WORKSPACE", tmp_path / "ws")
+    monkeypatch.setattr(he, "_run", refuse)
+    monkeypatch.setattr(he, "_write_states", guarded)
 
 
 def _git(*args, cwd):
@@ -797,10 +888,10 @@ def test_a_stale_scratch_clone_is_removed_and_the_run_continues(
 def test_files_written_during_the_clone_are_logged(tmp_path, remote, monkeypatch):
     bare, _ = remote
     deploy = _replace_ready(tmp_path)
-    real = he._run
+    real = _REAL_RUN
 
-    def clone_then_write(cmd, env=None):
-        real(cmd, env)
+    def clone_then_write(cmd):
+        real(cmd)
         (deploy / "hte" / "late.yml").write_text("late", encoding="utf-8")
 
     _REAL_ENSURE_HTE(deploy, tmp_path, url=str(bare), runner=clone_then_write)
@@ -951,6 +1042,7 @@ def test_main_clones_hte_when_a_prefix_only_resolves_after_the_clone(
 
 def test_main_never_touches_a_tracked_hte(monkeypatch):
     monkeypatch.setattr(he, "hte_state", lambda *a, **k: "tracked")
+    _stub_install(monkeypatch)
     assert he.main(["setup"]) == 0  # the autouse stub raises if ensure_hte is reached
 
 

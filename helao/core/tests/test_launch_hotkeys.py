@@ -4,7 +4,7 @@ A scripted or piped launch used to die inside the reader thread with
 ``termios.error: Inappropriate ioctl for device`` -- a bare traceback, no
 message, and the launcher process gone while its servers kept running.
 
-Run:  conda run -n helao python -m pytest helao/core/tests/test_launch_hotkeys.py
+Run:  python -m pytest helao/core/tests/test_launch_hotkeys.py
 """
 
 import io

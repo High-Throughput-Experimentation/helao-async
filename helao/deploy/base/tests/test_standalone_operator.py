@@ -1,6 +1,6 @@
 """Standalone tests for the standalone Bokeh operator. No pytest; run with:
 
-    PYTHONPATH=/mnt/STORAGE/repos/helao/helao-async conda run -n helao \
+    PYTHONPATH=/mnt/STORAGE/repos/helao/helao-async \
         python -m helao.deploy.base.tests.test_standalone_operator
 """
 

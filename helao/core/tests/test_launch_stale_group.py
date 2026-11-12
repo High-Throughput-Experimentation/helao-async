@@ -11,7 +11,7 @@ The guard has to distinguish three states, and the middle one is why
 ``psutil.pid_exists`` alone is not enough: falsely claiming an unrelated process
 is a live HELAO server would be worse than the bug.
 
-Run:  conda run -n helao python -m pytest helao/core/tests/test_launch_stale_group.py
+Run:  python -m pytest helao/core/tests/test_launch_stale_group.py
 """
 
 import logging as _logging

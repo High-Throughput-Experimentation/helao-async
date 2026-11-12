@@ -5,11 +5,11 @@ HELAO-async is Caltech HTE group's instrument control software following [HELAO]
 ## Requirements
 
 - Windows is required for Gamry (comtypes) drivers. Galil (gclib) drivers run on Windows and Linux. (Tested with Windows 10 x64)
-- [miniconda](https://docs.conda.io/en/latest/miniconda.html); the `helao` env pins Python 3.14 (see `helao_dev_*.yml`); its pip packages are in `requirements.txt` and `setup_env.*` installs them with `uv` after conda.
+- [pixi](https://pixi.sh) (setup_env installs it into ~/.pixi if missing); the env pins Python 3.14 (see pixi.toml).
 
 ## Installation
 
-From a miniconda prompt or PowerShell with an active conda profile:
+From a terminal (Windows: cmd or PowerShell):
 
 #### Windows
 
@@ -24,16 +24,13 @@ From a miniconda prompt or PowerShell with an active conda profile:
 
 `setup_env` also installs the public `hte` deployment into `helao/deploy/hte`; see [Deployments](#deployments).
 
-`setup_env` creates the `helao` env from `helao_dev_<platform>.yml` if it is missing, activates it and checks that `helao` is the active env, installs `requirements.txt` with `uv pip install`, and sets `PYTHONPATH` (the repo root) and `HELAOLAUNCH` in the env. With no arguments that is the whole install: the base env from the root env files. For a station, add its config prefixes (`setup_env.bat <prefix> ...` / `bash setup_env.sh <prefix> ...`) to also install the packages its servers need and record the prefixes for later `update_env` runs.
+`setup_env` installs pixi if it is missing, creates the host workspace `.helao-env/` from the tracked `pixi.toml` and `pixi.lock` (base env, installed straight from the lock), then composes the station's server packages into it and runs `pixi install`. With no arguments that is the whole install: the base env. For a station, add its config prefixes (`setup_env.bat <prefix> ...` / `bash setup_env.sh <prefix> ...`) to also install the packages its servers need and record the prefixes for later `update_env` runs.
 
-To pick up changed env files later, run `update_env.bat` / `bash update_env.sh`. It does the same, after a `conda env update` from the yml; with no arguments it replays the recorded station prefixes, or updates the base env only when none are recorded.
+To pick up changed env files later, run `update_env.bat` / `bash update_env.sh`. With no arguments it replays the recorded station prefixes. A host moving from the old conda env must run `setup_env <prefix> ...` once: the record is `<root>/STATES/setup_env_prefixes.json`, and only the `HELAO_STATION_PREFIXES` pointer to it lived in the conda env.
 
-An env built before 2026-10-16 has no `uv`, so `setup_env` fails at the uv step. Run `update_env` once instead; it adds `uv` from the yml.
+`pixi.lock` pins every base package for `linux-64` and `win-64` (CUDA hosts take theirs from the lock's own `linux-64-cuda` section, solved separately, so they can differ from `linux-64`); to move the pins, run `pixi update` in the repo root and commit the lock. A lock merge conflict is resolved by re-locking (`.gitattributes` marks it `merge=binary`).
 
-`helao_pinned_<platform>.yml` and `requirements_pinned_<platform>.txt` are the exact-version variants of the dev yml and `requirements.txt`; the setup and update scripts do not read them. Regenerate them with:
-
-    python repin_envs.py            # report only
-    python repin_envs.py --write    # rewrite the pinned files
+If the checkout is on a `noexec` mount, run `pixi config set --global detached-environments true` once before `setup_env`; pixi then keeps the env under `~/.cache` instead of `.helao-env/.pixi`.
 
 Private deployments may ship their own env files and setup scripts; see each deployment's readme.
 
@@ -57,7 +54,7 @@ Each folder under `helao/deploy/` is a deployment: configs, server folders, driv
 - **Missing `hte`:** cloned from `https://github.com/High-Throughput-Experimentation/helao-hte-deployment.git`. A run with no prefix clones it. A run whose config prefix is not found in any present deployment (an `hte` station config such as `eche10`) clones it, then looks the prefix up again. A no-argument `update_env` clones it before replaying the recorded station prefixes.
 - **`hte` is a git repo:** always pulled with `git pull --ff-only`, whatever the configs. Tracked files that are missing from the clone (for example after checking out an older parent commit) are restored first. If the pull fails (local edits in the way, a diverged branch, no network), the run stops only when a requested config uses `hte` or a prefix was not found; otherwise it warns and carries on.
 - **`hte` is a plain folder** (left over from a checkout made before the split): the new repo is cloned first. The old folder is then moved to `STATES/hte_leftover_<time>/`, and its file list is written to `STATES/hte_leftover_<time>.txt`. Nothing is deleted; remove the archive once you have copied out anything you need.
-- **Server packages:** when a station config uses `hte` servers, `setup_env <prefix>` installs the packages listed in those server folders' `environment.yml` / `requirements.txt`, like any other deployment.
+- **Server packages:** when a station config uses `hte` servers, `setup_env <prefix>` installs the packages listed in those server folders' `environment.yml` / `requirements.txt` (composed into the host's pixi workspace), like any other deployment.
 
 Any git failure leaves `helao/deploy/hte` as it was. To install `hte` by hand, move a leftover folder aside, then run:
 
@@ -80,16 +77,17 @@ See the launch section of [CLAUDE.md](CLAUDE.md) for the flags, and for what hap
 
 | file name | file description |
 | --- | --- |
-| helao.bat / helao.sh | activate the `helao` conda env and run `python launch.py` with args |
+| helao.bat / helao.sh | activate the `helao` env (`activate_helao.*`) and run `python launch.py` with args |
+| activate_helao.bat / activate_helao.sh | the one activation: `pixi shell-hook` on `.helao-env/`, or a conda `helao` env during the move |
 | launch.bat | windows: run `python launch.py` with args in the active env, no activation |
 | launch.py | main launcher script, requires config prefix or config path as first argument |
-| setup_env.bat / setup_env.sh | create the `helao` env if missing, install `requirements.txt` with uv, set `PYTHONPATH` and `HELAOLAUNCH` |
-| update_env.bat / update_env.sh | as `setup_env`, plus `conda env update` from the yml (adds `uv` to an older env) |
-| repin_envs.py | regenerate the pinned yml and requirements files from fresh solves |
+| setup_env.bat / setup_env.sh | install pixi if missing, create `.helao-env/`, compose station packages, `pixi install` |
+| update_env.bat / update_env.sh | `setup_env` in update mode (replays recorded prefixes) |
+| pixi.toml / pixi.lock | base packages and their pins for linux-64 and win-64 |
 | update.bat / update.sh | **discards uncommitted changes to tracked files** in `helao-async` (`git reset --hard`), then pulls; `update.bat` resets and pulls every nested deployment repo; `update.sh` pulls them; `test` and `base` are tracked here and skipped; a deployment folder without `.git` is skipped with a message |
 | switch.bat / switch.sh | **force-deletes the local `unstable` and re-creates it from the remote first** (unpushed commits on it are lost), then switches `helao-async` and every nested deployment repo to a branch; nested repos fall back to their default branch, `helao-async` does not; `switch <deploy-folder> <branch>` switches one nested repo |
 | reset_unstable.bat | windows: re-create the local `unstable` from the remote; **discards uncommitted changes and unpushed `unstable` commits** |
-| hipy.bat | windows: activate `helao`, set `PYTHONPATH`, start ipython |
+| hipy.bat | windows: activate the helao env, start ipython |
 
 ## Upgrading a station across the `hte` split (2026-11)
 

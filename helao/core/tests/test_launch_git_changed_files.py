@@ -3,7 +3,7 @@
 ``git diff --name-only`` collapses a rename into the new path alone, so a server
 that loaded ``a.py`` was never restarted after ``a.py`` moved into a subfolder.
 
-Run:  conda run -n helao python -m pytest helao/core/tests/test_launch_git_changed_files.py
+Run:  python -m pytest helao/core/tests/test_launch_git_changed_files.py
 """
 
 import os

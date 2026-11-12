@@ -1,6 +1,6 @@
 """Standalone tests for the data_browser package. No pytest; run with:
 
-    PYTHONPATH=/mnt/STORAGE/repos/helao/helao-async conda run -n helao \
+    PYTHONPATH=/mnt/STORAGE/repos/helao/helao-async \
         python -m helao.deploy.test.tests.test_data_browser
 """
 

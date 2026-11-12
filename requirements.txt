@@ -1,8 +1,0 @@
-nidaqmx
-pydasher
-pyft232
-uuid7
-reflex
-xy[reflex]
-# PyPI, not conda-forge: the conda-forge package hard-requires aiohttp
-pymodbus

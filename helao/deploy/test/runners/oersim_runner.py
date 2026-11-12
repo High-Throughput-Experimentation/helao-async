@@ -45,7 +45,7 @@ Prerequisites
 
 Run::
 
-    conda run -n helao python -m helao.deploy.test.runners.oersim_runner
+    python -m helao.deploy.test.runners.oersim_runner
 """
 
 from __future__ import annotations

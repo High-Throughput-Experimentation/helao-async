@@ -1,0 +1,104 @@
+[workspace]
+name = "helao"
+channels = ["conda-forge"]
+platforms = [
+    "linux-64",
+    "win-64",
+    { name = "linux-64-cuda", platform = "linux-64", cuda = "12.9" },
+]
+requires-pixi = ">=0.84.2"
+
+[dependencies]
+aiofiles = "*"
+anyio = "*"
+anywidget = "*"
+asyncua = "*"
+black = "*"
+bokeh = "3.*"
+boto3 = "*"
+botocore = "*"
+colorama = "*"
+colorlog = "*"
+docformatter = "*"
+fastapi = "*"
+filelock = "*"
+fsspec = "*"
+git = "*"
+h5py = "*"
+httpx = "*"
+ipykernel = "*"
+ipympl = "*"
+ipywidgets = "*"
+itables = "*"
+joblib = "*"
+jupyterlab = "*"
+matplotlib = "*"
+mendeleev = "*"
+mpltern = "*"
+msgspec = "*"
+nodejs = ">=22.12"
+ntplib = "*"
+numpy = "*"
+orjson = "*"
+pandas = "*"
+panel = "*"
+pip = "*"
+plotly = "*"
+psutil = "*"
+psycopg2 = "*"
+pyaml = "*"
+pyarrow = "*"
+pydantic = "*"
+pydantic-core = "*"
+pydantic-settings = "*"
+pyfiglet = ">=1"
+pyftdi = "*"
+pylablib = "*"
+pyright = "*"
+pyserial = "*"
+pytest-asyncio = "*"
+pytest-xdist = "*"
+python = "3.14.*"
+python-dotenv = "*"
+pyusb = "*"
+pyvisa = "*"
+pyvisa-py = "*"
+pyzmq = "*"
+pyzstd = "*"
+requests = "*"
+"ruamel.yaml" = "*"
+scikit-learn = "*"
+scipy = "*"
+setuptools = "<82"
+shortuuid = "*"
+sqlalchemy = "*"
+starlette = "*"
+statsmodels = "*"
+tomli-w = "*"
+tqdm = "*"
+uv = "*"
+uvicorn = "*"
+websockets = "*"
+zeromq = "*"
+
+[target.win-64.dependencies]
+comtypes = "*"
+
+[pypi-dependencies]
+nidaqmx = "*"
+pydasher = "*"
+pyft232 = "*"
+uuid7 = "*"
+# PyPI, not conda-forge: the conda-forge package hard-requires aiohttp, which
+# (with aiodns) broke station self-resolution. helao uses httpx only.
+pymodbus = "*"
+reflex = "*"
+xy = { version = "==0.0.8", extras = ["reflex"] }
+
+[target.linux-64.activation.env]
+PYTHONPATH = "$PIXI_PROJECT_ROOT"
+HELAOLAUNCH = "$PIXI_PROJECT_ROOT/helao.sh"
+
+[target.win-64.activation.env]
+PYTHONPATH = "%PIXI_PROJECT_ROOT%"
+HELAOLAUNCH = "%PIXI_PROJECT_ROOT%\\helao.bat"

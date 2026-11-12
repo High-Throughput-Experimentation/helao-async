@@ -7,7 +7,7 @@ Gamry; the teardown then had to kill the fresh process again. ``watch_until``
 ends the watcher loop on the teardown event, and ``guarded_restart`` refuses a
 restart before it starts and before it relaunches.
 
-Run:  conda run -n helao python -m pytest helao/core/tests/test_launch_hotreload_teardown.py
+Run:  python -m pytest helao/core/tests/test_launch_hotreload_teardown.py
 """
 
 import ast

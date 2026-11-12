@@ -1,6 +1,6 @@
 @echo off
 setlocal enabledelayedexpansion
-call conda activate helao
+call "%~dp0activate_helao.bat"
 
 if "%~1"=="" (
     echo usage: switch.bat ^<branch^>

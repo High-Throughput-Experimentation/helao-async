@@ -1,6 +1,6 @@
 # ty (Astral type checker) configuration.
-# Interpreter/deps are auto-detected from the active `helao` conda env
-# (run via `conda run -n helao ty check` or with the env activated).
+# Interpreter/deps are auto-detected from the active `helao` env
+# (run `ty check` with the env activated).
 # This repo's authoritative type checker is pyright (see pyrightconfig.json);
 # ty is used as a secondary, stricter pass.
 
