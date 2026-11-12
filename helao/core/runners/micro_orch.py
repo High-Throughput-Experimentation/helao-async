@@ -977,7 +977,7 @@ class MicroOrch:
         off from, unlike the orchestrator's ``move_dir``), so an unreachable
         SYNC must not abort the caller: ``yml_finisher`` only catches
         ``asyncio.TimeoutError`` internally, so a connection failure
-        (``aiohttp.ClientConnectorError`` and friends) would otherwise
+        (``httpx.ConnectError`` and friends) would otherwise
         propagate out of an already-written, already-finished record and
         crash ``run_experiment``/``run_sequence`` before it's loaded or
         tracked. Caught, logged, and swallowed instead; the yml stays on disk

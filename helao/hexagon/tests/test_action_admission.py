@@ -414,13 +414,13 @@ async def test_d_a_handler_error_over_rpc_does_not_fall_back_to_http(monkeypatch
         raise ValueError("driver fell over")
 
     posts = []
-    real_post = dispatcher.aiohttp.ClientSession.post
+    real_post = dispatcher.httpx.AsyncClient.post
 
     def _spy(self, *a, **kw):
         posts.append(1)
         return real_post(self, *a, **kw)
 
-    monkeypatch.setattr(dispatcher.aiohttp.ClientSession, "post", _spy)
+    monkeypatch.setattr(dispatcher.httpx.AsyncClient, "post", _spy)
     async with _serve_http_and_rpc(host) as (world, act):
         response, code = await dispatcher.async_action_dispatcher(
             world, act, params={}, timeout=5
@@ -915,32 +915,14 @@ async def test_h_a_real_rpc_call_carries_its_dispatch_id_to_admission():
 @pytest.mark.asyncio
 async def test_h_the_dispatcher_puts_one_id_on_both_copies(monkeypatch):
     seen = {}
+    real_client = dispatcher.httpx.AsyncClient
 
-    class _Resp:
-        status = 200
+    def _handler(request):
+        seen["headers"] = request.headers.get("X-Helao-Dispatch-Id")
+        return dispatcher.httpx.Response(200, json={})
 
-        async def json(self, **kw):
-            return {}
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *a):
-            return False
-
-    class _Session:
-        def __init__(self, *a, **kw):
-            pass
-
-        def post(self, url, **kw):
-            seen["headers"] = kw["headers"]
-            return _Resp()
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *a):
-            return False
+    def _client(*a, **kw):
+        return real_client(*a, transport=dispatcher.httpx.MockTransport(_handler), **kw)
 
     async def _no_rpc(*a, dispatch_id=None, **kw):
         seen["rpc_id"] = dispatch_id
@@ -953,13 +935,13 @@ async def test_h_the_dispatcher_puts_one_id_on_both_copies(monkeypatch):
         return _Client()
 
     monkeypatch.setattr(dispatcher, "_get_rpc_client", _get)
-    monkeypatch.setattr(dispatcher.aiohttp, "ClientSession", _Session)
+    monkeypatch.setattr(dispatcher.httpx, "AsyncClient", _client)
     A = Action(action_uuid=uuidlib.uuid4(), action_name="slow")
     A.action_server = MachineModel(server_name="SIM", machine_name="m")
     world = {"servers": {"SIM": {"host": "127.0.0.1", "port": 1}}}
     await dispatcher.async_action_dispatcher(world, A)
     first = seen["rpc_id"]
-    assert first and seen["headers"] == {"X-Helao-Dispatch-Id": first}
+    assert first and seen["headers"] == first
     await dispatcher.async_action_dispatcher(world, A)
     assert seen["rpc_id"] != first, "two sends shared a dispatch id"
 

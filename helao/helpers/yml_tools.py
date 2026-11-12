@@ -12,7 +12,7 @@ from io import StringIO
 from pathlib import Path
 from typing import Optional, Union
 
-import aiohttp
+import httpx
 import ruamel.yaml
 from ruamel.yaml.representer import RepresenterError
 
@@ -220,22 +220,22 @@ async def yml_finisher(yml_path: str, sync_config: dict = {}, retry: int = 3) ->
 
     req_params = {"yml_path": yml_path}
     req_url = f"http://{dbp_host}:{dbp_port}/finish_yml"
-    # The OS resolver, not aiohttp's aiodns one: see os_resolver_connector.
-    from helao.helpers.dispatcher import os_resolver_connector
+    # Local import, as before: keeps zmq/RPC out of this module's load.
+    from helao.helpers.dispatcher import _client_kwargs
 
-    async with aiohttp.ClientSession(connector=os_resolver_connector()) as session:
+    # aiohttp's old defaults (300 s total, 30 s connect).
+    timeout = httpx.Timeout(300, connect=30)
+    async with httpx.AsyncClient(**_client_kwargs(timeout)) as session:
         for i in range(retry):
             try:
-                async with session.post(req_url, params=req_params) as resp:
-                    if resp.status == 200:
-                        LOGGER.info(f"Finished {yml_type}: {yml_path}.")
-                        return True
-                    else:
-                        LOGGER.info(
-                            f"Retry [{i}/{retry}] finish {yml_type} {yml_path}."
-                        )
-                        await asyncio.sleep(1)
-            except asyncio.TimeoutError:
+                resp = await session.post(req_url, params=req_params)
+                if resp.status_code == 200:
+                    LOGGER.info(f"Finished {yml_type}: {yml_path}.")
+                    return True
+                else:
+                    LOGGER.info(f"Retry [{i}/{retry}] finish {yml_type} {yml_path}.")
+                    await asyncio.sleep(1)
+            except httpx.TimeoutException:
                 continue
         LOGGER.info(f"Could not finish {yml_path} after {retry} tries.")
         return False
