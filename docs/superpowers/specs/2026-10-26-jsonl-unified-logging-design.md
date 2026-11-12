@@ -43,8 +43,12 @@ file larger. There is no byte backstop; add one if a real station's files exceed
  "msg": "...", "exc": "Traceback (most recent call last): ..."}
 ```
 
-- `ts`: UTC, ISO-8601, microseconds, `Z` suffix, with the cached NTP offset applied (as
-  `NtpOffsetFormatter` does today). `pd.to_datetime` parses it to `datetime64[ns, UTC]`.
+- `ts`: ISO-8601, microseconds, with the cached NTP offset applied (as
+  `NtpOffsetFormatter` does today). `pd.to_datetime(utc=True)` parses it to
+  `datetime64[ns, UTC]`. **Amended 2026-11-12:** local time with its UTC offset
+  (`2026-11-12T14:18:53.097123-08:00`) instead of UTC with a `Z` suffix, because
+  operators read the station's clock. Files written before then still hold `Z`
+  stamps, so readers must parse the stamp and never compare the strings.
 - `server`: the process's server key, set once with `helao_logging.set_server_key` (the
   launcher's own process is `launch`). Before a process has set one, the logger name stands in.
 - `logger`: the record's logger name (`record.name`), e.g. `dispatcher` or `api`. Records written

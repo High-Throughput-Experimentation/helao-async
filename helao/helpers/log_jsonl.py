@@ -96,9 +96,13 @@ def record_to_json(
     # is set after import (a module-level read would freeze None)
     from helao.helpers import helao_logging
 
+    # Local time with its UTC offset (2026-11-12T14:18:53.097123-08:00): what
+    # an operator reads is the station's clock, and the offset keeps the stamp
+    # unambiguous. Records before 2026-11-12 carry UTC "...Z"; every reader
+    # parses the stamp rather than comparing strings.
     ts = datetime.fromtimestamp(record.created + offset_seconds, tz=timezone.utc)
     doc = {
-        "ts": ts.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+        "ts": ts.astimezone().isoformat(timespec="microseconds"),
         "level": record.levelname,
         "server": _clean(helao_logging.SERVER_KEY or record.name),
         "logger": _clean(record.name),

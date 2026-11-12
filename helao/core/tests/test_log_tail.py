@@ -278,7 +278,8 @@ def test_non_str_fields_do_not_raise():
     merged = log_tail.merge([], recs, 10)
     assert len(merged) == 2
     assert len(log_tail.filter_records(merged, None, "INFO", "42")) == 1
-    assert log_tail.to_rows(merged)[0][0] == "5"
+    # An unparsable stamp sorts as oldest and is shown raw.
+    assert log_tail.to_rows(merged)[-1][0] == "5"
 
 
 def test_rotated_tail_is_capped_with_a_note(tmp_path, monkeypatch):
@@ -340,3 +341,15 @@ def test_text_search_matches_the_logger_name():
     ]
     got = log_tail.filter_records(recs, None, "INFO", "DISPATCH")
     assert [r["logger"] for r in got] == ["dispatcher"]
+
+
+def test_old_utc_and_new_local_stamps_sort_by_instant():
+    """Logs written before 2026-11-12 stamp UTC "...Z", later ones local time
+    with an offset; as strings they do not sort by time."""
+    base = {"level": "INFO", "server": "A", "pid": 1, "msg": "m"}
+    # As strings "T13" sorts before "T20", but 13:00-08:00 is 21:00Z.
+    older = {**base, "seq": 1, "ts": "2026-11-12T20:00:00.000000Z"}
+    newer = {**base, "seq": 2, "ts": "2026-11-12T13:00:00.000000-08:00"}
+    merged = log_tail.merge([], [newer, older], 10)
+    assert [r["seq"] for r in merged] == [1, 2]
+    assert log_tail.to_rows(merged)[0][0] == "2026-11-12T21:00:00.000000+00:00"

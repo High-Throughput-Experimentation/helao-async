@@ -143,7 +143,7 @@ class LogsState(rx.State):
     min_level: str = "INFO"
     text: str = ""
     paused: bool = False
-    local_time: bool = False
+    local_time: bool = True
 
     @rx.event(background=True)
     async def start(self):

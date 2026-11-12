@@ -14,6 +14,7 @@ class FakeState:
         self._all, self._frozen, self._cursors, self._busy = (), (), (), False
         self.rows, self.servers, self.selected = [], [], []
         self.min_level, self.text, self.paused = "INFO", "", False
+        self.local_time = True
         self.entered = 0
 
     async def __aenter__(self):
