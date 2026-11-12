@@ -9,9 +9,7 @@ platforms = [
 requires-pixi = ">=0.84.2"
 
 [dependencies]
-aioboto3 = "*"
 aiofiles = "*"
-aiohttp = "*"
 anyio = "*"
 anywidget = "*"
 asyncua = "*"
@@ -56,7 +54,6 @@ pydantic-settings = "*"
 pyfiglet = ">=1"
 pyftdi = "*"
 pylablib = "*"
-pymodbus = "*"
 pyright = "*"
 pyserial = "*"
 pytest-asyncio = "*"
@@ -70,7 +67,6 @@ pyzmq = "*"
 pyzstd = "*"
 requests = "*"
 "ruamel.yaml" = "*"
-s3fs = "*"
 scikit-learn = "*"
 scipy = "*"
 setuptools = "<82"
@@ -93,6 +89,9 @@ nidaqmx = "*"
 pydasher = "*"
 pyft232 = "*"
 uuid7 = "*"
+# PyPI, not conda-forge: the conda-forge package hard-requires aiohttp, which
+# (with aiodns) broke station self-resolution. helao uses httpx only.
+pymodbus = "*"
 reflex = "*"
 xy = { version = "==0.0.8", extras = ["reflex"] }
 
