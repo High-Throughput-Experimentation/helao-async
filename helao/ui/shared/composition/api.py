@@ -14,6 +14,7 @@ network round-trip in the import graph of every module that imports this one.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import threading
 
@@ -66,6 +67,16 @@ def get_client():
                 creds.openapi_json_url, api_key=creds.OPENAPI_KEY
             )
         return _CLIENT
+
+
+async def aget_client():
+    """:func:`get_client` from a worker thread.
+
+    The first call builds the client, and building it fetches the OpenAPI spec
+    with a blocking request (up to 30 s); from an event handler that would
+    stall every other session on the server.
+    """
+    return await asyncio.to_thread(get_client)
 
 
 def reset_client() -> None:

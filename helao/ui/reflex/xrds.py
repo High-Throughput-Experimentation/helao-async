@@ -9,11 +9,13 @@ picks the original or background-subtracted pattern. No element grouping.
 
 from __future__ import annotations
 
+import asyncio
 from typing import ClassVar
 
 import reflex as rx
 
 from helao.helpers import helao_logging as logging
+from helao.ui.reflex.plate_photo import list_photos
 from helao.ui.reflex import spectra_page
 from helao.ui.reflex.composition import parse_plate_id, platemap_for
 from helao.ui.reflex.spectra_page import SpectraPageState
@@ -92,19 +94,20 @@ class XrdsState(SpectraPageState, rx.State):
         async with self:
             self.status = f"finding plate {plate_id}'s XRD frames..."
         try:
-            records = await xrds.records_for_plate(api.get_client(), plate_id)
+            records = await xrds.records_for_plate((await api.aget_client()), plate_id)
         except Exception as exc:
             LOGGER.warning(f"xrds could not list plate {plate_id}: {exc}")
             async with self:
                 self.error = f"plate {plate_id} could not be listed: {exc}"
                 self.status = ""
             return
-        rows, note = platemap_for(plate_id)
+        rows, note = await asyncio.to_thread(platemap_for, plate_id)
+        photos_found = await asyncio.to_thread(list_photos, plate_id)
         async with self:
             self._records = records
             self._pm_rows = rows
             self.platemap_note = note
-            self._load_photos(plate_id)
+            self._load_photos(plate_id, photos_found)
             self.run_use_options = grouping.run_use_options(records)
             self.run_use_choice = (
                 DEFAULT_RUN_USE
@@ -136,7 +139,7 @@ class XrdsState(SpectraPageState, rx.State):
             self.status = f"loading {len(chosen)} patterns..."
         # Each record is fetched by its own file type (`spectra.load_spectra`);
         # this is only the fallback for a record that carries none.
-        await self._load_and_draw(chosen, api.get_client(), file_types[0])
+        await self._load_and_draw(chosen, (await api.aget_client()), file_types[0])
 
 
 def build_page():
