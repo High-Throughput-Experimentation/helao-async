@@ -220,7 +220,10 @@ async def yml_finisher(yml_path: str, sync_config: dict = {}, retry: int = 3) ->
 
     req_params = {"yml_path": yml_path}
     req_url = f"http://{dbp_host}:{dbp_port}/finish_yml"
-    async with aiohttp.ClientSession() as session:
+    # The OS resolver, not aiohttp's aiodns one: see os_resolver_connector.
+    from helao.helpers.dispatcher import os_resolver_connector
+
+    async with aiohttp.ClientSession(connector=os_resolver_connector()) as session:
         for i in range(retry):
             try:
                 async with session.post(req_url, params=req_params) as resp:
