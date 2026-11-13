@@ -18,6 +18,7 @@ dependencies:
   - filelock
   - fsspec
   - git
+  - greenlet
   - h5py
   - httpx
   - ipykernel
