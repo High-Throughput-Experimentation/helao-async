@@ -347,3 +347,143 @@ def build_snapshot(
         "actions": action_rows(orch, first_seen, queued_cache),
         "events": list(events),
     }
+
+
+def _runner_action_row(m, a) -> dict:
+    """One action row of a runner's ACT strip."""
+    u = a.action_uuid
+    if u in m.active_actions():
+        state = "active"
+    else:
+        dump = m.latest(u)
+        if dump is not None:
+            state = _item_state(dump.get("action_status"))
+            state = "done" if state == "active" else state
+        elif u in m.t_dispatch:
+            state = "done"
+        else:
+            state = "queued"
+    return {
+        "uuid": str(u) if u else None,
+        "name": a.action_name,
+        "server": a.action_server.server_name,
+        "state": state,
+        "t_start": m.t_dispatch.get(u),
+        "t_end": m.t_finish.get(u),
+    }
+
+
+def _runner_server_rows(m) -> list:
+    servers = m.world_cfg.get("servers") or {}
+    active: dict = {}
+    for server, name, _nb in m.active_actions().values():
+        active.setdefault(server, name)
+    rows = []
+    for key in sorted(set(m.subscribed()) | set(active)):
+        if m.server_estop.get(key):
+            status = "estop"
+        elif key in active:
+            status = "busy"
+        elif m.finish_errors.get(key) in ERROR_STATUSES:
+            status = "error"
+        else:
+            status = "idle"
+        cfg = servers.get(key) or {}
+        rows.append(
+            {
+                "key": key,
+                "status": status,
+                "active_action": active.get(key),
+                "host": cfg.get("host"),
+                "port": cfg.get("port"),
+            }
+        )
+    return rows
+
+
+def build_runner_snapshot(micro, *, seq_no: int, now: float, events: list) -> dict:
+    """One runner frame, shaped like :func:`build_snapshot`'s (spec D5)."""
+    m = micro
+    seq = m.active_sequence or m.last_sequence
+    done_all = list(m.finished_experiments)
+    done = done_all[-EXP_DONE_WINDOW:]
+    experiments = [
+        {
+            "uuid": str(e.experiment_uuid),
+            "name": e.experiment_name,
+            "state": "error" if _item_state(e.experiment_status) == "error" else "done",
+            "t_start": epoch(e.experiment_timestamp),
+            "t_end": epoch(e.experiment_finished_timestamp),
+            "qidx": None,
+        }
+        for e in done
+    ]
+    exp = m.active_experiment
+    if exp is not None:
+        experiments.append(
+            {
+                "uuid": str(exp.experiment_uuid),
+                "name": exp.experiment_name,
+                "state": "active",
+                "t_start": epoch(exp.experiment_timestamp),
+                "t_end": None,
+                "qidx": None,
+            }
+        )
+    queued = list(m.queued_experiments)
+    experiments += [
+        {
+            "uuid": None,
+            "name": p.experiment_name,
+            "state": "queued",
+            "t_start": None,
+            "t_end": None,
+            "qidx": i,
+        }
+        for i, p in enumerate(queued[:EXP_QUEUED_WINDOW])
+    ]
+    act_exp = m.active_experiment or m.last_experiment
+    servers = _runner_server_rows(m)
+    running = (
+        bool(m.active_actions())
+        or m.active_experiment is not None
+        or m.active_sequence is not None
+    )
+    if any(r["status"] == "estop" for r in servers):
+        loop_state, orch_state = "estopped", "estopped"
+    elif running:
+        loop_state, orch_state = "started", "busy"
+    else:
+        loop_state, orch_state = "stopped", "idle"
+    return {
+        "seq_no": seq_no,
+        "t": now,
+        "orch_state": orch_state,
+        "loop_state": loop_state,
+        "loop_intent": "none",
+        "closing_out": False,
+        "n_sequences_queued": 0,
+        "seq": (
+            {
+                "uuid": str(seq.sequence_uuid),
+                "name": seq.sequence_name,
+                "label": seq.sequence_label,
+                "t_start": epoch(seq.sequence_timestamp),
+                "finished": m.active_sequence is None,
+                "ended": _seq_ended(seq, m.active_sequence is None),
+            }
+            if seq is not None
+            else None
+        ),
+        "orch_action": None,
+        "servers": servers,
+        "experiments": experiments,
+        "n_done": len(done_all) - len(done),
+        "n_queued": max(0, len(queued) - EXP_QUEUED_WINDOW),
+        "act_exp": str(act_exp.experiment_uuid) if act_exp is not None else None,
+        "actions": [_runner_action_row(m, a) for a in m.planned_actions],
+        "events": list(events),
+        "kind": "runner",
+        "instance": m.instance,
+        "config": m.feed_config(),
+    }
