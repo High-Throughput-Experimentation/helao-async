@@ -1096,7 +1096,10 @@ class GroupState(rx.State):
                 err = str(exc)
         async with self:
             self.action_error = err
-            if err or kind == "runner":
+            if kind == "runner":
+                if self.pending == name:  # a newer press keeps its spinner
+                    self.pending = ""
+            elif err:
                 self.pending = ""
 
     def _hover_strip(self, which: int, payload: dict) -> None:

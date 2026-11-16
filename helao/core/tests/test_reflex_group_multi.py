@@ -595,3 +595,17 @@ def test_clicking_a_server_row_that_is_also_a_peer_shows_server_info(
     _click(s, None, "ORCH")
     assert s.selected_feed == "R1"  # no view switch
     assert s._info_node == "ORCH" and "go — idle" in s.tree_html
+
+
+def test_a_runner_press_does_not_clear_a_newer_presss_pending(monkeypatch, fresh):
+    fresh.post("R1", _two_runner_frame())
+    s = _control_state()
+    s.selected_feed = "R1"
+
+    async def fake(server, host, port, path, params_dict=None, json_dict=None, **kw):
+        s.pending = "clear_estop"  # a newer press lands while this one is in flight
+        return {}, ErrorCodes.none
+
+    monkeypatch.setattr(group, "async_private_dispatcher", fake)
+    asyncio.run(group.GroupState.control.fn(s, "estop"))
+    assert s.pending == "clear_estop"
