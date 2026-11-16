@@ -40,6 +40,7 @@ class PushIngest:
         self.status.last_epoch = now
         self.status.state = "live"
         self.last_frame_at = now
+        self.ended = False
 
     def end(self) -> None:
         """Deregistered: read as lost at once."""

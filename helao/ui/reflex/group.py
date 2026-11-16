@@ -423,6 +423,8 @@ def _color_key(status: str) -> str:
 def build_graph(snap: dict, orch_key: str, lost: bool, peers=()) -> NetGraph:
     """The network graph for one snapshot: nodes and edges."""
     servers = snap.get("servers", [])
+    own = {s["key"] for s in servers}
+    peers = [(k, st) for k, st in peers if k not in own]  # a server row wins
     pos = group_layout(orch_key, [s["key"] for s in servers], [k for k, _ in peers])
     g = NetGraph(
         height_px=GRAPH_H,
@@ -619,6 +621,8 @@ async def _runner_estop(snap: dict, switch: bool) -> list:
                 f"{r['key']}/estop",
                 params_dict={"switch": switch},
                 json_dict={},
+                timeout=5,
+                retries=1,
             )
         except Exception as exc:
             return f"{r['key']}: {exc}"
@@ -1183,7 +1187,12 @@ class GroupState(rx.State):
         if not isinstance(node, str) or not node:
             return
         async with self:
-            if node != resolve_key(self.selected_feed) and feed_kind(node):
+            rows = (self._snap[0] if self._snap else {}).get("servers", [])
+            if (
+                node != resolve_key(self.selected_feed)
+                and feed_kind(node)
+                and not any(r["key"] == node for r in rows)
+            ):
                 # a peer node: view it, and mark the feed seen so the next tick's
                 # follow_feed does not reset the view again
                 switch_view(self)
@@ -1201,7 +1210,9 @@ class GroupState(rx.State):
         async with self:
             snap = self._snap[0] if self._snap else {}
         row = next((r for r in snap.get("servers", []) if r["key"] == node), {})
-        if feed_kind(node) == "runner":
+        if row:  # a server row of the current snap wins over a same-named feed
+            info = server_info(*await _server_cfg_and_status(node, row, servers))
+        elif feed_kind(node) == "runner":
             info = config_info((latest_frame(feed_for(node)) or {}).get("config") or {})
         elif node in ORCHS:
             info = config_info(servers.get(node) or {})

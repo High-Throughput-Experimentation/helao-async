@@ -79,3 +79,13 @@ def test_silent_runner_goes_lost_then_removed():
 def test_bad_body_is_400():
     _, c, _ = rig()
     assert c.post("/runners/R1/frame", json={"kind": "runner"}).status_code == 400
+
+
+def test_repost_after_delete_revives_the_entry_and_keeps_the_key():
+    reg, c, clock = rig()
+    c.post("/runners/R1/frame", json=frame("a"))
+    c.delete("/runners/R1", params={"instance": "a"})
+    clock.t += 1
+    assert c.post("/runners/R1/frame", json=frame("a")).status_code == 200
+    assert not reg.get("R1").ended and not reg.get("R1").lost(clock.t)
+    assert c.post("/runners/R1/frame", json=frame("b")).status_code == 409

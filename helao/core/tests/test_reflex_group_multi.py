@@ -101,7 +101,8 @@ def test_peer_rows_status(fresh):
 def test_runner_estop_calls_every_server_and_latches(monkeypatch, fresh):
     calls = []
 
-    async def fake(server, host, port, path, params_dict=None, json_dict=None):
+    async def fake(server, host, port, path, params_dict=None, json_dict=None, **kw):
+        assert kw == {"timeout": 5, "retries": 1}  # a dead server must not stall E-stop
         calls.append((server, path, params_dict))
         return {}, group.ErrorCodes.none
 
@@ -221,7 +222,7 @@ def _runner_control(monkeypatch, fresh, name, fail=(), frame_=None):
     fresh.post("R1", frame_ or _two_runner_frame())
     calls = []
 
-    async def fake(server, host, port, path, params_dict=None, json_dict=None):
+    async def fake(server, host, port, path, params_dict=None, json_dict=None, **kw):
         calls.append(server)
         return {}, (ErrorCodes.http if server in fail else ErrorCodes.none)
 
@@ -552,3 +553,45 @@ def test_a_tick_during_the_fetch_does_not_queue_a_second_one(monkeypatch, fresh)
 
     assert asyncio.run(go()) is None
     assert calls.count("get_status") == 1
+
+
+# ---- final fix pass ----------------------------------------------------------
+
+
+def _orch_row_frame():
+    return runner_frame(
+        servers=[
+            {"key": "ORCH", "status": "busy", "active_action": "wait"},
+            {"key": "SIM", "status": "idle"},
+        ]
+    )
+
+
+def test_a_server_row_wins_over_a_same_named_peer():
+    from helao.ui.shared.palette import GROUP_STATE_COLORS as C
+
+    snap = _orch_row_frame()
+    plain = group.build_graph(snap, "R1", False)
+    g = group.build_graph(snap, "R1", False, peers=[("ORCH", "idle")])
+    n = g.nodes["ORCH"]
+    assert n.color == C["busy"] and n.subtext == "wait"
+    assert (n.x, n.y) == (plain.nodes["ORCH"].x, plain.nodes["ORCH"].y)
+    assert any("ORCH" in (e.src, e.dst) for e in g.edges.values())
+
+
+def test_clicking_a_server_row_that_is_also_a_peer_shows_server_info(
+    monkeypatch, fresh
+):
+    fresh.clock = time_now
+    f = _orch_row_frame()
+    fresh.post("R1", f)
+    s = _bound(selected_feed="R1", _snap=(f,))
+    status = {"endpoints": {"go": {"active_dict": {}, "nonactive_dict": {}}}}
+
+    async def fake(server, host, port, path, params_dict=None, json_dict=None, **kw):
+        return status, ErrorCodes.none
+
+    monkeypatch.setattr(group, "async_private_dispatcher", fake)
+    _click(s, None, "ORCH")
+    assert s.selected_feed == "R1"  # no view switch
+    assert s._info_node == "ORCH" and "go — idle" in s.tree_html
