@@ -724,6 +724,7 @@ def _control_state():
         action_error="",
         _pending_at=0.0,
         _unconfirmed="",
+        selected_feed="",
     )
 
 

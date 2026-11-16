@@ -762,15 +762,24 @@ def reset_for_mount(s) -> None:
     s.graph_pulses = {"view": PULSE_VIEW, "seq": s._pulse_seq, "items": []}
 
 
+def switch_view(s) -> None:
+    """Every view change resets like a fresh page load: nothing of the old feed stays."""
+    reset_for_mount(s)
+    s._snap = ()
+    s._selected = ()
+    s.info_note = ""
+    s.tree_header, s.tree_html = TREE_EMPTY_HEADER, ""
+
+
 def follow_feed(s, feed) -> None:
-    """Restart the page's cursor when the viewed feed object was replaced.
+    """Reset the page when the viewed feed object was replaced.
 
     A new runner instance on a key gets a new ingest whose ``n_batches`` restarts
     at 1, so a cursor left ahead of it would stall the page.
     """
     if id(feed) != s._feed_id:
         s._feed_id = id(feed)
-        reset_for_mount(s)
+        switch_view(s)
 
 
 def apply_tick(s, feed, now: float, token: str, key=None, peers=()) -> bool:
@@ -831,7 +840,10 @@ def apply_tick(s, feed, now: float, token: str, key=None, peers=()) -> bool:
             setattr(s, name, value)
         s.lost = lost
         s.banner = (OLD_ORCH_BANNER if s._old_orch else LOST_BANNER) if lost else ""
-        if s.pending and pending_done(s.pending, snap):
+        # A runner's pending ends when ``control``'s HTTP calls return, not on a frame.
+        if kind == "runner":
+            pass
+        elif s.pending and pending_done(s.pending, snap):
             s.pending = ""
         elif s.pending and now - s._pending_at > PENDING_TIMEOUT_S:
             s.action_error = f"{s.pending} not confirmed by the orchestrator"
@@ -960,7 +972,7 @@ class GroupState(rx.State):
                 key = resolve_key(self.selected_feed)
                 if key != self.selected_feed:
                     self.selected_feed = key
-                    reset_for_mount(self)
+                    switch_view(self)
                 self.selected_kind = feed_kind(key) or "orchestrator"
                 now = time.time()
                 options = [
@@ -996,10 +1008,7 @@ class GroupState(rx.State):
         if feed_kind(key) is None or key == self.selected_feed:
             return
         self.selected_feed = key
-        reset_for_mount(self)
-        self._selected = ()
-        self.info_note = ""
-        self.tree_header, self.tree_html = TREE_EMPTY_HEADER, ""
+        switch_view(self)
         return GroupState.tick("")
 
     @rx.event(background=True)
@@ -1010,7 +1019,7 @@ class GroupState(rx.State):
             self.action_error = ""
             self._unconfirmed = ""
             self._pending_at = time.time()
-            key = resolve_key(getattr(self, "selected_feed", ""))
+            key = resolve_key(self.selected_feed)
         kind = feed_kind(key)
         err = ""
         if not kind:

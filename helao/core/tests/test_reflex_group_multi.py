@@ -137,3 +137,127 @@ def test_replaced_runner_feed_resets_the_page_cursor(fresh):
     assert s._cursor == 57  # same object: untouched
     group.follow_feed(s, SimpleNamespace())  # a new object took the key
     assert s._cursor == -1
+
+
+# ---- fix round 1: view changes, runner pending, latch -----------------------
+
+from helao.core.tests.test_reflex_group import (  # noqa: E402
+    Feed,
+    _control_state,
+    _FakeState,
+    frame,
+    state,
+)
+from helao.core.error import ErrorCodes  # noqa: E402
+
+
+def _two_runner_frame(**kw):
+    f = runner_frame(**kw)
+    f["servers"] = [
+        *f["servers"],
+        {
+            "key": "SIM2",
+            "status": "idle",
+            "active_action": None,
+            "host": "h",
+            "port": 4,
+        },
+    ]
+    return f
+
+
+def _tick_state():
+    return _FakeState(
+        **vars(state()),
+        _feed_id=0,
+        _running=False,
+        selected_feed="",
+        selected_kind="orchestrator",
+        feed_options=[],
+        router=SimpleNamespace(session=SimpleNamespace(client_token="t")),
+        estopped=False,
+        can_clear_estop=False,
+    )
+
+
+def test_view_change_drops_the_previous_feeds_snapshot(monkeypatch):
+    orch, orch2 = Feed(), Feed()
+    orch.push(frame(1, orch_state="estopped", loop_state="estopped"), now=time_now())
+    monkeypatch.setattr(group, "_FEEDS", {"ORCH": orch, "ORCH2": orch2})
+    s = _tick_state()
+    asyncio.run(group.GroupState.tick.fn(s))
+    assert s.estopped is True and s._snap
+    s.selected_feed = "ORCH2"  # as set_feed / a dropdown change leaves it
+    asyncio.run(group.GroupState.tick.fn(s))
+    assert s._snap == () and s.estopped is False and s.can_clear_estop is False
+
+
+def time_now():
+    import time
+
+    return time.time()
+
+
+def test_runner_pending_is_not_retired_by_a_frame(fresh):
+    fresh.post("R1", runner_frame())
+    s = state()
+    s.pending, s._pending_at = "clear_estop", 0.0
+    group.apply_tick(s, fresh.get("R1"), 1000.5, "t", "R1")
+    assert s.pending == "clear_estop" and s.action_error == ""
+
+
+def test_latch_reads_as_estopped_when_the_frame_does_not(fresh):
+    fresh.post("R1", runner_frame())
+    s = state()
+    group.apply_tick(s, fresh.get("R1"), 1000.5, "t", "R1")
+    assert s.estopped is False and s.can_estop is True
+    group.ESTOP_LATCH["R1"] = True
+    s = state()
+    group.apply_tick(s, fresh.get("R1"), 1000.5, "t", "R1")
+    assert s.estopped is True and s.can_clear_estop is True
+
+
+def _runner_control(monkeypatch, fresh, name, fail=(), frame_=None):
+    fresh.post("R1", frame_ or _two_runner_frame())
+    calls = []
+
+    async def fake(server, host, port, path, params_dict=None, json_dict=None):
+        calls.append(server)
+        return {}, (ErrorCodes.http if server in fail else ErrorCodes.none)
+
+    monkeypatch.setattr(group, "async_private_dispatcher", fake)
+    s = _control_state()
+    s.selected_feed = "R1"
+    asyncio.run(group.GroupState.control.fn(s, name))
+    return s, calls
+
+
+def test_runner_estop_ok_sets_latch(monkeypatch, fresh):
+    s, calls = _runner_control(monkeypatch, fresh, "estop")
+    assert group.ESTOP_LATCH["R1"] is True and s.action_error == ""
+    assert s.pending == "" and sorted(calls) == ["SIM", "SIM2"]
+
+
+def test_runner_estop_failure_leaves_latch_and_names_server(monkeypatch, fresh):
+    s, _ = _runner_control(monkeypatch, fresh, "estop", fail=("SIM2",))
+    assert "R1" not in group.ESTOP_LATCH
+    assert "SIM2" in s.action_error and "SIM:" not in s.action_error
+    assert s.pending == ""
+
+
+def test_runner_clear_ok_resets_latch(monkeypatch, fresh):
+    group.ESTOP_LATCH["R1"] = True
+    _runner_control(monkeypatch, fresh, "clear_estop")
+    assert group.ESTOP_LATCH["R1"] is False
+
+
+def test_runner_start_is_refused(monkeypatch, fresh):
+    s, calls = _runner_control(monkeypatch, fresh, "start")
+    assert s.action_error == "start is not available for a runner" and calls == []
+
+
+def test_runner_estop_skips_rows_without_host_and_port(monkeypatch, fresh):
+    f = _two_runner_frame()
+    del f["servers"][1]["host"]
+    _, calls = _runner_control(monkeypatch, fresh, "estop", frame_=f)
+    assert calls == ["SIM"]
