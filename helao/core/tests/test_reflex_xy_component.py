@@ -1222,6 +1222,22 @@ console.log(JSON.stringify({ got }));
     assert out["got"] == [{"type": "node", "key": "B"}]
 
 
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_a_click_on_the_enlarged_hover_circle_selects_the_node():
+    out = _run_js(_JS_HOVER_ENV + """
+const got = [];
+const st = make();
+st.onSelect = (m) => got.push(m);
+st.setNodes(batch([node("A", 0, 0, "#112233")]));       // r 10, hover_r 18
+const click = (x, y) => (listeners.click || []).forEach((cb) => cb({ clientX: x + 10, clientY: y + 20 }));
+click(65, 50);                                          // 15 px out, not hovered: a miss
+move(55, 50); frame();                                  // hover A
+click(65, 50);                                          // 15 px out, on the drawn circle
+console.log(JSON.stringify({ got }));
+""")
+    assert out["got"] == [{"type": "node", "key": "A"}]
+
+
 def test_the_shim_opts_hover_in_only_when_nodes_is_passed():
     js = xc._SHIM_COMPONENT_JS
     assert "setNodes(nodes)" in js

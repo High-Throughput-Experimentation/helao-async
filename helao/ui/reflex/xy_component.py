@@ -659,7 +659,7 @@ export function createController(options) {
     if (!el || !st.nodesOn || !st.pulseView || !st.onSelect) return;
     const r = el.getBoundingClientRect();
     const hit = hitNode(st.nodes.items, st.pulseView, el.clientWidth, el.clientHeight,
-      e.clientX - r.left, e.clientY - r.top, null, st.nodes.hover_r);
+      e.clientX - r.left, e.clientY - r.top, st.hoverNode && st.hoverNode.key, st.nodes.hover_r);
     if (hit) st.onSelect({ type: "node", key: hit.key });
   };
 
