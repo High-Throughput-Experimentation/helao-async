@@ -381,7 +381,8 @@ def test_group_picks_the_same_orchestrator_as_remote_backend(group):
         }
     }
     group.configure_group(cfg)
-    assert group._CFG["orch_key"] == RemoteBackend._detect_orch_key(cfg) == "ORCH2"
+    assert list(group.ORCHS)[0] == RemoteBackend._detect_orch_key(cfg) == "ORCH2"
+    assert list(group.ORCHS) == ["ORCH2", "ORCH1"]
 
 
 # ---- pure helpers (as specified) ---------------------------------------------
@@ -786,7 +787,7 @@ def test_control_error_sets_action_error_and_clears_pending(group, monkeypatch):
     monkeypatch.setattr(group, "async_private_dispatcher", raises)
     asyncio.run(group.GroupState.control.fn(s, "stop"))
     assert s.action_error == "link down" and s.pending == ""
-    group._CFG.clear()
+    group.configure_group({"servers": {}})
     asyncio.run(group.GroupState.control.fn(s, "stop"))
     assert s.action_error == "cannot reach the orchestrator" and s.pending == ""
 

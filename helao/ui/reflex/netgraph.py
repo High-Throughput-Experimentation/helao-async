@@ -65,11 +65,16 @@ def bezier(pa, pb, n=CURVE_SAMPLES):
     return pts
 
 
-def group_layout(orch_key, server_keys):
-    """Orchestrator at (0, 0); servers sorted, alternating above/below.
+#: Peer (other orchestrator / runner) slots on the centre row.
+PEER_X = (-0.55, 0.55, -0.85, 0.85)
 
-    Up to 8 per row sit at y = +/-0.7, evenly spaced in x; above 8 a row splits
-    into two bands at +/-0.4 and +/-0.9.
+
+def group_layout(orch_key, server_keys, peer_keys=()):
+    """Orchestrator at (0, 0); servers sorted, alternating above/below; peers
+    on the centre row.
+
+    Up to 8 servers per row sit at y = +/-0.7, evenly spaced in x; above 8 a row
+    splits into two bands at +/-0.4 and +/-0.9.
     """
     keys = sorted(server_keys)
     pos = {orch_key: (0.0, 0.0)}
@@ -79,6 +84,9 @@ def group_layout(orch_key, server_keys):
             n = len(band)
             for i, key in enumerate(band):
                 pos[key] = (-0.9 + 1.8 * (i + 0.5) / n, sign * y)
+    # ponytail: 4 centre-row slots; a 5th+ peer overlaps one. Add a row when needed.
+    for i, key in enumerate(sorted(peer_keys)):
+        pos[key] = (PEER_X[i % len(PEER_X)], 0.0)
     return pos
 
 
