@@ -236,6 +236,12 @@ class MicroOrch:
             "prefinish_sequence_hooks", "sequence"
         )
         await self.dispatcher.serve(self.host, derive_rpc_port(self.port))
+        urls = self.feed_urls()
+        if urls:
+            from helao.core.runners.runner_feed import RunnerGraphFeed
+
+            self._feed = RunnerGraphFeed(self, urls)
+            self._feed_task = asyncio.create_task(self._feed.run())
 
     def _load_prefinish(self, key: str, level: str) -> HookSet:
         override = self._prefinish_overrides[key]
@@ -256,6 +262,16 @@ class MicroOrch:
         Errors raised while closing individual clients are logged and
         suppressed so all clients get a chance to close.
         """
+        if self._feed_task is not None:
+            self._feed_task.cancel()
+            try:
+                await self._feed_task
+            except asyncio.CancelledError:
+                pass
+            self._feed_task = None
+        if self._feed is not None:
+            await self._feed.close()
+            self._feed = None
         await self.dispatcher.close()
         clients = list(self._clients.values())
         self._clients.clear()
