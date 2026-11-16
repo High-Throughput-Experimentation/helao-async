@@ -148,6 +148,7 @@ from helao.ui.reflex.group import (
 )
 from helao.ui.reflex.state import make_panel_state
 from helao.ui.reflex.xy_component import make_buffer_router
+from helao.ui.reflex.runner_registry import REGISTRY as RUNNERS, make_runner_router
 
 LOGGER = logging.LOGGER or logging.make_logger(__file__)
 
@@ -695,6 +696,7 @@ def build_app(world_cfg: dict, server_key: str):
     # and `_api` is private.
     backend = FastAPI()
     backend.include_router(make_buffer_router(plots.STORE))
+    backend.include_router(make_runner_router(RUNNERS))
 
     # `App.style={":root": ...}` does *not* reach `<html>`: Reflex merges
     # `App.style` per-component (`_get_component_style` matches only on
