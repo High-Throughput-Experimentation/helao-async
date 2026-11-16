@@ -76,7 +76,9 @@ the same keys:
 - `n_sequences_queued`: `0` (a runner has no queue).
 - `seq`, `experiments`, `n_done`, `n_queued`, `act_exp`, `actions`: from the
   state above, with the same windows and row fields as the orchestrator
-  builders. `qidx` is always `None` (nothing on a runner is re-orderable).
+  builders. Queued experiment rows carry `qidx` = their index (the page's
+  row ordinals need it) but no uuid; the page never sends a queue fetch for a
+  runner, so such a row's info box says "not found".
 - `servers`: the servers the runner has attached to (`_subscribed`) plus any in
   `_pending_meta`, each row `{key, status, active_action, host, port}`. `host`
   and `port` are new, optional fields, used by the page for runner E-stop.
@@ -147,7 +149,8 @@ On the FastAPI app `app.py` already passes as `api_transformer`:
   - Known key, same `instance`: append.
   - Known key, different `instance`: if the entry is lost (no frame for more
     than `STALE_S`), replace it; else `409`.
-  - A key equal to a config orchestrator's key: `409`.
+  - A key equal to any server key in the page's config: `409` (node keys on
+    the graph must be unique).
 - `DELETE /runners/{key}?instance=...`: mark the entry ended (it reads as lost
   at once). Wrong instance: `404`.
 - An ended or lost runner entry is removed 10 min after its last frame. The
@@ -179,7 +182,12 @@ a `ponytail:` comment: more than 4 peers overlap; a second row is the upgrade.
 - Selected runner: E-stop and Clear E-stop only. Each POSTs
   `/{server}/estop?switch=true|false` to every row of the frame's `servers` that
   has `host`/`port`, in parallel; a failure names the server in the error toast.
-  `can_estop`/`can_clear_estop` use the existing `_estopped` rule on the frame.
+  An idle action server's `/estop` sets its latch without sending a status
+  update, so a runner frame may never show the estop. The page therefore keeps
+  a process-wide latch per runner key, set when every estop call succeeded and
+  cleared when every clear call succeeded; the runner's `estopped` flag is the
+  frame's `_estopped` rule OR that latch. A runner button's pending state ends
+  when its HTTP calls return, not on frame confirmation.
 
 ### Info box
 
