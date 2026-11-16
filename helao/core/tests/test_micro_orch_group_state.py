@@ -17,7 +17,7 @@ from helao.core.tests.unit_test_micro_orch import (
     _free_port,
     _make_orch,
 )
-from helao.helpers.premodels import Action, Experiment
+from helao.helpers.premodels import Action, Experiment, ExperimentPlanMaker
 
 
 @pytest_asyncio.fixture  # the repo runs pytest-asyncio in strict mode
@@ -146,3 +146,33 @@ def test_feed_config_fields(tmp_path):
     assert cfg["rpc_port"] == derive_rpc_port(orch.port)
     assert cfg["world_servers"] == ["FAKE"]
     assert cfg["prefinish_experiment_hooks"] == []
+
+
+@pytest.mark.asyncio
+async def test_run_sequence_accepts_a_generator_seq_func(rig):
+    def gen_seq(cycles: int = 2):
+        epm = ExperimentPlanMaker()
+        for _ in range(cycles):
+            epm.add("demo_exp", {"wait_time": 0.0})
+        yield from epm.planned_experiments
+
+    await rig.run_sequence(gen_seq, {"demo_exp": _demo_exp_func}, cycles=2)
+    assert len(rig.finished_experiments) == 2
+
+
+@pytest.mark.asyncio
+async def test_a_second_start_does_not_leak_a_feed_task(tmp_path):
+    orch = _make_orch(str(tmp_path), {"FAKE": {"host": "h", "port": 1}})
+    orch.group_urls = ["http://127.0.0.1:1"]
+
+    async def serve(*a, **k):
+        return None
+
+    orch.dispatcher.serve = serve
+    await orch.start()
+    first = orch._feed_task
+    await orch.start()
+    try:
+        assert first is not None and orch._feed_task is first
+    finally:
+        await orch.stop()

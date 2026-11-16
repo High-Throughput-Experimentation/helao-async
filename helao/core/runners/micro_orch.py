@@ -237,7 +237,7 @@ class MicroOrch:
         )
         await self.dispatcher.serve(self.host, derive_rpc_port(self.port))
         urls = self.feed_urls()
-        if urls:
+        if urls and self._feed_task is None:
             from helao.core.runners.runner_feed import RunnerGraphFeed
 
             self._feed = RunnerGraphFeed(self, urls)
@@ -943,7 +943,7 @@ class MicroOrch:
 
         sequence.init_seq(time_offset=0)
 
-        planned = seq_func(**supplied)
+        planned = list(seq_func(**supplied))  # a generator must not be spent twice
         self.active_sequence = sequence
         self.finished_experiments = []
         self.queued_experiments = list(planned)
