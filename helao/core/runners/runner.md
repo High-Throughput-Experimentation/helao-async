@@ -9,3 +9,11 @@ A runner object maintains state: 1. counter for dispatched children 2. run statu
 # config and subscription inheritance
 
 Since action runners may be called by experiment runners, and experiment runners called by sequence runners, etc... Overhead can be reduced by sharing a subscriber and configuration context. The subscriber will provide the "update_status" API endpoint which will receive POST requests from action servers.
+
+# /group feed
+
+MicroOrch pushes frames to every `reflex:` server in `world_cfg` (backend `port + 1`). `group_urls=` overrides the targets; `group_urls=[]` disables the feed. `stop()` deregisters the runner.
+
+The page fetches object details through the `get_object(kind, uuid)` RPC on the runner's existing dispatcher.
+
+A second live runner with the same `server_key` gets a 409 and runs without a feed.
