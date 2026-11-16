@@ -259,5 +259,22 @@ def test_runner_start_is_refused(monkeypatch, fresh):
 def test_runner_estop_skips_rows_without_host_and_port(monkeypatch, fresh):
     f = _two_runner_frame()
     del f["servers"][1]["host"]
-    _, calls = _runner_control(monkeypatch, fresh, "estop", frame_=f)
+    s, calls = _runner_control(monkeypatch, fresh, "estop", frame_=f)
     assert calls == ["SIM"]
+    # a filter-less call would KeyError inside one() and surface here
+    assert s.action_error == "" and group.ESTOP_LATCH["R1"] is True
+
+
+def test_a_pending_press_does_not_follow_a_switch_to_a_runner(monkeypatch, fresh):
+    fresh.clock = time_now  # tick sweeps with the wall clock
+    fresh.post("R1", runner_frame())
+    orch = Feed()
+    orch.push(frame(1), now=time_now())
+    monkeypatch.setattr(group, "_FEEDS", {"ORCH": orch, "ORCH2": Feed()})
+    s = _tick_state()
+    asyncio.run(group.GroupState.tick.fn(s))
+    s.pending, s._pending_at = "stop", time_now()
+    s.selected_feed = "R1"
+    asyncio.run(group.GroupState.tick.fn(s))
+    assert s.pending == "" and s.selected_kind == "runner"
+    assert s.can_clear_estop is False  # not estopped; the gate is pending only

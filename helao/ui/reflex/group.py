@@ -769,6 +769,8 @@ def switch_view(s) -> None:
     s._selected = ()
     s.info_note = ""
     s.tree_header, s.tree_html = TREE_EMPTY_HEADER, ""
+    # a press belongs to the view it was made in
+    s.pending, s._unconfirmed, s._pending_at = "", "", 0.0
 
 
 def follow_feed(s, feed) -> None:
