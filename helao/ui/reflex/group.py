@@ -34,7 +34,13 @@ from helao.ui.reflex import plots
 from helao.ui.reflex.ingest import WsIngest
 from helao.ui.reflex.netgraph import NetGraph, group_layout
 from helao.ui.reflex.runner_registry import REGISTRY
-from helao.ui.reflex.operator import TREE_EMPTY_HEADER, session_backend, tree_for
+from helao.ui.reflex.node_info import config_info, node_at, server_info
+from helao.ui.reflex.operator import (
+    BACKENDS,
+    TREE_EMPTY_HEADER,
+    session_backend,
+    tree_for,
+)
 from helao.ui.reflex.timeline_strip import (
     HIT_COLS,
     HIT_ROWS,
@@ -47,7 +53,7 @@ from helao.ui.reflex.timeline_strip import (
     strip_marks,
 )
 from helao.ui.reflex.tree_pane import tree_pane
-from helao.ui.shared.operator.object_tree import truncate_uuid
+from helao.ui.shared.operator.object_tree import object_to_html, truncate_uuid
 from helao.ui.shared.palette import (
     GROUP_BADGE_CLASSES,
     GROUP_ERROR_TEXT_CLASS,
@@ -623,24 +629,47 @@ async def _runner_estop(snap: dict, switch: bool) -> list:
     return [e for e in await asyncio.gather(*(one(r) for r in rows)) if e]
 
 
-def _backend(token: str):
-    """The operator's session backend, if it targets the orchestrator this page streams.
-
-    ``configure_operator`` is called without an ``orch_key``, so its backend
-    takes ``RemoteBackend._detect_orch_key``: the first ``group: orchestrator``
-    server, the very pick :func:`configure_group` makes. The check keeps that
-    true if either side ever changes; on a mismatch buttons fail loudly rather
-    than steer a different orchestrator.
-    """
-    backend = session_backend(token)
+def _backend(token: str, key: str):
+    """A ``RemoteBackend`` for orchestrator ``key``; the operator's own for the first."""
     first = next(iter(ORCHS), None)
-    if backend is not None and getattr(backend, "orch_key", None) != first:
+    backend = session_backend(token) if key == first else session_backend(token, key)
+    if backend is not None and getattr(backend, "orch_key", None) != key:
         LOGGER.warning(
-            f"/group: operator backend targets {getattr(backend, 'orch_key', None)}, "
-            f"page streams {first}; refusing to use it"
+            f"/group: backend targets {getattr(backend, 'orch_key', None)}, "
+            f"page shows {key}; refusing to use it"
         )
         return None
     return backend
+
+
+#: ``token -> NetGraph`` last drawn, for hit-testing node clicks. A graph cannot
+#: ride a state var; cleared with the page's backends on unmount.
+_GRAPHS: dict = {}
+#: ``server key -> config entry`` fetched from the server itself (a runner's
+#: server is not in this process's world config).
+_SERVER_CFG: dict = {}
+
+
+async def _server_cfg_and_status(key: str, row: dict, servers: dict) -> tuple:
+    """``(config entry, /get_status dump or None)`` for an action server."""
+    cfg = servers.get(key) or _SERVER_CFG.get(key)
+    host = (cfg or {}).get("host") or row.get("host")
+    port = (cfg or {}).get("port") or row.get("port")
+    if not host or not port:
+        return cfg or {}, None
+    if cfg is None:
+        world, err = await async_private_dispatcher(
+            key, host, port, "get_config", json_dict={}
+        )
+        if err == ErrorCodes.none and isinstance(world, dict):
+            cfg = (world.get("servers") or {}).get(key) or {}
+            _SERVER_CFG[key] = cfg
+    status, err = await async_private_dispatcher(
+        key, host, port, "get_status", json_dict={}
+    )
+    return cfg or {}, (
+        status if err == ErrorCodes.none and isinstance(status, dict) else None
+    )
 
 
 def _render_graph(
@@ -659,7 +688,9 @@ def _render_graph(
         y_domain=(-1.0, 1.0),
         panel_id=f"group-graph-{token}",
         version=s._version,
+        click=True,
     )
+    _GRAPHS[token] = g
     s.graph_spec, s.graph_url, s.graph_layout = p.spec, p.buffer_url, p.layout
 
 
@@ -769,6 +800,8 @@ def switch_view(s) -> None:
     s._selected = ()
     s.info_note = ""
     s.tree_header, s.tree_html = TREE_EMPTY_HEADER, ""
+    # a stale node selection never survives a view change
+    s._info_node, s._info_sig = "", ()
     # a press belongs to the view it was made in
     s.pending, s._unconfirmed, s._pending_at = "", "", 0.0
 
@@ -822,6 +855,15 @@ def apply_tick(s, feed, now: float, token: str, key=None, peers=()) -> bool:
         s._snap = (frames[-1],)
         s._old_orch = False
     snap = s._snap[0] if s._snap else {}
+    if s._info_node:
+        row = next(
+            (r for r in snap.get("servers", []) if r["key"] == s._info_node), None
+        )
+        if (
+            row is not None
+            and (row.get("status"), row.get("active_action")) != s._info_sig
+        ):
+            s._info_due = True
     lost = stream_lost(feed, now)
     if fresh:
         s._pulse_seq += 1
@@ -952,6 +994,9 @@ class GroupState(rx.State):
     _hover_col: tuple = (-1, -1)
     _old_orch: bool = False
     _feed_id: int = 0  # id() of the viewed feed object; a replaced runner changes it
+    _info_node: str = ""  # graph node whose info the box shows, "" for a strip item
+    _info_sig: tuple = ()  # (status, active_action) the shown node info was built at
+    _info_due: bool = False  # the shown node changed state: rebuild its info
 
     @rx.event
     def mount(self):
@@ -990,12 +1035,16 @@ class GroupState(rx.State):
                 feed = feed_for(key)
                 follow_feed(self, feed)
                 probe = apply_tick(self, feed, now, token, key, peer_rows(key, now))
+                info_due, self._info_due = self._info_due, False
+                info_node = self._info_node
             for e in REGISTRY.sweep(time.time()):
                 await e.aclose()
             for k in [k for k in ESTOP_LATCH if k not in feed_keys()]:
                 del ESTOP_LATCH[k]
+            if info_due and info_node:
+                await self._show_node(info_node)
             if probe and key == default_key():
-                backend = _backend(token)
+                backend = _backend(token, key)
                 state = await backend.get_orch_state() if backend is not None else {}
                 async with self:
                     self._probe_at = time.time()
@@ -1095,20 +1144,89 @@ class GroupState(rx.State):
             at = next(i for i, it in enumerate(slots) if it is item)
             self._selected = (kind, ords[at], self._scopes[0 if exp else 1])
             self.info_note = ""
+            self._info_node = ""
+            key = resolve_key(self.selected_feed)
         request = object_request(kind, item)
-        backend = _backend(token)
         obj = None
-        if request is not None and backend is not None:
+        if request is not None and feed_kind(key) == "runner":
             method, k, ident = request
-            try:
-                obj = await getattr(backend, method)(k, ident)
-            except Exception as exc:
-                LOGGER.warning(f"/group could not fetch {kind} {ident}: {exc}")
+            entry = feed_for(key)
+            cfg = (latest_frame(entry) or {}).get("config") or {}
+            if method == "get_object" and cfg.get("host") and cfg.get("rpc_port"):
+                try:
+                    obj = await entry.rpc(cfg["host"], cfg["rpc_port"]).call(
+                        "get_object", kind=k, uuid=ident
+                    )
+                except Exception as exc:
+                    LOGGER.warning(
+                        f"/group could not fetch {kind} {ident} from {key}: {exc}"
+                    )
+        elif request is not None:
+            backend = _backend(token, key)
+            if backend is not None:
+                method, k, ident = request
+                try:
+                    obj = await getattr(backend, method)(k, ident)
+                except Exception as exc:
+                    LOGGER.warning(f"/group could not fetch {kind} {ident}: {exc}")
         obj, note = fetched_info(kind, item, obj)
         async with self:
             self.tree_header, self.tree_html = tree_for(kind, obj)
             if note:
                 self.info_note = note
+
+    @rx.event(background=True)
+    async def select_node(self, payload: dict):
+        """Graph click: show the node's config (and endpoints for an action server)."""
+        async with self:
+            token = self.router.session.client_token
+        g = _GRAPHS.get(token)
+        p = payload or {}
+        node = node_at(g, p.get("x", 9.0), p.get("y", 9.0)) if g is not None else None
+        if node is None:
+            return
+        async with self:
+            if node != resolve_key(self.selected_feed) and feed_kind(node):
+                # a peer node: view it, and mark the feed seen so the next tick's
+                # follow_feed does not reset the view again
+                switch_view(self)
+                self.selected_feed = node
+                self._feed_id = id(feed_for(node))
+            self._info_node = node
+            self._selected = ()
+            self.info_note = ""
+        await self._show_node(node)
+
+    async def _show_node(self, node: str):
+        servers = _WORLD.get("servers") or {}
+        async with self:
+            snap = self._snap[0] if self._snap else {}
+        row = next((r for r in snap.get("servers", []) if r["key"] == node), {})
+        if feed_kind(node) == "runner":
+            info = config_info((latest_frame(feed_for(node)) or {}).get("config") or {})
+        elif node in ORCHS:
+            info = config_info(servers.get(node) or {})
+        else:
+            info = server_info(*await _server_cfg_and_status(node, row, servers))
+        html = object_to_html(info, open_keys=["config"])
+        async with self:
+            self.tree_header, self.tree_html = node, html
+            self._info_sig = (row.get("status"), row.get("active_action"))
+
+    @rx.event(background=True)
+    async def refresh_node(self):
+        """The INFO box's refresh button: rebuild the shown node's info."""
+        async with self:
+            node = self._info_node
+        if node:
+            await self._show_node(node)
+
+    @rx.event
+    def drop_backends(self):
+        """Page unmount: close this session's per-orchestrator backends and graph."""
+        token = self.router.session.client_token
+        BACKENDS.drop_prefix(f"{token}|")
+        _GRAPHS.pop(token, None)
 
     @rx.event(background=True)
     async def select_exp(self, payload: dict):
@@ -1298,6 +1416,7 @@ def group_page() -> rx.Component:
                 width=GRAPH_W,
                 pulses=S.graph_pulses,
                 nodes=S.graph_nodes,
+                on_select=S.select_node,
             ),
             size="1",
         ),
@@ -1335,7 +1454,17 @@ def group_page() -> rx.Component:
     # positioned: a tall tree must scroll inside the box, not stretch the row.
     info = rx.card(
         rx.vstack(
-            rx.text("INFO", weight="bold"),
+            rx.hstack(
+                rx.text("INFO", weight="bold"),
+                rx.icon_button(
+                    rx.icon("refresh_cw", size=12),
+                    size="1",
+                    variant="soft",
+                    on_click=S.refresh_node,
+                ),
+                align="center",
+                spacing="2",
+            ),
             rx.cond(S.info_note != "", rx.text(S.info_note, size="1")),
             tree_pane(S.tree_header, S.tree_html, fill=True),
             position="absolute",
@@ -1353,6 +1482,7 @@ def group_page() -> rx.Component:
         rx.hstack(charts, info, width="100%", align="stretch", spacing="4"),
         rx.moment(interval=S.tick_ms, on_change=S.tick, display="none"),
         on_mount=S.mount,
+        on_unmount=S.drop_backends,
         padding_x="1em",
         width="100%",
     )

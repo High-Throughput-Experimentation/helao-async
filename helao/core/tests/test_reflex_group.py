@@ -58,6 +58,9 @@ def state():
         _act_ords=(),
         _scopes=(),
         _first_at=0.0,
+        _info_node="",
+        _info_sig=(),
+        _info_due=False,
         _hover_col=(-1, -1),
         _pulse_seq=0,
         graph_pulses={},
@@ -361,13 +364,13 @@ def test_backend_is_the_operators_only_when_it_targets_the_streamed_orch(
     monkeypatch.setattr(
         group, "session_backend", lambda token: SimpleNamespace(orch_key="ORCH")
     )
-    assert group._backend("t").orch_key == "ORCH"
+    assert group._backend("t", "ORCH").orch_key == "ORCH"
     monkeypatch.setattr(
         group, "session_backend", lambda token: SimpleNamespace(orch_key="OTHER")
     )
-    assert group._backend("t") is None
+    assert group._backend("t", "ORCH") is None
     monkeypatch.setattr(group, "session_backend", lambda token: None)
-    assert group._backend("t") is None
+    assert group._backend("t", "ORCH") is None
 
 
 def test_group_picks_the_same_orchestrator_as_remote_backend(group):
