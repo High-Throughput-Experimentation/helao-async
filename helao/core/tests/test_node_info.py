@@ -1,9 +1,7 @@
 """Info-box builders for graph nodes (spec: Info box)."""
 
-from helao.ui.reflex.netgraph import NetGraph
-from helao.ui.reflex.node_info import config_info, endpoint_rows, node_at, server_info
+from helao.ui.reflex.node_info import config_info, endpoint_rows, server_info
 from helao.ui.shared.mask import MASK
-from helao.ui.shared.palette import GROUP_STATE_COLORS
 
 STATUS = {
     "estop": False,
@@ -65,11 +63,3 @@ def test_config_info_masks():
     assert config_info({"token": "t", "port": 1}) == {
         "config": {"token": MASK, "port": 1}
     }
-
-
-def test_node_at_hits_within_radius_only():
-    c = GROUP_STATE_COLORS["idle"]  # never a literal colour (test_palette.py)
-    g = NetGraph(height_px=360, width_px=720)
-    g.add_node("A", 0.0, 0.0, color=c, label_color=c, text="A", subtext="", size_px=44)
-    assert node_at(g, 0.0, 0.0) == "A"
-    assert node_at(g, 0.9, 0.9) is None

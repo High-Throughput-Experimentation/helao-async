@@ -356,14 +356,11 @@ def _node_state(monkeypatch, fresh, selected):
     )
     fresh.post("R1", f)
     s = _bound(selected_feed=selected, _snap=(f,))
-    g = group.build_graph(f, "R1", False, [("ORCH", "idle"), ("ORCH2", "idle")])
-    group._GRAPHS["t"] = g
-    return s, g, f
+    return s, None, f
 
 
 def _click(s, g, key):
-    n = g.nodes[key]
-    asyncio.run(group.GroupState.select_node.fn(s, {"x": n.x, "y": n.y}))
+    asyncio.run(group.GroupState.select_node.fn(s, {"type": "node", "key": key}))
 
 
 def test_action_server_node_click_shows_config_and_endpoints(monkeypatch, fresh):
@@ -375,7 +372,8 @@ def test_action_server_node_click_shows_config_and_endpoints(monkeypatch, fresh)
     }
     calls = []
 
-    async def fake(server, host, port, path, params_dict=None, json_dict=None):
+    async def fake(server, host, port, path, params_dict=None, json_dict=None, **kw):
+        assert kw == {"timeout": 5, "retries": 1}  # a click must not stall long
         calls.append(path)
         if path == "get_config":
             return {
@@ -453,3 +451,104 @@ def test_backend_registry_drop_prefix_closes_only_that_session():
     assert sorted(closed) == ["t|A", "t|B"]
     assert reg.get("t") is not None and reg.get("u|A") is not None
     assert reg.get("t|A") is None
+
+
+def test_select_node_without_a_key_does_nothing(fresh):
+    s = _bound(selected_feed="R1")
+    for payload in ({}, {"x": 0.0, "y": 0.0}, {"type": "node"}, {"key": 3}, None):
+        asyncio.run(group.GroupState.select_node.fn(s, payload))
+    assert s._info_node == "" and s.tree_html == ""
+
+
+def _slow_status_setup(monkeypatch, fresh):
+    s, g, f = _node_state(monkeypatch, fresh, "R1")
+    calls = []
+    gate = {}
+
+    async def fake(server, host, port, path, params_dict=None, json_dict=None, **kw):
+        calls.append(path)
+        if "gate" in gate:
+            await gate["gate"].wait()
+        if path == "get_config":
+            return {"servers": {"SIM": {"host": "h", "port": 1}}}, ErrorCodes.none
+        return {"estop": False, "endpoints": {}}, ErrorCodes.none
+
+    monkeypatch.setattr(group, "async_private_dispatcher", fake)
+    monkeypatch.setitem(group._WORLD, "servers", {})
+    group._SERVER_CFG.clear()
+    return s, f, calls, gate
+
+
+def test_one_click_fetches_status_once_across_click_and_next_tick(monkeypatch, fresh):
+    s, f, calls, _ = _slow_status_setup(monkeypatch, fresh)
+    orch = Feed()
+    orch.push(frame(1), now=time_now())
+    monkeypatch.setattr(group, "_FEEDS", {"ORCH": orch, "ORCH2": Feed()})
+    asyncio.run(group.GroupState.tick.fn(s))  # R1's frame is in s._snap
+    _click(s, None, "SIM")
+    ev = asyncio.run(group.GroupState.tick.fn(s))
+    assert ev is None and s._info_due is False
+    assert calls.count("get_status") == 1
+
+
+def test_a_changed_node_refreshes_as_its_own_event_not_inside_the_tick(
+    monkeypatch, fresh
+):
+    s, f, calls, _ = _slow_status_setup(monkeypatch, fresh)
+    fresh.clock = time_now
+    fresh.post("R1", f)
+    asyncio.run(group.GroupState.tick.fn(s))  # first tick adopts the feed
+    s._info_node, s._info_sig = "SIM", ("idle", None)  # the frame says busy / a
+    ev = asyncio.run(group.GroupState.tick.fn(s))
+    assert ev is group.GroupState.refresh_node and calls == []  # tick did not fetch
+    assert s._info_sig == ("idle", None)
+    asyncio.run(group.GroupState.refresh_node.fn(s))
+    assert s._info_sig == ("busy", "a") and calls.count("get_status") == 1
+
+
+def test_show_node_does_not_overwrite_a_newer_selection(monkeypatch, fresh):
+    s, f, calls, gate = _slow_status_setup(monkeypatch, fresh)
+
+    async def go():
+        gate["gate"] = asyncio.Event()
+        s._info_node = "SIM"
+        task = asyncio.ensure_future(s._show_node("SIM"))
+        await asyncio.sleep(0.05)
+        assert calls  # the fetch is in flight
+        s._info_node = ""  # a strip click / view change took the box
+        s.tree_header, s.tree_html = "other", "<b>kept</b>"
+        gate["gate"].set()
+        await task
+
+    asyncio.run(go())
+    assert s.tree_header == "other" and s.tree_html == "<b>kept</b>"
+
+
+def test_an_unchanged_node_is_not_refetched(fresh):
+    f = runner_frame()
+    s = _bound(_info_node="SIM", _info_sig=("busy", "a"), selected_feed="R1")
+    fresh.post("R1", f)
+    group.apply_tick(s, fresh.get("R1"), time_now(), "t", "R1", ())
+    assert s._info_due is False
+
+
+def test_a_tick_during_the_fetch_does_not_queue_a_second_one(monkeypatch, fresh):
+    s, f, calls, gate = _slow_status_setup(monkeypatch, fresh)
+    orch = Feed()
+    orch.push(frame(1), now=time_now())
+    monkeypatch.setattr(group, "_FEEDS", {"ORCH": orch, "ORCH2": Feed()})
+    asyncio.run(group.GroupState.tick.fn(s))  # adopt the feed
+
+    async def go():
+        gate["gate"] = asyncio.Event()
+        task = asyncio.ensure_future(
+            group.GroupState.select_node.fn(s, {"type": "node", "key": "SIM"})
+        )
+        await asyncio.sleep(0.05)
+        ev = await group.GroupState.tick.fn(s)  # while get_status is in flight
+        gate["gate"].set()
+        await task
+        return ev
+
+    assert asyncio.run(go()) is None
+    assert calls.count("get_status") == 1

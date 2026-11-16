@@ -1202,8 +1202,24 @@ console.log(JSON.stringify({ none, drawnPlain, moveL, leaveL, removed,
     assert out["drawnPlain"] == {"raf": 0, "canvases": 0, "hover": None}
     assert out["moveL"] == 1 and out["leaveL"] == 1
     assert (
-        sorted(out["removed"]) == ["pointerleave", "pointermove"] and out["left"] == 0
+        sorted(out["removed"]) == ["click", "pointerleave", "pointermove"]
+        and out["left"] == 0
     )
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_a_host_click_on_a_node_selects_its_key():
+    out = _run_js(_JS_HOVER_ENV + """
+const got = [];
+const st = make();
+st.onSelect = (m) => got.push(m);
+st.setNodes(batch([node("A", 0, 0, "#112233"), node("B", 0.5, 0.5, "#445566")]));
+const click = (x, y) => (listeners.click || []).forEach((cb) => cb({ clientX: x + 10, clientY: y + 20 }));
+click(71, 29);   // B
+click(5, 5);     // empty
+console.log(JSON.stringify({ got }));
+""")
+    assert out["got"] == [{"type": "node", "key": "B"}]
 
 
 def test_the_shim_opts_hover_in_only_when_nodes_is_passed():

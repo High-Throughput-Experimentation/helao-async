@@ -34,7 +34,7 @@ from helao.ui.reflex import plots
 from helao.ui.reflex.ingest import WsIngest
 from helao.ui.reflex.netgraph import NetGraph, group_layout
 from helao.ui.reflex.runner_registry import REGISTRY
-from helao.ui.reflex.node_info import config_info, node_at, server_info
+from helao.ui.reflex.node_info import config_info, server_info
 from helao.ui.reflex.operator import (
     BACKENDS,
     TREE_EMPTY_HEADER,
@@ -642,12 +642,15 @@ def _backend(token: str, key: str):
     return backend
 
 
-#: ``token -> NetGraph`` last drawn, for hit-testing node clicks. A graph cannot
-#: ride a state var; cleared with the page's backends on unmount.
-_GRAPHS: dict = {}
 #: ``server key -> config entry`` fetched from the server itself (a runner's
 #: server is not in this process's world config).
 _SERVER_CFG: dict = {}
+
+
+def _row_sig(snap: dict, node: str) -> tuple:
+    """``(status, active_action)`` of ``node``'s row in ``snap``; ``(None, None)`` if none."""
+    row = next((r for r in snap.get("servers", []) if r["key"] == node), {})
+    return (row.get("status"), row.get("active_action"))
 
 
 async def _server_cfg_and_status(key: str, row: dict, servers: dict) -> tuple:
@@ -659,13 +662,13 @@ async def _server_cfg_and_status(key: str, row: dict, servers: dict) -> tuple:
         return cfg or {}, None
     if cfg is None:
         world, err = await async_private_dispatcher(
-            key, host, port, "get_config", json_dict={}
+            key, host, port, "get_config", json_dict={}, timeout=5, retries=1
         )
         if err == ErrorCodes.none and isinstance(world, dict):
             cfg = (world.get("servers") or {}).get(key) or {}
             _SERVER_CFG[key] = cfg
     status, err = await async_private_dispatcher(
-        key, host, port, "get_status", json_dict={}
+        key, host, port, "get_status", json_dict={}, timeout=5, retries=1
     )
     return cfg or {}, (
         status if err == ErrorCodes.none and isinstance(status, dict) else None
@@ -688,9 +691,7 @@ def _render_graph(
         y_domain=(-1.0, 1.0),
         panel_id=f"group-graph-{token}",
         version=s._version,
-        click=True,
     )
-    _GRAPHS[token] = g
     s.graph_spec, s.graph_url, s.graph_layout = p.spec, p.buffer_url, p.layout
 
 
@@ -1035,20 +1036,20 @@ class GroupState(rx.State):
                 feed = feed_for(key)
                 follow_feed(self, feed)
                 probe = apply_tick(self, feed, now, token, key, peer_rows(key, now))
-                info_due, self._info_due = self._info_due, False
-                info_node = self._info_node
+                refresh = self._info_due and bool(self._info_node)
+                self._info_due = False
             for e in REGISTRY.sweep(time.time()):
                 await e.aclose()
             for k in [k for k in ESTOP_LATCH if k not in feed_keys()]:
                 del ESTOP_LATCH[k]
-            if info_due and info_node:
-                await self._show_node(info_node)
             if probe and key == default_key():
                 backend = _backend(token, key)
                 state = await backend.get_orch_state() if backend is not None else {}
                 async with self:
                     self._probe_at = time.time()
                     self._old_orch = bool(state)
+            # the fetch runs as its own event: it must not hold up the 2 Hz tick
+            return GroupState.refresh_node if refresh else None
         finally:
             async with self:
                 self._running = False
@@ -1177,13 +1178,9 @@ class GroupState(rx.State):
 
     @rx.event(background=True)
     async def select_node(self, payload: dict):
-        """Graph click: show the node's config (and endpoints for an action server)."""
-        async with self:
-            token = self.router.session.client_token
-        g = _GRAPHS.get(token)
-        p = payload or {}
-        node = node_at(g, p.get("x", 9.0), p.get("y", 9.0)) if g is not None else None
-        if node is None:
+        """Graph click ``{"type": "node", "key"}``: show the node's info."""
+        node = (payload or {}).get("key")
+        if not isinstance(node, str) or not node:
             return
         async with self:
             if node != resolve_key(self.selected_feed) and feed_kind(node):
@@ -1195,6 +1192,8 @@ class GroupState(rx.State):
             self._info_node = node
             self._selected = ()
             self.info_note = ""
+            # before any await, so the tick that follows sees no change
+            self._info_sig = _row_sig(self._snap[0] if self._snap else {}, node)
         await self._show_node(node)
 
     async def _show_node(self, node: str):
@@ -1210,23 +1209,25 @@ class GroupState(rx.State):
             info = server_info(*await _server_cfg_and_status(node, row, servers))
         html = object_to_html(info, open_keys=["config"])
         async with self:
-            self.tree_header, self.tree_html = node, html
-            self._info_sig = (row.get("status"), row.get("active_action"))
+            # a strip click or a view change meanwhile owns the box now
+            if self._info_node == node:
+                self.tree_header, self.tree_html = node, html
 
     @rx.event(background=True)
     async def refresh_node(self):
-        """The INFO box's refresh button: rebuild the shown node's info."""
+        """Rebuild the shown node's info (refresh button, or its state changed)."""
         async with self:
             node = self._info_node
+            if node:
+                self._info_sig = _row_sig(self._snap[0] if self._snap else {}, node)
         if node:
             await self._show_node(node)
 
     @rx.event
     def drop_backends(self):
-        """Page unmount: close this session's per-orchestrator backends and graph."""
+        """Page unmount: close this session's per-orchestrator backends."""
         token = self.router.session.client_token
         BACKENDS.drop_prefix(f"{token}|")
-        _GRAPHS.pop(token, None)
 
     @rx.event(background=True)
     async def select_exp(self, payload: dict):

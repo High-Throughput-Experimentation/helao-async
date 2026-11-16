@@ -5,17 +5,6 @@ from typing import Optional
 from helao.ui.shared.mask import mask_secrets
 
 
-def node_at(g, x: float, y: float) -> Optional[str]:
-    """Key of the node whose drawn circle contains data point ``(x, y)``."""
-    best, best_d = None, 1.0
-    for n in g.nodes.values():
-        rx_, ry_ = n.size_px / 2 * g.sx, n.size_px / 2 * g.sy
-        d = ((x - n.x) / rx_) ** 2 + ((y - n.y) / ry_) ** 2
-        if d <= best_d:
-            best, best_d = n.key, d
-    return best
-
-
 def _newest_finished(nonactive: dict) -> Optional[str]:
     newest = None  # (timestamp, status)
     for status, bucket in (nonactive or {}).items():
