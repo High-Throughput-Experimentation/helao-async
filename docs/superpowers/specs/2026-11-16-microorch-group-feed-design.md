@@ -16,7 +16,9 @@ as peer nodes.
 Success: launch `goldenreflex`, run `python -m helao.deploy.test.runners.simulatews_runner`
 against it, and on `/group` the runner appears in the selector and as a peer node,
 its view shows dispatch/finish pulses on SIM and ORCH and its experiment and action
-strips, and its E-stop latches SIM.
+strips, and its E-stop latches SIM. (Strips and ACT-click need a runner that calls
+`run_experiment`/`run_sequence`; `simulatews_runner` only exercises nodes, pulses,
+the info box and E-stop.)
 
 ## Why it does not work today
 
@@ -135,9 +137,9 @@ for orchestrators `host`/`port`.
 - `configure_group(world_cfg)` registers one `WsIngest` per `group: orchestrator`
   entry (no longer only the first). `start_feed`/`stop_feed` start and stop all of
   them.
-- `PushIngest` (new, in `ingest.py`) exposes the attributes `new_frames`,
+- `PushIngest` (new, in `runner_registry.py`) exposes the attributes `new_frames`,
   `latest_frame` and `stream_lost` read from `WsIngest`: `raw`, `n_batches`,
-  `status.message_count`, and the last-message time. `put(frame)` appends one
+  `status.message_count`, and the last-message time. `put(frame, now)` appends one
   batch.
 
 ### Registration routes
@@ -241,6 +243,11 @@ other keys that merely end in `key` are not matched.
 
 ## Risks
 
+- Clear E-stop on a runner whose server was idle sends no status update (action
+  host `/estop?switch=false` does not push), so the runner frame keeps showing the
+  E-stop until that server's next status push; deferred, safe-side.
+- Unauthenticated POSTs can register any number of keys; each is capped at 200
+  frames and swept 10 min after its last frame.
 - E-stop on a runner's servers also stops orchestrator work on any server they
   share. That is the intended meaning of an E-stop.
 - Two scripts constructing MicroOrch with the same `server_key`: the second

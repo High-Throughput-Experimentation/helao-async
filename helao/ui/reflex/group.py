@@ -1,9 +1,11 @@
 """The /group page: server-group graph, sequence timelines, controls, info box.
 
-One process-wide ``WsIngest`` on the orchestrator's ``/ws_orch``; frames are
-whole snapshots, read from ``ingest.raw``. ``GroupState`` is a plain
-``rx.State`` (one page per orchestrator) ticked by ``rx.moment`` at 2 Hz. Never
-a server-side loop. Pulses are not animated here: each is sent ONCE as a
+One ``WsIngest`` per ``group: orchestrator`` entry on its ``/ws_orch`` (``_FEEDS``),
+plus a ``PushIngest`` per runner that POSTs frames to ``/runners/{key}/frame``
+(``runner_registry``); frames are whole snapshots, read from ``raw``.
+``GroupState`` is a plain ``rx.State`` showing one feed at a time (the selector or
+a peer node switches it), ticked by ``rx.moment`` at 2 Hz. Never a server-side
+loop. Pulses are not animated here: each is sent ONCE as a
 descriptor (:func:`pulse_items`) and the chart shim moves it at display
 refresh. Buttons and the
 info box go over HTTP: the four control buttons straight through
@@ -1160,7 +1162,12 @@ class GroupState(rx.State):
             method, k, ident = request
             entry = feed_for(key)
             cfg = (latest_frame(entry) or {}).get("config") or {}
-            if method == "get_object" and cfg.get("host") and cfg.get("rpc_port"):
+            if (
+                entry is not None
+                and method == "get_object"
+                and cfg.get("host")
+                and cfg.get("rpc_port")
+            ):
                 try:
                     obj = await entry.rpc(cfg["host"], cfg["rpc_port"]).call(
                         "get_object", kind=k, uuid=ident
@@ -1492,7 +1499,10 @@ def group_page() -> rx.Component:
     )
     return rx.vstack(
         selector,
-        rx.cond(S.feed_options.length() == 0, rx.text(NO_ORCH_NOTE, size="1")),
+        rx.cond(
+            S.feed_options.length() == 0,  # type: ignore[attr-defined]
+            rx.text(NO_ORCH_NOTE, size="1"),
+        ),
         header,
         rx.hstack(charts, info, width="100%", align="stretch", spacing="4"),
         rx.moment(interval=S.tick_ms, on_change=S.tick, display="none"),
