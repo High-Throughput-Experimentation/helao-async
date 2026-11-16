@@ -5,7 +5,7 @@ from typing import Optional
 from helao.ui.shared.mask import mask_secrets
 
 
-def _newest_finished(nonactive: dict) -> Optional[str]:
+def _newest_finished(nonactive: Optional[dict]) -> Optional[str]:
     newest = None  # (timestamp, status)
     for status, bucket in (nonactive or {}).items():
         for a in (bucket or {}).values():
