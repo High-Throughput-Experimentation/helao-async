@@ -74,3 +74,45 @@ async def test_close_sends_delete_with_instance():
     f, _ = feed_with(rec)
     await f.close()
     assert rec.calls == [("DELETE", "http://ui:1/runners/RUNNER?instance=i-1")]
+
+
+def _orch(tmp_path, group_urls):
+    from helao.core.runners.micro_orch import MicroOrch
+    from helao.core.tests.unit_test_micro_orch import _free_port
+
+    port = _free_port()
+    return MicroOrch(
+        server_key="micro",
+        host="127.0.0.1",
+        port=port,
+        world_cfg={"root": str(tmp_path), "servers": {}},
+        group_urls=group_urls,
+    )
+
+
+@pytest.mark.asyncio
+async def test_no_targets_means_no_feed_task(tmp_path):
+    orch = _orch(tmp_path, [])
+    await orch.start()
+    try:
+        assert orch._feed_task is None and orch._feed is None
+    finally:
+        await orch.stop()
+
+
+@pytest.mark.asyncio
+async def test_stop_cancels_feed_and_deregisters(tmp_path):
+    rec = Recorder()
+    orch = _orch(tmp_path, ["http://ui:1"])
+    await orch.start()
+    try:
+        assert orch._feed_task is not None and not orch._feed_task.done()
+        await orch._feed.client.aclose()
+        orch._feed.client = httpx.AsyncClient(transport=httpx.MockTransport(rec))
+    finally:
+        await orch.stop()
+    assert orch._feed_task is None and orch._feed is None
+    assert (
+        "DELETE",
+        f"http://ui:1/runners/micro?instance={orch.instance}",
+    ) in rec.calls
