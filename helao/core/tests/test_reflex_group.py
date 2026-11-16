@@ -1081,6 +1081,13 @@ def test_the_graph_has_no_hovered_traces_and_no_server_hover_path(group):
     assert "mark_style" not in s.graph_spec
 
 
+def test_the_graph_chart_is_inert_to_xy_pointer_tracking(group):
+    s = state()
+    group._render_graph(s, _two_server_frame(1, "busy"), False, "t")
+    assert s.graph_spec["dom"]["style"]["pointer_events"] == "none"
+    assert s.graph_spec["interaction"]["click"] is False
+
+
 def test_the_graph_chart_is_opted_in_to_nodes_and_not_to_server_hover(group):
     import inspect
 

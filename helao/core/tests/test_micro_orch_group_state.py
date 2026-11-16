@@ -1,11 +1,14 @@
 """MicroOrch state the /group runner feed reads (spec: Runner side)."""
 
+import asyncio
+import json
 import shutil
 import tempfile
 
 import pytest
 import pytest_asyncio
 
+from helao.core.models.group_snapshot import build_runner_snapshot
 from helao.core.models.machine import MachineModel
 from helao.core.rpc import RPCClient, derive_rpc_port
 from helao.core.tests.unit_test_micro_orch import (
@@ -52,6 +55,38 @@ async def test_run_experiment_records_and_clears_active_state(rig):
     assert orch.drain_events() == []
     u = orch.planned_actions[0].action_uuid
     assert orch.t_dispatch[u] <= orch.t_finish[u]
+
+
+@pytest.mark.asyncio
+async def test_runner_snapshot_follows_a_real_experiment_and_serialises(rig):
+    orch = rig
+    snaps = []
+
+    def take():
+        snaps.append(build_runner_snapshot(orch, seq_no=0, now=0.0, events=[]))
+
+    async def sampler():
+        while True:
+            take()
+            await asyncio.sleep(0.005)
+
+    take()  # before
+    task = asyncio.create_task(sampler())
+    try:
+        await orch.run_experiment(
+            _demo_exp_func, experiment=Experiment(experiment_name="e1")
+        )
+    finally:
+        task.cancel()
+    take()  # after
+    json.dumps(snaps)  # the runner POSTs this
+    assert not snaps[0]["experiments"]
+    assert any(
+        [r["state"] for r in s["experiments"]] == ["active"] for s in snaps[1:-1]
+    )
+    last = snaps[-1]
+    assert [r["state"] for r in last["experiments"]] == ["done"]
+    assert [r["state"] for r in last["actions"]] == ["done", "done"]
 
 
 @pytest.mark.asyncio
