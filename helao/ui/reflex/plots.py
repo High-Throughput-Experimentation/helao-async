@@ -1133,7 +1133,7 @@ def marks_chart(
     # keeps hover state even with hover off (tooltip hidden, highlight clear),
     # and drawing it threw (null buffer) when a node's trace was swapped under
     # the pointer, which reloads the page. The host element still sees the
-    # pointer, which is where the /group graph's own hover listens.
+    # pointer, which is where the /group graph's hover and clicks both listen.
     inert = {} if hover_events or click else {"pointer_events": "none"}
     pad = CHART_PADDING_PX
     figure = xy.chart(

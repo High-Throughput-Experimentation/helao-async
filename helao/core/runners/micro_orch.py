@@ -30,6 +30,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import os
+import time
 import zipfile
 from collections.abc import Callable
 from copy import deepcopy
@@ -44,6 +45,7 @@ from helao.core.hooks.config import find_orchestrator_entry, prefinish_config
 from helao.core.hooks.loader import load_hook_set
 from helao.core.hooks.prefinish import run_prefinish
 from helao.core.models.action_start_condition import ActionStartCondition
+from helao.core.models.group_snapshot import ERROR_STATUSES
 from helao.core.models.experiment import ExperimentModel, ShortExperimentModel
 from helao.core.models.hlostatus import HloStatus, is_terminal
 from helao.core.models.run_dir import diag_root, run_root
@@ -75,6 +77,17 @@ def _is_terminal(action_status: Optional[list[Any]]) -> bool:
     if not action_status:
         return False
     return HloStatus.active not in action_status and "active" not in action_status
+
+
+#: Undrained events kept at most; the feed drains every 100 ms.
+EVENTS_MAX = 500
+
+
+def _finish_status(statuses) -> str:
+    """The status a finish event reports: an error status wins, else ``finished``."""
+    names = {str(getattr(s, "value", s)) for s in statuses or []}
+    errors = sorted(names & ERROR_STATUSES)
+    return errors[0] if errors else "finished"
 
 
 # (server_name, action_name, nonblocking) — what start-condition checks need.
@@ -113,6 +126,7 @@ class MicroOrch:
         loader_factory: Optional[Callable[[str], Any]] = None,
         prefinish_experiment_hooks: Optional[dict] = None,
         prefinish_sequence_hooks: Optional[dict] = None,
+        group_urls: Optional[list[str]] = None,
     ) -> None:
         """Initialize the micro-orchestrator and register the status handler.
 
@@ -130,6 +144,9 @@ class MicroOrch:
             prefinish_sequence_hooks: Override the world config's
                 orchestrator entry for experiment/sequence pre-finish hooks;
                 same shape as the config key.
+            group_urls: Reflex backend URLs to push /group frames to;
+                ``None`` derives them from ``world_cfg`` reflex entries,
+                ``[]`` disables the feed.
         """
         self.server_key = server_key
         self.host = host
@@ -182,6 +199,26 @@ class MicroOrch:
         self.experiment_hooks: HookSet = HookSet.empty()
         self.sequence_hooks: HookSet = HookSet.empty()
 
+        # /group runner feed (spec 2026-11-16-microorch-group-feed).
+        self.instance = str(gen_uuid())
+        self.group_urls = group_urls
+        self.active_sequence: Optional[Sequence] = None
+        self.last_sequence: Optional[Sequence] = None
+        self.active_experiment: Optional[Experiment] = None
+        self.last_experiment: Optional[Experiment] = None
+        self.finished_experiments: list[Experiment] = []
+        self.queued_experiments: list = []
+        self.planned_actions: list[Action] = []
+        self.server_estop: dict[str, bool] = {}
+        self.finish_errors: dict[str, str] = {}
+        # ponytail: unbounded per action; a runner is short-lived. Prune by age if one runs for days.
+        self.t_dispatch: dict[UUID, float] = {}
+        self.t_finish: dict[UUID, float] = {}
+        self._events: list[dict] = []
+        self._feed = None
+        self._feed_task: Optional[asyncio.Task] = None
+        self.dispatcher.register("get_object", self.get_object)
+
     # ------------------------------------------------------------------
     # lifecycle
     # ------------------------------------------------------------------
@@ -199,6 +236,12 @@ class MicroOrch:
             "prefinish_sequence_hooks", "sequence"
         )
         await self.dispatcher.serve(self.host, derive_rpc_port(self.port))
+        urls = self.feed_urls()
+        if urls and self._feed_task is None:
+            from helao.core.runners.runner_feed import RunnerGraphFeed
+
+            self._feed = RunnerGraphFeed(self, urls)
+            self._feed_task = asyncio.create_task(self._feed.run())
 
     def _load_prefinish(self, key: str, level: str) -> HookSet:
         override = self._prefinish_overrides[key]
@@ -219,6 +262,16 @@ class MicroOrch:
         Errors raised while closing individual clients are logged and
         suppressed so all clients get a chance to close.
         """
+        if self._feed_task is not None:
+            self._feed_task.cancel()
+            try:
+                await self._feed_task
+            except asyncio.CancelledError:
+                pass
+            self._feed_task = None
+        if self._feed is not None:
+            await self._feed.close()
+            self._feed = None
         await self.dispatcher.close()
         clients = list(self._clients.values())
         self._clients.clear()
@@ -347,6 +400,9 @@ class MicroOrch:
         if actionservermodel is None:
             return False
         async with self._cond:
+            server = actionservermodel.action_server.server_name
+            if server:
+                self.server_estop[server] = bool(actionservermodel.estop)
             for endpoint in actionservermodel.endpoints.values():
                 for uuid, act in endpoint.active_dict.items():
                     self._latest[uuid] = act.as_dict()
@@ -363,10 +419,99 @@ class MicroOrch:
 
         Caller must already hold ``self._cond``'s lock.
         """
-        self._pending_meta.pop(action_uuid, None)
+        meta = self._pending_meta.pop(action_uuid, None)
+        if meta is not None:
+            # first retirement only: update_status re-reports finished actions
+            status = _finish_status(dump.get("action_status"))
+            self.finish_errors[meta[0]] = status
+            self._emit("finish", meta[0], meta[1], action_uuid, status)
         fut = self._pending.pop(action_uuid, None)
         if fut is not None and not fut.done():
             fut.set_result(dump)
+
+    # ------------------------------------------------------------------
+    # /group feed support
+    # ------------------------------------------------------------------
+
+    def _emit(self, kind: str, server: str, name: str, uuid: UUID, status: str) -> None:
+        now = time.time()
+        (self.t_dispatch if kind == "dispatch" else self.t_finish)[uuid] = now
+        self._events.append(
+            {
+                "kind": kind,
+                "server": server,
+                "action_uuid": str(uuid),
+                "action_name": name,
+                "status": status,
+                "t": now,
+            }
+        )
+        del self._events[:-EVENTS_MAX]
+
+    def drain_events(self) -> list[dict]:
+        """Events since the last drain, oldest first."""
+        out, self._events = self._events, []
+        return out
+
+    def active_actions(self) -> dict:
+        """``{uuid: (server, action_name, nonblocking)}`` of in-flight actions."""
+        return dict(self._pending_meta)
+
+    def subscribed(self) -> set:
+        """Servers this runner has attached to."""
+        return set(self._subscribed)
+
+    def feed_urls(self) -> list[str]:
+        """Reflex backends to push frames to (``group_urls`` wins when set)."""
+        if self.group_urls is not None:
+            return list(self.group_urls)
+        servers = self.world_cfg.get("servers") or {}
+        return [
+            f"http://{c['host']}:{int(c['port']) + 1}"
+            for c in servers.values()
+            if isinstance(c, dict) and c.get("reflex")
+        ]
+
+    def feed_config(self) -> dict:
+        """This runner's settings, shown when its /group node is clicked."""
+        return {
+            "server_key": self.server_key,
+            "host": self.host,
+            "port": self.port,
+            "rpc_port": derive_rpc_port(self.port),
+            "default_timeout": self.default_timeout,
+            "finished_timeout": self.finished_timeout,
+            "poll_interval": self.poll_interval,
+            "group_urls": self.feed_urls(),
+            "prefinish_experiment_hooks": sorted(self.experiment_hooks.hooks),
+            "prefinish_sequence_hooks": sorted(self.sequence_hooks.hooks),
+            "world_servers": sorted((self.world_cfg.get("servers") or {}).keys()),
+        }
+
+    def get_object(self, kind: str, uuid: str) -> Optional[dict]:
+        """RPC ``get_object``: a sequence, experiment or action this runner holds."""
+        if kind == "sequence":
+            cands = [self.active_sequence, self.last_sequence]
+            for s in cands:
+                if s is not None and str(s.sequence_uuid) == uuid:
+                    return s.as_dict()
+        elif kind == "experiment":
+            cands = [
+                self.active_experiment,
+                self.last_experiment,
+                *reversed(self.finished_experiments),
+            ]
+            for e in cands:
+                if e is not None and str(e.experiment_uuid) == uuid:
+                    return e.as_dict()
+        elif kind == "action":
+            for k, dump in self._latest.items():
+                if str(k) == uuid:
+                    return dump
+            for a in self.planned_actions:
+                if str(a.action_uuid) == uuid:
+                    return a.as_dict()
+        return None
 
     # ------------------------------------------------------------------
     # start-condition gating (mirrors Orch.loop_task_dispatch_action)
@@ -485,6 +630,7 @@ class MicroOrch:
                 bool(action.nonblocking),
             )
             self.last_action_uuid = action_uuid
+            self._emit("dispatch", server_name, action_name, action_uuid, "active")
 
         client = self._client_for(server_name)
         rpc_args: dict[str, Any] = dict(params or {})
@@ -500,6 +646,8 @@ class MicroOrch:
                 pending = self._pending.pop(action_uuid, None)
                 if pending is not None and not pending.done():
                     pending.cancel()
+                self.finish_errors[server_name] = "errored"
+                self._emit("finish", server_name, action_name, action_uuid, "errored")
                 self._cond.notify_all()
             raise
 
@@ -698,7 +846,26 @@ class MicroOrch:
 
         for i, act in enumerate(actions):
             self._stage_action(act, order=i)
+        self.active_experiment = experiment
+        self.planned_actions = list(actions)
+        try:
+            return await self._dispatch_experiment_actions(
+                experiment, actions, await_completion, dispatch_timeout, wait_timeout
+            )
+        finally:
+            self.last_experiment = experiment
+            self.active_experiment = None
+            self.finished_experiments.append(experiment)
 
+    async def _dispatch_experiment_actions(
+        self,
+        experiment: Experiment,
+        actions: list[Action],
+        await_completion: bool,
+        dispatch_timeout: float,
+        wait_timeout: Optional[float],
+    ) -> Any:
+        """Dispatch staged actions, wait, finish: the tail of :meth:`run_experiment`."""
         results: list[dict] = []
         for act in actions:
             self._apply_from_global(act)
@@ -776,10 +943,38 @@ class MicroOrch:
 
         sequence.init_seq(time_offset=0)
 
-        planned = seq_func(**supplied)
+        planned = list(seq_func(**supplied))  # a generator must not be spent twice
+        self.active_sequence = sequence
+        self.finished_experiments = []
+        self.queued_experiments = list(planned)
+        try:
+            return await self._run_planned(
+                sequence,
+                planned,
+                experiment_lib,
+                await_completion,
+                dispatch_timeout,
+                wait_timeout,
+            )
+        finally:
+            self.last_sequence = sequence
+            self.active_sequence = None
+            self.queued_experiments = []
 
+    async def _run_planned(
+        self,
+        sequence: Sequence,
+        planned: list,
+        experiment_lib: dict,
+        await_completion: bool,
+        dispatch_timeout: float,
+        wait_timeout: Optional[float],
+    ) -> Any:
+        """Run each planned experiment, then finish the sequence: the tail of :meth:`run_sequence`."""
         raw_results: list[Any] = []
         for plan in planned:
+            if self.queued_experiments:
+                self.queued_experiments.pop(0)
             exp_func = experiment_lib.get(plan.experiment_name)
             if exp_func is None:
                 raise KeyError(

@@ -618,6 +618,7 @@ export function createController(options) {
     st.nodeListening = true;
     st.el.addEventListener("pointermove", st.onPointerMove);
     st.el.addEventListener("pointerleave", st.onPointerLeave);
+    st.el.addEventListener("click", st.onNodeClick);
   };
 
   st.unlistenNodes = () => {
@@ -625,6 +626,7 @@ export function createController(options) {
     st.nodeListening = false;
     st.el.removeEventListener("pointermove", st.onPointerMove);
     st.el.removeEventListener("pointerleave", st.onPointerLeave);
+    st.el.removeEventListener("click", st.onNodeClick);
     st.pointer = null;
   };
 
@@ -648,6 +650,17 @@ export function createController(options) {
     const r = st.el.getBoundingClientRect();
     st.pointer = [e.clientX - r.left, e.clientY - r.top];
     st.rehover();
+  };
+
+  // A click on a node is reported as {type: "node", key}; the chart itself stays
+  // inert (xy's own pointer handling throws when a node's trace is swapped).
+  st.onNodeClick = (e) => {
+    const el = st.el;
+    if (!el || !st.nodesOn || !st.pulseView || !st.onSelect) return;
+    const r = el.getBoundingClientRect();
+    const hit = hitNode(st.nodes.items, st.pulseView, el.clientWidth, el.clientHeight,
+      e.clientX - r.left, e.clientY - r.top, st.hoverNode && st.hoverNode.key, st.nodes.hover_r);
+    if (hit) st.onSelect({ type: "node", key: hit.key });
   };
 
   st.onPointerLeave = () => {

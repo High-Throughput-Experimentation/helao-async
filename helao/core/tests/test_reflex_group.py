@@ -58,6 +58,9 @@ def state():
         _act_ords=(),
         _scopes=(),
         _first_at=0.0,
+        _info_node="",
+        _info_sig=(),
+        _info_due=False,
         _hover_col=(-1, -1),
         _pulse_seq=0,
         graph_pulses={},
@@ -361,13 +364,13 @@ def test_backend_is_the_operators_only_when_it_targets_the_streamed_orch(
     monkeypatch.setattr(
         group, "session_backend", lambda token: SimpleNamespace(orch_key="ORCH")
     )
-    assert group._backend("t").orch_key == "ORCH"
+    assert group._backend("t", "ORCH").orch_key == "ORCH"
     monkeypatch.setattr(
         group, "session_backend", lambda token: SimpleNamespace(orch_key="OTHER")
     )
-    assert group._backend("t") is None
+    assert group._backend("t", "ORCH") is None
     monkeypatch.setattr(group, "session_backend", lambda token: None)
-    assert group._backend("t") is None
+    assert group._backend("t", "ORCH") is None
 
 
 def test_group_picks_the_same_orchestrator_as_remote_backend(group):
@@ -381,7 +384,8 @@ def test_group_picks_the_same_orchestrator_as_remote_backend(group):
         }
     }
     group.configure_group(cfg)
-    assert group._CFG["orch_key"] == RemoteBackend._detect_orch_key(cfg) == "ORCH2"
+    assert list(group.ORCHS)[0] == RemoteBackend._detect_orch_key(cfg) == "ORCH2"
+    assert list(group.ORCHS) == ["ORCH2", "ORCH1"]
 
 
 # ---- pure helpers (as specified) ---------------------------------------------
@@ -723,6 +727,7 @@ def _control_state():
         action_error="",
         _pending_at=0.0,
         _unconfirmed="",
+        selected_feed="",
     )
 
 
@@ -786,7 +791,7 @@ def test_control_error_sets_action_error_and_clears_pending(group, monkeypatch):
     monkeypatch.setattr(group, "async_private_dispatcher", raises)
     asyncio.run(group.GroupState.control.fn(s, "stop"))
     assert s.action_error == "link down" and s.pending == ""
-    group._CFG.clear()
+    group.configure_group({"servers": {}})
     asyncio.run(group.GroupState.control.fn(s, "stop"))
     assert s.action_error == "cannot reach the orchestrator" and s.pending == ""
 
@@ -1074,6 +1079,13 @@ def test_the_graph_has_no_hovered_traces_and_no_server_hover_path(group):
     group._render_graph(s, _two_server_frame(1, "busy"), False, "t")
     assert "hover" not in s.graph_spec["interaction"]  # xy reports nothing on hover
     assert "mark_style" not in s.graph_spec
+
+
+def test_the_graph_chart_is_inert_to_xy_pointer_tracking(group):
+    s = state()
+    group._render_graph(s, _two_server_frame(1, "busy"), False, "t")
+    assert s.graph_spec["dom"]["style"]["pointer_events"] == "none"
+    assert s.graph_spec["interaction"]["click"] is False
 
 
 def test_the_graph_chart_is_opted_in_to_nodes_and_not_to_server_hover(group):

@@ -284,6 +284,13 @@ class BackendRegistry:
         with self._lock:
             return self._backends.get(token)
 
+    def drop_prefix(self, prefix: str) -> None:
+        """Close and forget every backend whose key starts with ``prefix``."""
+        with self._lock:
+            keys = [k for k in self._backends if k.startswith(prefix)]
+        for k in keys:
+            self.drop(k)
+
     def drop(self, token: str) -> None:
         """Close and forget a session's backend.
 
@@ -859,14 +866,18 @@ def tree_for(kind: str, obj) -> tuple:
     return (header or "—"), object_to_html(obj, open_keys=open_keys_for(obj))
 
 
-def session_backend(token: str):
+def session_backend(token: str, orch_key: Optional[str] = None):
     """Return this session's backend, building it on first use.
+
+    ``orch_key`` picks a specific orchestrator (the /group page keeps one
+    backend per orchestrator, registered as ``token|orch_key``).
 
     Returns ``None`` when the app has not been configured or the backend
     cannot be built -- a poll that fires first must degrade to "cannot reach
     the orchestrator", not raise inside a background event.
     """
-    backend = BACKENDS.get(token)
+    reg_key = token if orch_key is None else f"{token}|{orch_key}"
+    backend = BACKENDS.get(reg_key)
     if backend is not None:
         return backend
     with _SETTINGS_LOCK:
@@ -875,12 +886,14 @@ def session_backend(token: str):
         return None
     try:
         backend = make_backend(
-            settings["world_cfg"], settings["server_key"], settings.get("orch_key")
+            settings["world_cfg"],
+            settings["server_key"],
+            orch_key or settings.get("orch_key"),
         )
     except Exception as exc:
         LOGGER.warning(f"operator backend could not be built: {exc}")
         return None
-    BACKENDS.put(token, backend)
+    BACKENDS.put(reg_key, backend)
     return backend
 
 
