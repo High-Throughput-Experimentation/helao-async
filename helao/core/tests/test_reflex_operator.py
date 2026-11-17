@@ -1501,7 +1501,8 @@ def test_store_kind_maps_the_library_kind_to_the_file_key():
 
     assert opx.store_kind("sequence") == "seq"
     assert opx.store_kind("experiment") == "exp"
-    assert set(ps.PARAM_KINDS) == {"seq", "exp"}
+    assert set(opx.STORE_KINDS.values()) <= set(ps.PARAM_KINDS)
+    assert "runner" in ps.PARAM_KINDS
 
 
 def test_store_kind_refuses_an_unknown_library_kind():

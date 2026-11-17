@@ -27,7 +27,7 @@ from helao.helpers import helao_logging as logging
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 #: The two kinds of saved parameters, matching the file's top-level keys.
-PARAM_KINDS = ("seq", "exp")
+PARAM_KINDS = ("seq", "exp", "runner")
 
 #: Name of the store under the config root's STATES directory.
 STORE_NAME = "previous_params.json"

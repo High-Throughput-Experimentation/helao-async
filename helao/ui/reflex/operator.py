@@ -645,8 +645,8 @@ async def dispatch_remove(backend, kind: str, position: int, length: int) -> str
 
 
 #: Library kind -> the key the shared parameter store uses. The file is
-#: written by both operators, so this mapping cannot drift from
-#: ``param_store.PARAM_KINDS``.
+#: written by both operators, so every value here must be in
+#: ``param_store.PARAM_KINDS`` (which also holds the /runners page's kind).
 STORE_KINDS = {"sequence": "seq", "experiment": "exp"}
 
 
