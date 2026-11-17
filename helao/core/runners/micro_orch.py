@@ -90,6 +90,10 @@ def _finish_status(statuses) -> str:
     return errors[0] if errors else "finished"
 
 
+class RunnerStopped(Exception):
+    """Raised by :meth:`MicroOrch.dispatch_action` after :meth:`MicroOrch.request_stop`."""
+
+
 # (server_name, action_name, nonblocking) — what start-condition checks need.
 _PendingMeta = tuple[str, str, bool]
 
@@ -211,6 +215,7 @@ class MicroOrch:
         self.planned_actions: list[Action] = []
         self.server_estop: dict[str, bool] = {}
         self.finish_errors: dict[str, str] = {}
+        self.stop_requested = False
         # ponytail: unbounded per action; a runner is short-lived. Prune by age if one runs for days.
         self.t_dispatch: dict[UUID, float] = {}
         self.t_finish: dict[UUID, float] = {}
@@ -448,6 +453,10 @@ class MicroOrch:
         )
         del self._events[:-EVENTS_MAX]
 
+    def request_stop(self) -> None:
+        """Dispatch nothing more; actions already dispatched are still awaited."""
+        self.stop_requested = True
+
     def drain_events(self) -> list[dict]:
         """Events since the last drain, oldest first."""
         out, self._events = self._events, []
@@ -610,6 +619,8 @@ class MicroOrch:
             Exception: Any exception raised by the underlying RPC call is
                 re-raised after cleaning up the pending future.
         """
+        if self.stop_requested:
+            raise RunnerStopped("stop requested")
         action.init_act()
         server_name = action.action_server.server_name
         action_name = action.action_name
@@ -805,6 +816,8 @@ class MicroOrch:
         Returns:
             A list of action dumps, one per dispatched action, in order.
         """
+        if self.stop_requested:
+            raise RunnerStopped("stop requested")
         if experiment is None:
             experiment = Experiment()
 
@@ -867,12 +880,44 @@ class MicroOrch:
     ) -> Any:
         """Dispatch staged actions, wait, finish: the tail of :meth:`run_experiment`."""
         results: list[dict] = []
-        for act in actions:
-            self._apply_from_global(act)
-            await self._wait_for_start_condition(act)
-            result = await self.dispatch_action(act, timeout=dispatch_timeout)
-            results.append(result)
-            self._capture_to_global(result, act.to_global_params)
+        dispatched: list[Action] = []
+        try:
+            for act in actions:
+                self._apply_from_global(act)
+                await self._wait_for_start_condition(act)
+                result = await self.dispatch_action(act, timeout=dispatch_timeout)
+                results.append(result)
+                dispatched.append(act)
+                self._capture_to_global(result, act.to_global_params)
+        except RunnerStopped:
+            for act, immediate in zip(dispatched, results):
+                status = (
+                    immediate.get("action_status")
+                    if isinstance(immediate, dict)
+                    else None
+                )
+                dump = immediate
+                if not _is_terminal(status) and not act.nonblocking:
+                    dump = await self.wait_for_action(
+                        act.action_uuid, timeout=wait_timeout
+                    )
+                if isinstance(dump, dict):
+                    try:
+                        experiment.dispatched_actions.append(
+                            Action.model_validate(dump)
+                        )
+                    except Exception:
+                        LOGGER.exception("could not rebuild Action from terminal dump")
+            yml_path = await self._finish_experiment(
+                experiment, status=HloStatus.aborted
+            )
+            self._track_run(
+                "experiment",
+                experiment.experiment_uuid,
+                experiment.experiment_name,
+                yml_path,
+            )
+            raise
 
         if not await_completion:
             return results
@@ -994,15 +1039,36 @@ class MicroOrch:
                     else:
                         exp.experiment_params[v] = val
 
-            exp_result = await self.run_experiment(
-                exp_func,
-                experiment=exp,
-                await_completion=await_completion,
-                dispatch_timeout=dispatch_timeout,
-                wait_timeout=wait_timeout,
-                _sequence=sequence,
-                **(exp.experiment_params),
-            )
+            prev = self.last_experiment
+            try:
+                exp_result = await self.run_experiment(
+                    exp_func,
+                    experiment=exp,
+                    await_completion=await_completion,
+                    dispatch_timeout=dispatch_timeout,
+                    wait_timeout=wait_timeout,
+                    _sequence=sequence,
+                    **(exp.experiment_params),
+                )
+            except RunnerStopped:
+                # last_experiment: run_experiment may have adopted a copy of exp
+                last = self.last_experiment
+                if (
+                    last is not prev
+                    and last is not None
+                    and last.sequence_uuid == sequence.sequence_uuid
+                ):
+                    sequence.dispatched_experiments.append(last.get_exp())
+                yml_path = await self._finish_sequence(
+                    sequence, status=HloStatus.aborted
+                )
+                self._track_run(
+                    "sequence",
+                    sequence.sequence_uuid,
+                    sequence.sequence_name,
+                    yml_path,
+                )
+                raise
             if await_completion:
                 # exp_result is a HelaoExperiment whose .json is the persisted
                 # ExperimentModel dict (already carrying aggregated
@@ -1125,9 +1191,11 @@ class MicroOrch:
     # artifact persistence (mirrors Base.write_exp / write_seq)
     # ------------------------------------------------------------------
 
-    async def _finish_experiment(self, experiment: Experiment) -> str:
+    async def _finish_experiment(
+        self, experiment: Experiment, status: HloStatus = HloStatus.finished
+    ) -> str:
         """Mark finished, run pre-finish hooks, write the yml, hand it to SYNC."""
-        experiment.reset_experiment_status(HloStatus.finished)
+        experiment.reset_experiment_status(status)
         experiment.experiment_finished_timestamp = set_time(offset=0)
         manual = bool(experiment.manual_action)
         await run_prefinish(
@@ -1143,9 +1211,11 @@ class MicroOrch:
         await self._notify_sync(yml_path, manual)
         return yml_path
 
-    async def _finish_sequence(self, sequence: Sequence) -> str:
+    async def _finish_sequence(
+        self, sequence: Sequence, status: HloStatus = HloStatus.finished
+    ) -> str:
         """Sequence twin of :meth:`_finish_experiment`."""
-        sequence.reset_sequence_status(HloStatus.finished)
+        sequence.reset_sequence_status(status)
         sequence.sequence_finished_timestamp = set_time(offset=0)
         manual = bool(sequence.manual_action)
         await run_prefinish(
