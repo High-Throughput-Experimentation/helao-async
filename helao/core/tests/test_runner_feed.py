@@ -59,13 +59,42 @@ async def test_post_failure_never_raises_and_logs_once(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_409_stops_posting_to_that_target():
+async def test_409_backs_off_then_retries_and_warns_once(monkeypatch):
+    warnings = []
+    monkeypatch.setattr(rf.LOGGER, "warning", lambda msg, *a, **k: warnings.append(msg))
     rec = Recorder(status=409)
     f, _ = feed_with(rec)
+    now = [100.0]
+    f.clock = lambda: now[0]
     frame = f.step(0.0)
     await f.post(frame)
+    assert len(rec.calls) == 1 and set(f.retry_at) == {"http://ui:1"}
+    now[0] = 100.0 + rf.RETRY_409_S - 0.1
     await f.post(frame)
-    assert len(rec.calls) == 1 and f.blocked == {"http://ui:1"}
+    assert len(rec.calls) == 1  # still backing off
+    now[0] = 100.0 + rf.RETRY_409_S
+    await f.post(frame)
+    assert len(rec.calls) == 2  # retried after the back-off
+    assert len(warnings) == 1 and "'RUNNER'" in warnings[0]
+
+
+@pytest.mark.asyncio
+async def test_2xx_after_409_clears_back_off_and_rewarns(monkeypatch):
+    warnings = []
+    monkeypatch.setattr(rf.LOGGER, "warning", lambda msg, *a, **k: warnings.append(msg))
+    rec = Recorder(status=409)
+    f, _ = feed_with(rec)
+    now = [0.0]
+    f.clock = lambda: now[0]
+    frame = f.step(0.0)
+    await f.post(frame)
+    rec.status = 200
+    now[0] = rf.RETRY_409_S
+    await f.post(frame)
+    assert f.retry_at == {}
+    rec.status = 409
+    await f.post(frame)
+    assert len(warnings) == 2
 
 
 @pytest.mark.asyncio

@@ -982,3 +982,63 @@ async def test_estop_actions_returns_when_a_server_never_answers(monkeypatch):
 
     assert set(received) == {"A", "B", "C"}
     assert any("estop for A" in m and "timed out" in m for m in logged), logged
+
+
+# --- D: /estop pushes the full model to subscribers -----------------------------
+
+
+@pytest.mark.asyncio
+async def test_estop_pushes_full_model_to_subscribers_on_latch_and_release(tmp_path):
+    """An idle latch and every release used to notify no subscriber.
+
+    The push is background work: the route returns while a push is still blocked.
+    """
+    host = _host(tmp_path)
+    host.status_clients.add(("RUNNER", "127.0.0.1", 9))
+    pushes = []
+    gate = asyncio.Event()
+
+    async def fake_send(key, h, p, action_name=None):
+        await gate.wait()
+        pushes.append((key, h, p, action_name, host.actionservermodel.estop))
+        return {}, ErrorCodes.none
+
+    host.send_statuspackage = fake_send
+    route = next(r for r in host.routes if getattr(r, "path", "") == "/SIM/estop")
+    for switch in (True, False):
+        pushes.clear()
+        gate.clear()
+        await asyncio.wait_for(route.endpoint(switch=switch), 1.0)
+        assert pushes == []  # returned before the push finished
+        gate.set()
+        await asyncio.gather(*host._estop_pushes)
+        assert pushes == [("RUNNER", "127.0.0.1", 9, None, switch)]
+
+
+@pytest.mark.asyncio
+async def test_estop_push_failure_to_one_client_still_pushes_the_next(tmp_path):
+    host = _host(tmp_path)
+    host.status_clients.update({("A", "h", 1), ("B", "h", 2)})
+    pushed = []
+
+    async def fake_send(key, h, p, action_name=None):
+        if key == "A":
+            raise RuntimeError("unreachable")
+        pushed.append(key)
+        return {}, ErrorCodes.none
+
+    host.send_statuspackage = fake_send
+    route = next(r for r in host.routes if getattr(r, "path", "") == "/SIM/estop")
+    await route.endpoint(switch=True)
+    await asyncio.gather(*host._estop_pushes)
+    assert pushed == ["B"]
+
+
+def test_endpoint_slice_carries_the_estop_latch(tmp_path):
+    """A slice built with estop defaulting to False would undo a full-model push."""
+    from helao.core.models.server import EndpointModel
+
+    model = _host(tmp_path).actionservermodel
+    model.endpoints["x"] = EndpointModel.model_construct(endpoint_name="x")
+    model.estop = True
+    assert model.get_fastapi_json(action_name="x")["estop"] is True

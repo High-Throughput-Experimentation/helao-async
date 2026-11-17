@@ -1,8 +1,8 @@
 """Push a MicroOrch's /group frames to Reflex backends (spec D1/D2).
 
 Never in a run's way: each POST is short-timeout, errors are logged once per
-target and swallowed, and a 409 (key held by another live runner) stops posting
-to that target for good.
+target and swallowed, and a 409 (key held by another live runner) pauses posting
+to that target for RETRY_409_S, then tries again.
 """
 
 import asyncio
@@ -19,6 +19,7 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 TICK_S = 0.1
 HEARTBEAT_S = 2.0
 POST_TIMEOUT_S = 1.0
+RETRY_409_S = 5.0
 
 
 def fingerprint(m) -> tuple:
@@ -57,7 +58,7 @@ class RunnerGraphFeed:
         self.heartbeat_s = heartbeat_s
         self.clock = clock
         self.client = client or httpx.AsyncClient(timeout=POST_TIMEOUT_S)
-        self.blocked: set = set()
+        self.retry_at: dict = {}
         self._failing: set = set()
         self._seq_no = 0
         self._last_fp = None
@@ -84,7 +85,7 @@ class RunnerGraphFeed:
 
     async def post(self, frame: dict) -> None:
         for url in self.urls:
-            if url in self.blocked:
+            if self.clock() < self.retry_at.get(url, float("-inf")):
                 continue
             try:
                 r = await self.client.post(
@@ -96,17 +97,19 @@ class RunnerGraphFeed:
                     LOGGER.warning(f"/group frame POST to {url} failed: {exc!r}")
                 continue
             if r.status_code == 409:
-                self.blocked.add(url)
-                LOGGER.warning(
-                    f"/group at {url} already shows a live runner named "
-                    f"{self.micro.server_key!r}; not posting there"
-                )
+                if url not in self.retry_at:
+                    LOGGER.warning(
+                        f"/group at {url} already shows a live runner named "
+                        f"{self.micro.server_key!r}; retrying in {RETRY_409_S}s"
+                    )
+                self.retry_at[url] = self.clock() + RETRY_409_S
             elif r.status_code >= 400:
                 if url not in self._failing:
                     self._failing.add(url)
                     LOGGER.warning(f"/group frame POST to {url}: HTTP {r.status_code}")
             else:
                 self._failing.discard(url)
+                self.retry_at.pop(url, None)
 
     async def run(self) -> None:
         """Tick until cancelled; a failed frame build is logged and skipped."""

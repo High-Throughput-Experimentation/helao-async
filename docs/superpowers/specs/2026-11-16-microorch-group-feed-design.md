@@ -122,7 +122,8 @@ as a task, cancelled by `stop()`.
   raises into a run. Each POST has a short timeout (1 s) so a dead page cannot
   slow the tick.
 - `409` from a target means another live instance holds the key: log a warning
-  naming the key and stop posting to that target.
+  naming the key (once). Skip that target for 5 s (`RETRY_409_S`), then post
+  again; a 2xx clears the state.
 - `stop()` sends `DELETE {url}/runners/{server_key}?instance=<uuid>` to each
   target, best-effort.
 
@@ -243,15 +244,15 @@ other keys that merely end in `key` are not matched.
 
 ## Risks
 
-- Clear E-stop on a runner whose server was idle sends no status update (action
-  host `/estop?switch=false` does not push), so the runner frame keeps showing the
-  E-stop until that server's next status push; deferred, safe-side.
+- `/estop` (latch and release) now pushes the full model to subscribers.
 - Unauthenticated POSTs can register any number of keys; each is capped at 200
   frames and swept 10 min after its last frame.
 - E-stop on a runner's servers also stops orchestrator work on any server they
   share. That is the intended meaning of an E-stop.
 - Two scripts constructing MicroOrch with the same `server_key`: the second
-  gets `409` and runs without a feed. The warning names the key.
+  gets `409`, warns naming the key, and retries every 5 s; a runner restarted
+  under the same key within `STALE_S` appears once the old entry is replaced or
+  swept.
 - A Reflex page that restarts loses the registry; live runners re-register on
   their next frame (within 2 s, the heartbeat).
 - `/get_status` returns every endpoint's `nonactive_dict`, which is unbounded
@@ -273,7 +274,7 @@ Unit (pytest, run by `run_tests.py`):
   experiment: keys equal `build_snapshot`'s plus `kind`/`instance`; strip rows
   move queued → active → done; an error finish makes the server `error`.
 - `RunnerGraphFeed`: heartbeat and change-only framing; POST failure does not
-  raise; `409` stops posting; no targets means no task.
+  raise; `409` backs off 5 s then retries, warning once; no targets means no task.
 - Registry routes (FastAPI `TestClient`): register, append, `409` on a live
   duplicate, replace a lost one, `DELETE` with right and wrong instance, removal
   after 10 min with an injected clock.
