@@ -16,4 +16,4 @@ MicroOrch pushes frames to every `reflex:` server in `world_cfg` (backend `port 
 
 The page fetches object details through the `get_object(kind, uuid)` RPC on the runner's existing dispatcher.
 
-A second live runner with the same `server_key` gets a 409 and runs without a feed.
+A second live runner with the same `server_key` gets a 409 and retries every 5 s (a restart under the same key appears once the old entry goes stale).
