@@ -49,6 +49,8 @@ An optional second UI stack, opt-in per config via a `reflex:` server key alongs
 
 `/group` shows the group's orchestrator as a live graph with experiment/action timelines and Start/Stop/E-stop, fed by the orchestrator's `/ws_orch` stream; a config with no orchestrator renders a note there.
 
+`/runners` lists and launches runner scripts from `helao/deploy/<deployment>/runners/`, where the deployment is the one holding the config; the contract, launcher and Stop semantics are in `helao/core/runners/runner.md`.
+
 Read `helao/ui/reflex/CLAUDE.md` before editing anything under `helao/ui/reflex/`. The bundle stamp, the mixin rule for panel state, the lazy-`add_page` trap, the WebGL context cap, and the paged-queue index rules live there, and each one fails silently.
 
 ### Colours

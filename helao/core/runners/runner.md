@@ -17,3 +17,27 @@ MicroOrch pushes frames to every `reflex:` server in `world_cfg` (backend `port 
 The page fetches object details through the `get_object(kind, uuid)` RPC on the runner's existing dispatcher.
 
 A second live runner with the same `server_key` gets a 409 and retries every 5 s (a restart under the same key appears once the old entry goes stale).
+
+# Runner scripts
+
+A runner script is a module under `helao/deploy/<deployment>/runners/` that the `/runners` page can list and launch.
+
+- Contract: `async def run(orch: MicroOrch, <params with defaults>)`. Every parameter after `orch` needs a default. Annotate with `int`, `float`, `str` or `bool` to get typed form fields and coercion.
+- `REQUIRES = {server: [action, ...]}` is optional. The page checks it against the group. Without it, the page infers requirements from literal action-building calls.
+- The docstring of `run` (else the module docstring) is shown on the page.
+
+Launcher:
+
+```
+python -m helao.core.runners.launch <config> <module> [--key K] [--params JSON] [--host H]
+python -m helao.core.runners.launch --describe <module>
+```
+
+`--describe` prints one JSON line (docstring, params, `REQUIRES`, inferred requirements) or an `error` field. The default key is the module name upper-cased without a `_runner` suffix. A key that is a server key in the config is a usage error.
+
+Exit codes: 0 clean or stopped, 1 runner exception or import failure, 2 usage error, 130 forced.
+
+Stop semantics:
+- The first SIGTERM (SIGINT, or CTRL_BREAK on Windows) is a cooperative stop. The runner dispatches nothing more, the in-flight action finishes, and the experiment/sequence is written as aborted. Exit 0.
+- A second signal cancels the runner task at once. Exit 130.
+- The page's Stop sends the first signal. Force kill (SIGKILL) is a separate button.
