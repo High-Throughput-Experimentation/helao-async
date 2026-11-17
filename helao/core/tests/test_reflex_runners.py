@@ -242,3 +242,58 @@ def test_force_kill_enabled_only_while_stopping():
     text = str(runners.runners_page())
     kill = text[text.index("Force kill") - 300 : text.index("Force kill")]
     assert '=== "stopping"' in kill and '"running"' not in kill
+
+
+def test_unexpected_launch_failure_is_an_error_message(monkeypatch):
+    async def fake_launch(*a, **k):
+        raise OSError("no such interpreter")
+
+    monkeypatch.setattr(runners.runner_procs, "launch", fake_launch)
+    monkeypatch.setattr(runners, "write_params", lambda *a, **k: True)
+    err = asyncio.run(
+        runners.try_launch(
+            {"root": "/r"}, ENTRY, {}, "K", blocked=False, override=False
+        )
+    )
+    assert err == "launch failed: no such interpreter"
+
+
+class BgState(FakeState):
+    """FakeState that also serves ``async with self`` of a background event."""
+
+    entries: list = []
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+
+def test_refresh_failure_keeps_old_catalog_and_reports(monkeypatch):
+    _catalog(monkeypatch, m=ENTRY)
+
+    async def boom(*a):
+        raise OSError("describe exploded")
+
+    monkeypatch.setattr(runners.runner_procs, "refresh_catalog", boom)
+    st = BgState()
+    asyncio.run(runners.RunnersState.refresh.fn(st))
+    assert st.error == "refresh failed: describe exploded"
+    assert list(runners.runner_procs.CATALOG) == ["m"]
+
+
+def test_launch_refused_when_entry_changed_since_form_was_built(monkeypatch):
+    _catalog(monkeypatch, m=ENTRY)
+    st = BgState()
+    runners.RunnersState.select.fn(st, "m")
+    st.blocked = False
+    # another tab refreshed the catalog: the entry now differs from the form
+    _catalog(monkeypatch, m={**ENTRY, "doc": "Edited."})
+
+    async def boom(*a, **k):
+        raise AssertionError("must not launch")
+
+    monkeypatch.setattr(runners, "try_launch", boom)
+    asyncio.run(runners.RunnersState.launch_selected.fn(st))
+    assert st.error == "runner changed; re-check"

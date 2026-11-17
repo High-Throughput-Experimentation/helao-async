@@ -90,8 +90,12 @@ def _finish_status(statuses) -> str:
     return errors[0] if errors else "finished"
 
 
-class RunnerStopped(Exception):
-    """Raised by :meth:`MicroOrch.dispatch_action` after :meth:`MicroOrch.request_stop`."""
+class RunnerStopped(BaseException):
+    """Raised by :meth:`MicroOrch.dispatch_action` after :meth:`MicroOrch.request_stop`.
+
+    A ``BaseException`` on purpose: a runner's own ``except Exception`` retry
+    loop must not swallow a stop and dispatch again.
+    """
 
 
 # (server_name, action_name, nonblocking) — what start-condition checks need.
@@ -170,6 +174,9 @@ class MicroOrch:
         self._pending_meta: dict[UUID, _PendingMeta] = {}
         self._latest: dict[UUID, dict] = {}
         self._subscribed: set = set()
+        # every server an attach was tried on: a call that timed out here may
+        # still have registered us there, so stop() detaches all of these
+        self._attach_tried: set = set()
         # Single condition variable: anyone waiting on a start condition
         # gets a notify_all() whenever an action terminates.
         self._cond = asyncio.Condition()
@@ -281,7 +288,7 @@ class MicroOrch:
         if self._feed is not None:
             await self._feed.close()
             self._feed = None
-        for server_name in list(self._subscribed):
+        for server_name in list(self._attach_tried):
             try:
                 await self.detach_from(server_name)
             except Exception:
@@ -290,6 +297,7 @@ class MicroOrch:
         clients = list(self._clients.values())
         self._clients.clear()
         self._subscribed.clear()
+        self._attach_tried.clear()
         for client in clients:
             try:
                 await client.close()
@@ -350,6 +358,7 @@ class MicroOrch:
         if server_name in self._subscribed:
             return True
         client = self._client_for(server_name)
+        self._attach_tried.add(server_name)
         try:
             await client.call(
                 "attach_client",
@@ -373,7 +382,7 @@ class MicroOrch:
         Args:
             server_name: Target action server name.
         """
-        if server_name not in self._subscribed:
+        if server_name not in self._attach_tried:
             return
         client = self._client_for(server_name)
         try:
@@ -386,6 +395,7 @@ class MicroOrch:
             )
         finally:
             self._subscribed.discard(server_name)
+            self._attach_tried.discard(server_name)
 
     # ------------------------------------------------------------------
     # update_status handler (registered on the dispatcher)

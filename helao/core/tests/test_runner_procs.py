@@ -263,3 +263,53 @@ async def test_watch_final_state(start, rc, want):
     p = rp.RunnerProc(key="K", module="m", log_path="", proc=Proc(), state=start)
     await rp._watch(p)
     assert (p.state, p.rc) == (want, rc)
+
+
+@pytest.mark.asyncio
+async def test_launch_sets_server_key_in_child_env(tmp_path, monkeypatch):
+    seen = {}
+
+    class P:
+        pid = 1
+
+        async def wait(self):
+            return 0
+
+    async def fake_exec(*a, **kw):
+        seen.update(kw["env"])
+        return P()
+
+    monkeypatch.setattr(rp.asyncio, "create_subprocess_exec", fake_exec)
+    rp.PROCS.clear()
+    world = {"root": str(tmp_path), "loaded_config_path": "c.yml"}
+    await rp.launch(world, "m", "KEY1", {})
+    await asyncio.sleep(0)
+    rp.PROCS.clear()
+    assert seen["HELAO_SERVER_KEY"] == "KEY1"
+
+
+@pytest.mark.asyncio
+async def test_non_runner_helper_is_unlisted_but_broken_import_is_listed(
+    tmp_path, monkeypatch
+):
+    runners = _pkg(tmp_path)
+    (runners / "good_runner.py").write_text(GOOD, encoding="utf-8")
+    (runners / "helper.py").write_text("X = 1\n", encoding="utf-8")
+    (runners / "bad_runner.py").write_text(
+        "raise RuntimeError('x')\n", encoding="utf-8"
+    )
+    monkeypatch.setenv("PYTHONPATH", f"{tmp_path}{os.pathsep}{REPO}")
+    monkeypatch.chdir(tmp_path)
+    world = {"loaded_config_path": "/x/helao/deploy/zz/configs/c.yml"}
+    entries = await rp.refresh_catalog(world, str(tmp_path))
+    mods = {e["module"] for e in entries}
+    assert mods == {
+        "helao.deploy.zz.runners.good_runner",
+        "helao.deploy.zz.runners.bad_runner",
+    }
+    assert set(rp.CATALOG) == mods
+    helper = await rp._describe("helao.deploy.zz.runners.helper")
+    assert helper["not_runner"] is True and "error" in helper
+    bad = await rp._describe("helao.deploy.zz.runners.bad_runner")
+    assert "not_runner" not in bad and "error" in bad
+    rp.CATALOG.clear()

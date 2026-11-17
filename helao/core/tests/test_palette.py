@@ -919,7 +919,7 @@ def test_slate_500_is_measured_on_every_tint(pair: tuple[str, str]) -> None:
 
 
 def test_slate_500_fails_the_body_floor_on_eight_of_the_fifteen_tints() -> None:
-    """Exactly seven, and named -- not "at least one".
+    """Exactly eight, and named -- not "at least one".
 
     A count would pass if the failing set moved to four different tints, and
     the point of the row block above is that *which* surfaces fail is not

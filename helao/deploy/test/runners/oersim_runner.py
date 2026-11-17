@@ -167,7 +167,7 @@ async def run(
         )
         print(f"step {step + 1}/{iterations}: feature={GLOBALS.get('_feature')}")
 
-    # --- archive every produced artifact relative to RUNS_FINISHED -----
+    # --- archive every produced artifact relative to RUNS (or DIAG) -----
     zip_path = os.path.join(orch.world_cfg["root"], "oersim_microorch_runs.zip")
     orch.zip_runs(zip_path)
     print(f"\ntracked {len(orch.runs)} artifacts; archived -> {zip_path}")

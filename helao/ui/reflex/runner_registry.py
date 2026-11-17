@@ -142,6 +142,13 @@ def make_runner_router(registry: RunnerRegistry) -> APIRouter:
     async def delete_runner(key: str, instance: str) -> Response:
         return Response(status_code=registry.delete(key, instance))
 
+    @router.api_route("/runners_busy", methods=["GET", "POST"])
+    async def runners_busy() -> dict:
+        """Hot-reload gate (spec D4): restarting this server kills its runners."""
+        from helao.ui.reflex import runner_procs  # lazy: runner_procs imports group
+
+        return {"busy": runner_procs.busy()}
+
     return router
 
 

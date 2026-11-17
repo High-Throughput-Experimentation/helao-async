@@ -1,7 +1,7 @@
 """The operator's saved-parameter store, shared by both UIs.
 
 Both operators offer "load last parameters": the values last used for a
-sequence or experiment, plus the label and campaign that went with them,
+sequence, experiment or runner, plus the label and campaign that went with them,
 persisted under ``<root>/STATES/previous_params.json``. The file is a
 cross-session, cross-UI artifact -- a station's operator may have saved it from
 Bokeh and reloaded it from Reflex -- so one reader and one writer, here.
@@ -26,7 +26,7 @@ from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
-#: The two kinds of saved parameters, matching the file's top-level keys.
+#: The kinds of saved parameters, matching the file's top-level keys.
 PARAM_KINDS = ("seq", "exp", "runner")
 
 #: Name of the store under the config root's STATES directory.
@@ -65,7 +65,7 @@ def _load(root: str) -> dict:
         LOGGER.warning("previous_params.json does not hold an object; ignoring it")
         return _empty()
     # Start from what was read, so a key written by another version of the
-    # store survives a write from this one. Only the three keys this module
+    # store survives a write from this one. Only the keys this module
     # owns are normalised.
     store = dict(loaded)
     for key, blank in _empty().items():
@@ -79,8 +79,8 @@ def read_params(root: str, kind: str, name: str) -> dict:
 
     Args:
         root: The config root.
-        kind: ``"seq"`` or ``"exp"``.
-        name: Sequence or experiment name.
+        kind: ``"seq"``, ``"exp"`` or ``"runner"``.
+        name: Sequence, experiment or runner module name.
     """
     if kind not in PARAM_KINDS:
         return {}
@@ -99,8 +99,8 @@ def write_params(root: str, kind: str, name: str, params: dict, meta=None) -> bo
     Args:
         root: The config root. Empty for a UI-only server, where persisting is
             not possible.
-        kind: ``"seq"`` or ``"exp"``.
-        name: Sequence or experiment name.
+        kind: ``"seq"``, ``"exp"`` or ``"runner"``.
+        name: Sequence, experiment or runner module name.
         params: The parameters to remember.
         meta: Optional label/campaign block. Omitted leaves the previous one
             in place, so saving a sequence's parameters does not wipe the

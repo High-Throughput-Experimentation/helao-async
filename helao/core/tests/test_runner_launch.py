@@ -38,6 +38,11 @@ async def run(orch: MicroOrch, n: int = 2, label: str = "x"):
 '''
 
 
+posix_only = pytest.mark.skipif(
+    sys.platform == "win32", reason="sends SIGTERM to a subprocess"
+)
+
+
 def test_describe_good_module(tmp_path):
     _write(tmp_path, "demo_runner", GOOD)
     out = subprocess.run(
@@ -168,6 +173,7 @@ def _wait_line(p, text, timeout=30):
     return False
 
 
+@posix_only
 def test_sigterm_is_clean_stop(tmp_path, spawn):
     _write(tmp_path, "slow_runner", SLOW)
     p = spawn("slow_runner")
@@ -177,6 +183,7 @@ def test_sigterm_is_clean_stop(tmp_path, spawn):
     assert p.wait(timeout=30) == 0
 
 
+@posix_only
 def test_second_sigterm_forces_130(tmp_path, spawn):
     _write(
         tmp_path, "stuck_runner", SLOW.replace("if orch.stop_requested:", "if False:")
@@ -348,6 +355,7 @@ sys.exit(asyncio.run(main()))
 """
 
 
+@posix_only
 def test_two_signals_before_task_exists_force_130(tmp_path):
     script = tmp_path / "race.py"
     script.write_text(RACE, encoding="utf-8")
@@ -359,3 +367,20 @@ def test_two_signals_before_task_exists_force_130(tmp_path):
         timeout=60,
     )
     assert out.returncode == 130, out.stdout + out.stderr
+
+
+TASKGROUP_STOP = """
+import asyncio
+from helao.core.runners.micro_orch import MicroOrch, RunnerStopped
+async def run(orch: MicroOrch):
+    async def worker():
+        raise RunnerStopped("stop")
+    async with asyncio.TaskGroup() as tg:
+        tg.create_task(worker())
+"""
+
+
+def test_stop_inside_taskgroup_exits_0(tmp_path, spawn):
+    _write(tmp_path, "tg_runner", TASKGROUP_STOP)
+    p = spawn("tg_runner")
+    assert p.wait(timeout=60) == 0

@@ -289,3 +289,49 @@ async def test_stop_detaches_from_servers():
     finally:
         await fake.dispatcher.close()
         shutil.rmtree(root, ignore_errors=True)
+
+
+class _SlowRegisteringServer(_SubscriberServer):
+    """Registers the subscriber, then answers after the client gave up."""
+
+    async def _attach(self, client_servkey, client_host, client_port, **kw):
+        self.subscribers.add((client_servkey, client_host, client_port))
+        await asyncio.sleep(0.8)
+        return True
+
+
+@pytest.mark.asyncio
+async def test_stop_detaches_server_whose_attach_timed_out_but_registered():
+    root = tempfile.mkdtemp(prefix="micro_stop_")
+    port = _free_port()
+    fake = _SlowRegisteringServer("FAKE", "ping", root)
+    await fake.dispatcher.serve("127.0.0.1", derive_rpc_port(port))
+    orch = _make_orch(root, {"FAKE": {"host": "127.0.0.1", "port": port}})
+    orch.default_timeout = 0.3
+    orch.group_urls = []
+    await orch.start()
+    try:
+        assert await orch.attach_to("FAKE") is False  # timed out client-side
+        assert len(fake.subscribers) == 1  # ... yet registered server-side
+        await orch.stop()
+        assert fake.subscribers == set()
+    finally:
+        await fake.dispatcher.close()
+        shutil.rmtree(root, ignore_errors=True)
+
+
+@pytest.mark.asyncio
+async def test_runner_except_exception_loop_cannot_swallow_a_stop(rig):
+    """A runner's retry loop around run_action must not turn a stop into a retry."""
+    orch, fake = rig
+    orch.request_stop()
+    attempts = 0
+    act = Action(action_name="ping", action_server=MachineModel(server_name="FAKE"))
+    with pytest.raises(RunnerStopped):
+        for _ in range(3):
+            attempts += 1
+            try:
+                await orch.run_action(act)
+            except Exception:
+                continue
+    assert attempts == 1 and fake.action_calls == []

@@ -110,6 +110,8 @@ async def refresh_catalog(world_cfg: dict, repo_root: str) -> list:
     entries = (
         await describe_all(runner_modules(dep, repo_root), repo_root) if dep else []
     )
+    # a module with no async run(orch, ...) is a helper, not a runner: unlisted
+    entries = [e for e in entries if not e.get("not_runner")]
     CATALOG.clear()
     CATALOG.update({e["module"]: e for e in entries})
     return entries
@@ -195,7 +197,7 @@ async def launch(world_cfg: dict, module: str, key: str, params: dict) -> Runner
         log_path = os.path.join(
             logs, f"runner_{key}_{time.strftime('%Y%m%d-%H%M%S')}.log"
         )
-        env = {**os.environ, PARENT_PID_ENV: str(os.getpid())}
+        env = {**os.environ, PARENT_PID_ENV: str(os.getpid()), "HELAO_SERVER_KEY": key}
         env.pop(DETACH_MARKER_ENV, None)
         kwargs, _ = _platform_ops()
         with open(log_path, "w", encoding="utf-8") as log:
@@ -243,6 +245,13 @@ def force_kill(key: str) -> None:
             return
         p.state = "killed"
         LOGGER.warning(f"runner {key}: force kill (pid {p.pid})")
+
+
+def busy() -> bool:
+    """True while any runner is being spawned, running or stopping."""
+    return bool(_LAUNCHING) or any(
+        p.state in ("running", "stopping") for p in PROCS.values()
+    )
 
 
 def dismiss(key: str) -> None:

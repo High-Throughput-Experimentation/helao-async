@@ -706,6 +706,27 @@ class ActionHost(HelaoFastAPI):
                     f"({client_host}:{client_port}) failed: {failure}"
                 )
 
+    def _evict_dead_client(self, combo_key: tuple) -> None:
+        """Drop a subscriber whose whole retry round failed; warn naming it.
+
+        The orchestrator is spared: it is the one subscriber the server must
+        keep (``log_status_task`` re-attaches it only when the set is empty,
+        and an unresponsive orchestrator is recoverable, a silently dropped
+        one is not); it is matched by key so a host/port spelling difference
+        cannot evict it. Cost (accepted by the user, 2026-11-17): any other
+        subscriber that stays unresponsive for a whole retry round is
+        evicted, and MicroOrch never re-attaches, so a live runner that
+        blocked its event loop that long waits forever on its next action
+        and must be force-killed.
+        """
+        if combo_key[0] == self.orch_key:
+            return
+        self.status_clients.discard(combo_key)
+        LOGGER.warning(
+            f"evicted unresponsive status subscriber {combo_key[0]} "
+            f"({combo_key[1]}:{combo_key[2]})."
+        )
+
     async def regular_status_task(
         self, delay: float = 10, retry_limit: int = 5
     ) -> None:
@@ -722,6 +743,8 @@ class ActionHost(HelaoFastAPI):
                     )
                     if response and error_code == ErrorCodes.none:
                         break
+                else:
+                    self._evict_dead_client(combo_key)
             await asyncio.sleep(delay)
 
     async def log_status_task(self, retry_limit: int = 5) -> None:
@@ -789,6 +812,7 @@ class ActionHost(HelaoFastAPI):
                             f"Failed to push status message to {client_servkey} "
                             f"after {retry_limit} attempts."
                         )
+                        self._evict_dead_client(combo_key)
                     # Per-client pacing, as legacy had. It yields to the event
                     # loop (C4a): a blocking sleep here froze every coroutine
                     # on the server for 0.3 s per client per status.

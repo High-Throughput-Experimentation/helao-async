@@ -180,6 +180,13 @@ def resolve_key(selected: str) -> str:
     return selected if selected and feed_kind(selected) else default_key()
 
 
+def feed_label(feed, now: float) -> str:
+    """Selector label: a deregistered runner reads "ended", not "unreachable"."""
+    if getattr(feed, "ended", False):
+        return "ended"
+    return "unreachable" if stream_lost(feed, now) else "live"
+
+
 def _feed_status(key: str, now: float) -> str:
     feed = feed_for(key)
     if stream_lost(feed, now):
@@ -1033,7 +1040,7 @@ class GroupState(rx.State):
                     {
                         "key": k,
                         "label": f"{k} · {feed_kind(k)} · "
-                        f"{'unreachable' if stream_lost(feed_for(k), now) else 'live'}",
+                        f"{feed_label(feed_for(k), now)}",
                     }
                     for k in feed_keys()
                 ]

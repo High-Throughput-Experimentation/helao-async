@@ -1937,13 +1937,33 @@ def server_is_idle(group, server_entry):
     - orchestrator: ``/global_status`` shows loop_state 'stopped' and no active
       actions. Pending (not-yet-dispatched) queue items are preserved across the
       restart via the --restore path, so they do not block idleness.
-    - visualizer/operator: always idle (stateless bokeh subscribers).
+    - reflex (any group): not idle only on ``{"busy": true}`` from
+      ``/runners_busy`` (backend port + 1), a timeout, or an unreadable reply;
+      non-2xx (older process without the route) and refused connections are idle.
+    - visualizer/operator: otherwise always idle (stateless bokeh subscribers).
 
     Any query failure returns False (fail safe: do not restart what we cannot
     confirm is idle)."""
+    host, port = server_entry["host"], server_entry["port"]
+    if "reflex" in server_entry:
+        # A reflex server launches runner processes as children; a restart
+        # SIGTERMs its process group and kills them mid-action (spec D4). Its
+        # backend is on port + 1.
+        try:
+            resp = requests.get(
+                f"http://{host}:{int(port) + 1}/runners_busy", timeout=5
+            )
+            if not resp.ok:  # older Reflex process without the route: no runners
+                return True
+            return not resp.json().get("busy", True)
+        except requests.exceptions.Timeout:
+            return False  # alive but unresponsive: do not restart
+        except requests.exceptions.ConnectionError:
+            return True  # backend down: a restart is wanted
+        except Exception:
+            return False
     if group in ("visualizer", "operator"):
         return True
-    host, port = server_entry["host"], server_entry["port"]
     try:
         if group == "orchestrator":
             resp = requests.post(f"http://{host}:{port}/global_status", timeout=10)

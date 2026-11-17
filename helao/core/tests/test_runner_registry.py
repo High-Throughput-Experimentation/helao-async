@@ -89,3 +89,41 @@ def test_repost_after_delete_revives_the_entry_and_keeps_the_key():
     assert c.post("/runners/R1/frame", json=frame("a")).status_code == 200
     assert not reg.get("R1").ended and not reg.get("R1").lost(clock.t)
     assert c.post("/runners/R1/frame", json=frame("b")).status_code == 409
+
+
+def test_runners_busy_follows_proc_states(monkeypatch):
+    from helao.ui.reflex import runner_procs
+
+    _, c, _ = rig()
+    monkeypatch.setattr(runner_procs, "PROCS", {})
+    assert c.get("/runners_busy").json() == {"busy": False}
+    for state, want in [
+        ("running", True),
+        ("stopping", True),
+        ("exited", False),
+        ("stopped", False),
+        ("killed", False),
+    ]:
+        monkeypatch.setattr(
+            runner_procs,
+            "PROCS",
+            {"K": runner_procs.RunnerProc("K", "m", "l", None, state=state)},
+        )
+        assert c.post("/runners_busy").json() == {"busy": want}, state
+
+
+def test_runners_busy_while_a_runner_is_spawning(monkeypatch):
+    from helao.ui.reflex import runner_procs
+
+    monkeypatch.setattr(runner_procs, "PROCS", {})
+    monkeypatch.setattr(runner_procs, "_LAUNCHING", {"K"})
+    assert runner_procs.busy() is True
+
+
+def test_ended_runner_reads_ended_in_group_selector():
+    from helao.ui.reflex.group import feed_label
+
+    class F:
+        ended = True
+
+    assert feed_label(F(), 0.0) == "ended"

@@ -13,6 +13,7 @@ import reflex as rx
 
 from helao.core.runners import requirements
 from helao.core.runners.requirements import default_key
+from helao.helpers import helao_logging as logging
 from helao.ui.reflex import runner_procs
 from helao.ui.reflex.group import GroupState
 from helao.ui.reflex.operator import (
@@ -21,7 +22,13 @@ from helao.ui.reflex.operator import (
     flatten_fields,
 )
 from helao.ui.shared.operator.param_store import form_values, read_params, write_params
-from helao.ui.shared.palette import GROUP_BADGE_CLASSES, GROUP_ERROR_TEXT_CLASS
+from helao.ui.shared.palette import (
+    GROUP_BADGE_CLASSES,
+    GROUP_ERROR_TEXT_CLASS,
+    reflex_muted_text_class,
+)
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 _CONFIG: dict = {"world": {}, "repo_root": ""}
 
@@ -114,6 +121,9 @@ async def try_launch(
         await runner_procs.launch(world_cfg, entry["module"], key, params)
     except ValueError as exc:
         return str(exc)
+    except Exception as exc:
+        LOGGER.exception("runner launch failed")
+        return f"launch failed: {exc}"
     return ""
 
 
@@ -219,7 +229,13 @@ class RunnersState(rx.State):
 
     @rx.event(background=True)
     async def refresh(self):
-        await runner_procs.refresh_catalog(_CONFIG["world"], _CONFIG["repo_root"])
+        try:
+            await runner_procs.refresh_catalog(_CONFIG["world"], _CONFIG["repo_root"])
+        except Exception as exc:
+            LOGGER.exception("runner catalog refresh failed")
+            async with self:
+                self.error = f"refresh failed: {exc}"
+            return
         async with self:
             self.entries = _entry_rows()
             changed = _apply_refresh(self)
@@ -272,7 +288,12 @@ class RunnersState(rx.State):
             entry = runner_procs.CATALOG.get(self.selected)
             values, key = dict(self.values), self.key
             blocked, override = self.blocked, self.override
+            stale = entry is not None and _sig(entry) != self._sig
         if entry is None:
+            return
+        if stale:
+            async with self:
+                self.error = "runner changed; re-check"
             return
         err = await try_launch(
             _CONFIG["world"], entry, values, key, blocked=blocked, override=override
@@ -313,13 +334,13 @@ def _entry_row(row) -> rx.Component:
     return rx.cond(
         row[3] != "",
         rx.box(
-            rx.text(row[1], weight="bold", class_name="text-slate-600"),
+            rx.text(row[1], weight="bold", class_name=reflex_muted_text_class()),
             rx.text(row[3], class_name=GROUP_ERROR_TEXT_CLASS, size="1"),
         ),
         rx.box(
             rx.text(row[1], weight="bold"),
             rx.text(row[2], size="1"),
-            rx.text(row[4], size="1", class_name="text-slate-600"),
+            rx.text(row[4], size="1", class_name=reflex_muted_text_class()),
             cursor="pointer",
             on_click=S.select(row[0]),
         ),

@@ -27,10 +27,14 @@ PORT_WINDOW = (20000, 40000)
 TYPES = {"int": int, "float": float, "str": str, "bool": bool}
 
 
+class NotRunner(TypeError):
+    """The module has no async ``run(orch, ...)``: a helper, not a runner."""
+
+
 def _run_func(mod):
     fn = getattr(mod, "run", None)
     if not inspect.iscoroutinefunction(fn):
-        raise TypeError("no async run(orch, ...)")
+        raise NotRunner("no async run(orch, ...)")
     params = list(inspect.signature(fn).parameters.values())
     if not params:
         raise TypeError("run() takes no orch argument")
@@ -175,6 +179,12 @@ async def _run(fn, world_cfg, key, params, host) -> int:
         except asyncio.CancelledError:
             LOGGER.warning(f"runner {key}: forced stop")
             return 130
+        except BaseExceptionGroup as eg:  # a stop raised inside a TaskGroup
+            if eg.split(RunnerStopped)[1] is None:
+                LOGGER.info(f"runner {key}: stopped")
+                return 0
+            LOGGER.exception(f"runner {key} failed")
+            return 1
         except Exception:
             LOGGER.exception(f"runner {key} failed")
             return 1
@@ -196,11 +206,10 @@ def main(argv: Optional[list] = None) -> int:
             print(json.dumps(describe(args.describe), default=str))
             return 0
         except Exception as exc:
-            print(
-                json.dumps(
-                    {"module": args.describe, "error": f"{type(exc).__name__}: {exc}"}
-                )
-            )
+            out = {"module": args.describe, "error": f"{type(exc).__name__}: {exc}"}
+            if isinstance(exc, NotRunner):
+                out["not_runner"] = True
+            print(json.dumps(out))
             return 1
 
     if not (args.config and args.module):
