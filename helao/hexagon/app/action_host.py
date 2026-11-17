@@ -286,6 +286,8 @@ class ActionHost(HelaoFastAPI):
         #: over this set would mean a server that accepts every subscription
         #: and broadcasts to nobody, with both halves logging success.
         self.status_clients: set = set()
+        #: In-flight estop model pushes; held so they are not collected mid-run.
+        self._estop_pushes: set = set()
         #: Background loop handles, created at startup (legacy: Base.myinit).
         self.bufferer: Optional[asyncio.Task] = None
         self.status_logger: Optional[asyncio.Task] = None
@@ -687,6 +689,22 @@ class ActionHost(HelaoFastAPI):
         LOGGER.info(f"{self.server.server_name} live buffer task created.")
         async for live_msg in self.live_q.subscribe():
             self.live_buffer.update(live_msg)
+
+    async def _push_full_model(self) -> None:
+        """Send the full model once to each current subscriber; warn on failure."""
+        for client_servkey, client_host, client_port in self.status_clients.copy():
+            try:
+                _, error_code = await self.send_statuspackage(
+                    client_servkey, client_host, client_port, action_name=None
+                )
+                failure = None if error_code == ErrorCodes.none else error_code
+            except Exception as exc:
+                failure = repr(exc)
+            if failure is not None:
+                LOGGER.warning(
+                    f"estop status push to {client_servkey} "
+                    f"({client_host}:{client_port}) failed: {failure}"
+                )
 
     async def regular_status_task(
         self, delay: float = 10, retry_limit: int = 5
@@ -1277,6 +1295,14 @@ class ActionHost(HelaoFastAPI):
                 for executor_id in list(self.executors):
                     self.stop_executor_by_id(executor_id)
                 estopped = await self.estop_actives()
+            # Latch or release, tell every subscriber with the full model:
+            # only a latch that ends an active action sends any status, so an
+            # idle latch and every release would otherwise leave subscribers
+            # (a MicroOrch runner) on the old estop value. Background: an
+            # unreachable subscriber must not delay this response.
+            push = asyncio.get_running_loop().create_task(self._push_full_model())
+            self._estop_pushes.add(push)
+            push.add_done_callback(self._estop_pushes.discard)
             LOGGER.info(
                 f"E-STOP {'latch' if switch else 'release'} on {server_key}: "
                 f"driver={driver_resp!r}, estopped_actions={estopped}"

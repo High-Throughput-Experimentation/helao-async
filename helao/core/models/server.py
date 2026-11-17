@@ -132,6 +132,7 @@ class ActionServerModel(BaseModel, HelaoDict):
                     # status_msg should be a Action
                     endpoints={action_name: self.endpoints[action_name]},
                     last_action_uuid=self.last_action_uuid,
+                    estop=self.estop,
                 ).as_dict()
 
         return json_dict
