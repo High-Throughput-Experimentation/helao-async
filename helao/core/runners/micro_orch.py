@@ -262,10 +262,14 @@ class MicroOrch:
         )
 
     async def stop(self) -> None:
-        """Close the dispatcher and every cached RPC client.
+        """Detach from every server, then close the dispatcher and RPC clients.
 
-        Errors raised while closing individual clients are logged and
-        suppressed so all clients get a chance to close.
+        Detaching matters: a server keeps pushing status to a subscriber it was
+        never told left, and its push loop is serial, so one dead subscriber
+        (5 retries x 30 s) holds every later runner's status behind it.
+        Each detach is bounded by ``default_timeout``. Errors raised while
+        detaching or closing individual clients are logged and suppressed so
+        all of them get a chance.
         """
         if self._feed_task is not None:
             self._feed_task.cancel()
@@ -277,6 +281,11 @@ class MicroOrch:
         if self._feed is not None:
             await self._feed.close()
             self._feed = None
+        for server_name in list(self._subscribed):
+            try:
+                await self.detach_from(server_name)
+            except Exception:
+                LOGGER.exception(f"detach_client from {server_name!r} failed")
         await self.dispatcher.close()
         clients = list(self._clients.values())
         self._clients.clear()

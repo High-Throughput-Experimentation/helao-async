@@ -246,3 +246,46 @@ async def test_stop_between_experiments_does_not_duplicate_the_finished_one(rig)
     assert "aborted" in [str(s) for s in rec["sequence_status"]]
     uuids = [str(e["experiment_uuid"]) for e in rec["dispatched_experiments_abbr"]]
     assert uuids == [str(orch.last_experiment.experiment_uuid)]
+
+
+class _SubscriberServer(_FakeDataActionServer):
+    """Keeps a subscriber list like ActionHost.status_clients."""
+
+    def __init__(self, *a):
+        super().__init__(*a)
+        self.subscribers = set()
+        self.dispatcher.register("attach_client", self._attach)
+        self.dispatcher.register("detach_client", self._detach)
+
+    async def _attach(self, client_servkey, client_host, client_port, **kw):
+        self.subscribers.add((client_servkey, client_host, client_port))
+        return True
+
+    async def _detach(self, client_servkey, client_host, client_port, **kw):
+        self.subscribers.discard((client_servkey, client_host, client_port))
+        return True
+
+
+@pytest.mark.asyncio
+async def test_stop_detaches_from_servers():
+    """A stopped runner must leave the server's subscriber list: the server's
+    serial status push otherwise stalls 5 x 30 s on the dead address and every
+    later runner's wait_for_action never sees its status (the /runners hang)."""
+    root = tempfile.mkdtemp(prefix="micro_stop_")
+    port = _free_port()
+    fake = _SubscriberServer("FAKE", "ping", root)
+    await fake.dispatcher.serve("127.0.0.1", derive_rpc_port(port))
+    orch = _make_orch(root, {"FAKE": {"host": "127.0.0.1", "port": port}})
+    orch.group_urls = []
+    await orch.start()
+    try:
+        await orch.run_action(
+            Action(action_name="ping", action_server=MachineModel(server_name="FAKE")),
+            await_completion=False,
+        )
+        assert len(fake.subscribers) == 1
+        await orch.stop()
+        assert fake.subscribers == set()
+    finally:
+        await fake.dispatcher.close()
+        shutil.rmtree(root, ignore_errors=True)

@@ -155,3 +155,20 @@ def test_a_key_this_version_does_not_know_survives_a_write(tmp_path):
     ps.write_params(root, "seq", "seq_a", {"alpha": 1})
     with open(path, "r", encoding="utf8") as handle:
         assert json.load(handle)["future"] == {"x": 1}
+
+
+def test_runner_write_into_an_empty_root(tmp_path):
+    root = _root(tmp_path)
+    assert ps.write_params(root, "runner", "mod_a", {"n": 1})
+    assert ps.read_params(root, "runner", "mod_a") == {"n": 1}
+
+
+def test_runner_write_into_a_store_without_a_runner_section(tmp_path):
+    root = _root(tmp_path)
+    path = ps.params_path(root)
+    os.makedirs(os.path.dirname(path))
+    with open(path, "w", encoding="utf8") as handle:
+        json.dump({"seq": {"s": {"a": 1}}, "exp": {}, "last_meta": {}}, handle)
+    assert ps.write_params(root, "runner", "mod_a", {"n": 1})
+    assert ps.read_params(root, "runner", "mod_a") == {"n": 1}
+    assert ps.read_params(root, "seq", "s") == {"a": 1}

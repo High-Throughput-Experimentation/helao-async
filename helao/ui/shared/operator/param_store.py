@@ -39,7 +39,7 @@ def params_path(root: str) -> str:
 
 
 def _empty() -> dict:
-    return {"seq": {}, "exp": {}, "last_meta": {}}
+    return {**{kind: {} for kind in PARAM_KINDS}, "last_meta": {}}
 
 
 def _load(root: str) -> dict:
@@ -116,7 +116,7 @@ def write_params(root: str, kind: str, name: str, params: dict, meta=None) -> bo
     if not root:
         return False
     store = _load(root)
-    store[kind][name] = params
+    store.setdefault(kind, {})[name] = params
     if meta:
         store["last_meta"] = meta
     path = params_path(root)
