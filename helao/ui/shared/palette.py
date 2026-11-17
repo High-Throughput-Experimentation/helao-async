@@ -92,6 +92,7 @@ TW: Final[Mapping[str, str]] = {
     "purple-800": "#6b21a8",
     "fuchsia-600": "#c026d3",
     "pink-50": "#fdf2f8",
+    "blue-50": "#eff6ff",
     "pink-400": "#f472b6",
     "pink-500": "#ec4899",
     # The /control page canvas. A rose rather than a sixth cool tint because it
@@ -205,6 +206,7 @@ REFLEX_PAGE_TINTS: Final[Mapping[str, str]] = {
     "/quarantine": "red-50",
     "/logs": "indigo-50",
     "/group": "pink-50",
+    "/runners": "blue-50",
 }
 """One page canvas per Reflex route — the functional-section signal.
 

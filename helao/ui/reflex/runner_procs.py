@@ -31,6 +31,8 @@ _DEP_RE = re.compile(r"helao[\\/]deploy[\\/]([^\\/]+)[\\/]configs[\\/]")
 CATALOG: dict = {}
 PROCS: dict = {}
 _WATCHERS: set = set()
+# rc after Stop that mean "stopped": clean 0, SIGTERM, Windows CTRL_BREAK
+_CLEAN_STOP_RC = (0, -signal.SIGTERM) + ((0xC000013A,) if os.name == "nt" else ())
 _LAUNCHING: set = set()  # keys reserved between the check and PROCS[key]
 
 
@@ -177,7 +179,9 @@ def _taken(key: str) -> bool:
 
 async def _watch(p: RunnerProc) -> None:
     p.rc = await p.proc.wait()
-    if p.state != "killed":
+    if p.state == "stopping" and p.rc in _CLEAN_STOP_RC:  # early Stop can give -15
+        p.state = "stopped"
+    elif p.state != "killed":
         p.state = "exited"
 
 

@@ -240,3 +240,26 @@ def test_platform_ops_nt_branch(monkeypatch):
     assert rp._platform_ops("nt") == ({"creationflags": 512}, 1)
     monkeypatch.setattr(os, "name", "nt")
     assert rp._platform_ops()[0] == {"creationflags": 512}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "start,rc,want",
+    [
+        ("stopping", -15, "stopped"),
+        ("stopping", 0, "stopped"),
+        ("stopping", 1, "exited"),
+        ("killed", -9, "killed"),
+        ("running", 1, "exited"),
+    ],
+)
+async def test_watch_final_state(start, rc, want):
+    class Proc:
+        pid = 1
+
+        async def wait(self):
+            return rc
+
+    p = rp.RunnerProc(key="K", module="m", log_path="", proc=Proc(), state=start)
+    await rp._watch(p)
+    assert (p.state, p.rc) == (want, rc)

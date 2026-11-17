@@ -18,19 +18,13 @@ from typing import Optional
 
 from helao.core.rpc import derive_rpc_port
 from helao.core.runners.micro_orch import MicroOrch, RunnerStopped
-from helao.core.runners.requirements import inferred
+from helao.core.runners.requirements import default_key, inferred
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 PORT_WINDOW = (20000, 40000)
 TYPES = {"int": int, "float": float, "str": str, "bool": bool}
-
-
-def default_key(module_name: str) -> str:
-    """``pkg.simulatews_runner`` -> ``SIMULATEWS``."""
-    last = module_name.rsplit(".", 1)[-1].upper()
-    return last[: -len("_RUNNER")] if last.endswith("_RUNNER") else last
 
 
 def _run_func(mod):

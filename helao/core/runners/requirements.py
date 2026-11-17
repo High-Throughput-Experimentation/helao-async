@@ -10,6 +10,12 @@ from typing import Optional
 ACT_HELPERS = ("_act", "make_action")
 
 
+def default_key(module_name: str) -> str:
+    """``pkg.simulatews_runner`` -> ``SIMULATEWS``."""
+    last = module_name.rsplit(".", 1)[-1].upper()
+    return last[: -len("_RUNNER")] if last.endswith("_RUNNER") else last
+
+
 def _lit(node) -> Optional[str]:
     return (
         node.value
