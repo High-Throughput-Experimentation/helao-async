@@ -12,21 +12,18 @@ dispatches to both directly.
 
 Prerequisites
 -------------
-- ``ORCH`` and ``SIM`` must be running and share this script's ``root``. Launch
-  the ``test`` group (its Bokeh/operator pages are unused)::
+- ``ORCH`` and ``SIM`` must be running and share the launcher config's ``root``.
+  Launch the ``test`` group (its Bokeh/operator pages are unused)::
 
       ./helao.sh test           # ORCH:8001 + SIM:8002 + LIVE vis
 
-- ``root`` defaults to ``C:/INST_hlo``; override with ``HELAO_ROOT``.
-
 Run::
 
-    conda run -n helao python -m helao.deploy.test.runners.simulatews_runner
+    python -m helao.core.runners.launch test helao.deploy.test.runners.simulatews_runner
 """
 
 from __future__ import annotations
 
-import asyncio
 import os
 from typing import Optional
 
@@ -34,17 +31,7 @@ from helao.core.models.machine import MachineModel
 from helao.core.runners.micro_orch import MicroOrch
 from helao.helpers.premodels import Action
 
-ROOT = os.environ.get("HELAO_ROOT", "C:/INST_hlo")
-WORLD_CFG = {
-    "root": ROOT,
-    "servers": {
-        "ORCH": {"host": "127.0.0.1", "port": 8001},  # hosts the wait action
-        "SIM": {"host": "127.0.0.1", "port": 8002},  # hosts acquire_data
-    },
-}
-
-WAIT_TIME = 3.0
-DATA_DURATION = 5.0
+REQUIRES = {"ORCH": ["wait"], "SIM": ["acquire_data"]}
 
 
 def _act(server: str, name: str, params: Optional[dict] = None) -> Action:
@@ -56,30 +43,29 @@ def _act(server: str, name: str, params: Optional[dict] = None) -> Action:
     )
 
 
-async def main() -> None:
-    """wait -> acquire -> wait -> acquire, all dispatched over RPC."""
-    async with MicroOrch(
-        server_key="micro_ws",
-        host="127.0.0.1",
-        port=9110,
-        world_cfg=WORLD_CFG,
-    ) as orch:
-        acquisitions = []
-        for i in range(2):
-            await orch.run_action(_act("ORCH", "wait", {"waittime": WAIT_TIME}))
-            act = await orch.run_action(
-                _act("SIM", "acquire_data", {"duration": DATA_DURATION})
-            )
-            acquisitions.append(act)
-            print(f"acquire {i + 1}/2: action {act.action_uuid} -> {act.yml_path}")
+async def run(
+    orch: MicroOrch, wait_time: float = 3.0, data_duration: float = 5.0
+) -> None:
+    """wait -> acquire -> wait -> acquire, all dispatched over RPC.
 
-        zip_path = os.path.join(ROOT, "simulatews_microorch_runs.zip")
-        orch.zip_runs(zip_path)
-        print(
-            f"\nran {len(acquisitions)} acquisitions; "
-            f"tracked {len(orch.runs)} artifacts; archived -> {zip_path}"
+    Launch the ``test`` group first (ORCH and SIM).
+
+    Args:
+        wait_time: seconds for each ORCH/wait.
+        data_duration: seconds of SIM/acquire_data per acquisition.
+    """
+    acquisitions = []
+    for i in range(2):
+        await orch.run_action(_act("ORCH", "wait", {"waittime": wait_time}))
+        act = await orch.run_action(
+            _act("SIM", "acquire_data", {"duration": data_duration})
         )
+        acquisitions.append(act)
+        print(f"acquire {i + 1}/2: action {act.action_uuid} -> {act.yml_path}")
 
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    zip_path = os.path.join(orch.world_cfg["root"], "simulatews_microorch_runs.zip")
+    orch.zip_runs(zip_path)
+    print(
+        f"\nran {len(acquisitions)} acquisitions; "
+        f"tracked {len(orch.runs)} artifacts; archived -> {zip_path}"
+    )

@@ -35,21 +35,20 @@ simply marks that server stopped.)
 
 Prerequisites
 -------------
-- ``ORCH`` must be running and share this script's ``root``. Launch the
+- ``ORCH`` must be running and share the launcher config's ``root``. Launch the
   ``test`` group (SIM/visualizers are unused here)::
 
       ./helao.sh test           # ORCH:8001
 
-- ``root`` defaults to ``C:/INST_hlo``; override with ``HELAO_ROOT``.
+Scenarios (``scenario`` parameter): ``noblocking``, ``conditional`` or ``both``.
 
 Run::
 
-    conda run -n helao python -m helao.deploy.test.runners.test_runner
+    python -m helao.core.runners.launch test helao.deploy.test.runners.test_runner
 """
 
 from __future__ import annotations
 
-import asyncio
 import os
 from typing import Any, Optional
 
@@ -57,17 +56,7 @@ from helao.core.models.machine import MachineModel
 from helao.core.runners.micro_orch import MicroOrch
 from helao.helpers.premodels import Action
 
-ROOT = os.environ.get("HELAO_ROOT", "C:/INST_hlo")
-WORLD_CFG = {
-    "root": ROOT,
-    "servers": {
-        "ORCH": {"host": "127.0.0.1", "port": 8001},  # hosts wait/global/stop
-    },
-}
-
-WAIT_TIME = 0.2
-CYCLES = 2
-SAMPLES = (1, 2)
+REQUIRES = {"ORCH": ["wait", "add_global_param", "conditional_stop"]}
 
 # Script-level global store: the MicroOrch-script stand-in for Orch.global_params.
 GLOBALS: dict[str, Any] = {}
@@ -89,24 +78,26 @@ def _inject(params: dict, mapping: dict[str, str]) -> dict:
     return params
 
 
-async def consecutive_noblocking(orch: MicroOrch) -> None:
+async def consecutive_noblocking(
+    orch: MicroOrch, wait_time: float, cycles: int, samples: tuple
+) -> None:
     """Reproduce TEST_consecutive_noblocking via explicit ORCH dispatch."""
-    for smp in SAMPLES:
-        for cycle in range(CYCLES):
+    for smp in samples:
+        for cycle in range(cycles):
             # from_global: after the first cycle, dummy_param comes from the
             # prior cycle's test_wait (placeholder consumer, as in the library).
             dummy_param = GLOBALS["test_wait"] if cycle > 0 else 0.0
             print(f"sample {smp} cycle {cycle}: dummy_param={dummy_param}")
 
             # non-blocking wait: fire-and-forget so it overlaps the blocking one
-            nb = _act("ORCH", "wait", {"waittime": WAIT_TIME * 10})
+            nb = _act("ORCH", "wait", {"waittime": wait_time * 10})
             nb.nonblocking = True
             reply = await orch.dispatch_action(nb)
             # to_global: waittime -> test_wait (read the returned action_params)
             GLOBALS["test_wait"] = reply["action_params"]["waittime"]
 
             # blocking wait
-            await orch.run_action(_act("ORCH", "wait", {"waittime": WAIT_TIME}))
+            await orch.run_action(_act("ORCH", "wait", {"waittime": wait_time}))
 
 
 async def conditional_stop(orch: MicroOrch) -> None:
@@ -141,25 +132,35 @@ async def conditional_stop(orch: MicroOrch) -> None:
         await orch.run_action(_act("ORCH", "wait", {"waittime": 1}))
 
 
-async def main() -> None:
-    """Run both TEST equivalents, dispatching every action to the ORCH server."""
-    async with MicroOrch(
-        server_key="micro_test",
-        host="127.0.0.1",
-        port=9120,
-        world_cfg=WORLD_CFG,
-    ) as orch:
-        print("=== TEST_consecutive_noblocking equivalent ===")
-        await consecutive_noblocking(orch)
-        print(f"globals after loop: {dict(GLOBALS)}")
+async def run(
+    orch: MicroOrch,
+    wait_time: float = 0.2,
+    cycles: int = 2,
+    samples=(1, 2),
+    scenario: str = "both",
+) -> None:
+    """Run the TEST equivalents (``scenario``: noblocking, conditional or both).
 
+    Launch the ``test`` group first (ORCH).
+
+    Args:
+        wait_time: base seconds for ORCH/wait (the non-blocking wait is 10x).
+        cycles: cycles per sample in the noblocking scenario.
+        samples: sample numbers to loop over (a list or tuple).
+        scenario: ``noblocking``, ``conditional`` or ``both``.
+    """
+    if isinstance(samples, str):
+        raise ValueError("samples must be a list or tuple")
+    if scenario not in ("noblocking", "conditional", "both"):
+        raise ValueError(f"unknown scenario {scenario!r}")
+    if scenario in ("noblocking", "both"):
+        print("=== TEST_consecutive_noblocking equivalent ===")
+        await consecutive_noblocking(orch, wait_time, cycles, tuple(samples))
+        print(f"globals after loop: {dict(GLOBALS)}")
+    if scenario in ("conditional", "both"):
         print("\n=== TEST_sub_conditional_stop equivalent ===")
         await conditional_stop(orch)
 
-        zip_path = os.path.join(ROOT, "test_microorch_runs.zip")
-        orch.zip_runs(zip_path)
-        print(f"\ntracked {len(orch.runs)} artifacts; archived -> {zip_path}")
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    zip_path = os.path.join(orch.world_cfg["root"], "test_microorch_runs.zip")
+    orch.zip_runs(zip_path)
+    print(f"\ntracked {len(orch.runs)} artifacts; archived -> {zip_path}")

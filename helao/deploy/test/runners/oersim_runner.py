@@ -34,23 +34,19 @@ active-learning loop is a plain Python loop here (default stop rule mirrors
 
 Prerequisites
 -------------
-- ``CPSIM`` and ``GPSIM`` must be running and share this script's ``root``.
+- ``CPSIM`` and ``GPSIM`` must be running and share the launcher config's ``root``.
   Launch the ``demo0`` group (its ORCH/Bokeh are unused -- MicroOrch talks
   straight to the action servers)::
 
       ./helao.sh demo0          # CPSIM:8002, GPSIM:8003
 
-- ``root`` defaults to the demo configs' ``C:/INST_hlo``; override with
-  ``HELAO_ROOT`` to match your servers' configured root.
-
 Run::
 
-    conda run -n helao python -m helao.deploy.test.runners.oersim_runner
+    python -m helao.core.runners.launch demo0 helao.deploy.test.runners.oersim_runner
 """
 
 from __future__ import annotations
 
-import asyncio
 import os
 from typing import Any, Optional
 
@@ -58,19 +54,10 @@ from helao.core.models.machine import MachineModel
 from helao.core.runners.micro_orch import MicroOrch
 from helao.helpers.premodels import Action
 
-# --- wiring (matches demo0.yml CPSIM/GPSIM host:port) ----------------------
-ROOT = os.environ.get("HELAO_ROOT", "C:/INST_hlo")
-WORLD_CFG = {
-    "root": ROOT,
-    "servers": {
-        "CPSIM": {"host": "127.0.0.1", "port": 8002},
-        "GPSIM": {"host": "127.0.0.1", "port": 8003},
-    },
+REQUIRES = {
+    "CPSIM": ["change_plate", "get_loaded_plate", "measure_cp"],
+    "GPSIM": ["initialize_plate", "acquire_point", "update_model"],
 }
-
-PLATE_ID = 2750
-INIT_RANDOM_POINTS = 5
-ITERATIONS = 8  # active-learning steps (orchestrator default stop: max_iters)
 
 # Script-level global store -- the MicroOrch-script stand-in for
 # Orch.global_params. to_global writes here; from_global reads from here.
@@ -111,72 +98,76 @@ async def _capture(
     return result
 
 
-async def main() -> None:
-    """Load-plate then the active-learning loop, all via explicit run_action."""
-    async with MicroOrch(
-        server_key="micro_oersim",
-        host="127.0.0.1",
-        port=9100,
-        world_cfg=WORLD_CFG,
-    ) as orch:
-        # --- load plate (mirrors OERSIM_sub_load_plate) --------------------
-        await orch.run_action(_act("CPSIM", "change_plate", {"plate_id": PLATE_ID}))
+async def run(
+    orch: MicroOrch,
+    plate_id: int = 2750,
+    init_random_points: int = 5,
+    iterations: int = 8,
+) -> None:
+    """Load-plate then the active-learning loop, all via explicit run_action.
+
+    Launch the ``demo0`` group first (CPSIM and GPSIM).
+
+    Args:
+        plate_id: plate to load on CPSIM.
+        init_random_points: random points GPSIM initialises the plate with.
+        iterations: active-learning steps (mirrors the orchestrator's
+            ``max_iters`` default stop).
+    """
+    # --- load plate (mirrors OERSIM_sub_load_plate) --------------------
+    await orch.run_action(_act("CPSIM", "change_plate", {"plate_id": plate_id}))
+    # to_global: get_loaded_plate -> _loaded_plate_id
+    await _capture(
+        orch,
+        _act("CPSIM", "get_loaded_plate"),
+        to_global={"_loaded_plate_id": "_loaded_plate_id"},
+    )
+    # from_global: _loaded_plate_id -> initialize_plate.plate_id
+    await orch.run_action(
+        _act(
+            "GPSIM",
+            "initialize_plate",
+            _inject(
+                {"num_random_points": init_random_points, "reinitialize": False},
+                {"_loaded_plate_id": "plate_id"},
+            ),
+        )
+    )
+    print(f"loaded plate {GLOBALS.get('_loaded_plate_id')}")
+
+    # --- active-learning loop (mirrors OERSIM_sub_measure_CP) -----------
+    for step in range(iterations):
         # to_global: get_loaded_plate -> _loaded_plate_id
         await _capture(
             orch,
             _act("CPSIM", "get_loaded_plate"),
             to_global={"_loaded_plate_id": "_loaded_plate_id"},
         )
-        # from_global: _loaded_plate_id -> initialize_plate.plate_id
+        # from_global plate_id; to_global: acquire_point -> _feature
+        await _capture(
+            orch,
+            _act(
+                "GPSIM",
+                "acquire_point",
+                _inject({}, {"_loaded_plate_id": "plate_id"}),
+            ),
+            to_global={"_feature": "_feature"},
+        )
+        # from_global: _feature -> measure_cp.comp_vec
+        await orch.run_action(
+            _act("CPSIM", "measure_cp", _inject({}, {"_feature": "comp_vec"}))
+        )
+        # from_global: _loaded_plate_id -> update_model.plate_id
         await orch.run_action(
             _act(
                 "GPSIM",
-                "initialize_plate",
-                _inject(
-                    {"num_random_points": INIT_RANDOM_POINTS, "reinitialize": False},
-                    {"_loaded_plate_id": "plate_id"},
-                ),
+                "update_model",
+                _inject({}, {"_loaded_plate_id": "plate_id"}),
             )
         )
-        print(f"loaded plate {GLOBALS.get('_loaded_plate_id')}")
+        print(f"step {step + 1}/{iterations}: feature={GLOBALS.get('_feature')}")
 
-        # --- active-learning loop (mirrors OERSIM_sub_measure_CP) -----------
-        for step in range(ITERATIONS):
-            # to_global: get_loaded_plate -> _loaded_plate_id
-            await _capture(
-                orch,
-                _act("CPSIM", "get_loaded_plate"),
-                to_global={"_loaded_plate_id": "_loaded_plate_id"},
-            )
-            # from_global plate_id; to_global: acquire_point -> _feature
-            await _capture(
-                orch,
-                _act(
-                    "GPSIM",
-                    "acquire_point",
-                    _inject({}, {"_loaded_plate_id": "plate_id"}),
-                ),
-                to_global={"_feature": "_feature"},
-            )
-            # from_global: _feature -> measure_cp.comp_vec
-            await orch.run_action(
-                _act("CPSIM", "measure_cp", _inject({}, {"_feature": "comp_vec"}))
-            )
-            # from_global: _loaded_plate_id -> update_model.plate_id
-            await orch.run_action(
-                _act(
-                    "GPSIM",
-                    "update_model",
-                    _inject({}, {"_loaded_plate_id": "plate_id"}),
-                )
-            )
-            print(f"step {step + 1}/{ITERATIONS}: feature={GLOBALS.get('_feature')}")
-
-        # --- archive every produced artifact relative to RUNS_FINISHED -----
-        zip_path = os.path.join(ROOT, "oersim_microorch_runs.zip")
-        orch.zip_runs(zip_path)
-        print(f"\ntracked {len(orch.runs)} artifacts; archived -> {zip_path}")
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    # --- archive every produced artifact relative to RUNS_FINISHED -----
+    zip_path = os.path.join(orch.world_cfg["root"], "oersim_microorch_runs.zip")
+    orch.zip_runs(zip_path)
+    print(f"\ntracked {len(orch.runs)} artifacts; archived -> {zip_path}")
