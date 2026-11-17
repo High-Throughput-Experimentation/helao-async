@@ -113,7 +113,7 @@ is the static scan below. A module that fails to import, or has no async
 
 ## Requirement check
 
-`helao/ui/reflex/runner_requirements.py` (pure functions, no Reflex):
+`helao/core/runners/requirements.py` (pure functions, no Reflex; in core because the launcher's `--describe` calls `inferred`):
 
 - `declared` requirements come from the describe output's `requires`.
 - `inferred(source: str) -> dict` (called by `--describe`): AST scan of the module source for calls whose
