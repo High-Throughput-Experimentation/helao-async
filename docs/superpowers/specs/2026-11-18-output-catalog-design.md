@@ -18,7 +18,13 @@ In scope:
 
 - **Action servers.** For each action (endpoint) that writes data: the data files
   (`.jsonl` + `.meta.json`, `.parquet`, images, vendor raw files, zips) and the
-  `action_output` dict saved in the `-act.json` record.
+  action results saved in the `-act.json` record. Actions publish results mostly by
+  writing keys into `action.action_params` at run time (`action_params["x"] = ...`);
+  these keys feed `to_global_params` (`helao/hexagon/adapters/native/finalizer.py:280`).
+  The `action_output` dict is also read there, but in-tree code only sets
+  `error_message` in it (`helao/hexagon/app/action_host.py:1503`). Both are cataloged
+  as "action results". Params the caller passes in and the action never rewrites are
+  inputs, not results, and are not cataloged.
 - **Analyses.** Analysis modules under each deployment's `servers/analysis/analyses/`:
   the inline `output` dict of each `AnalysisOutputModel`
   (`helao/core/models/analysis.py:69`) and each S3 artifact (`output_type`,
@@ -56,11 +62,11 @@ written at `gamry_server2.py:NNN`.
 |---|---|---|---|---|---|
 | `t_s` | float | scalar per row | s | time since technique start | `driver.py:NNN` |
 
-`action_output` (in `-act.json`):
+Action results (in `-act.json`):
 
-| key | type | structure | meaning | set at |
-|---|---|---|---|---|
-| `fom_ocv` | float | scalar | ... | `...:NNN` |
+| key | in | type | structure | meaning | set at |
+|---|---|---|---|---|---|
+| `fom_ocv` | `action_params` | float | scalar | ... | `...:NNN` |
 ```
 
 Rules:
@@ -73,7 +79,7 @@ Rules:
   of `<n>` (config param, driver channel list, etc.).
 - Non-tabular files (image, vendor raw, zip): one row each, giving format, file name
   pattern, and writer.
-- An action that writes nothing gets one line: `No data files or action_output.` so
+- An action that writes nothing gets one line: `No data files or action results.` so
   absence is explicit rather than an omission.
 - Analyses: one table for the `output` dict keys, one row per S3 artifact.
 - Processors and batch scripts: same tables, plus a short list of the input files each
@@ -103,10 +109,13 @@ Per phase:
 - **Writer pass** (implementer): builds the tables from code with `file:line` citations.
 - **Review pass** (reviewer, separate agent): samples rows against their cited lines,
   checks type and structure, and searches each folder for writers the tables miss.
-- **Guard test** `test_readme_outputs.py` in each repo's tests: walks the repo's server,
-  analysis, processor and script folders; for any folder whose Python writes an output
-  (matches `json_data_keys`, `to_parquet`, `AnalysisOutputModel`, or a `.jsonl` write),
-  asserts the folder's `README.md` exists and contains `## Outputs`. It checks presence
+- **Guard test** `test_readme_outputs.py` in each deployment's `tests/`, calling one
+  shared helper `helao/helpers/readme_outputs.py`. The helper groups Python files into
+  units (`servers/<name>/`, `scripts/<name>/`, `processors/`). A unit whose code matches
+  a writer pattern (`enqueue_data*`, `write_live_data`, `write_file*(`,
+  `json_data_keys`, `action_output_dir`, run-time `action_params[...] =`,
+  `.to_parquet(`, `.to_csv(`, `savefig(`, `np.save`, `AnalysisOutput`) must have a
+  `README.md` containing an `## Outputs` heading. It checks presence
   only, not content. A mutation check (delete one `## Outputs` section, the test must
   fail) is required before the test is accepted.
 - Each repo's `CLAUDE.md`, where one exists, gains one line: when a change alters a
@@ -120,8 +129,8 @@ action, analysis, processor or batch script adds or changes an output.
 
 The skill carries:
 
-- **Trigger:** a diff that touches a writer (the guard test's patterns, `action_output`
-  assignments, `AnalysisOutputModel` construction), or a guard-test failure.
+- **Trigger:** a diff that touches a writer (the guard test's patterns, run-time
+  `action_params[...]` or `action_output` assignments, `AnalysisOutput` construction), or a guard-test failure.
 - **Scope step:** from the diff, list the affected folders and entry points; only those
   sections are rewritten.
 - **Format:** the rules in "Format" above, with the table templates.
