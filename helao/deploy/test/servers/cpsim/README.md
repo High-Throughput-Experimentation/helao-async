@@ -37,10 +37,10 @@ Data file `CPSIM-*.jsonl` (+ `.meta.json`):
 | field | type | structure | unit | meaning | written at |
 |---|---|---|---|---|---|
 | `elements` | list[str] | list[str] | none | first row only; element symbols of the selected composition (`el_str` split on `-`) | `helao/deploy/test/servers/cpsim/cpsim_driver.py:185` |
-| `atfracs` | list[unknown (dynamic)] | list[unknown (dynamic)] | at. % (as stored) | first row only; fraction of each element; type comes from the stored dataset, not from code | `helao/deploy/test/servers/cpsim/cpsim_driver.py:185` |
-| `t_s` | unknown (dynamic) | list[unknown (dynamic)] | s | time since trace start; one slice per poll row, empty in the first row; element type fixed by the stored dataset (the `calc_eta` docstring, `helao/deploy/test/servers/cpsim/oer_metrics.py:26`, calls them lists) | `helao/deploy/test/servers/cpsim/cpsim_driver.py:206` |
-| `erhe_v` | unknown (dynamic) | list[unknown (dynamic)] | V vs RHE | working-electrode potential; one slice per poll row, empty in the first row; element type fixed by the stored dataset | `helao/deploy/test/servers/cpsim/cpsim_driver.py:206` |
-| `<column>` | unknown (dynamic) | list[unknown (dynamic)] | unknown (dynamic) | one slice per poll row; every other key of the stored `CP3` dict; the set is fixed by the dataset `oer13_cps.pzstd`, not by code | `helao/deploy/test/servers/cpsim/cpsim_driver.py:188`, `:206` |
+| `atfracs` | list[float] | list[float] | at. % (as stored) | first row only; fraction of each element; elements are float as shipped in `helao/deploy/test/demos/data/oer13_cps.pzstd` | `helao/deploy/test/servers/cpsim/cpsim_driver.py:185` |
+| `t_s` | list[float \| int] | list[float \| int] | s | time since trace start; one slice per poll row, empty in the first row; elements are float or int as shipped in `helao/deploy/test/demos/data/oer13_cps.pzstd` | `helao/deploy/test/servers/cpsim/cpsim_driver.py:206` |
+| `erhe_v` | list[float] | list[float] | V vs RHE | working-electrode potential; one slice per poll row, empty in the first row; elements are float as shipped in `helao/deploy/test/demos/data/oer13_cps.pzstd` | `helao/deploy/test/servers/cpsim/cpsim_driver.py:206` |
+| `<column>` | unknown (dynamic) | list[unknown (dynamic)] | unknown (dynamic) | any further key of a stored `CP3` dict, one slice per poll row. The shipped dataset has exactly `t_s` and `erhe_v`; another dataset may add keys of unknown type | `helao/deploy/test/servers/cpsim/cpsim_driver.py:188`, `:206` |
 
 Column names are the stored names after the `column_aliases` rename (`helao/deploy/test/servers/cpsim/cpsim_driver.py:206`). The first row (`_exec`, `:185-188`) carries `elements`, `atfracs` and the empty series; poll rows (`_poll`, `:205-217`) carry only the series slices.
 
@@ -63,7 +63,7 @@ Data file `<action_abbr>-*.jsonl` (+ `.meta.json`), one row:
 | field | type | structure | unit | meaning | written at |
 |---|---|---|---|---|---|
 | `loaded_plate_id` | int | scalar per row | none | the startup `plate_id` (never updated by `change_plate`; see Notes) | `helao/deploy/test/servers/cpsim/cpsim_server.py:95` |
-| `orch_key` | str \| null | scalar per row | none | first orchestrator-group server key in the config, `null` if none (`helao/hexagon/app/action_host.py:245-250`) | `helao/deploy/test/servers/cpsim/cpsim_server.py:96` |
+| `orch_key` | str \| null | scalar per row | none | first orchestrator-group server key in the config, `null` if none (`helao/hexagon/app/action_host.py:238-250`) | `helao/deploy/test/servers/cpsim/cpsim_server.py:96` |
 | `orch_host` | str \| null | scalar per row | none | that orchestrator's host, `null` if none | `helao/deploy/test/servers/cpsim/cpsim_server.py:97` |
 | `orch_port` | int \| null | scalar per row | none | that orchestrator's port, `null` if none | `helao/deploy/test/servers/cpsim/cpsim_server.py:98` |
 
@@ -72,9 +72,9 @@ Action results (in `-act.json`):
 | key | in | type | structure | meaning | set at |
 |---|---|---|---|---|---|
 | `_loaded_plate_id` | `action_params` | int | scalar | copy of `loaded_plate_id` (startup plate; see Notes) | `helao/deploy/test/servers/cpsim/cpsim_server.py:100` |
-| `_orch_key` | `action_params` | str | scalar | copy of `orch_key` | `helao/deploy/test/servers/cpsim/cpsim_server.py:100` |
-| `_orch_host` | `action_params` | str | scalar | copy of `orch_host` | `helao/deploy/test/servers/cpsim/cpsim_server.py:100` |
-| `_orch_port` | `action_params` | int | scalar | copy of `orch_port` | `helao/deploy/test/servers/cpsim/cpsim_server.py:100` |
+| `_orch_key` | `action_params` | str \| null | scalar | copy of `orch_key`; `null` with no orchestrator | `helao/deploy/test/servers/cpsim/cpsim_server.py:100` |
+| `_orch_host` | `action_params` | str \| null | scalar | copy of `orch_host` | `helao/deploy/test/servers/cpsim/cpsim_server.py:100` |
+| `_orch_port` | `action_params` | int \| null | scalar | copy of `orch_port` | `helao/deploy/test/servers/cpsim/cpsim_server.py:100` |
 
 ### `change_plate` (action)
 
@@ -95,4 +95,4 @@ Action results (in `-act.json`):
 ## Notes
 
 - `_poll` emits `v[last_idx:newest_idx]`, a half-open slice, and finishes when `newest_idx` reaches the last index (`helao/deploy/test/servers/cpsim/cpsim_driver.py:206`, `:210`), so the final stored sample is never written to the data file.
-- `CPSim.change_plate` swaps only `self.data` and never assigns `self.loaded_plate`, which is set once at startup (`helao/deploy/test/servers/cpsim/cpsim_driver.py:55`, `:75-90`). `get_loaded_plate` and `change_plate` therefore always report the startup `plate_id`, even after a successful switch. An unknown plate id returns `False` silently and the action still finishes without error.
+- `CPSim.change_plate` swaps only `self.data` and never assigns `self.loaded_plate`, which is set once at startup (`helao/deploy/test/servers/cpsim/cpsim_driver.py:55`, `:75-90`). `get_loaded_plate` and `change_plate` therefore always report the startup `plate_id`, even after a successful switch. An unknown plate id makes `change_plate` return `False` to the caller; it is logged only at INFO (`cpsim_driver.py:89`) and the action still finishes without error.

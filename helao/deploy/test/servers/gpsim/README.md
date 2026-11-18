@@ -48,13 +48,13 @@ No data files or action results.
 
 Writes the plate's stored progress dict as one row and as underscore-prefixed `action_params` keys; writer `helao/deploy/test/servers/gpsim/gpsim_server.py:92-93`.
 
-Data file `<action_abbr>-*.jsonl` (+ `.meta.json`), one row: the progress dict above, plus `max_prediction_stdev` (float, present after a `check_condition` on the plate) (`gpsim_server.py:93`). The stored dict is `{}` until an `acquire_point` has run for the plate; the row is then `{}` and no `_` keys are set.
+Data file `<action_abbr>-*.jsonl` (+ `.meta.json`), one row: the progress dict above, plus `max_prediction_stdev` (float, present after a `check_condition` and before the next `acquire_point`, which replaces the stored dict with a fresh five-key one, `gpsim_driver.py:277-284`) (`gpsim_server.py:93`). The stored dict is `{}` until an `acquire_point` has run for the plate; the row is then `{}` and no `_` keys are set.
 
 Action results (in `-act.json`):
 
 | key | in | type | structure | meaning | set at |
 |---|---|---|---|---|---|
-| `_expected_improvement`, `_feature`, `_total_plate_mae`, `_plate_step`, `_global_step`, `_max_prediction_stdev` (last one only after a `check_condition` on the plate) | `action_params` | as the progress dict | as the progress dict | `_` + each progress field | `helao/deploy/test/servers/gpsim/gpsim_server.py:92` |
+| `_expected_improvement`, `_feature`, `_total_plate_mae`, `_plate_step`, `_global_step`, `_max_prediction_stdev` (last one only after a `check_condition` and before the next `acquire_point`) | `action_params` | as the progress dict (`_max_prediction_stdev`: float) | as the progress dict (`_max_prediction_stdev`: scalar) | `_` + each progress field | `helao/deploy/test/servers/gpsim/gpsim_server.py:92` |
 
 ### `acquire_point` (action)
 
@@ -70,7 +70,7 @@ Action results (in `-act.json`):
 
 ### `update_model` (action)
 
-Refits the surrogate via `GPSimExec` (`helao/deploy/test/servers/gpsim/gpsim_server.py:128`); `action_abbr` is `GPSIM` (`:127`). Its `_post_exec` queues the plate's stored progress dict as one row (`helao/deploy/test/servers/gpsim/gpsim_driver.py:595-599`), data file `GPSIM-*.jsonl` (+ `.meta.json`) with the progress dict fields above, plus `max_prediction_stdev` (float) when a `check_condition` has run on the plate. An empty dict queues no row (`helao/hexagon/app/executor_runner.py:158`).
+Refits the surrogate via `GPSimExec` (`helao/deploy/test/servers/gpsim/gpsim_server.py:128`); `action_abbr` is `GPSIM` (`:127`). Its `_post_exec` queues the plate's stored progress dict as one row (`helao/deploy/test/servers/gpsim/gpsim_driver.py:595-599`), data file `GPSIM-*.jsonl` (+ `.meta.json`) with the progress dict fields above, plus `max_prediction_stdev` (float) after a `check_condition` and before the next `acquire_point`. An empty dict queues no row (`helao/hexagon/app/executor_runner.py:158`).
 
 Action results (in `-act.json`):
 

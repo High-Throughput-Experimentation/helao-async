@@ -60,8 +60,8 @@ Registers no data-writing action and sets no action results. It hosts the framew
 
 | file | format | name pattern | meaning | written at |
 |---|---|---|---|---|
-| `.prg` | YAML | beside each record, `<record>.prg` | sync progress sidecar of one record | `helao/hexagon/adapters/native/sync_driver.py:1097` |
-| `-prc.json` | JSON | `<pidx>__<uuid>__<technique_name>-prc.json` in the experiment's directory | process record pushed to S3 and the API | `helao/hexagon/adapters/native/sync_driver.py:2608` |
+| `.prg` | YAML | the record path with its suffix replaced (`X-act.json` -> `X-act.prg`) | sync progress sidecar of one record | `helao/hexagon/adapters/native/sync_driver.py:1123-1124` (path `:819`) |
+| `-prc.json` | JSON | `<pidx>__<uuid>__<technique_name>-prc.json` in the experiment's directory | process record pushed to S3 and the API; a legacy `-prc.yml` is rewritten in place as YAML (`:2603-2604`) | `helao/hexagon/adapters/native/sync_driver.py:2607` |
 
 The rest of this section covers the recorder, active only with `s3_record: true`. It records every S3 upload the syncer would make to the local tree `<root>/S3_SIM`; the content is whatever the syncer uploads (the record's own file list, see `helao/hexagon/adapters/native/CLAUDE.md`).
 
