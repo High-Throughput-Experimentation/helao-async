@@ -56,7 +56,14 @@ No data files or action results. Its endpoints are `tags=["private"]` routes tha
 
 ### `sim_db_server` (entry point: `makeApp`)
 
-Writes no action data or action results. With `s3_record: true` it records every S3 upload the syncer would make to the local tree `<root>/S3_SIM`; the content is whatever the syncer uploads (the record's own file list, see `helao/hexagon/adapters/native/CLAUDE.md`).
+Registers no data-writing action and sets no action results. It hosts the framework syncer (`SimNativeSyncer`, `helao/deploy/test/servers/action/sim_db_server.py:81-88`, wired as the driver at `:99`), which writes the first two files below. They are framework outputs, documented in `helao/hexagon/adapters/native/CLAUDE.md` and `docs/superpowers/specs/2026-10-23-json-storage-format-design.md`, and are not catalogued field by field here.
+
+| file | format | name pattern | meaning | written at |
+|---|---|---|---|---|
+| `.prg` | YAML | beside each record, `<record>.prg` | sync progress sidecar of one record | `helao/hexagon/adapters/native/sync_driver.py:1097` |
+| `-prc.json` | JSON | `<pidx>__<uuid>__<technique_name>-prc.json` in the experiment's directory | process record pushed to S3 and the API | `helao/hexagon/adapters/native/sync_driver.py:2608` |
+
+The rest of this section covers the recorder, active only with `s3_record: true`. It records every S3 upload the syncer would make to the local tree `<root>/S3_SIM`; the content is whatever the syncer uploads (the record's own file list, see `helao/hexagon/adapters/native/CLAUDE.md`).
 
 | file | format | name pattern | meaning | written at |
 |---|---|---|---|---|

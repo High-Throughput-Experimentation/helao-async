@@ -48,4 +48,4 @@ Published by `WsSim.poll_data_loop` at 10 Hz, independent of any action (`helao/
 
 | field | type | structure | unit | meaning | written at |
 |---|---|---|---|---|---|
-| `sim_dict` | dict | dict, stamped `(value, epoch)` | none | `{<column>: float}` as above | `helao/deploy/test/servers/wssim/ws_simulator.py:85-86` |
+| `sim_dict` | dict | dict | none | `{<column>: float}` as above; each value is stamped `(value, epoch)` | `helao/deploy/test/servers/wssim/ws_simulator.py:85-86` |
