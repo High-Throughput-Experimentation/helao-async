@@ -47,3 +47,28 @@ params:
 
 Notes:
 - `NativeSyncer` replaces its params with those of the server keyed `SYNC` when its own params carry no `aws_config_path` (`helao/hexagon/adapters/native/native_syncer.py:48`). `s3_record` is read after that, so a `sim_db_server` that is not itself keyed `SYNC`, in a config that also has a `SYNC` server, reads `s3_record` from that other server's params. The test configs key it `SYNC`.
+
+## Outputs
+
+### `control_sim` (entry point: `makeApp`)
+
+No data files or action results. Its endpoints are `tags=["private"]` routes that return values to the caller (`helao/deploy/test/servers/action/control_sim.py:182`, `:193`, `:211`, `:231`, `:273`); it registers no data-writing action.
+
+### `sim_db_server` (entry point: `makeApp`)
+
+Writes no action data or action results. With `s3_record: true` it records every S3 upload the syncer would make to the local tree `<root>/S3_SIM`; the content is whatever the syncer uploads (the record's own file list, see `helao/hexagon/adapters/native/CLAUDE.md`).
+
+| file | format | name pattern | meaning | written at |
+|---|---|---|---|---|
+| uploaded object copy | as uploaded (not interpreted) | `<root>/S3_SIM/<bucket>/<key>` | copy of the object passed to `upload_fileobj` | `helao/deploy/test/servers/action/sim_db_server.py:68-71` |
+| uploaded object copy | as uploaded (not interpreted) | `<root>/S3_SIM/<bucket>/<key>` | copy of the file passed to `upload_file` | `helao/deploy/test/servers/action/sim_db_server.py:75-77` |
+| `manifest.jsonl` | JSON lines | `<root>/S3_SIM/manifest.jsonl` | one line per upload (below) | `helao/deploy/test/servers/action/sim_db_server.py:64-65` |
+
+Manifest line (built at `helao/deploy/test/servers/action/sim_db_server.py:57-62`):
+
+| field | type | structure | meaning |
+|---|---|---|---|
+| `bucket` | str | scalar per row | S3 bucket argument |
+| `key` | str | scalar per row | S3 key argument |
+| `mode` | str | scalar per row | `"fileobj"` or `"file"` |
+| `gzip` | bool | scalar per row | `key` ends with `.gz` |

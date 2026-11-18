@@ -114,6 +114,7 @@ The orchestrator is the long-lived queue-and-dispatch service used in production
 - The `dummy: true` / `simulation: true` keys at the top of a config govern banner color and whether simulated drivers are used.
 - Logging: do not instantiate loggers directly; use `helao.helpers.helao_logging.make_logger(__file__)` (or the already-initialized `logging.LOGGER`) so per-server log routing and email alerts work.
 - Vendor-SDK drivers: Gamry (`comtypes`) here and Ocean Insight (`oceandirect`) in a private deployment are Windows-only. Galil (`gclib`) runs on Windows and Linux; its servers take `gclib_api` (`"1"` default: wrapper 1.0 `gclib.py()`; `"2"`: wrapper 2.x `gclib.Controller`), which must match the wrapper installed in the env. Most other code, and the `test` deployment's simulators, run on Linux. All three import their vendor package inside `connect()` (Galil: inside the channel's `open()`, which `connect()` calls), not at module scope, so the modules and their tests still import on Linux; `run_tests.py` then reports a missing package as `ENV` rather than `FAIL`.
+- Output catalog: a folder under `helao/deploy/*/servers/`, `scripts/` or `processors/` that writes or publishes data documents every field in its `README.md` under `## Outputs` (type, structure, unit, meaning, `file:line`). Changing a written field means updating that table. `helao/helpers/readme_outputs.py` plus each deployment's `tests/test_readme_outputs.py` check the section exists.
 
 ### BioLogic potentiostats: three backends
 
