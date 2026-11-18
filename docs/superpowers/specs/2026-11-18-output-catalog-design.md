@@ -112,6 +112,29 @@ Per phase:
 - Each repo's `CLAUDE.md`, where one exists, gains one line: when a change alters a
   written field, update that folder README's `## Outputs`.
 
+## Re-run skill
+
+The procedure is recorded as a user-level skill, `helao-output-catalog`, kept outside
+this repository (user ruling), so it can name private deployments. It is re-run when an
+action, analysis, processor or batch script adds or changes an output.
+
+The skill carries:
+
+- **Trigger:** a diff that touches a writer (the guard test's patterns, `action_output`
+  assignments, `AnalysisOutputModel` construction), or a guard-test failure.
+- **Scope step:** from the diff, list the affected folders and entry points; only those
+  sections are rewritten.
+- **Format:** the rules in "Format" above, with the table templates.
+- **Procedure:** writer pass from code with `file:line`; separate reviewer pass; run the
+  repo's guard test; `black` the tests; commit per repo, no push without approval.
+- **Repo map:** which repo owns each deployment and its test command, and the rule that
+  tracked parent-repo files never name a private deployment.
+
+The skill is written in phase 1, used to run phases 2 and 3, and corrected wherever
+those phases show a step is wrong or missing. It is linked into the local Claude skills
+directory; other hosts get it only after their skill directory is wired to the same
+source.
+
 ## Delivery
 
 - `black` on the new test files before each commit.
