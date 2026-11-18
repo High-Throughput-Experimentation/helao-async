@@ -69,7 +69,7 @@ Rules:
 
 - Dynamic column names (per-channel, per-element, per-wavelength): expect a pattern row with its source, not a guessed literal list.
 - Units documented under the server README but written by a shared module elsewhere (`helao/hexagon/...`, `scripts/common/`): expect the row to cite the shared writer and the unit's call site both.
-- `action_params` keys that look like inputs but are rewritten at run time (e.g. `voltage` in `power_supply_server.py:511`): expect them listed as results.
+- `action_params` keys that look like inputs but are rewritten at run time (e.g. `voltage` in `power_supply_server.py:511`): expect them listed as results (these assignments overwrite the dispatched value with the endpoint default, a defect; the keys are still results).
 - A unit the guard does not flag but that writes through an unrecognized idiom (API posts, delegated converters): expect it covered via the test's `extra` list.
 - A README with a `## Outputs` heading but an empty section: the guard passes; the reviewer must reject it.
 
@@ -397,7 +397,7 @@ git -C /mnt/STORAGE/repos/helao/helao-async/helao/deploy/hte commit -m "docs: ou
 **Files:** Modify `README.md` in `helao/deploy/hte/servers/` `calc`, `co2sensor`, `diapump`, `htedata`, `kinesis`, `mfc`, `o2sensor`, `pal`, `power_supply`, `sample`, `syringe`, `tec`. Check `pdu` by hand (not flagged); document if it publishes results.
 
 - [ ] **Step 1: Baseline** (Task 4 Step 1 command). Expected: these units listed.
-- [ ] **Step 2: Document each unit.** `power_supply_server.py:511-512` rewrites `voltage` and `sleep_time` into `action_params`: these are results. `sample` writes archive/sample DB files: catalog the files and the sample fields written. `pal`: the run-time sample/`action_params` results it publishes for later actions.
+- [ ] **Step 2: Document each unit.** `power_supply_server.py:511-512` rewrites `voltage` and `sleep_time` into `action_params` from the endpoint kwargs, overwriting the dispatched value with the endpoint default (a defect); they are still listed as results. `sample` writes archive/sample DB files: catalog the files and the sample fields written. `pal`: the run-time sample/`action_params` results it publishes for later actions.
 - [ ] **Step 3: Re-run baseline.** Expected: none of these units listed.
 - [ ] **Step 4: Review, then commit (main session)**: `git -C .../hte add servers`; `commit -m "docs: output catalogs for servers (part 2)"`.
 
