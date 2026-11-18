@@ -297,3 +297,16 @@ def test_launch_refused_when_entry_changed_since_form_was_built(monkeypatch):
     monkeypatch.setattr(runners, "try_launch", boom)
     asyncio.run(runners.RunnersState.launch_selected.fn(st))
     assert st.error == "runner changed; re-check"
+
+
+def test_process_table_shows_exit_code_for_every_ended_state():
+    from types import SimpleNamespace as P
+
+    from helao.ui.reflex.runners import state_label
+
+    assert state_label(P(state="running", rc=None)) == "running"
+    assert state_label(P(state="stopping", rc=None)) == "stopping"
+    assert state_label(P(state="stopped", rc=0)) == "stopped (rc 0)"
+    assert state_label(P(state="stopped", rc=-15)) == "stopped (rc -15)"
+    assert state_label(P(state="killed", rc=-9)) == "killed (rc -9)"
+    assert state_label(P(state="exited", rc=1)) == "exited 1"

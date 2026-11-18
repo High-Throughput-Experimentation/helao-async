@@ -147,6 +147,15 @@ def _entry_rows() -> list:
     return rows
 
 
+def state_label(p) -> str:
+    """Process-table state; an ended process always shows its exit code."""
+    if p.rc is None:
+        return p.state
+    if p.state == "exited":
+        return f"exited {p.rc}"
+    return f"{p.state} (rc {p.rc})"
+
+
 def _proc_rows() -> list:
     return [
         [
@@ -155,7 +164,7 @@ def _proc_rows() -> list:
             str(p.pid),
             time.strftime("%H:%M:%S", time.localtime(p.started)),
             p.state,
-            f"exited {p.rc}" if p.state == "exited" else p.state,
+            state_label(p),
             p.log_path,
         ]
         for p in runner_procs.PROCS.values()

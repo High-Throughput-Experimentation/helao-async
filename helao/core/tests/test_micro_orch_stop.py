@@ -335,3 +335,154 @@ async def test_runner_except_exception_loop_cannot_swallow_a_stop(rig):
             except Exception:
                 continue
     assert attempts == 1 and fake.action_calls == []
+
+
+async def _stop_after(orch, delay):
+    await asyncio.sleep(delay)
+    orch.request_stop()
+
+
+@pytest.mark.asyncio
+async def test_stop_abandons_attach_to_a_down_server():
+    """ "launch anyway" against a down server: Stop must not wait out the
+    attach + dispatch RPC timeouts (was about 50 s on the live page)."""
+    root = tempfile.mkdtemp(prefix="micro_stop_")
+    port = _free_port()  # nothing listens here
+    orch = _make_orch(root, {"FAKE": {"host": "127.0.0.1", "port": port}})
+    orch.group_urls = []
+    await orch.start()
+    try:
+        stopper = asyncio.create_task(_stop_after(orch, 0.3))
+        act = Action(action_name="ping", action_server=MachineModel(server_name="FAKE"))
+        with pytest.raises(RunnerStopped):
+            await asyncio.wait_for(orch.dispatch_action(act, timeout=60), 3)
+        await stopper
+    finally:
+        await orch.stop()
+        shutil.rmtree(root, ignore_errors=True)
+
+
+class _SlowInlineServer(_FakeDataActionServer):
+    """Runs the action inside the RPC handler, like galil ``move``."""
+
+    def __init__(self, *a):
+        super().__init__(*a)
+        self.entered = asyncio.Event()
+
+    async def _run_action(self, action: dict = None, **kwargs):
+        self.entered.set()
+        await asyncio.sleep(1.0)
+        return await super()._run_action(action=action, **kwargs)
+
+
+@pytest.mark.asyncio
+async def test_stop_never_abandons_a_dispatch_to_a_live_server():
+    """An unanswered dispatch to a subscribed server is a running inline
+    action (spec D4): Stop must wait for its reply, not cut it loose."""
+    root = tempfile.mkdtemp(prefix="micro_stop_")
+    port = _free_port()
+    fake = _SlowInlineServer("FAKE", "ping", root)
+    await fake.dispatcher.serve("127.0.0.1", derive_rpc_port(port))
+    orch = _make_orch(root, {"FAKE": {"host": "127.0.0.1", "port": port}})
+    orch.group_urls = []
+    await orch.start()
+    try:
+        act = Action(action_name="ping", action_server=MachineModel(server_name="FAKE"))
+        task = asyncio.create_task(orch.dispatch_action(act, timeout=60))
+        await asyncio.wait_for(fake.entered.wait(), 5)
+        orch.request_stop()
+        result = await asyncio.wait_for(task, 5)  # no RunnerStopped
+        assert isinstance(result, dict)
+        finishes = [e for e in orch.drain_events() if e.get("kind") == "finish"]
+        assert "aborted" not in [e.get("status") for e in finishes]
+    finally:
+        await orch.stop()
+        await fake.dispatcher.close()
+        shutil.rmtree(root, ignore_errors=True)
+
+
+@pytest.mark.asyncio
+async def test_stop_abandons_dispatch_to_a_server_that_never_answered_attach():
+    root = tempfile.mkdtemp(prefix="micro_stop_")
+    port = _free_port()  # nothing listens here
+    orch = _make_orch(root, {"FAKE": {"host": "127.0.0.1", "port": port}})
+    orch.default_timeout = 0.3  # attach fails fast; the dispatch then hangs
+    orch.group_urls = []
+    await orch.start()
+    try:
+        act = Action(action_name="ping", action_server=MachineModel(server_name="FAKE"))
+        task = asyncio.create_task(orch.dispatch_action(act, timeout=60))
+        for _ in range(100):  # wait until the dispatch is pending
+            await asyncio.sleep(0.05)
+            if act.action_uuid in orch._pending:
+                break
+        assert act.action_uuid in orch._pending
+        orch.request_stop()
+        with pytest.raises(RunnerStopped):
+            await asyncio.wait_for(task, 3)
+        finishes = [e for e in orch.drain_events() if e.get("kind") == "finish"]
+        assert [e.get("status") for e in finishes] == ["aborted"]
+        assert "FAKE" not in orch.finish_errors
+        assert act.action_uuid not in orch._pending
+    finally:
+        await orch.stop()
+        shutil.rmtree(root, ignore_errors=True)
+
+
+@pytest.mark.asyncio
+async def test_cancelling_a_pending_dispatch_leaves_no_orphan_rpc_call():
+    root = tempfile.mkdtemp(prefix="micro_stop_")
+    port = _free_port()  # nothing listens here
+    orch = _make_orch(root, {"FAKE": {"host": "127.0.0.1", "port": port}})
+    orch.default_timeout = 0.3
+    orch.group_urls = []
+    await orch.start()
+    try:
+        act = Action(action_name="ping", action_server=MachineModel(server_name="FAKE"))
+        task = asyncio.create_task(orch.dispatch_action(act, timeout=60))
+        for _ in range(100):
+            await asyncio.sleep(0.05)
+            if act.action_uuid in orch._pending:
+                break
+        task.cancel()  # e.g. a forced second Stop
+        await asyncio.gather(task, return_exceptions=True)
+        await asyncio.sleep(0.05)
+        calls = [
+            t
+            for t in asyncio.all_tasks()
+            if "RPCClient.call" in repr(t.get_coro()) and not t.done()
+        ]
+        assert calls == []
+    finally:
+        await orch.stop()
+        shutil.rmtree(root, ignore_errors=True)
+
+
+@pytest.mark.asyncio
+async def test_stop_never_abandons_dispatch_to_a_server_that_pushed_status():
+    """Late registration: attach timed out client-side, but the server
+    registered us and pushed status, so it is alive and must be awaited."""
+    root = tempfile.mkdtemp(prefix="micro_stop_")
+    port = _free_port()
+    fake = _SlowInlineServer("FAKE", "ping", root)
+    await fake.dispatcher.serve("127.0.0.1", derive_rpc_port(port))
+    orch = _make_orch(root, {"FAKE": {"host": "127.0.0.1", "port": port}})
+    orch.group_urls = []
+    await orch.start()
+    try:
+        orch._subscribed.discard("FAKE")
+        orch.attach_to = _never_subscribes  # type: ignore[method-assign]
+        orch.server_estop["FAKE"] = False  # it has pushed status to us
+        act = Action(action_name="ping", action_server=MachineModel(server_name="FAKE"))
+        task = asyncio.create_task(orch.dispatch_action(act, timeout=60))
+        await asyncio.wait_for(fake.entered.wait(), 5)
+        orch.request_stop()
+        assert isinstance(await asyncio.wait_for(task, 5), dict)
+    finally:
+        await orch.stop()
+        await fake.dispatcher.close()
+        shutil.rmtree(root, ignore_errors=True)
+
+
+async def _never_subscribes(server_name):
+    return False

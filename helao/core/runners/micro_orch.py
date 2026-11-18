@@ -223,6 +223,7 @@ class MicroOrch:
         self.server_estop: dict[str, bool] = {}
         self.finish_errors: dict[str, str] = {}
         self.stop_requested = False
+        self._stop_event = asyncio.Event()
         # ponytail: unbounded per action; a runner is short-lived. Prune by age if one runs for days.
         self.t_dispatch: dict[UUID, float] = {}
         self.t_finish: dict[UUID, float] = {}
@@ -473,8 +474,38 @@ class MicroOrch:
         del self._events[:-EVENTS_MAX]
 
     def request_stop(self) -> None:
-        """Dispatch nothing more; actions already dispatched are still awaited."""
+        """Dispatch nothing more; actions already dispatched are still awaited.
+
+        Exception: a server that never answered attach is treated as down, so
+        a pending attach, or a dispatch to such a server, is abandoned (see
+        :meth:`_unless_stopped`). A dispatch to a subscribed server is always
+        awaited: many endpoints run the whole action inside the handler, so
+        an unanswered dispatch there means the action is running.
+        """
         self.stop_requested = True
+        self._stop_event.set()
+
+    async def _unless_stopped(self, coro):
+        """Await ``coro``; abandon it and raise RunnerStopped if a stop comes first.
+
+        Only for calls with no hardware effect, or to a server that never
+        answered attach (down): against a down server they would otherwise
+        hold a stop for the whole RPC timeout. Never for a dispatch to a
+        subscribed server (see :meth:`request_stop`).
+        """
+        task = asyncio.ensure_future(coro)
+        stop = asyncio.ensure_future(self._stop_event.wait())
+        try:
+            await asyncio.wait({task, stop}, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            stop.cancel()
+            if not task.done():
+                task.cancel()  # stop, or the outer task was cancelled: no orphan
+        if task.done():
+            return task.result()
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        raise RunnerStopped("stop requested before the server answered")
 
     def drain_events(self) -> list[dict]:
         """Events since the last drain, oldest first."""
@@ -637,6 +668,10 @@ class MicroOrch:
                 after initialization.
             Exception: Any exception raised by the underlying RPC call is
                 re-raised after cleaning up the pending future.
+            RunnerStopped: A stop was requested before the call, during the
+                attach, or during a dispatch to a server that never answered
+                attach or pushed status (treated as down; see
+                :meth:`request_stop`).
         """
         if self.stop_requested:
             raise RunnerStopped("stop requested")
@@ -648,7 +683,7 @@ class MicroOrch:
         assert action_name is not None, "action.action_name must be set"
         assert action_uuid is not None, "init_act must have assigned action_uuid"
 
-        await self.attach_to(server_name)
+        await self._unless_stopped(self.attach_to(server_name))
 
         loop = asyncio.get_running_loop()
         fut: asyncio.Future = loop.create_future()
@@ -669,15 +704,28 @@ class MicroOrch:
         try:
             # `args=` (not `**rpc_args`) so an action param named `timeout`
             # cannot collide with call()'s own `timeout` kwarg.
-            result = await client.call(method, timeout=timeout, args=rpc_args)
-        except Exception:
+            call = client.call(method, timeout=timeout, args=rpc_args)
+            # alive = answered attach, or has pushed status to us (an attach
+            # that timed out client-side but registered server-side)
+            if server_name in self._subscribed or server_name in self.server_estop:
+                result = await call  # alive: the action may be running inline
+            else:  # never answered: treat as down, Stop may abandon
+                result = await self._unless_stopped(call)
+        except (Exception, RunnerStopped) as exc:
+            status = "aborted" if isinstance(exc, RunnerStopped) else "errored"
+            if status == "aborted":
+                LOGGER.warning(
+                    f"stop: abandoned unanswered dispatch {method} ({action_uuid}); "
+                    "server never answered attach, the action may still be running"
+                )
             async with self._cond:
                 self._pending_meta.pop(action_uuid, None)
                 pending = self._pending.pop(action_uuid, None)
                 if pending is not None and not pending.done():
                     pending.cancel()
-                self.finish_errors[server_name] = "errored"
-                self._emit("finish", server_name, action_name, action_uuid, "errored")
+                if status == "errored":
+                    self.finish_errors[server_name] = "errored"
+                self._emit("finish", server_name, action_name, action_uuid, status)
                 self._cond.notify_all()
             raise
 
