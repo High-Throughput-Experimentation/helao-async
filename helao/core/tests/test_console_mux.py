@@ -130,7 +130,10 @@ def test_bad_chunk_costs_one_line_and_is_counted():
     mux = launch.ConsoleMux(stream)
     mux._write_out(["a\n", "→\n", "b\n"], 0)
     assert stream.text() == "a\nb\n"
-    assert mux._dropped_lines == 1
+    assert mux._failed_lines == 1 and mux._dropped_lines == 0
+    mux._write_out([], 0, 1)
+    assert "1 line(s) lost" in stream.text()
+    assert "overflowed" not in stream.text()
 
 
 def test_isolation_mid_batch_returns_remainder_to_buffer():
@@ -147,25 +150,30 @@ def test_isolation_mid_batch_returns_remainder_to_buffer():
     assert mux._buffered_bytes == 4
 
 
-def test_drain_flushes_queue_and_is_bounded_on_blocked_terminal():
-    stream = _Stream()
+def test_drain_waits_for_a_blocked_write_then_returns():
+    gate = threading.Event()
+    stream = _Stream(gate)
     mux = launch.ConsoleMux(stream)
     wf = _child(mux, "A")
     wf.write(b"last words\n")
     wf.flush()
-    assert _wait(lambda: mux._buffer or "last words" in stream.text())
-    mux.drain(2.0)
+    time.sleep(0.2)
+    threading.Timer(0.3, gate.set).start()
+    mux.drain(5.0)
     assert "last words" in stream.text()
     wf.close()
 
+
+def test_drain_gives_up_on_a_terminal_that_stays_blocked():
     gate = threading.Event()
     mux = launch.ConsoleMux(_Stream(gate))
     wf = _child(mux, "A")
     wf.write(b"stuck\n")
     wf.flush()
     time.sleep(0.2)
-    t0 = time.monotonic()
-    mux.drain(0.5)
-    assert time.monotonic() - t0 < 2.0
+    t = threading.Thread(target=mux.drain, args=(0.5,), daemon=True)
+    t.start()
+    t.join(2.0)
+    assert not t.is_alive(), "drain ignored its timeout"
     gate.set()
     wf.close()

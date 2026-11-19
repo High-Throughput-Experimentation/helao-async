@@ -119,8 +119,10 @@ SHUTDOWN_POST_ORDER = ["orchestrator", "action"]
 # is doing. A child writing to a full pipe blocks inside write(); for a helao
 # server that means its asyncio loop stops serving HTTP, status websockets and
 # driver polling *while the process stays alive and its PID stays valid*, so
-# neither Pidd._pid_is_server nor server_is_idle would notice. Only the display
-# is gated -- drained lines go to an in-memory buffer and are flushed on resume.
+# neither Pidd._pid_is_server nor server_is_idle would notice. Readers only read
+# and enqueue into a bounded buffer (oldest lines dropped and counted); a single
+# writer thread is the only code that ever blocks on the terminal, and it holds
+# output while the display is gated (menu isolation) until resume.
 
 # Launcher-side buffer holding output produced while the display is suppressed.
 CONSOLE_BUFFER_MAX_BYTES = 1024 * 1024
@@ -193,6 +195,7 @@ class ConsoleMux:
         self._buffer = deque()
         self._buffered_bytes = 0
         self._dropped_lines = 0
+        self._failed_lines = 0
         self._pipes = {}  # server_key -> binary pipe object being drained
         self._suppress_reason = None
 
@@ -360,18 +363,19 @@ class ConsoleMux:
                 while not (self._buffer and self._display.is_set()):
                     self._cv.wait()
                 pending, dropped = list(self._buffer), self._dropped_lines
+                failed, self._failed_lines = self._failed_lines, 0
                 self._buffer.clear()
                 self._buffered_bytes = 0
                 self._dropped_lines = 0
                 self._writing = True
             try:
-                self._write_out(pending, dropped)
+                self._write_out(pending, dropped, failed)
             finally:
                 with self._cv:
                     self._writing = False
                     self._cv.notify_all()
 
-    def _write_out(self, pending, dropped):
+    def _write_out(self, pending, dropped, failed=0):
         """Write ``pending`` (and a dropped-lines note) to the stream, unlocked.
 
         A chunk that fails to write is counted as dropped, not allowed to take
@@ -385,6 +389,12 @@ class ConsoleMux:
                     f"({CONSOLE_BUFFER_MAX_BYTES // 1024} KiB) overflowed while "
                     f"the menu was open or the terminal was blocked; see the "
                     f"per-server logs under LOGS/.\n"
+                )
+            if failed:
+                self.stream.write(
+                    f"... {failed} line(s) lost: the terminal rejected the write "
+                    f"(e.g. an encoding error); see the per-server logs under "
+                    f"LOGS/.\n"
                 )
         except Exception:
             pass
@@ -401,7 +411,7 @@ class ConsoleMux:
                 failed += 1
         if failed:
             with self._cv:
-                self._dropped_lines += failed
+                self._failed_lines += failed
         try:
             self.stream.flush()
         except Exception:
@@ -462,7 +472,10 @@ class ConsoleMux:
     # -- isolation ----------------------------------------------------------
 
     def resume(self, reason=None):
-        """End suppression: leave the alternate screen and flush the buffer.
+        """End suppression: leave the alternate screen and wake the writer.
+
+        The writer thread flushes the held output asynchronously; this returns
+        before that has happened.
 
         Idempotent and safe to call from the watchdog thread while the menu's
         blocking menu read is still pending -- that intentionally restores the
