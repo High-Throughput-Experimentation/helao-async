@@ -58,6 +58,7 @@ from helao.helpers.premodels import Action, Experiment
 from helao.helpers.time_utils import gen_uuid
 from helao.helpers.zdeque import zdeque
 from helao.hexagon.app import orch_unpack
+from helao.hexagon.domain.orchestration import StatusChanged
 from helao.hexagon.domain.dispatch_policy import (
     DispatchPolicy,
     DrainForStop,
@@ -250,6 +251,43 @@ class DispatchRunner:
 
         A.init_act(time_offset=orch.ntp_offset)
 
+    def _purge_nonactive(self, action_uuid) -> None:
+        """Drop *action_uuid* from every finished/skipped bucket, global and
+        per endpoint (a no-op for an action never dispatched before)."""
+        gsm = self.orch.globalstatusmodel
+        for bucket in gsm.nonactive_dict.values():
+            bucket.pop(action_uuid, None)
+        for asm in gsm.server_dict.values():
+            for ep in asm.endpoints.values():
+                for bucket in ep.nonactive_dict.values():
+                    bucket.pop(action_uuid, None)
+
+    async def _retire_failed(self, action_uuid) -> None:
+        """Retire a failed dispatch's uuid from the active dicts (to ``skipped``).
+
+        The action published ``active`` before its dispatch answered 500, and no
+        status will ever clear it, so the stop drain would wait on it forever.
+        Does what ``/clear_actives`` does for one uuid, then folds
+        ``StatusChanged`` so ``orch_state`` is idle before the drain re-checks
+        it (the ``HexHealthMonitor`` order). Caller holds ``aiolock``.
+        """
+        gsm = self.orch.globalstatusmodel
+        act = gsm.active_dict.pop(action_uuid, None)
+        for asm in gsm.server_dict.values():
+            for ep in asm.endpoints.values():
+                ep_act = ep.active_dict.pop(action_uuid, None)
+                if ep_act is not None:
+                    act = act or ep_act
+                    ep.nonactive_dict.setdefault(HloStatus.skipped, {})[
+                        action_uuid
+                    ] = ep_act
+        if act is not None:
+            gsm.nonactive_dict.setdefault(HloStatus.skipped, {})[action_uuid] = act
+            LOGGER.info(f"retired {action_uuid} after failed dispatch")
+            await self.orch._hex_runtime.handle(
+                StatusChanged(any_active=bool(gsm.active_dict))
+            )
+
     async def _dispatch_action_locked(
         self, A
     ) -> tuple[Optional[ErrorCodes], Optional[dict]]:
@@ -285,6 +323,10 @@ class DispatchRunner:
                 LOGGER.info("orchestrator estopped, not dispatching action")
                 error_code = ErrorCodes.estop
 
+        # A re-dispatch (resume after a failed attempt) makes the old attempt's
+        # record obsolete: drop it so this response self-registers below.
+        self._purge_nonactive(A.action_uuid)
+
         # The dispatch itself runs WITHOUT the lock. It used to be inside it,
         # and since the POST is held for the whole action, /update_status --
         # which takes the same lock -- was starved for the action's duration:
@@ -314,6 +356,7 @@ class DispatchRunner:
                 if cond:
                     orch.current_stop_message = stop_message
                     LOGGER.warning(stop_message)
+                    await self._retire_failed(A.action_uuid)
                     await orch.stop()
                     LOGGER.info(f"Re-queuing {A.action_name}")
                     orch.action_dq.insert(0, A)

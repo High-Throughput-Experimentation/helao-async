@@ -83,6 +83,8 @@ class ActionAdmission:
         #: Memory ceiling: ``maxlen`` (500) entries, each holding the handler's
         #: result, so a server with large results can hold 500 of them.
         self._seen: "OrderedDict[str, list]" = OrderedDict()
+        #: Strong refs to unwedge drain tasks (asyncio keeps only weak ones).
+        self._drains: set = set()
 
     def _remember(
         self, uuid: str, record: dict, parked: bool, ids: Optional[set] = None
@@ -118,6 +120,35 @@ class ActionAdmission:
             entry[2].set_result(_FAILED)
         if release and entry is not None:
             self._seen.pop(str(uuid), None)
+        if uuid and not release:
+            self._unwedge(str(uuid))
+
+    def _unwedge(self, uuid: str) -> None:
+        """Retire a raised handler's uuid from its endpoint, locally.
+
+        A handler that raised after ``begin()`` never publishes a terminal
+        status, so its uuid sat in the endpoint's ``active_dict`` and every
+        later request on the endpoint parked behind it. Nothing is published
+        (the orchestrator learns of the failure from the 500). A session whose
+        executor still runs is left alone: it publishes its own terminal status.
+        The queue drain runs under the host's ``drain_lock``, so it cannot race
+        ``log_status_task``'s own drain.
+        """
+        running = {id(s) for s in self.host.executors.values()}
+        for k, sess in list(self.host.actives.items()):
+            if str(k) != uuid or id(sess) in running:
+                continue
+            ep = self.host.actionservermodel.endpoints.get(sess.action.action_name)
+            if ep is None:
+                continue
+            # after split() the endpoint holds the session's current uuid
+            freed = [ep.active_dict.pop(u, None) for u in {k, sess.action.action_uuid}]
+            if any(f is not None for f in freed):
+                t = asyncio.ensure_future(
+                    self.host.drain_endpoint_queues(sess.action.get_act())
+                )
+                self._drains.add(t)
+                t.add_done_callback(self._drains.discard)
 
     def _is_failed(self, entry: Optional[list], held: Any) -> bool:
         """True if the record *held* for a uuid is a failed, finished action."""

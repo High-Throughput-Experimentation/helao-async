@@ -199,6 +199,9 @@ class ActionHost(HelaoFastAPI):
         self.local_action_queue = zdeque([])
         #: Per-endpoint parking, keyed by endpoint name.
         self.endpoint_queues: dict = {}
+        #: Held across a queue drain so ``log_status_task`` and the unwedge
+        #: path (``ActionAdmission``) never pop two parked actions at once.
+        self.drain_lock = asyncio.Lock()
         #: Route descriptors; populated by init_endpoint_status at startup.
         self.fast_urls: list = []
         #: Captured at startup; the executor runner's create_task target.
@@ -825,31 +828,43 @@ class ActionHost(HelaoFastAPI):
                 ].clear_finished()
                 LOGGER.debug("all log_status_task messages sent.")
 
-                active_nonqueued = {
-                    endpoint: [
-                        auuid
-                        for auuid, act in endmod.active_dict.items()
-                        if not act.action_params.get("queued_on_actserv", False)
-                        or act.action_params.get("queued_launch", False)
-                    ]
-                    for endpoint, endmod in self.actionservermodel.endpoints.items()
-                }
-                active_nq = [x for y in active_nonqueued.values() for x in y]
-
-                if not self.server_params.get("allow_concurrent_actions", True):
-                    if len(self.local_action_queue) > 0 and not active_nq:
-                        await self.process_unified_queue()
-                else:
-                    if len(
-                        self.endpoint_queues[status_msg.action_name]
-                    ) > 0 and not active_nonqueued.get(status_msg.action_name, []):
-                        await self.process_endpoint_queue(status_msg)
+                await self.drain_endpoint_queues(status_msg)
 
             LOGGER.info("log_status_task done.")
 
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             LOGGER.error(f"status logger task was cancelled with error: {repr(e), tb,}")
+
+    async def drain_endpoint_queues(self, status_msg) -> None:
+        """Dispatch a queued action if the endpoint (or server) just freed up.
+
+        Run after every status, and by ``ActionAdmission`` when it retires a
+        raised handler's uuid locally. Serialized under ``drain_lock``, and the
+        decision is made after the lock is taken: the dispatch awaits the whole
+        relaunched action, so a second drain waits for it and then sees the
+        endpoint busy or the queue empty.
+        """
+        async with self.drain_lock:
+            active_nonqueued = {
+                endpoint: [
+                    auuid
+                    for auuid, act in endmod.active_dict.items()
+                    if not act.action_params.get("queued_on_actserv", False)
+                    or act.action_params.get("queued_launch", False)
+                ]
+                for endpoint, endmod in self.actionservermodel.endpoints.items()
+            }
+            active_nq = [x for y in active_nonqueued.values() for x in y]
+
+            if not self.server_params.get("allow_concurrent_actions", True):
+                if len(self.local_action_queue) > 0 and not active_nq:
+                    await self.process_unified_queue()
+            else:
+                if len(
+                    self.endpoint_queues[status_msg.action_name]
+                ) > 0 and not active_nonqueued.get(status_msg.action_name, []):
+                    await self.process_endpoint_queue(status_msg)
 
     def stop_executor(self, executor_id: str) -> dict:
         """Legacy's spelling; the estop handler and clients both use it."""
