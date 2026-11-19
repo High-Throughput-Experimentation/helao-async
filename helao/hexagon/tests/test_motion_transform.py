@@ -2,6 +2,7 @@
 (P3a D6 split of `TransformXY` out of `galil_motion_driver.py`)."""
 
 import numpy as np
+import pytest
 
 from helao.hexagon.domain.motion_transform import TransformXY
 
@@ -106,3 +107,24 @@ def test_singular_minstr_leaves_system_inverse_intact():
     assert t.get_Mplate_Msystem(np.identity(3)) is None
     assert t.Minv.shape == (4, 4)
     assert t.transform_motorxy_to_platexy([1.0, 2.0]) is not None
+
+
+def test_get_mplate_msystem_parses_the_json_string_form():
+    # The MxytoMPlate actions declare Mxy: Optional[str]; identity in -> identity out.
+    t = _identity_transform(seq=None)
+    result = t.get_Mplate_Msystem("[[1,0,0],[0,1,0],[0,0,1]]")
+    assert np.allclose(result, np.identity(3))
+
+
+def test_get_mplate_msystem_accepts_a_nested_list():
+    # Review Focus RF2: an Action envelope can carry the matrix as a list.
+    t = _identity_transform(seq=None)
+    result = t.get_Mplate_Msystem([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+    assert np.allclose(result, np.identity(3))
+
+
+def test_get_mplate_msystem_none_raises_a_clear_error():
+    # Review Focus RF2: a missing Mxy is a 500 (pause + re-queue), not an IndexError.
+    t = _identity_transform(seq=None)
+    with pytest.raises(ValueError, match="Mxy required"):
+        t.get_Mplate_Msystem(None)

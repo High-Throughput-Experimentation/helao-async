@@ -9,6 +9,7 @@ domain allow-list (``helao.helpers.helao_logging`` is outside it, mirroring
 unchanged from the original driver-hosted class.
 """
 
+import json
 import logging
 import traceback
 
@@ -358,9 +359,17 @@ class TransformXY:
         """Given a global system matrix `Mxy`, factor out `Minstr` to recover Mplate.
 
         Used during alignment to convert a fitted global transform into a
-        plate-only calibration. Returns ``None`` (and leaves ``Minv``
-        untouched) when `Minstr` is singular.
+        plate-only calibration. `Mxy` may be a JSON string (the
+        ``MxytoMPlate`` action form), a nested list or an array. Returns
+        ``None`` (and leaves ``Minv`` untouched) when `Minstr` is singular.
+
+        Raises:
+            ValueError: If `Mxy` is None.
         """
+        if Mxy is None:
+            raise ValueError("Mxy required")
+        if isinstance(Mxy, str):
+            Mxy = json.loads(Mxy)
         Mxy = np.asarray(Mxy)
         Mglobal = np.asmatrix(np.identity(4))
         Mglobal[0:2, 0:2] = Mxy[0:2, 0:2]
