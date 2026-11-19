@@ -33,6 +33,8 @@ class ErrorCodes(str, Enum):
         not_allowed: Operation is not allowed in the current state.
     """
 
+    __str__ = str.__str__  # format()/str() give the value, as before Python 3.12
+
     none = "none"
     critical = "critical"
     critical_error = "critical_error"

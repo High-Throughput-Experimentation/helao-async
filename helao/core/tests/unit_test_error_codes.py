@@ -88,6 +88,17 @@ def error_codes_unit_test() -> bool:
             lambda: ErrorCodes.none == "none",
         )
 
+        reporter.section("ErrorCodes renders as its bare value (Python 3.12+ format)")
+        # Independent expectation: the member values are the strings "none"/"stop".
+        reporter.check(
+            'f"{ErrorCodes.none}" == "none"',
+            lambda: f"{ErrorCodes.none}" == "none",
+        )
+        reporter.check(
+            'str(ErrorCodes.stop) == "stop"',
+            lambda: str(ErrorCodes.stop) == "stop",
+        )
+
         return reporter.success()
 
     except Exception as exc:  # noqa: BLE001
