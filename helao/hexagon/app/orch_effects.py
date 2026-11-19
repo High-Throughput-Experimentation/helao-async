@@ -268,11 +268,14 @@ class OrchCommandRunner:
                     getattr(orch, "_hex_runtime", None), "estop_gen", 0
                 ):
                     break
-                if gsm.orch_state == OrchStatus.idle:
+                # idle OR error: an errored action leaves orch_state at error
+                # with nothing active, and waiting for idle spun forever
+                if gsm.orch_state != OrchStatus.busy:
                     await orch.intend_none()
                     LOGGER.info("got stop")
                     gsm.loop_state = LoopStatus.stopped
                     break
+                await asyncio.sleep(0)  # orch_wait_for_all_actions may not yield
             return None
 
         if isinstance(cmd, RequeueHeadAction):

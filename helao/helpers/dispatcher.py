@@ -303,7 +303,10 @@ async def async_action_dispatcher(
             # Anything else happened with the request already in flight. An
             # action POST is not idempotent -- the action may be running right
             # now -- so this is reported, never re-sent.
-            error_code = ErrorCodes.http
+            # Not ErrorCodes.http: that means the server answered with a
+            # failure (the action is over). Here the outcome is unknown, and
+            # the orchestrator must keep waiting for the action's own status.
+            error_code = ErrorCodes.unspecified
             LOGGER.error(
                 f"{A.action_server.server_name}/{A.action_name} failed after the request was sent; "
                 "not retrying, the action may be running",

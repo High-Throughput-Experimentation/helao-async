@@ -145,3 +145,83 @@ async def test_estop_during_drain_after_dispatch_500_still_estops(monkeypatch):
         await _until(lambda: gsm.loop_state == LoopStatus.estopped)
     finally:
         await loop.close()
+
+
+async def _fail_unknown(world_cfg, A, **kw):
+    return None, ErrorCodes.unspecified  # sent, outcome unknown: may be running
+
+
+@pytest.mark.asyncio
+async def test_transport_error_keeps_waiting_for_the_running_action(monkeypatch):
+    orch, runtime, ing = _setup()
+    gsm = orch.globalstatusmodel
+    x = uuid4()
+    await ing.update_status(actionservermodel=_asm(_act(x, [HloStatus.active])))
+    gsm.loop_state = LoopStatus.started
+    _patch(monkeypatch, _fail_unknown)
+    await DispatchRunner(orch)._dispatch_action_locked(_act(x, []))
+    assert x in gsm.active_dict  # not retired: the action may still be running
+    loop = HexDispatchLoop(runtime)
+    loop.start()
+    gsm.loop_state = LoopStatus.stopped
+    try:
+        await runtime.handle(StartRequested())
+        await asyncio.sleep(0.4)
+        assert gsm.loop_state == LoopStatus.started  # drain still waiting
+        await ing.update_status(
+            actionservermodel=_asm(
+                _act(x, [HloStatus.active, HloStatus.finished]), False
+            )
+        )
+        await _until(lambda: gsm.loop_state == LoopStatus.stopped)
+    finally:
+        await loop.close()
+
+
+@pytest.mark.asyncio
+async def test_late_active_push_after_500_is_ignored_until_redispatch(monkeypatch):
+    orch, runtime, ing = _setup()
+    gsm = orch.globalstatusmodel
+    x = uuid4()
+    gsm.loop_state = LoopStatus.started
+    _patch(monkeypatch, _fail)
+    await DispatchRunner(orch)._dispatch_action_locked(_act(x, []))  # 500 first
+    await ing.update_status(actionservermodel=_asm(_act(x, [HloStatus.active])))
+    assert x not in gsm.active_dict and gsm.actions_idle()
+
+    async def ok(world_cfg, B, **kw):
+        return _act(x, [HloStatus.active]).as_dict(), ErrorCodes.none
+
+    _patch(monkeypatch, ok)
+    await DispatchRunner(orch)._dispatch_action_locked(orch.action_dq[0])
+    assert x in gsm.active_dict  # re-dispatch registers it
+    await ing.update_status(actionservermodel=_asm(_act(x, [HloStatus.active])))
+    assert x in gsm.active_dict  # and its own active pushes count again
+
+
+@pytest.mark.parametrize("variant", ["errored_before_drain", "errored_during_drain"])
+@pytest.mark.asyncio
+async def test_stop_drain_ends_after_an_errored_action(variant):
+    """An action that ends errored leaves orch_state at error; the stop drain
+    used to wait for idle forever and hot-spin (bounded here by wait_for)."""
+    orch, runtime, ing = _setup()
+    gsm = orch.globalstatusmodel
+    x = uuid4()
+    term = [HloStatus.active, HloStatus.errored, HloStatus.finished]
+    await ing.update_status(actionservermodel=_asm(_act(x, [HloStatus.active])))
+    loop = HexDispatchLoop(runtime)
+    loop.start()
+    orch.action_dq = ["requeued"]
+    try:
+        if variant == "errored_before_drain":
+            gsm.loop_state = LoopStatus.started
+            await ing.update_status(actionservermodel=_asm(_act(x, term), False))
+            gsm.loop_state = LoopStatus.stopped
+        gsm.loop_intent = LoopIntent.stop
+        await runtime.handle(StartRequested())
+        await asyncio.sleep(0.1)
+        if variant == "errored_during_drain":
+            await ing.update_status(actionservermodel=_asm(_act(x, term), False))
+        await _until(lambda: gsm.loop_state == LoopStatus.stopped)
+    finally:
+        await loop.close()

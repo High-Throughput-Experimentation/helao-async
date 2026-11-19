@@ -153,6 +153,14 @@ class HexStatusIngestion:
                                 )
                                 break
 
+            # A late `active` push for a uuid whose dispatch already failed
+            # (see DispatchRunner._retire_failed) would strand it again.
+            retired = getattr(orch, "retired_failed_uuids", None)
+            if retired:
+                for ep in actionservermodel.endpoints.values():
+                    for u in [u for u in ep.active_dict if u in retired]:
+                        ep.active_dict.pop(u)
+
             recent_nonactive = orch.globalstatusmodel.update_global_with_acts(
                 actionservermodel=actionservermodel
             )

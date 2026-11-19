@@ -209,3 +209,43 @@ async def test_parked_actions_never_run_concurrently_after_raise():
         em.async_action_dispatcher = orig
         t.cancel()
         await c.aclose()
+
+
+@pytest.mark.asyncio
+async def test_raise_after_split_frees_endpoint():
+    host = _host()
+    host.aloop = asyncio.get_running_loop()
+    calls = []
+
+    @host.action()
+    async def slow(ctx: ActionContext):
+        active = await ctx.begin()
+        calls.append(1)
+        if len(calls) == 1:
+            await active.split()
+            await asyncio.sleep(0.2)
+            raise RuntimeError("raise after split")
+        fin = await active.finish()
+        return fin.as_dict()
+
+    await host.init_endpoint_status()
+    task = asyncio.create_task(host.log_status_task())
+    await asyncio.sleep(0.1)
+    transport = httpx.ASGITransport(app=host, raise_app_exceptions=False)
+    try:
+        async with httpx.AsyncClient(transport=transport, base_url="http://t") as c:
+            r1 = await c.post(
+                "/SIM/slow", json={"action": {"action_uuid": str(uuidlib.uuid4())}}
+            )
+            assert r1.status_code == 500
+            await asyncio.sleep(0.5)
+            assert not host.actionservermodel.endpoints["slow"].active_dict
+            r2 = await asyncio.wait_for(
+                c.post(
+                    "/SIM/slow", json={"action": {"action_uuid": str(uuidlib.uuid4())}}
+                ),
+                5,
+            )
+            assert not (r2.json().get("action_params") or {}).get("queued_on_actserv")
+    finally:
+        task.cancel()

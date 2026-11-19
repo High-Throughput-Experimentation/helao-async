@@ -171,11 +171,14 @@ class DispatchRunner:
                     != getattr(getattr(orch, "_hex_runtime", None), "estop_gen", 0)
                 ):
                     break
-                if orch.globalstatusmodel.orch_state == OrchStatus.idle:
+                # idle OR error: an errored action leaves orch_state at error
+                # with nothing active, and waiting for idle spun forever
+                if orch.globalstatusmodel.orch_state != OrchStatus.busy:
                     await orch.intend_none()
                     LOGGER.info("got stop")
                     orch.globalstatusmodel.loop_state = LoopStatus.stopped
                     break
+                await asyncio.sleep(0)  # orch_wait_for_all_actions may not yield
         elif isinstance(step, SkipClearActions):  # :826-831
             # clear action queue, forcing next experiment
             orch.action_dq.clear()
@@ -255,6 +258,7 @@ class DispatchRunner:
         """Drop *action_uuid* from every finished/skipped bucket, global and
         per endpoint (a no-op for an action never dispatched before)."""
         gsm = self.orch.globalstatusmodel
+        getattr(self.orch, "retired_failed_uuids", set()).discard(action_uuid)
         for bucket in gsm.nonactive_dict.values():
             bucket.pop(action_uuid, None)
         for asm in gsm.server_dict.values():
@@ -272,6 +276,12 @@ class DispatchRunner:
         it (the ``HexHealthMonitor`` order). Caller holds ``aiolock``.
         """
         gsm = self.orch.globalstatusmodel
+        # An `active` push still in flight from the server must not re-register
+        # it (ingestion drops those); cleared when the uuid is re-dispatched.
+        retired = getattr(self.orch, "retired_failed_uuids", None)
+        if retired is None:
+            retired = self.orch.retired_failed_uuids = set()
+        retired.add(action_uuid)
         act = gsm.active_dict.pop(action_uuid, None)
         for asm in gsm.server_dict.values():
             for ep in asm.endpoints.values():
@@ -340,7 +350,7 @@ class DispatchRunner:
                 )
             except Exception as e:
                 LOGGER.info(f"Error while dispatching action {A.action_name}: {e}")
-                error_code = ErrorCodes.http
+                error_code = ErrorCodes.unspecified  # outcome unknown
 
         async with orch.aiolock:
             for cond, stop_message in [
@@ -356,7 +366,11 @@ class DispatchRunner:
                 if cond:
                     orch.current_stop_message = stop_message
                     LOGGER.warning(stop_message)
-                    await self._retire_failed(A.action_uuid)
+                    if error_code == ErrorCodes.http:
+                        # the server answered with a failure, so the action is
+                        # over; any other code leaves its outcome unknown and
+                        # the drain keeps waiting for its own status
+                        await self._retire_failed(A.action_uuid)
                     await orch.stop()
                     LOGGER.info(f"Re-queuing {A.action_name}")
                     orch.action_dq.insert(0, A)
