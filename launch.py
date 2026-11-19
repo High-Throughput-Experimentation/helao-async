@@ -187,6 +187,8 @@ class ConsoleMux:
         self._display = threading.Event()
         self._display.set()
         self._lock = threading.Lock()
+        self._cv = threading.Condition(self._lock)
+        self._writer = None
         self._buffer = deque()
         self._buffered_bytes = 0
         self._dropped_lines = 0
@@ -270,6 +272,7 @@ class ConsoleMux:
             self._grow_pipe(proc.stdout)
             self._pipes[server_key] = proc.stdout
             self.enabled = True
+            self._start_writer()
             threading.Thread(
                 target=self._reader,
                 args=(server_key, proc.stdout),
@@ -321,20 +324,61 @@ class ConsoleMux:
                 pass
 
     def _emit(self, text):
-        """Forward ``text`` now, or buffer it while the display is suppressed."""
-        if self._display.is_set():
-            try:
-                self.stream.write(text)
-                self.stream.flush()
-            except Exception:
-                pass
-            return
-        with self._lock:
+        """Queue ``text`` for the writer thread; never touches the terminal.
+
+        The buffer is bounded: past :data:`CONSOLE_BUFFER_MAX_BYTES` the oldest
+        lines are dropped and counted, so a blocked or paused terminal costs
+        console lines (records still reach LOGS/) but never stops a reader from
+        draining its pipe.
+        """
+        with self._cv:
             self._buffer.append(text)
             self._buffered_bytes += len(text)
             while self._buffered_bytes > CONSOLE_BUFFER_MAX_BYTES and self._buffer:
                 self._buffered_bytes -= len(self._buffer.popleft())
                 self._dropped_lines += 1
+            self._cv.notify_all()
+
+    def _start_writer(self):
+        """Start the single terminal-writer thread, once."""
+        with self._lock:
+            if self._writer is not None:
+                return
+            self._writer = threading.Thread(
+                target=self._write_loop, name="console_mux__writer", daemon=True
+            )
+        self._writer.start()
+
+    def _write_loop(self):
+        """Sole writer to the terminal; the only thread allowed to block on it.
+
+        Holds output while the display is suppressed (menu isolation).
+        """
+        while True:
+            with self._cv:
+                while not (self._buffer and self._display.is_set()):
+                    self._cv.wait()
+                pending, dropped = list(self._buffer), self._dropped_lines
+                self._buffer.clear()
+                self._buffered_bytes = 0
+                self._dropped_lines = 0
+            self._write_out(pending, dropped)
+
+    def _write_out(self, pending, dropped):
+        """Write ``pending`` (and a dropped-lines note) to the stream, unlocked."""
+        try:
+            if dropped:
+                self.stream.write(
+                    f"... {dropped} line(s) dropped: launcher console buffer "
+                    f"({CONSOLE_BUFFER_MAX_BYTES // 1024} KiB) overflowed while "
+                    f"the menu was open or the terminal was blocked; see the "
+                    f"per-server logs under LOGS/.\n"
+                )
+            for chunk in pending:
+                self.stream.write(chunk)
+            self.stream.flush()
+        except Exception:
+            pass
 
     # -- pressure -----------------------------------------------------------
 
@@ -376,26 +420,6 @@ class ConsoleMux:
 
     # -- isolation ----------------------------------------------------------
 
-    def _flush(self):
-        """Write out everything buffered, noting any dropped lines."""
-        with self._lock:
-            pending, dropped = list(self._buffer), self._dropped_lines
-            self._buffer.clear()
-            self._buffered_bytes = 0
-            self._dropped_lines = 0
-        try:
-            if dropped:
-                self.stream.write(
-                    f"... {dropped} line(s) dropped: launcher console buffer "
-                    f"({CONSOLE_BUFFER_MAX_BYTES // 1024} KiB) overflowed while "
-                    f"the menu was open; see the per-server logs under LOGS/.\n"
-                )
-            for chunk in pending:
-                self.stream.write(chunk)
-            self.stream.flush()
-        except Exception:
-            pass
-
     def resume(self, reason=None):
         """End suppression: leave the alternate screen and flush the buffer.
 
@@ -418,8 +442,9 @@ class ConsoleMux:
                 self.stream.flush()
             except Exception:
                 pass
-        self._display.set()
-        self._flush()
+        with self._cv:
+            self._display.set()
+            self._cv.notify_all()
         if reason:
             _mux_log("warning", f"Menu isolation ended early: {reason}")
 
