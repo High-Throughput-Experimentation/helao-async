@@ -222,6 +222,14 @@ def signal_group(pgid: int, sig) -> None:
         pass
 
 
+def _is_zombie(proc) -> bool:
+    """True if ``proc`` has exited (zombie or already reaped)."""
+    try:
+        return proc.status() == psutil.STATUS_ZOMBIE
+    except psutil.NoSuchProcess:
+        return True
+
+
 def terminate_tree(
     pid: int, term_wait: float, kill_wait: float, logger=None, pgid=None
 ) -> bool:
@@ -265,6 +273,9 @@ def terminate_tree(
         signal_group(pgid, signal.SIGKILL)
 
     _, still_alive = psutil.wait_procs(alive, timeout=kill_wait)
+    # A killed grandchild is reparented to init, which reaps it on its own
+    # schedule; until then it is a zombie: gone for every purpose but the pid.
+    still_alive = [p for p in still_alive if not _is_zombie(p)]
     if still_alive and logger is not None:
         pids = ", ".join(str(p.pid) for p in still_alive)
         logger.warning(f"reflex backend pids {pids} did not exit after kill")
