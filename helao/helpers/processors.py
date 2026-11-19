@@ -71,8 +71,8 @@ class MetaProcessor(ABC):
         core: The owning runtime object (e.g. orchestrator or base server).
         meta: The metadata model to be mutated.
         meta_type: Lowercased class name of ``meta`` (e.g. ``"action"``).
-        global_params: Orchestrator global parameters dict when ``core`` is an
-            orchestrator, otherwise an empty dict.
+        global_params: ``core.global_params`` when ``core`` has one (the
+            orchestrator), otherwise an empty dict.
     """
 
     def __init__(self, meta, core):
@@ -86,9 +86,7 @@ class MetaProcessor(ABC):
         self.core = core
         self.meta = meta
         self.meta_type = meta.__class__.__name__.lower()
-        self.global_params = (
-            core.global_params if core.__class__.__name__.lower() == "orch" else {}
-        )
+        self.global_params = getattr(core, "global_params", None) or {}
 
     @abstractmethod
     def process(self) -> None:

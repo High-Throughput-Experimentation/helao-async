@@ -227,3 +227,26 @@ async def test_meta_adapter_mutates_in_place():
         PrefinishContext(record=rec, record_dir=Path("."), server=object(), args=None)
     )
     assert rec.experiment_params == {"k": "experiment"}
+
+
+@pytest.mark.asyncio
+async def test_meta_processor_sees_orchestrator_global_params():
+    from helao.hexagon.app.orch_host import OrchHost
+
+    seen = {}
+
+    class PP(MetaProcessor):
+        def process(self):
+            seen.update(self.global_params)
+
+    class Sequence:
+        sequence_params = {}
+
+    orch = object.__new__(OrchHost)  # class name "OrchHost", not the legacy "Orch"
+    orch.global_params = {"last_OCP_V": 0.5}
+    await MetaProcessorHook(PP).run(
+        PrefinishContext(
+            record=Sequence(), record_dir=Path("."), server=orch, args=None
+        )
+    )
+    assert seen == {"last_OCP_V": 0.5}
