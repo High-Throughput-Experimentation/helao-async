@@ -540,9 +540,11 @@ def test_terminate_tree_kills_grandchildren_too():
 
         assert rl.terminate_tree(parent.pid, 3.0, 1.0) is True
         parent.poll()
+        # reparented to init, a killed grandchild stays a zombie until reaped
         assert (
-            not psutil.pid_exists(grandchild)
-            or not psutil.Process(grandchild).is_running()
+            rl._is_zombie(psutil.Process(grandchild))
+            if psutil.pid_exists(grandchild)
+            else True
         )
     finally:
         if parent.poll() is None:
