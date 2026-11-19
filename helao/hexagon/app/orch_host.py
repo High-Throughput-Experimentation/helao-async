@@ -188,6 +188,9 @@ class OrchHost(ActionHost):
         self.globalstatusmodel = GlobalStatusModel(orchestrator=self.server)
         self.globalstatusmodel._sort_status()
         self.interrupt_q = asyncio.Queue()
+        #: Uuids whose dispatch answered a failure (see DispatchRunner);
+        #: late `active` pushes for them are dropped until re-dispatch.
+        self.retired_failed_uuids: set = set()
         self.incoming_status = asyncio.Queue()
         self.incoming = None
 

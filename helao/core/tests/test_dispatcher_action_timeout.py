@@ -246,7 +246,8 @@ async def test_a_request_the_server_received_is_never_resent():
         srv.close()
         await srv.wait_closed()
 
-    assert response is None and error_code == ErrorCodes.http
+    # unspecified, not http: the outcome is unknown (the action may be running)
+    assert response is None and error_code == ErrorCodes.unspecified
     assert len(hits) == 1, f"a received request was sent {len(hits)} times"
 
 
