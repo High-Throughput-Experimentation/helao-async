@@ -116,3 +116,56 @@ def test_isolation_holds_output_until_resume():
         assert "held" not in stream.text()
     assert _wait(lambda: "held" in stream.text())
     wf.close()
+
+
+class _StrictStream(_Stream):
+    def write(self, text):
+        if "→" in text:
+            raise UnicodeEncodeError("cp1252", text, 0, 1, "bad")
+        super().write(text)
+
+
+def test_bad_chunk_costs_one_line_and_is_counted():
+    stream = _StrictStream()
+    mux = launch.ConsoleMux(stream)
+    mux._write_out(["a\n", "→\n", "b\n"], 0)
+    assert stream.text() == "a\nb\n"
+    assert mux._dropped_lines == 1
+
+
+def test_isolation_mid_batch_returns_remainder_to_buffer():
+    class _Isolating(_Stream):
+        def write(self, text):
+            super().write(text)
+            mux._display.clear()
+
+    stream = _Isolating()
+    mux = launch.ConsoleMux(stream)
+    mux._write_out(["a\n", "b\n", "c\n"], 0)
+    assert stream.text() == "a\n"
+    assert list(mux._buffer) == ["b\n", "c\n"]
+    assert mux._buffered_bytes == 4
+
+
+def test_drain_flushes_queue_and_is_bounded_on_blocked_terminal():
+    stream = _Stream()
+    mux = launch.ConsoleMux(stream)
+    wf = _child(mux, "A")
+    wf.write(b"last words\n")
+    wf.flush()
+    assert _wait(lambda: mux._buffer or "last words" in stream.text())
+    mux.drain(2.0)
+    assert "last words" in stream.text()
+    wf.close()
+
+    gate = threading.Event()
+    mux = launch.ConsoleMux(_Stream(gate))
+    wf = _child(mux, "A")
+    wf.write(b"stuck\n")
+    wf.flush()
+    time.sleep(0.2)
+    t0 = time.monotonic()
+    mux.drain(0.5)
+    assert time.monotonic() - t0 < 2.0
+    gate.set()
+    wf.close()

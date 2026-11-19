@@ -189,6 +189,7 @@ class ConsoleMux:
         self._lock = threading.Lock()
         self._cv = threading.Condition(self._lock)
         self._writer = None
+        self._writing = False
         self._buffer = deque()
         self._buffered_bytes = 0
         self._dropped_lines = 0
@@ -362,10 +363,21 @@ class ConsoleMux:
                 self._buffer.clear()
                 self._buffered_bytes = 0
                 self._dropped_lines = 0
-            self._write_out(pending, dropped)
+                self._writing = True
+            try:
+                self._write_out(pending, dropped)
+            finally:
+                with self._cv:
+                    self._writing = False
+                    self._cv.notify_all()
 
     def _write_out(self, pending, dropped):
-        """Write ``pending`` (and a dropped-lines note) to the stream, unlocked."""
+        """Write ``pending`` (and a dropped-lines note) to the stream, unlocked.
+
+        A chunk that fails to write is counted as dropped, not allowed to take
+        the rest of the batch with it. If isolation starts mid-batch the
+        untaken remainder goes back to the front of the buffer.
+        """
         try:
             if dropped:
                 self.stream.write(
@@ -374,11 +386,40 @@ class ConsoleMux:
                     f"the menu was open or the terminal was blocked; see the "
                     f"per-server logs under LOGS/.\n"
                 )
-            for chunk in pending:
+        except Exception:
+            pass
+        failed = 0
+        for i, chunk in enumerate(pending):
+            if not self._display.is_set():
+                with self._cv:
+                    self._buffer.extendleft(reversed(pending[i:]))
+                    self._buffered_bytes += sum(len(c) for c in pending[i:])
+                break
+            try:
                 self.stream.write(chunk)
+            except Exception:
+                failed += 1
+        if failed:
+            with self._cv:
+                self._dropped_lines += failed
+        try:
             self.stream.flush()
         except Exception:
             pass
+
+    def drain(self, timeout=1.0):
+        """Wait up to ``timeout`` s for queued output to reach the terminal.
+
+        For exit paths only. Never waits past ``timeout``, so a blocked
+        terminal cannot delay exit.
+        """
+        end = time.monotonic() + timeout
+        with self._cv:
+            while (self._buffer or self._writing) and self._display.is_set():
+                left = end - time.monotonic()
+                if left <= 0:
+                    return
+                self._cv.wait(left)
 
     # -- pressure -----------------------------------------------------------
 
@@ -2791,6 +2832,7 @@ def main():
             except KeyboardInterrupt:
                 LAUNCH_LOGGER.info("Interrupted, terminating orchestration group.")
                 teardown_group()
+                CONSOLE.drain()
             return
         result = None
         while result not in ["\x18", "\x04"]:
@@ -2858,6 +2900,7 @@ def main():
         if result == "\x18":
             LAUNCH_LOGGER.info("Detected CTRL-x, terminating orchestration group.")
             teardown_group()
+            CONSOLE.drain()
         else:
             # CTRL-d leaves every server running on purpose. Announce that
             # *before* this process exits: each child armed a kernel
@@ -2886,6 +2929,7 @@ def main():
             )
             # children spill to their own files until a --reconnect launcher
             # binds the endpoint again
+            CONSOLE.drain()
             if collector is not None:
                 collector.stop()
 
@@ -2973,6 +3017,7 @@ def main():
             signame = signal.Signals(shutdown_signal.get("signum", 0)).name
             LAUNCH_LOGGER.info(f"Received {signame}; terminating orchestration group.")
             teardown_group()
+            CONSOLE.drain()
             # The keypress thread is still blocked reading stdin and is not a
             # daemon, so returning would hang here forever. Everything is torn
             # down and reaped by now, so leave immediately and deliberately.
