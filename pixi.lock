@@ -213,6 +213,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/perl-5.44.0-1_h7cc23a3_perl5.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pillow-13.0.0-py314h50bfbbb_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pixman-0.46.4-h54a6638_3.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/polars-runtime-32-2.1.0-py311hb519a9e_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/prometheus-cpp-1.3.0-h26ae035_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/protobuf-7.35.1-py314ha90251e_5.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/psutil-7.2.2-py314hfe1a184_3.conda
@@ -425,6 +426,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/pluggy-1.7.0-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/plumbum-2.0.2-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ply-3.11-pyhd8ed1ab_3.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/polars-2.1.0-pyh3138b34_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/prometheus_client-0.26.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/prompt-toolkit-3.0.53-pyha770c72_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/psygnal-0.16.1-pyhd8ed1ab_0.conda
@@ -519,6 +521,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/38/5c/552f1dce2443dc33ce6b2ee7f67599ba5c83ef5582e2235a9878ac239049/python_engineio-4.15.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/49/5e/cdc63ec026ba46303b4427ad3f71163b3dfdf0ad27ff2ac35d739ec6fa05/granian-2.8.7-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/4a/2e/2677f3f93dae0497e7e33b6637302e7f3744efc553f34231183e32584885/redis-7.4.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/4a/66/f75dff4ef9f56511823bdbee4bff2f71c443197895a8b8ffc4307f42788f/yamlrocks-0.7.1-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/51/d4/ac60401cb41999f375887c8dee0902db0bf9d0f43dc6f8b0695483b7016c/pymodbus-3.16.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/52/59/0782e51887ac6b07ffd1570e0364cf901ebc36345fea669969d2084baebb/simple_websocket-1.1.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/57/35/4293396c33dfe9d8807d61a48456e345bb3ee8e1edd26923a451efcee833/reflex_components_recharts-0.10.0-py3-none-any.whl
@@ -731,6 +734,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/perl-5.44.0-1_h7cc23a3_perl5.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pillow-13.0.0-py314h50bfbbb_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pixman-0.46.4-h54a6638_3.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/polars-runtime-32-2.1.0-py311hb519a9e_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/prometheus-cpp-1.3.0-h26ae035_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/protobuf-7.35.1-py314ha90251e_5.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/psutil-7.2.2-py314hfe1a184_3.conda
@@ -943,6 +947,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/pluggy-1.7.0-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/plumbum-2.0.2-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ply-3.11-pyhd8ed1ab_3.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/polars-2.1.0-pyh3138b34_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/prometheus_client-0.26.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/prompt-toolkit-3.0.53-pyha770c72_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/psygnal-0.16.1-pyhd8ed1ab_0.conda
@@ -1037,6 +1042,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/38/5c/552f1dce2443dc33ce6b2ee7f67599ba5c83ef5582e2235a9878ac239049/python_engineio-4.15.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/49/5e/cdc63ec026ba46303b4427ad3f71163b3dfdf0ad27ff2ac35d739ec6fa05/granian-2.8.7-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/4a/2e/2677f3f93dae0497e7e33b6637302e7f3744efc553f34231183e32584885/redis-7.4.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/4a/66/f75dff4ef9f56511823bdbee4bff2f71c443197895a8b8ffc4307f42788f/yamlrocks-0.7.1-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/51/d4/ac60401cb41999f375887c8dee0902db0bf9d0f43dc6f8b0695483b7016c/pymodbus-3.16.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/52/59/0782e51887ac6b07ffd1570e0364cf901ebc36345fea669969d2084baebb/simple_websocket-1.1.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/57/35/4293396c33dfe9d8807d61a48456e345bb3ee8e1edd26923a451efcee833/reflex_components_recharts-0.10.0-py3-none-any.whl
@@ -1202,6 +1208,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/pluggy-1.7.0-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/plumbum-2.0.2-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ply-3.11-pyhd8ed1ab_3.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/polars-2.1.0-pyh3138b34_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/prometheus_client-0.26.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/prompt-toolkit-3.0.53-pyha770c72_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/psygnal-0.16.1-pyhd8ed1ab_0.conda
@@ -1424,6 +1431,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/pcre2-10.47-h8466c1e_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pillow-13.0.0-py314h6acc0e1_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pixman-0.46.4-h5112557_3.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/polars-runtime-32-2.1.0-py311hb4e3305_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/prometheus-cpp-1.3.0-hd44ad28_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/protobuf-7.35.1-py314h5a8cbbf_5.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/psutil-7.2.2-py314hc5dbbe4_3.conda
@@ -1504,6 +1512,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/cb/ba/c75b5038cc61edce3a1e6cb2cfad7ea2378474ba7e62bf14aabc9950ca65/reflex_components_gridjs-0.10.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/ce/a7/a4545d59a42d8c34e01fb528b55e03e01d73c82fe5d508296b59ede9b2ad/reflex_base-0.10.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d7/03/a1b51933d39e06560976539f61dcbddc0f0642ba8700476e1a0a08c54499/nidaqmx-1.7.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/dc/2f/bfd714291e351775bc926e205bcb5a56b3598c438b860d97e909f15276fc/yamlrocks-0.7.1-cp314-cp314-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/e0/a8/4935d4fe0b63affa2651478c6a5403ab1046f188f49286b893792abc04ae/reflex_components_radix-0.10.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e5/9b/a0cfc483c16b8c18e0b637524e353c98b89a7eb45374eb67132395f97b67/reflex_hosting_cli-0.2.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e7/1c/8ea00e535c7396901f5e3be102e3d4c99457fcc432921c2cf29a8ddf7573/reflex_components_markdown-0.10.0-py3-none-any.whl
@@ -1921,7 +1930,7 @@ packages:
   license: MIT
   license_family: MIT
   purls:
-  - pkg:pypi/brotli?source=compressed-mapping
+  - pkg:pypi/brotli?source=hash-mapping
   run_exports: {}
   size: 367606
   timestamp: 1792653822828
@@ -4262,7 +4271,7 @@ packages:
   license: BSD-3-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/markupsafe?source=compressed-mapping
+  - pkg:pypi/markupsafe?source=hash-mapping
   run_exports: {}
   size: 29215
   timestamp: 1793707103879
@@ -4472,7 +4481,7 @@ packages:
   license: BSD-2-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/numba?source=compressed-mapping
+  - pkg:pypi/numba?source=hash-mapping
   run_exports: {}
   size: 6247985
   timestamp: 1793629394915
@@ -4493,7 +4502,7 @@ packages:
   license: BSD-3-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/numpy?source=compressed-mapping
+  - pkg:pypi/numpy?source=hash-mapping
   run_exports:
     weak:
     - numpy >=1.25,<3
@@ -4728,6 +4737,26 @@ packages:
     - pixman >=0.46.4,<1.0a0
   size: 376704
   timestamp: 1786106621354
+- conda: https://conda.anaconda.org/conda-forge/linux-64/polars-runtime-32-2.1.0-py311hb519a9e_0.conda
+  noarch: python
+  sha256: fd6f86e0de0bb26bc023eeb0d8fb0cd195324bc9553b5b261972fcb46a9d2834
+  md5: b61e4c5a066c86ddd692eab0027bb930
+  depends:
+  - python
+  - libgcc >=15
+  - __glibc >=2.17,<3.0.a0
+  - libstdcxx >=15
+  - _python_abi3_support 1.*
+  - cpython >=3.11
+  constrains:
+  - __glibc >=2.17
+  license: MIT
+  license_family: MIT
+  purls:
+  - pkg:pypi/polars-runtime-32?source=compressed-mapping
+  run_exports: {}
+  size: 41048638
+  timestamp: 1793016606615
 - conda: https://conda.anaconda.org/conda-forge/linux-64/prometheus-cpp-1.3.0-h26ae035_1.conda
   sha256: a8114acfa58fe3c3f7d7c5cc5212db82d013aa1037ecf6fd28a76ed51d0e5841
   md5: dded2177cb0602c33ef3fe6b08acf4dc
@@ -6265,8 +6294,7 @@ packages:
   depends:
   - python >=3.14
   license: Python-2.0
-  purls:
-  - pkg:pypi/backports-zstd?source=compressed-mapping
+  purls: []
   run_exports: {}
   size: 7663
   timestamp: 1792690550162
@@ -6936,7 +6964,7 @@ packages:
   license: BSD-3-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/httpcore2?source=compressed-mapping
+  - pkg:pypi/httpcore2?source=hash-mapping
   run_exports: {}
   size: 55805
   timestamp: 1792598507037
@@ -6978,7 +7006,7 @@ packages:
   license: BSD-3-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/httpx2?source=compressed-mapping
+  - pkg:pypi/httpx2?source=hash-mapping
   run_exports: {}
   size: 88292
   timestamp: 1792598507037
@@ -7363,7 +7391,7 @@ packages:
   - nodejs >=22
   license: Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND ISC AND MIT
   purls:
-  - pkg:pypi/jupyter-builder?source=compressed-mapping
+  - pkg:pypi/jupyter-builder?source=hash-mapping
   run_exports: {}
   size: 888217
   timestamp: 1793170401976
@@ -8244,6 +8272,34 @@ packages:
   run_exports: {}
   size: 49052
   timestamp: 1733239818090
+- conda: https://conda.anaconda.org/conda-forge/noarch/polars-2.1.0-pyh3138b34_0.conda
+  sha256: ebfa4ab7db111a512cbd858e41c01c6b318cd020f303c6af7e432fe4505022b2
+  md5: 3e2d5d685bbde2dce96887d79fa481e9
+  depends:
+  - polars-runtime-32 ==2.1.0
+  - python >=3.11
+  - python
+  constrains:
+  - numpy >=1.16.0
+  - pyarrow >=7.0.0
+  - fastexcel >=0.9
+  - openpyxl >=3.0.0
+  - xlsx2csv >=0.8.0
+  - connectorx >=0.3.2
+  - deltalake >=1.0.0
+  - pyiceberg >=0.7.1
+  - altair >=5.4.0
+  - great_tables >=0.8.0
+  - polars-runtime-32 ==2.1.0
+  - polars-runtime-64 ==2.1.0
+  - polars-runtime-compat ==2.1.0
+  license: MIT
+  license_family: MIT
+  purls:
+  - pkg:pypi/polars?source=compressed-mapping
+  run_exports: {}
+  size: 596323
+  timestamp: 1793016606615
 - conda: https://conda.anaconda.org/conda-forge/noarch/prometheus_client-0.26.0-pyhd8ed1ab_0.conda
   sha256: 794eec057361b41db1b06a9677eb8632adc0de81f7dcfe113bca8f0b04a23553
   md5: 3aa7e2d85645e61627c98082747dfdfe
@@ -8555,7 +8611,7 @@ packages:
   license: Apache-2.0
   license_family: APACHE
   purls:
-  - pkg:pypi/pytest-asyncio?source=compressed-mapping
+  - pkg:pypi/pytest-asyncio?source=hash-mapping
   run_exports: {}
   size: 43551
   timestamp: 1793562833938
@@ -8680,7 +8736,7 @@ packages:
   license: Apache-2.0
   license_family: APACHE
   purls:
-  - pkg:pypi/python-multipart?source=compressed-mapping
+  - pkg:pypi/python-multipart?source=hash-mapping
   run_exports: {}
   size: 40033
   timestamp: 1793464843791
@@ -9049,7 +9105,7 @@ packages:
   - python >=3.11
   license: MIT
   purls:
-  - pkg:pypi/soupsieve?source=compressed-mapping
+  - pkg:pypi/soupsieve?source=hash-mapping
   run_exports: {}
   size: 52388
   timestamp: 1794285419684
@@ -12006,6 +12062,24 @@ packages:
     - pixman >=0.46.4,<1.0a0
   size: 257473
   timestamp: 1786106677325
+- conda: https://conda.anaconda.org/conda-forge/win-64/polars-runtime-32-2.1.0-py311hb4e3305_0.conda
+  noarch: python
+  sha256: 4a9fd4022f0d1fbee50c72d3718a22fc2dc2ce0cbe0ba24380e4c1c52c2c20c0
+  md5: d85d00fd1f75954a1fa4906b538dc1ad
+  depends:
+  - python
+  - vc >=14.3,<15
+  - vc14_runtime >=14.44.35208
+  - ucrt >=10.0.20348.0
+  - _python_abi3_support 1.*
+  - cpython >=3.11
+  license: MIT
+  license_family: MIT
+  purls:
+  - pkg:pypi/polars-runtime-32?source=hash-mapping
+  run_exports: {}
+  size: 44333929
+  timestamp: 1793016425121
 - conda: https://conda.anaconda.org/conda-forge/win-64/prometheus-cpp-1.3.0-hd44ad28_1.conda
   sha256: ee1b5e31ac2d8fd73fcfaab63cd01910cd897ceaf22cb9c9e3928f6a9a9b0667
   md5: 9fc34b6b8a760c3d2208635bb97d4472
@@ -13043,6 +13117,11 @@ packages:
   - opentelemetry-sdk>=1.39.1 ; extra == 'otel'
   - xxhash~=3.6.0 ; extra == 'xxhash'
   requires_python: '>=3.10'
+- pypi: https://files.pythonhosted.org/packages/4a/66/f75dff4ef9f56511823bdbee4bff2f71c443197895a8b8ffc4307f42788f/yamlrocks-0.7.1-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+  name: yamlrocks
+  version: 0.7.1
+  sha256: a921c4b4881b029f0024f5ce5d72c1e0e91f3e5108f5ea17351991de5b7e44a6
+  requires_python: '>=3.12'
 - pypi: https://files.pythonhosted.org/packages/51/d4/ac60401cb41999f375887c8dee0902db0bf9d0f43dc6f8b0695483b7016c/pymodbus-3.16.2-py3-none-any.whl
   name: pymodbus
   version: 3.16.2
@@ -13264,6 +13343,11 @@ packages:
   - typing-extensions>=4.0.0
   - tzlocal>=5.0,<6.0
   requires_python: '>=3.9,<4.0'
+- pypi: https://files.pythonhosted.org/packages/dc/2f/bfd714291e351775bc926e205bcb5a56b3598c438b860d97e909f15276fc/yamlrocks-0.7.1-cp314-cp314-win_amd64.whl
+  name: yamlrocks
+  version: 0.7.1
+  sha256: bf386b410bf204580e3cbcc3dfa88cbc9aa46f6fedcebb65eff5ee7162ad6206
+  requires_python: '>=3.12'
 - pypi: https://files.pythonhosted.org/packages/e0/a8/4935d4fe0b63affa2651478c6a5403ab1046f188f49286b893792abc04ae/reflex_components_radix-0.10.1-py3-none-any.whl
   name: reflex-components-radix
   version: 0.10.1

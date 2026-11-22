@@ -45,6 +45,7 @@ pandas = "*"
 panel = "*"
 pip = "*"
 plotly = "*"
+polars = "==2.1.0"
 psutil = "*"
 psycopg2 = "*"
 pyaml = "*"
@@ -90,6 +91,8 @@ nidaqmx = "*"
 pydasher = "*"
 pyft232 = "*"
 uuid7 = "*"
+# PyPI only: not on conda-forge.
+yamlrocks = "==0.7.1"
 # PyPI, not conda-forge: the conda-forge package hard-requires aiohttp, which
 # (with aiodns) broke station self-resolution. helao uses httpx only.
 pymodbus = "*"
