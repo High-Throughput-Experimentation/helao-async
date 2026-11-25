@@ -166,11 +166,9 @@ def artifact_generation_unit_test() -> bool:
         )
 
         reporter.section("read_hlo keep_keys / omit_keys filtering")
-        # keep_keys and omit_keys are OR-combined in the current implementation,
-        # so to keep only one column populate both arguments explicitly.
-        meta_k, data_k = read_hlo(hlo_path, keep_keys=["t_s"], omit_keys=["v"])
+        meta_k, data_k = read_hlo(hlo_path, keep_keys=["t_s"])
         reporter.check(
-            "keep_keys + omit_keys retains only the requested column",
+            "keep_keys retains only the requested column",
             lambda: list(data_k.keys()) == ["t_s"],
         )
         meta_o, data_o = read_hlo(hlo_path, omit_keys=["v"])
