@@ -229,6 +229,24 @@ class Hook(FinishHook):
 
         LOGGER.debug(f"Patching model for {prog.yml.target.name}")
         patched_meta = {MOD_PATCH.get(k, k): v for k, v in meta.items()}
+        # a legacy local record carries only the abbr lists; record_dict strips
+        # them, so derive the uuid lists first (mirrors premodels get_exp/get_seq)
+        fold = {
+            "experiment": ("action_list", "dispatched_actions_abbr", "action_uuid"),
+            "sequence": (
+                "experiment_list",
+                "dispatched_experiments_abbr",
+                "experiment_uuid",
+            ),
+        }.get(prog.yml.type)
+        if fold and not patched_meta.get(fold[0]):
+            patched_meta[fold[0]] = list(
+                dict.fromkeys(
+                    d[fold[2]]
+                    for d in patched_meta.get(fold[1]) or []
+                    if isinstance(d, dict) and d.get(fold[2])
+                )
+            )
         meta = MOD_MAP[prog.yml.type](**patched_meta).record_dict(strip_private=True)
 
         # patch technique lists in meta

@@ -328,6 +328,7 @@ async def test_experiment_push_strips_lists_and_ships_plan_first(tmp_path, mod):
         assert Path(by_target[f"experiment/{uuid}.plan.json"]) == plan
         meta = by_target[f"experiment/{uuid}.json"]
         assert "planned_actions" not in meta and "dispatched_actions_abbr" not in meta
+        assert [str(u) for u in meta["action_list"]] == [mk_uuid(2)]
     finally:
         await teardown_driver(drv)
 
@@ -349,5 +350,33 @@ async def test_missing_plan_file_does_not_block_the_meta_push(tmp_path, mod):
         targets = [t for t, _ in sent]
         assert f"experiment/{uuid}.json" in targets
         assert f"experiment/{uuid}.plan.json" not in targets
+    finally:
+        await teardown_driver(drv)
+
+
+@pytest.mark.parametrize("mod", MODS)
+@pytest.mark.asyncio
+async def test_plan_upload_failure_blocks_the_meta_push(tmp_path, mod):
+    drv = make_sync_driver(
+        tmp_path, mod.SyncDriver, postfinish_hooks={"experiment": {"s3_upload": ["*"]}}
+    )
+    try:
+        sent = []
+
+        async def fail_plan(msg=None, target=None, compress=False, retries=5):
+            sent.append(target)
+            return not str(target).endswith(".plan.json")
+
+        drv.to_s3 = fail_plan
+        _no_requeue(drv)
+        uuid = mk_uuid(1)
+        exp_yml = make_exp_tree(tmp_path, "RUNS", uuid)
+        plan = exp_yml.parent / f"{ts(0)}-exp.plan.json"
+        plan.write_text("{}\n", encoding="utf-8")
+        write_yml(exp_yml, {**exp_meta(uuid), "aux_files": [plan.name]})
+        await asyncio.wait_for(drv.sync_yml(yml_path=exp_yml, rank=1), timeout=15)
+        assert f"experiment/{uuid}.plan.json" in sent
+        assert f"experiment/{uuid}.json" not in sent
+        assert mod.Progress(exp_yml).dict.get("s3") is not True
     finally:
         await teardown_driver(drv)
