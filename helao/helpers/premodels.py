@@ -101,6 +101,12 @@ class Sequence(SequenceModel):
             ShortExperimentModel.model_validate(exp.model_dump())
             for exp in self.dispatched_experiments
         ]
+        # A converter sets the abbreviated list directly and never fills
+        # dispatched_experiments; fall back to it so its record keeps the link.
+        source = seq.dispatched_experiments_abbr or self.dispatched_experiments_abbr
+        seq.experiment_list = list(
+            dict.fromkeys(e.experiment_uuid for e in source if e.experiment_uuid)
+        )
         # either we have a plan at the beginning or not
         # don't add it later from the dispatched_experiments
         # seq.planned_experiments = [ShortExperimentModel(**exp.model_dump()) for exp in self.dispatched_experiments]
@@ -264,6 +270,11 @@ class Experiment(Sequence, ExperimentModel):
         exp = ExperimentModel.model_validate(self.model_dump())
         # now add all actions
         self._experiment_update_from_actlist(exp=exp)
+        exp.action_list = list(
+            dict.fromkeys(
+                a.action_uuid for a in exp.dispatched_actions_abbr if a.action_uuid
+            )
+        )
         return exp
 
     def _experiment_update_from_actlist(self, exp: ExperimentModel):

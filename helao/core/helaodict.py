@@ -7,7 +7,7 @@ import types
 from datetime import date, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 from uuid import UUID
 
 import numpy as np
@@ -34,6 +34,17 @@ class HelaoDict:
     `datetime`, `Path`, enums, NaN floats, nested models) into plain Python
     types suitable for YAML/JSON output.
     """
+
+    #: Fields a stored record omits (spec §3.2). Runtime models and transport
+    #: (``clean_dict``) still carry them.
+    RECORD_EXCLUDE: ClassVar[frozenset[str]] = frozenset()
+
+    def record_dict(self, strip_private: bool = False) -> dict:
+        """``clean_dict(strip_private)`` minus :attr:`RECORD_EXCLUDE`: what a record file or S3 meta holds."""
+        d = self.clean_dict(strip_private=strip_private)
+        for key in self.RECORD_EXCLUDE:
+            d.pop(key, None)
+        return d
 
     def _serialize_dict(self, dict_in: dict) -> dict:
         """Serialize each entry of a dict via `_serialize_item`, skipping functions and dunder strings."""

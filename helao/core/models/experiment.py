@@ -4,7 +4,7 @@ __all__ = ["ShortExperimentModel", "ExperimentModel"]
 
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import ClassVar, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -80,6 +80,7 @@ class ExperimentModel(ShortExperimentModel):
         experiment_finished_timestamp (Optional[datetime]): When the experiment finished.
         planned_actions (list): Planned action records prior to dispatch.
         dispatched_actions_abbr (list[ShortActionModel]): Short records of dispatched actions.
+        action_list (list[UUID]): Dispatched action uuids in dispatch order.
         samples_in (list): Input samples (union of sample types).
         samples_out (list): Output samples (union of sample types).
         files (list[FileInfo]): Files produced by the experiment.
@@ -115,6 +116,12 @@ class ExperimentModel(ShortExperimentModel):
     experiment_finished_timestamp: Optional[datetime] = None
     planned_actions: list = []
     dispatched_actions_abbr: list[ShortActionModel] = Field(default=[])
+    RECORD_EXCLUDE: ClassVar[frozenset[str]] = frozenset(
+        {"planned_actions", "dispatched_actions_abbr"}
+    )
+    #: Dispatched action uuids in dispatch order, splits and retries included
+    #: (spec §3.1). The plan lives in ``<ts>-exp.plan.json``.
+    action_list: list[UUID] = Field(default=[])
     samples_in: list[SampleUnion] = Field(default=[])
     samples_out: list[SampleUnion] = Field(default=[])
     files: list[FileInfo] = Field(default=[])

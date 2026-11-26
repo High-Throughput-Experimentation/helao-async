@@ -4,7 +4,7 @@ __all__ = ["ShortSequenceModel", "SequenceModel"]
 
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import ClassVar, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -79,6 +79,7 @@ class SequenceModel(ShortSequenceModel):
         dummy (bool): True if this is a dummy/test sequence.
         simulation (bool): True if the sequence ran against simulated drivers.
         sequence_uuid (Optional[UUID]): Unique identifier for the sequence.
+        experiment_list (list[UUID]): Dispatched experiment uuids in dispatch order.
         sequence_timestamp (Optional[datetime]): Creation timestamp.
         sequence_status (list[HloStatus]): Accumulated status flags.
         sequence_output_dir (Optional[Path]): Output directory.
@@ -113,6 +114,12 @@ class SequenceModel(ShortSequenceModel):
     aux_files: list[str] = Field(default=[])
     data_request_id: Optional[UUID] = None
     orchestrator: MachineModel = MachineModel()
+    RECORD_EXCLUDE: ClassVar[frozenset[str]] = frozenset(
+        {"planned_experiments", "dispatched_experiments_abbr"}
+    )
+    #: Dispatched experiment uuids in dispatch order; the record's link to its
+    #: experiments (spec §3.1). The plan lives in ``<ts>-seq.plan.json``.
+    experiment_list: list[UUID] = Field(default=[])
     dispatched_experiments_abbr: list[ShortExperimentModel] = Field(
         default=[]
     )  # list of completed experiments (abbreviated) from dispatched_experiments (premodels.py)
