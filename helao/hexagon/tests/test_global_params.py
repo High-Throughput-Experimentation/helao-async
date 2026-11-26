@@ -4,6 +4,7 @@ from helao.hexagon.app.orch_global_params import (
     apply_from_globals,
     collect_to_globals,
 )
+from helao.helpers.global_exports import resolve_global_exports
 from helao.hexagon.domain.models import Action
 
 
@@ -34,7 +35,7 @@ def _result_action(to_global, **identity):
     return act
 
 
-def test_collect_to_globals_list_form_params_precede_output():
+def test_collect_to_globals_list_form_output_precedes_params():
     g = {}
     collect_to_globals(
         _result_action(["x", "y", "shared", "absent"]),
@@ -43,7 +44,7 @@ def test_collect_to_globals_list_form_params_precede_output():
         orch_host="127.0.0.1",
         orch_port=8001,
     )
-    assert g == {"x": 1, "y": 2, "shared": "from_params"}
+    assert g == {"x": 1, "y": 2, "shared": "from_output"}
 
 
 def test_collect_to_globals_dict_form_renames():
@@ -80,3 +81,16 @@ def test_collect_to_globals_port_compare_is_int():
         orch_port=8001,
     )
     assert g == {"x": 1}  # int(...) comparison verbatim from legacy
+
+
+def test_resolver_prefers_output_and_renames():
+    assert resolve_global_exports(
+        {"k": "renamed", "only_p": "p2"},
+        {"k": "stale_input", "only_p": 1},
+        {"k": "result"},
+    ) == {"renamed": "result", "p2": 1}
+
+
+def test_resolver_ignores_missing_and_bad_shapes():
+    assert resolve_global_exports(["absent"], {}, {}) == {}
+    assert resolve_global_exports(None, {"a": 1}, {}) == {}

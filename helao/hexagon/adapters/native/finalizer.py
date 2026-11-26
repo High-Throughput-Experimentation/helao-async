@@ -43,6 +43,7 @@ from helao.core.models.hlostatus import HloStatus
 from helao.core.models.run_dir import redirect_manual_dir
 from helao.helpers import helao_logging as logging
 from helao.helpers.dispatcher import async_private_dispatcher
+from helao.helpers.global_exports import resolve_global_exports
 from helao.helpers.premodels import Action
 from helao.helpers.time_utils import set_time
 from helao.helpers.yml_tools import move_dir
@@ -299,31 +300,11 @@ class NativeActionFinalizer:
 
                 # send globalparams
                 if action.to_global_params:
-                    export_params = {}
-                    if isinstance(action.to_global_params, list):
-                        for k in action.to_global_params:
-                            if k in action.action_params:
-                                LOGGER.info(f"updating {k} in orch global vars")
-                                export_params[k] = action.action_params[k]
-                            elif k in action.action_output:
-                                LOGGER.info(f"updating {k} in orch global vars")
-                                export_params[k] = action.action_output[k]
-                            else:
-                                LOGGER.info(
-                                    f"key {k} not found in action output or params"
-                                )
-                    elif isinstance(action.to_global_params, dict):
-                        for k1, k2 in action.to_global_params.items():
-                            if k1 in action.action_params:
-                                LOGGER.info(f"updating {k2} in global vars")
-                                export_params[k2] = action.action_params[k1]
-                            elif k1 in action.action_output:
-                                LOGGER.info(f"updating {k2} in global vars")
-                                export_params[k2] = action.action_output[k1]
-                            else:
-                                LOGGER.info(
-                                    f"key {k1} not found in action output or params"
-                                )
+                    export_params = resolve_global_exports(
+                        action.to_global_params,
+                        action.action_params,
+                        action.action_output,
+                    )
                     # Skip the RPC when nothing resolved (e.g. an estop interrupts
                     # before the action produces its to_global_params output): an
                     # empty json_dict reaches update_global_params with no args and

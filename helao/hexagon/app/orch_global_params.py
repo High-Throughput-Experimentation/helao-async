@@ -19,6 +19,7 @@ and key iteration order.
 """
 
 from helao.helpers import helao_logging as logging
+from helao.helpers.global_exports import resolve_global_exports
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -79,23 +80,11 @@ def collect_to_globals(
     ):
         return
 
-    if isinstance(result_action.to_global_params, list):
-        for k in result_action.to_global_params:
-            if k in result_action.action_params:
-                LOGGER.info(f"updating {k} in global vars")
-                global_params[k] = result_action.action_params[k]
-            elif k in result_action.action_output:
-                LOGGER.info(f"updating {k} in global vars")
-                global_params[k] = result_action.action_output[k]
-            else:
-                LOGGER.info(f"key {k} not found in action output or params")
-    elif isinstance(result_action.to_global_params, dict):
-        for k1, k2 in result_action.to_global_params.items():
-            if k1 in result_action.action_params:
-                LOGGER.info(f"updating {k2} in global vars")
-                global_params[k2] = result_action.action_params[k1]
-            elif k1 in result_action.action_output:
-                LOGGER.info(f"updating {k2} in global vars")
-                global_params[k2] = result_action.action_output[k1]
-            else:
-                LOGGER.info(f"key {k1} not found in action output or params")
+    exports = resolve_global_exports(
+        result_action.to_global_params,
+        result_action.action_params,
+        result_action.action_output,
+    )
+    for k in exports:
+        LOGGER.info(f"updating {k} in global vars")
+    global_params.update(exports)

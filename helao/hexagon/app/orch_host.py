@@ -723,7 +723,7 @@ class OrchHost(ActionHost):
                     "param_value"
                 ]
             }
-            active.action.action_params.update(pdict)
+            active.set_output(**pdict)
             self.global_params.update(pdict)
             finished_action = await active.finish()
             return finished_action.as_dict()

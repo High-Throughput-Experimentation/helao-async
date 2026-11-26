@@ -54,6 +54,7 @@ from helao.core.models.server import ActionServerModel
 from helao.core.rpc import RPCClient, RPCDispatcher, RPCError, derive_rpc_port
 from helao.helpers import helao_logging as logging
 from helao.helpers.artifact_hash import log_artifact_hashes
+from helao.helpers.global_exports import resolve_global_exports
 from helao.helpers.file_utils import replace_when_free, staging_path
 from helao.helpers.meta_io import dumps_meta, meta_glob, resolve_meta_path
 from helao.helpers.plan_io import write_plan_once
@@ -1249,20 +1250,13 @@ class MicroOrch:
         """Pull keys named in ``to_global_params`` out of *result* into ``self.global_params``."""
         if not isinstance(result, dict) or not to_global_params:
             return
-        action_params = result.get("action_params") or {}
-        action_output = result.get("action_output") or {}
-        if isinstance(to_global_params, list):
-            for k in to_global_params:
-                if k in action_params:
-                    self.global_params[k] = action_params[k]
-                elif k in action_output:
-                    self.global_params[k] = action_output[k]
-        elif isinstance(to_global_params, dict):
-            for k1, k2 in to_global_params.items():
-                if k1 in action_params:
-                    self.global_params[k2] = action_params[k1]
-                elif k1 in action_output:
-                    self.global_params[k2] = action_output[k1]
+        self.global_params.update(
+            resolve_global_exports(
+                to_global_params,
+                result.get("action_params") or {},
+                result.get("action_output") or {},
+            )
+        )
 
     # ------------------------------------------------------------------
     # artifact persistence (mirrors Base.write_exp / write_seq)
