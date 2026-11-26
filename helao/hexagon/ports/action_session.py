@@ -77,6 +77,8 @@ class ActionSessionPort(Protocol):
     num_data_queued: int
     #: Count of data messages written.
     num_data_written: int
+    #: ``action_params`` as of executor start, or None (finalizer param-write guard).
+    params_snapshot: Optional[dict]
 
     # -- async methods -------------------------------------------------------
 

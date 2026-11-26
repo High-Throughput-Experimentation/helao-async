@@ -174,6 +174,10 @@ class ActionModel(ShortActionModel):
     from_global_act_params: dict = {}
     to_global_params: Union[list, dict] = []
 
+    def set_output(self, **values) -> None:
+        """Merge produced values into ``action_output``; its only writer (spec §4.2)."""
+        self.action_output.update(values)
+
     @property
     def url(self) -> str:
         """Return the HTTP endpoint URL on the action server for this action."""

@@ -1523,9 +1523,11 @@ class ActionHost(HelaoFastAPI):
             action.error_code = ErrorCodes.critical_error
             if HloStatus.errored not in action.action_status:
                 action.append_action_status(HloStatus.errored)
-            action.action_output["error_message"] = (
-                "The action server stopped while the action was running; the "
-                "record was reconciled at the next server startup."
+            action.set_output(
+                error_message=(
+                    "The action server stopped while the action was running; the "
+                    "record was reconciled at the next server startup."
+                )
             )
             await self.write_act(action, reason="reconcile_interrupted")
             LOGGER.warning(f"Reconciled interrupted action {uuid} ({act_dir}).")

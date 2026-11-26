@@ -73,6 +73,9 @@ class ActionSession:
         self.action_task = None
         self.action_loop_running = False
         self.manual_stop = False
+        #: ``action_params`` as of executor start; the finalizer warns on later
+        #: writes (spec §4.7). None for actions that never start an executor.
+        self.params_snapshot: Optional[dict] = None
 
         self.file_conn_dict: dict = {}
         for file_conn_key, file_conn_param in (
@@ -479,6 +482,16 @@ class ActionSession:
         return await self.action_finalizer.split(
             uuid_list=uuid_list, new_fileconnparams=new_fileconnparams
         )
+
+    def set_output(self, **values) -> None:
+        """Record produced values on the running split (spec §4.2)."""
+        if HloStatus.finished in self.action.action_status:
+            LOGGER.warning(
+                f"set_output({sorted(values)}) on finished action "
+                f"{self.action.action_name} ({self.action.action_uuid}); "
+                "its record may already be written"
+            )
+        self.action.set_output(**values)
 
     async def finish(self, finish_uuid_list=None) -> Action:
         return await self.action_finalizer.finish(finish_uuid_list=finish_uuid_list)

@@ -88,7 +88,7 @@ def _session_class():
     return ActionSession
 
 
-#: The 10 port members that are instance attributes assigned in __init__ rather
+#: The 11 port members that are instance attributes assigned in __init__ rather
 #: than class attributes, so `hasattr(cls, ...)` is False for them by design.
 INSTANCE_ATTRS = {
     "action",
@@ -101,6 +101,7 @@ INSTANCE_ATTRS = {
     "listen_uuids",
     "num_data_queued",
     "num_data_written",
+    "params_snapshot",
 }
 
 

@@ -248,6 +248,27 @@ class NativeActionFinalizer:
         async with self.active.finish_lock:
             return await self.active._finish(finish_uuid_list=finish_uuid_list)
 
+    def _warn_param_writes(self) -> None:
+        """Warn on action_params keys added or changed after executor start (spec §4.7)."""
+        snap = self.active.params_snapshot
+        if snap is None:
+            return
+        for action in self.active.action_list:
+            changed = []
+            for k, v in action.action_params.items():
+                try:
+                    same = k in snap and bool(snap[k] == v)
+                except Exception:
+                    same = False
+                if not same:
+                    changed.append(k)
+            if changed:
+                LOGGER.warning(
+                    f"action {action.action_name} ({action.action_uuid}) wrote "
+                    f"action_params keys {sorted(changed)} during the run; produced "
+                    "values belong in action_output via ActionSession.set_output"
+                )
+
     async def _finish(
         self,
         finish_uuid_list: Optional[list[UUID]] = None,
@@ -396,6 +417,7 @@ class NativeActionFinalizer:
                 )
             LOGGER.info("all active action are done, closing active")
 
+            self._warn_param_writes()
             # DB server call to finish_yml if DB exists
             for action in self.active.action_list:
                 try:

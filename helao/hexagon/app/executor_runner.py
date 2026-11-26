@@ -26,6 +26,7 @@ errors are not latched; a later poll result replaces an earlier one.
 
 import asyncio
 import traceback
+from copy import deepcopy
 
 from helao.core.error import ErrorCodes
 from helao.core.models.data import DataModel
@@ -85,6 +86,7 @@ class ExecutorRunner:
             await self.active.send_nonblocking_status()
 
         LOGGER.info("action_loop_task started")
+        self.active.params_snapshot = deepcopy(self.active.action.action_params)
         setup_state = await executor._pre_exec()
         setup_error = setup_state.get("error", ErrorCodes.none)
         if setup_error == ErrorCodes.none:
