@@ -2383,6 +2383,9 @@ class SyncDriver:
                 if pc not in act_meta:
                     continue
                 contrib = act_meta[pc]
+                if pc == "action_params":
+                    # produced values live in action_output; output wins
+                    contrib = {**(contrib or {}), **(act_meta.get("action_output") or {})}
                 new_name = pc.replace("action_", "process_")
                 if new_name not in process_meta:
                     # copy mutable contribs so multiple groups (and repeated

@@ -394,3 +394,38 @@ async def test_later_split_does_not_reopen_pushed_group(tmp_path, cls):
         assert [p.name for p in exp_yml.parent.glob("0__*-prc.json")] == [prc.name]
     finally:
         await teardown_driver(drv)
+
+
+# --- 9. action_params contrib folds action_output over action_params -------
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "output, expected",
+    [
+        ({"b": 2, "shared": "out"}, {"a": 1, "b": 2, "shared": "out"}),
+        (None, {"a": 1, "shared": "in"}),
+    ],
+)
+async def test_process_params_overlay_action_output(tmp_path, output, expected):
+    drv = make_sync_driver(str(tmp_path), NativeSyncDriver)
+    try:
+        exp_yml = make_exp_tree(
+            Path(tmp_path),
+            RunDir.FINISHED.value,
+            mk_uuid(1009),
+            process_order_groups={0: [0]},
+        )
+        m = act_meta(0, process_finish=False)
+        m["process_contrib"] = ["action_params"]
+        m["action_params"] = {"a": 1, "shared": "in"}
+        if output is not None:
+            m["action_output"] = output
+        ay = exp_yml.parent / "0__0__srv__test_action" / f"{ts(1)}-act.yml"
+        write_yml(ay, m)
+        drv.get_progress(exp_yml)
+        ep = drv.update_process(HelaoYml(ay), m)
+        got = ep.dict["process_metas"][0]["process_params"]
+        assert got == {"foo": "bar", **expected}  # foo: experiment base params
+    finally:
+        await teardown_driver(drv)
