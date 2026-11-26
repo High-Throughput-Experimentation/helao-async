@@ -5,6 +5,7 @@ import json
 import shutil
 import tempfile
 from copy import deepcopy
+from pathlib import Path
 
 import pytest
 import pytest_asyncio
@@ -182,7 +183,11 @@ async def test_stop_waits_for_active_action_before_writing_aborted_record(
     rec = _load(orch.runs[-1]["yml_path"])
     assert "aborted" in [str(s) for s in rec["experiment_status"]]
     assert len(orch.last_experiment.dispatched_actions) == 1
-    assert len(rec["dispatched_actions_abbr"]) == 1
+    assert len(rec["action_list"]) == 1
+    (plan_path,) = list(Path(orch.runs[-1]["yml_path"]).parent.glob("*-exp.plan.json"))
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    assert len(plan["planned"]) == 2  # both staged, one ran
+    assert all("action_params" not in e for e in plan["planned"])
     done = orch.last_experiment.dispatched_actions[0]
     assert "finished" in [str(getattr(s, "value", s)) for s in done.action_status]
 
@@ -206,8 +211,12 @@ async def test_stop_during_sequence_aborts_sequence_and_keeps_the_experiment(
     rec = _load(orch.runs[-1]["yml_path"])
     assert orch.runs[-1]["type"] == "sequence"
     assert "aborted" in [str(s) for s in rec["sequence_status"]]
-    uuids = [str(e["experiment_uuid"]) for e in rec["dispatched_experiments_abbr"]]
+    uuids = [str(u) for u in rec["experiment_list"]]
     assert uuids == [str(orch.last_experiment.experiment_uuid)]
+    (plan_path,) = list(Path(orch.runs[-1]["yml_path"]).parent.glob("*-seq.plan.json"))
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    assert [e["experiment_name"] for e in plan["planned"]] == ["demo", "demo"]
+    assert "planned_experiments" not in rec
 
 
 @pytest.mark.asyncio
@@ -244,7 +253,7 @@ async def test_stop_between_experiments_does_not_duplicate_the_finished_one(rig)
     rec = _load(orch.runs[-1]["yml_path"])
     assert orch.runs[-1]["type"] == "sequence"
     assert "aborted" in [str(s) for s in rec["sequence_status"]]
-    uuids = [str(e["experiment_uuid"]) for e in rec["dispatched_experiments_abbr"]]
+    uuids = [str(u) for u in rec["experiment_list"]]
     assert uuids == [str(orch.last_experiment.experiment_uuid)]
 
 

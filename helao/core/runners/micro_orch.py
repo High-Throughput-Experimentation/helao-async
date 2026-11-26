@@ -48,6 +48,7 @@ from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.group_snapshot import ERROR_STATUSES
 from helao.core.models.experiment import ExperimentModel, ShortExperimentModel
 from helao.core.models.hlostatus import HloStatus, is_terminal
+from helao.core.models.plan import experiment_plan, plan_name, sequence_plan
 from helao.core.models.run_dir import diag_root, run_root
 from helao.core.models.server import ActionServerModel
 from helao.core.rpc import RPCClient, RPCDispatcher, RPCError, derive_rpc_port
@@ -55,6 +56,7 @@ from helao.helpers import helao_logging as logging
 from helao.helpers.artifact_hash import log_artifact_hashes
 from helao.helpers.file_utils import replace_when_free, staging_path
 from helao.helpers.meta_io import dumps_meta, meta_glob, resolve_meta_path
+from helao.helpers.plan_io import write_plan_once
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.server_keys import get_sync_server_cfg
 from helao.helpers.time_utils import gen_uuid, set_time
@@ -926,6 +928,9 @@ class MicroOrch:
 
         for i, act in enumerate(actions):
             self._stage_action(act, order=i)
+        await self._write_plan(
+            experiment, experiment_plan(experiment.experiment_uuid, actions), "exp"
+        )
         self.active_experiment = experiment
         self.planned_actions = list(actions)
         try:
@@ -1056,6 +1061,9 @@ class MicroOrch:
         sequence.init_seq(time_offset=0)
 
         planned = list(seq_func(**supplied))  # a generator must not be spent twice
+        await self._write_plan(
+            sequence, sequence_plan(sequence.sequence_uuid, planned), "seq"
+        )
         self.active_sequence = sequence
         self.finished_experiments = []
         self.queued_experiments = list(planned)
@@ -1352,15 +1360,41 @@ class MicroOrch:
             await f.write(output_str)
         await replace_when_free(tmp_file, output_file)
 
+    def _record_file(self, record, kind: str) -> str:
+        """``<record_root>/<record dir>/<ts>-<kind>.json`` (DIAG for a manual record)."""
+        root = self._record_root(manual=bool(record.manual_action))
+        if kind == "seq":
+            rel, stamp = record.get_sequence_dir(), record.sequence_timestamp
+        else:
+            rel, stamp = record.get_experiment_dir(), record.experiment_timestamp
+        return os.path.join(
+            root, rel, f"{stamp.strftime('%y%m%d.%H%M%S%f')}-{kind}.json"
+        )
+
+    async def _write_plan(self, record, payload: dict, kind: str) -> None:
+        """Write-once plan sidecar beside the record, listed in ``aux_files``."""
+        record_file = self._record_file(record, kind)
+        target = os.path.join(os.path.dirname(record_file), plan_name(record_file))
+        owner = getattr(record, f"{'sequence' if kind == 'seq' else 'experiment'}_uuid")
+        try:
+            await write_plan_once(
+                target,
+                payload,
+                self._write_meta_atomic,
+                kind=f"{kind}_plan",
+                owner_uuid=owner,
+            )
+        except Exception:
+            LOGGER.error(f"could not write plan sidecar {target}", exc_info=True)
+            return
+        name = os.path.basename(target)
+        if name not in record.aux_files:
+            record.aux_files.append(name)
+
     async def _write_exp(self, experiment: Experiment) -> str:
         """Write ``<record_root>/<exp_dir>/<ts>-exp.json`` (or an in-flight ``.yml``); return its path."""
-        exp_dict = experiment.get_exp().clean_dict()
-        root = self._record_root(manual=bool(experiment.manual_action))
-        output_path = os.path.join(root, experiment.get_experiment_dir())
-        output_file = os.path.join(
-            output_path,
-            f"{experiment.experiment_timestamp.strftime('%y%m%d.%H%M%S%f')}-exp.json",
-        )
+        exp_dict = experiment.get_exp().record_dict()
+        output_file = self._record_file(experiment, "exp")
         output_dict = {"file_type": "experiment"}
         output_dict.update(exp_dict)
         # clean_dict drops empty dicts, but the localfs loader indexes
@@ -1380,13 +1414,8 @@ class MicroOrch:
 
     async def _write_seq(self, sequence: Sequence) -> str:
         """Write ``<record_root>/<seq_dir>/<ts>-seq.json`` (or an in-flight ``.yml``); return its path."""
-        seq_dict = sequence.get_seq().clean_dict()
-        root = self._record_root(manual=bool(sequence.manual_action))
-        output_path = os.path.join(root, sequence.get_sequence_dir())
-        output_file = os.path.join(
-            output_path,
-            f"{sequence.sequence_timestamp.strftime('%y%m%d.%H%M%S%f')}-seq.json",
-        )
+        seq_dict = sequence.get_seq().record_dict()
+        output_file = self._record_file(sequence, "seq")
         output_dict = {"file_type": "sequence"}
         output_dict.update(seq_dict)
         # See _write_exp: keep an empty sequence_params for strict read-back.
