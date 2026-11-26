@@ -138,3 +138,54 @@ def test_conn_keys_md5(tmp_path):
     base.meta_writer = native  # type: ignore[reportAttributeAccessIssue]
     assert native.dflt_file_conn_key() == UUID("6adf97f83acf6453d4a6a4b1070f3754")
     assert native.new_file_conn_key("abc") == UUID("900150983cd24fb0d6963f7d28e17f72")
+
+
+import json  # noqa: E402
+
+from helao.core.models.experiment import ShortExperimentModel  # noqa: E402
+from helao.helpers.premodels import Experiment, Sequence  # noqa: E402
+
+
+def _seq_exp_from_action():
+    dump = mk_action().model_dump()
+    seq = Sequence.model_validate(
+        {k: v for k, v in dump.items() if k in Sequence.model_fields}
+    )
+    exp = Experiment.model_validate(
+        {k: v for k, v in dump.items() if k in Experiment.model_fields}
+    )
+    return seq, exp
+
+
+@pytest.mark.asyncio
+async def test_write_seq_record_omits_lists_and_plan_is_stripped(tmp_path):
+    save_root = str(tmp_path / "RUNS_ACTIVE")
+    base = _swap(make_base(save_root), tmp_path)
+    seq, _ = _seq_exp_from_action()
+    seq.planned_experiments = [
+        ShortExperimentModel(experiment_name="e", experiment_params={"p": 1})
+    ]
+    name = await base.write_seq_plan(seq)
+    assert name.endswith("-seq.plan.json")
+    seq_dir = os.path.join(save_root, seq.get_sequence_dir())
+    plan = json.loads(open(os.path.join(seq_dir, name), encoding="utf-8").read())
+    assert plan["planned"][0]["experiment_name"] == "e"
+    assert "experiment_params" not in plan["planned"][0]
+    await base.write_seq(seq)
+    rec_file = [f for f in os.listdir(seq_dir) if f.endswith("-seq.json")][0]
+    rec = read_meta(os.path.join(seq_dir, rec_file))
+    assert "planned_experiments" not in rec
+
+
+@pytest.mark.asyncio
+async def test_write_exp_plan_is_written_once(tmp_path):
+    save_root = str(tmp_path / "RUNS_ACTIVE")
+    base = _swap(make_base(save_root), tmp_path)
+    _, exp = _seq_exp_from_action()
+    acts = [mk_action(action_name="a1"), mk_action(action_name="a2")]
+    name = await base.write_exp_plan(exp, acts)
+    path = os.path.join(save_root, exp.get_experiment_dir(), name)
+    before = open(path, "rb").read()
+    assert await base.write_exp_plan(exp, acts[:1]) == name  # a restore re-dispatch
+    assert open(path, "rb").read() == before
+    assert len(json.loads(before)["planned"]) == 2

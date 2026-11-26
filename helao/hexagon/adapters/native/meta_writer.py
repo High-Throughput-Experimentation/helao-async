@@ -30,12 +30,14 @@ from uuid import UUID
 import aiofiles
 
 from helao.core.models.hlostatus import is_terminal
+from helao.core.models.plan import experiment_plan, plan_name, sequence_plan
 from helao.core.models.run_dir import redirect_manual_dir
 from helao.helpers import helao_logging as logging
 from helao.helpers.artifact_hash import log_artifact_hashes
 from helao.helpers.file_utils import replace_when_free, staging_path
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.meta_io import dumps_meta, resolve_meta_path
+from helao.helpers.plan_io import write_plan_once
 from helao.hexagon.domain.naming import (
     DATA_SUFFIX,
     HEADER_SUFFIX,
@@ -158,21 +160,27 @@ class NativeMetaFileWriter:
                 reason=reason,
             )
 
+    def _record_file(self, record, kind: str) -> str:
+        """``<save_root>/<record dir>/<ts>-<kind>.json``; DIAG for a manual record."""
+        save_root = str(self.base.helaodirs.save_root)
+        if record.manual_action:
+            save_root = redirect_manual_dir(save_root)
+        if kind == "seq":
+            rel, stamp = record.get_sequence_dir(), record.sequence_timestamp
+        else:
+            rel, stamp = record.get_experiment_dir(), record.experiment_timestamp
+        return os.path.join(
+            save_root, rel, f"{stamp.strftime('%y%m%d.%H%M%S%f')}-{kind}.json"
+        )
+
     async def write_exp(self, experiment: Experiment, reason: Optional[str] = None):
         """Write ``<experiment_dir>/<timestamp>-exp.json`` (or the existing ``-exp.yml`` it rewrites in place).
 
         Args:
             experiment: ``Experiment`` whose metadata should be persisted.
         """
-        exp_dict = experiment.get_exp().clean_dict()
-        save_root = str(self.base.helaodirs.save_root)
-        if experiment.manual_action:
-            save_root = redirect_manual_dir(save_root)
-        output_path = os.path.join(save_root, experiment.get_experiment_dir())
-        output_file = os.path.join(
-            output_path,
-            f"{experiment.experiment_timestamp.strftime('%y%m%d.%H%M%S%f')}-exp.json",
-        )
+        exp_dict = experiment.get_exp().record_dict()
+        output_file = self._record_file(experiment, "exp")
 
         LOGGER.info(f"writing to exp meta file: {output_file}")
         output_dict = {"file_type": "experiment"}
@@ -194,16 +202,8 @@ class NativeMetaFileWriter:
         Args:
             sequence: ``Sequence`` whose metadata should be persisted.
         """
-        seq_dict = sequence.get_seq().clean_dict()
-        sequence_dir = sequence.get_sequence_dir()
-        save_root = str(self.base.helaodirs.save_root)
-        if sequence.manual_action:
-            save_root = redirect_manual_dir(save_root)
-        output_path = os.path.join(save_root, sequence_dir)
-        output_file = os.path.join(
-            output_path,
-            f"{sequence.sequence_timestamp.strftime('%y%m%d.%H%M%S%f')}-seq.json",
-        )
+        seq_dict = sequence.get_seq().record_dict()
+        output_file = self._record_file(sequence, "seq")
 
         LOGGER.info(f"writing to seq meta file: {output_file}")
         output_dict = {"file_type": "sequence"}
@@ -218,6 +218,32 @@ class NativeMetaFileWriter:
                 event=_event(reason),
                 reason=reason,
             )
+
+    async def write_seq_plan(self, sequence) -> str:
+        """Write ``<ts>-seq.plan.json`` once (spec §3.3); return its basename."""
+        record_file = self._record_file(sequence, "seq")
+        target = os.path.join(os.path.dirname(record_file), plan_name(record_file))
+        await write_plan_once(
+            target,
+            sequence_plan(sequence.sequence_uuid, sequence.planned_experiments),
+            self.base._write_meta_atomic,
+            kind="seq_plan",
+            owner_uuid=sequence.sequence_uuid,
+        )
+        return os.path.basename(target)
+
+    async def write_exp_plan(self, experiment, actions: list) -> str:
+        """Write ``<ts>-exp.plan.json`` once from staged actions; return its basename."""
+        record_file = self._record_file(experiment, "exp")
+        target = os.path.join(os.path.dirname(record_file), plan_name(record_file))
+        await write_plan_once(
+            target,
+            experiment_plan(experiment.experiment_uuid, actions),
+            self.base._write_meta_atomic,
+            kind="exp_plan",
+            owner_uuid=experiment.experiment_uuid,
+        )
+        return os.path.basename(target)
 
     def new_file_conn_key(self, key: str) -> UUID:
         """Return a UUID derived from the MD5 hash of ``key``.

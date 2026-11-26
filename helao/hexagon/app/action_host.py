@@ -497,6 +497,14 @@ class ActionHost(HelaoFastAPI):
         """Write the sequence's ``-seq.yml``."""
         await self.meta_writer.write_seq(sequence)
 
+    async def write_seq_plan(self, sequence) -> str:
+        """Write the sequence's write-once ``-seq.plan.json``; return its basename."""
+        return await self.meta_writer.write_seq_plan(sequence)
+
+    async def write_exp_plan(self, experiment, actions) -> str:
+        """Write the experiment's write-once ``-exp.plan.json``; return its basename."""
+        return await self.meta_writer.write_exp_plan(experiment, actions)
+
     # -- file connection keys ------------------------------------------------
 
     def new_file_conn_key(self, key: str):
