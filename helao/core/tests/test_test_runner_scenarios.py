@@ -18,9 +18,10 @@ class StubOrch:
     async def run_action(self, action):
         self.names.append(action.action_name)
         params = dict(action.action_params)
-        if action.action_name == "add_global_param":  # server stamps the value
-            params[params["param_name"]] = params["param_value"]
-        return SimpleNamespace(action_params=params)
+        out = {}
+        if action.action_name == "add_global_param":  # server set_output()s the value
+            out[params["param_name"]] = params["param_value"]
+        return SimpleNamespace(action_params=params, meta_dict={"action_output": out})
 
     async def dispatch_action(self, action):
         self.names.append(action.action_name)
@@ -52,3 +53,9 @@ def test_unknown_scenario_dispatches_nothing():
 def test_string_samples_rejected():
     with pytest.raises(ValueError):
         asyncio.run(tr.run(StubOrch(), samples="1,2"))
+
+
+def test_conditional_reads_global_from_output():
+    tr.GLOBALS.clear()
+    asyncio.run(tr.run(StubOrch(), scenario="conditional"))
+    assert tr.GLOBALS["global_test"] is True

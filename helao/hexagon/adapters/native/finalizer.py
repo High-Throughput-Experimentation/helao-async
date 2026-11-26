@@ -311,6 +311,8 @@ class NativeActionFinalizer:
                     # its required `params` cannot be filled -> TypeError. An empty
                     # update is a no-op anyway.
                     if export_params:
+                        for k in export_params:
+                            LOGGER.info(f"updating {k} in orch global vars")
                         _, error_code = await async_private_dispatcher(
                             server_key=action.orch_key,
                             host=action.orch_host,

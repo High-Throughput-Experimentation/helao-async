@@ -13,9 +13,9 @@ Per the P5 constraints (:doc:`CARDS_REFACTOR_P5.md` sec 3.1 rule 3): these
 functions cache no shared mutable state -- every caller passes the concrete
 dict(s) to mutate/read at call time, so ``import_queues`` reassigning
 ``global_params`` (or any other attribute) cannot leave a stale reference
-behind here. Behavior is byte-identical to the original inline blocks,
-including log message wording, list-vs-dict ``to_global_params`` handling,
-and key iteration order.
+behind here. Fold-out resolution lives in
+``helao.helpers.global_exports.resolve_global_exports``: ``action_output``
+first, then ``action_params`` (record schema spec sec 4.5).
 """
 
 from helao.helpers import helao_logging as logging

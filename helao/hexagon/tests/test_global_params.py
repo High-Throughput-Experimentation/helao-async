@@ -1,10 +1,10 @@
 """Fold-in/fold-out semantics of ``helao/hexagon/app/orch_global_params.py``."""
 
+from helao.helpers.global_exports import resolve_global_exports
 from helao.hexagon.app.orch_global_params import (
     apply_from_globals,
     collect_to_globals,
 )
-from helao.helpers.global_exports import resolve_global_exports
 from helao.hexagon.domain.models import Action
 
 

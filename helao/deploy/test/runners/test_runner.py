@@ -54,6 +54,7 @@ from typing import Any, Optional
 
 from helao.core.models.machine import MachineModel
 from helao.core.runners.micro_orch import MicroOrch
+from helao.helpers.global_exports import resolve_global_exports
 from helao.helpers.premodels import Action
 
 REQUIRES = {"ORCH": ["wait", "add_global_param", "conditional_stop"]}
@@ -110,7 +111,14 @@ async def conditional_stop(orch: MicroOrch) -> None:
             {"param_name": "global_test", "param_value": True},
         )
     )
-    GLOBALS["global_test"] = res.action_params["global_test"]
+    # the server publishes via set_output: the value is in action_output
+    GLOBALS.update(
+        resolve_global_exports(
+            ["global_test"],
+            res.action_params,
+            res.meta_dict.get("action_output") or {},
+        )
+    )
 
     # conditional_stop with from_global: GLOBALS[global_test] -> action param
     await orch.run_action(
