@@ -97,7 +97,7 @@ def makeApp(server_key):
             "orch_host": app.base.orch_host,
             "orch_port": app.base.orch_port,
         }
-        active.action.action_params.update({f"_{k}": v for k, v in data_dict.items()})
+        active.set_output(**{f"_{k}": v for k, v in data_dict.items()})
         await active.enqueue_data_dflt(datadict=data_dict)
         finished_action = await active.finish()
         return finished_action.as_dict()
@@ -111,7 +111,7 @@ def makeApp(server_key):
         active = await ctx.begin()
         app.driver.change_plate(active.action.action_params["plate_id"])
         loaded_plate_id = app.driver.loaded_plate
-        active.action.action_params["_loaded_plate_id"] = loaded_plate_id
+        active.set_output(_loaded_plate_id=loaded_plate_id)
         await active.enqueue_data_dflt(datadict={"loaded_plate_id": loaded_plate_id})
         finished_action = await active.finish()
         return finished_action.as_dict()

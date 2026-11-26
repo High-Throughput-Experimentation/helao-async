@@ -15,16 +15,16 @@ Under the orchestrator, actions declare ``to_global_params`` /
 thing explicitly, which is the whole point of MicroOrch -- no Orch needed:
 
 * **to_global**: read the object returned by :meth:`MicroOrch.run_action`,
-  pull the value out of its ``action_params``, and store it in a plain dict in
-  this script (:data:`GLOBALS`).
+  pull the value out of its ``action_output`` (``meta_dict``; falling back to
+  ``action_params``), and store it in a plain dict in this script (:data:`GLOBALS`).
 * **from_global**: copy the value from :data:`GLOBALS` into the next action's
   params before dispatching it.
 
 The :func:`_capture` and :func:`_inject` helpers below implement exactly that,
 mirroring the ``to_global_params`` / ``from_global_act_params`` declarations in
-``OERSIM_exp.py``. The simulator servers stamp their outputs onto the action's
-``action_params`` (e.g. ``get_loaded_plate`` -> ``_loaded_plate_id``,
-``acquire_point`` -> ``_feature``), so the returned ``HelaoAction.action_params``
+``OERSIM_exp.py``. The simulator servers write their outputs to the action's
+``action_output`` (e.g. ``get_loaded_plate`` -> ``_loaded_plate_id``,
+``acquire_point`` -> ``_feature``), so the returned ``HelaoAction.action_output``
 is the source of every captured value.
 
 The orchestrator version self-requeues via ``GPSIM/check_condition`` calling
@@ -87,14 +87,21 @@ def _inject(params: dict, mapping: dict[str, str]) -> dict:
 async def _capture(
     orch: MicroOrch, action: Action, to_global: Optional[dict[str, str]] = None
 ):
-    """run_action, then to_global: copy named ``action_params`` into ``GLOBALS``.
+    """run_action, then to_global: copy named values into ``GLOBALS``.
 
-    ``to_global`` is ``{action_param_key: global_key}``. With a 1:1 name it
+    Each value is read from the record's ``action_output`` first (the loaded
+    ``HelaoAction`` exposes it only via ``meta_dict``), falling back to
+    ``action_params`` for keys that stayed inputs or older records.
+
+    ``to_global`` is ``{action_key: global_key}``. With a 1:1 name it
     matches an action's ``to_global_params`` list entry.
     """
     result = await orch.run_action(action)
+    out = result.meta_dict.get("action_output") or {}
     for src_key, gkey in (to_global or {}).items():
-        GLOBALS[gkey] = result.action_params[src_key]
+        GLOBALS[gkey] = (
+            out[src_key] if src_key in out else result.action_params[src_key]
+        )
     return result
 
 

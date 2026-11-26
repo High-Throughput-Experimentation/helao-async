@@ -89,7 +89,7 @@ def makeApp(server_key):
         if not progress:
             app.driver.fit_model(active.action.action_params["plate_id"])
         progress = app.driver.progress[active.action.action_params["plate_id"]]
-        active.action.action_params.update({f"_{k}": v for k, v in progress.items()})
+        active.set_output(**{f"_{k}": v for k, v in progress.items()})
         await active.enqueue_data_dflt(datadict=progress)
         finished_action = await active.finish()
         return finished_action.as_dict()
@@ -110,7 +110,7 @@ def makeApp(server_key):
                 orch_str=orch_string,
             )
         await active.enqueue_data_dflt(datadict=data)
-        active.action.action_params["_feature"] = data["feature"]
+        active.set_output(_feature=data["feature"])
         finished_action = await active.finish()
         return finished_action.as_dict()
 

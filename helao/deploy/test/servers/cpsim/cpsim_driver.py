@@ -217,11 +217,11 @@ class CPSimExec(Executor):
         }
 
     async def _post_exec(self) -> dict:
-        """Compute the final-window eta and write it back to action params.
+        """Compute the final-window eta and write it to action output.
 
         Returns:
             Dict with ``ErrorCodes.none``.
         """
         # calculate final 4-second eta mean and pass to params
-        self.active.action.action_params["mean_eta_vrhe"] = calc_eta(self.cp)
+        self.active.set_output(mean_eta_vrhe=calc_eta(self.cp))
         return {"error": ErrorCodes.none}
