@@ -153,6 +153,9 @@ class ActionModel(ShortActionModel):
     # §5.2). clean_dict drops the empty default, so ymls without failures are
     # byte-identical to before the field existed.
     prefinish_errors: list[dict] = Field(default=[])
+    # Pre-finish hooks that ran on this record, failures included (record
+    # schema spec §5.1). clean_dict drops the empty default.
+    prefinish_hooks: list[str] = Field(default=[])
     error_code: Optional[ErrorCodes] = ErrorCodes.none
     process_uuid: Optional[UUID] = None
     data_request_id: Optional[UUID] = None

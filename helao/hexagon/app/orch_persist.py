@@ -77,6 +77,7 @@ _RUNTIME_ACTION_FIELDS = (
     "parent_action_uuid",
     "child_action_uuid",
     "prefinish_errors",
+    "prefinish_hooks",
 )
 
 # What the live status copy of an in-flight action lacks: dispatch fills the

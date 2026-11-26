@@ -90,3 +90,25 @@ async def test_empty_hookset_is_a_noop():
     exp = _exp()
     await run_prefinish(HookSet.empty(), exp, "exp1", Path("/tmp/x"), server=object())
     assert exp.prefinish_errors == []
+
+
+def test_prefinish_hooks_default_is_omitted_from_clean_dict():
+    for model in (
+        Action(action_name="a"),
+        Experiment(experiment_name="e"),
+        Sequence(sequence_name="s"),
+    ):
+        assert model.prefinish_hooks == []
+        assert "prefinish_hooks" not in model.clean_dict()
+
+
+@pytest.mark.asyncio
+async def test_prefinish_hooks_lists_every_hook_that_ran_failures_included():
+    hs = HookSet(
+        cfg={"ok": {"*": None}, "boom": {"*": None}, "skip": {"other": None}},
+        hooks={"ok": _Ok([], "ok"), "boom": _Boom(), "skip": _Ok([], "skip")},
+    )
+    exp = _exp()
+    await run_prefinish(hs, exp, "exp1", Path("/tmp/x"), server=object())
+    assert exp.prefinish_hooks == ["ok", "boom"]
+    assert [e["hook"] for e in exp.prefinish_errors] == ["boom"]

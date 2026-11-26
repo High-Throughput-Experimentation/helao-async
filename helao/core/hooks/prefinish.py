@@ -24,6 +24,7 @@ async def run_prefinish(
     kind = record.__class__.__name__.lower()
     uuid = getattr(record, f"{kind}_uuid", None)
     for hook_name, hook, args in hook_set.select(name):
+        record.prefinish_hooks.append(hook_name)
         LOGGER.info(f"Running pre-finish hook {hook_name!r} for {kind} {name}")
         try:
             await hook.run(

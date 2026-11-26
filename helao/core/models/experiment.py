@@ -141,6 +141,9 @@ class ExperimentModel(ShortExperimentModel):
     # §5.2). clean_dict drops the empty default, so ymls without failures are
     # byte-identical to before the field existed.
     prefinish_errors: list[dict] = Field(default=[])
+    # Pre-finish hooks that ran on this record, failures included (record
+    # schema spec §5.1). clean_dict drops the empty default.
+    prefinish_hooks: list[str] = Field(default=[])
 
     def replace_experiment_status(self, old: HloStatus, new: HloStatus) -> None:
         """Guarded swap-or-append onto ``experiment_status`` (see status_transitions.guarded_replace)."""
