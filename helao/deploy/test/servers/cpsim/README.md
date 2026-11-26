@@ -48,7 +48,7 @@ Action results (in `-act.json`):
 
 | key | in | type | structure | meaning | set at |
 |---|---|---|---|---|---|
-| `mean_eta_vrhe` | `action_params` | float | scalar | OER overpotential: mean of `erhe_v` over the last 4 s of the trace minus 1.23 V | `helao/deploy/test/servers/cpsim/cpsim_driver.py:226` |
+| `mean_eta_vrhe` | `action_output` | float | scalar | OER overpotential: mean of `erhe_v` over the last 4 s of the trace minus 1.23 V | `helao/deploy/test/servers/cpsim/cpsim_driver.py:226` |
 
 ### `cancel_measure_cp` (action)
 
@@ -56,7 +56,7 @@ No data files or action results.
 
 ### `get_loaded_plate` (action)
 
-Writes one row and four underscore-prefixed `action_params` keys; writer `helao/deploy/test/servers/cpsim/cpsim_server.py:100-101`.
+Writes one row and four underscore-prefixed `action_output` keys; writer `helao/deploy/test/servers/cpsim/cpsim_server.py:100-101`.
 
 Data file `<action_abbr>-*.jsonl` (+ `.meta.json`), one row:
 
@@ -71,14 +71,14 @@ Action results (in `-act.json`):
 
 | key | in | type | structure | meaning | set at |
 |---|---|---|---|---|---|
-| `_loaded_plate_id` | `action_params` | int | scalar | copy of `loaded_plate_id` (startup plate; see Notes) | `helao/deploy/test/servers/cpsim/cpsim_server.py:100` |
-| `_orch_key` | `action_params` | str \| null | scalar | copy of `orch_key`; `null` with no orchestrator | `helao/deploy/test/servers/cpsim/cpsim_server.py:100` |
-| `_orch_host` | `action_params` | str \| null | scalar | copy of `orch_host` | `helao/deploy/test/servers/cpsim/cpsim_server.py:100` |
-| `_orch_port` | `action_params` | int \| null | scalar | copy of `orch_port` | `helao/deploy/test/servers/cpsim/cpsim_server.py:100` |
+| `_loaded_plate_id` | `action_output` | int | scalar | copy of `loaded_plate_id` (startup plate; see Notes) | `helao/deploy/test/servers/cpsim/cpsim_server.py:100` |
+| `_orch_key` | `action_output` | str \| null | scalar | copy of `orch_key`; `null` with no orchestrator | `helao/deploy/test/servers/cpsim/cpsim_server.py:100` |
+| `_orch_host` | `action_output` | str \| null | scalar | copy of `orch_host` | `helao/deploy/test/servers/cpsim/cpsim_server.py:100` |
+| `_orch_port` | `action_output` | int \| null | scalar | copy of `orch_port` | `helao/deploy/test/servers/cpsim/cpsim_server.py:100` |
 
 ### `change_plate` (action)
 
-Writes one row and one `action_params` key; writer `helao/deploy/test/servers/cpsim/cpsim_server.py:114-115`.
+Writes one row and one `action_output` key; writer `helao/deploy/test/servers/cpsim/cpsim_server.py:114-115`.
 
 Data file `<action_abbr>-*.jsonl` (+ `.meta.json`), one row:
 
@@ -90,7 +90,7 @@ Action results (in `-act.json`):
 
 | key | in | type | structure | meaning | set at |
 |---|---|---|---|---|---|
-| `_loaded_plate_id` | `action_params` | int | scalar | the startup `plate_id`, not the requested one (see Notes) | `helao/deploy/test/servers/cpsim/cpsim_server.py:114` |
+| `_loaded_plate_id` | `action_output` | int | scalar | the startup `plate_id`, not the requested one (see Notes) | `helao/deploy/test/servers/cpsim/cpsim_server.py:114` |
 
 ## Notes
 

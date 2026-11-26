@@ -141,6 +141,8 @@ class ActionSessionPort(Protocol):
 
     def get_realtime_nowait(self) -> int: ...
 
+    def set_output(self, **values) -> None: ...
+
     def init_datafile(
         self,
         header,

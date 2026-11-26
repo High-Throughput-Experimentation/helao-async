@@ -23,6 +23,10 @@ REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 COLLABORATORS: Final[tuple[str, ...]] = ("data_stream", "data_file", "finalizer")
 
 
+#: Deployment-facing members declared on the port though no collaborator reads them.
+DEPLOYMENT_ONLY: Final[frozenset[str]] = frozenset({"set_output"})
+
+
 def _members_read_off_the_back_reference() -> set[str]:
     """Every ``self.active.<name>`` the native collaborators touch."""
     found: set[str] = set()
@@ -62,7 +66,7 @@ def test_the_collaborators_still_read_exactly_what_the_port_declares() -> None:
     an obligation on every future session implementation.
     """
     derived = _members_read_off_the_back_reference()
-    declared = _protocol_members()
+    declared = _protocol_members() - DEPLOYMENT_ONLY
     assert derived == declared, (
         f"missing from ActionSessionPort: {sorted(derived - declared)}\n"
         f"declared but unused by any collaborator: {sorted(declared - derived)}"

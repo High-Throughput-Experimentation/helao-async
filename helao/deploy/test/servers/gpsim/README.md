@@ -46,7 +46,7 @@ No data files or action results.
 
 ### `get_progress` (action)
 
-Writes the plate's stored progress dict as one row and as underscore-prefixed `action_params` keys; writer `helao/deploy/test/servers/gpsim/gpsim_server.py:92-93`.
+Writes the plate's stored progress dict as one row and as underscore-prefixed `action_output` keys; writer `helao/deploy/test/servers/gpsim/gpsim_server.py:92-93`.
 
 Data file `<action_abbr>-*.jsonl` (+ `.meta.json`), one row: the progress dict above, plus `max_prediction_stdev` (float, present after a `check_condition` and before the next `acquire_point`, which replaces the stored dict with a fresh five-key one, `gpsim_driver.py:277-284`) (`gpsim_server.py:93`). The stored dict is `{}` until an `acquire_point` has run for the plate; the row is then `{}` and no `_` keys are set.
 
@@ -54,7 +54,7 @@ Action results (in `-act.json`):
 
 | key | in | type | structure | meaning | set at |
 |---|---|---|---|---|---|
-| `_expected_improvement`, `_feature`, `_total_plate_mae`, `_plate_step`, `_global_step`, `_max_prediction_stdev` (last one only after a `check_condition` and before the next `acquire_point`) | `action_params` | as the progress dict (`_max_prediction_stdev`: float) | as the progress dict (`_max_prediction_stdev`: scalar) | `_` + each progress field | `helao/deploy/test/servers/gpsim/gpsim_server.py:92` |
+| `_expected_improvement`, `_feature`, `_total_plate_mae`, `_plate_step`, `_global_step`, `_max_prediction_stdev` (last one only after a `check_condition` and before the next `acquire_point`) | `action_output` | as the progress dict (`_max_prediction_stdev`: float) | as the progress dict (`_max_prediction_stdev`: scalar) | `_` + each progress field | `helao/deploy/test/servers/gpsim/gpsim_server.py:92` |
 
 ### `acquire_point` (action)
 
@@ -66,7 +66,7 @@ Action results (in `-act.json`):
 
 | key | in | type | structure | meaning | set at |
 |---|---|---|---|---|---|
-| `_feature` | `action_params` | list[int] | list[int] | composition vector chosen | `helao/deploy/test/servers/gpsim/gpsim_server.py:113` |
+| `_feature` | `action_output` | list[int] | list[int] | composition vector chosen | `helao/deploy/test/servers/gpsim/gpsim_server.py:113` |
 
 ### `update_model` (action)
 

@@ -71,9 +71,9 @@ Under the orchestrator, actions declare `to_global_params` /
 `Orch.global_params`. A runner does the same thing explicitly:
 
 - **to_global**: read the object returned by `run_action` (a loader-backed
-  `HelaoAction`), pull the value out of its `action_params`, and store it in a
-  plain dict (the runners use a module-level `GLOBALS`). The simulator servers
-  write their outputs to `action_output` (e.g.
+  `HelaoAction`), pull the value out of its `action_output` (then `action_params`), and store it
+  in a plain dict (the runners use a module-level `GLOBALS`). The simulator
+  servers write their outputs to `action_output` (e.g.
   `get_loaded_plate -> _loaded_plate_id`, `acquire_point -> _feature`,
   `add_global_param -> <param_name>`).
 - **from_global**: copy a value out of that dict into the next action's params

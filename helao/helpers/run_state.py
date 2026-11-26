@@ -313,6 +313,9 @@ _PARENT_KIND = {"action": "experiment", "experiment": "sequence"}
 #: ``sequence_params`` (records written before 2026-11 also carried
 #: ``planned_experiments`` there and ran to hundreds of thousands of lines) -- and
 #: an experiment's parent ``sequence_uuid`` lands ~20 lines from its end for the same reason.
+#: In new records ``experiment_list`` follows ``sequence_uuid``, so for a very long
+#: sequence the uuid can sit beyond this tail window; the reader then falls back to a
+#: line stream.
 #: Measured across the 26.03-26.05 production archive, where seq ymls run
 #: 427k-560k lines: a head-only read would recover no sequence uuid at all.
 _HEAD_BYTES = 4096

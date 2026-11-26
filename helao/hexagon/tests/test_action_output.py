@@ -115,3 +115,34 @@ async def test_finish_is_silent_without_snapshot_or_changes(
     with caplog.at_level(logging.WARNING):
         await active.finish()
     assert "wrote action_params" not in caplog.text
+
+
+class _NoCopy:
+    def __deepcopy__(self, memo):
+        raise TypeError("cannot copy")
+
+
+class _ProbeNone(_Probe):
+    async def _pre_exec(self):
+        self.seen = self.active.params_snapshot
+        self.reached = True
+        raise RuntimeError("probe stops here")
+
+
+@pytest.mark.asyncio
+async def test_uncopyable_param_does_not_kill_the_loop(tmp_path, monkeypatch):
+    import helao.hexagon.app.executor_runner as er
+
+    warned = []
+    monkeypatch.setattr(er.LOGGER, "warning", lambda m, *a, **k: warned.append(m))
+    _, active = await _session(tmp_path, action_params={"a": _NoCopy()})
+    probe = _ProbeNone(active)
+    try:
+        await active.executor_runner.action_loop_task(probe)
+    except RuntimeError as exc:
+        assert "probe" in str(exc)
+    assert probe.reached and probe.seen is None
+    assert len(warned) == 1 and str(active.action.action_uuid) in warned[0]
+    assert "cannot copy" in warned[0]
+    active.data_logger.cancel()
+    await asyncio.sleep(0.05)

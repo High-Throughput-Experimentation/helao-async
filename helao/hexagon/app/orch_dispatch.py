@@ -700,8 +700,8 @@ class DispatchRunner:
         try:
             name = await write()
         except Exception:
-            uid = getattr(record, "sequence_uuid", None) or getattr(
-                record, "experiment_uuid", None
+            uid = getattr(record, "experiment_uuid", None) or getattr(
+                record, "sequence_uuid", None
             )
             LOGGER.error(f"could not write plan sidecar for {uid}", exc_info=True)
             return

@@ -86,7 +86,12 @@ class ExecutorRunner:
             await self.active.send_nonblocking_status()
 
         LOGGER.info("action_loop_task started")
-        self.active.params_snapshot = deepcopy(self.active.action.action_params)
+        try:
+            self.active.params_snapshot = deepcopy(self.active.action.action_params)
+        except Exception as exc:
+            LOGGER.warning(
+                f"params snapshot skipped for action {self.active.action.action_uuid}: {exc!r}"
+            )
         setup_state = await executor._pre_exec()
         setup_error = setup_state.get("error", ErrorCodes.none)
         if setup_error == ErrorCodes.none:
