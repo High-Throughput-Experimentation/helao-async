@@ -156,6 +156,9 @@ class ActionModel(ShortActionModel):
     # Pre-finish hooks that ran on this record, failures included (record
     # schema spec §5.1). clean_dict drops the empty default.
     prefinish_hooks: list[str] = Field(default=[])
+    # Post-finish chain SYNC selected for this record; set on the S3 meta only,
+    # never on the local record (record schema spec §5.2).
+    postfinish_hooks: list[str] = Field(default=[])
     error_code: Optional[ErrorCodes] = ErrorCodes.none
     process_uuid: Optional[UUID] = None
     data_request_id: Optional[UUID] = None

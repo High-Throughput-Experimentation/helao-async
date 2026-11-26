@@ -380,3 +380,39 @@ async def test_plan_upload_failure_blocks_the_meta_push(tmp_path, mod):
         assert mod.Progress(exp_yml).dict.get("s3") is not True
     finally:
         await teardown_driver(drv)
+
+
+OK_HOOK = """
+from helao.core.hooks import FinishHook
+class Hook(FinishHook):
+    blocking = False
+    phase = "postfinish"
+    async def run(self, ctx):
+        return None
+"""
+
+
+@pytest.mark.parametrize("mod", MODS)
+@pytest.mark.asyncio
+async def test_s3_meta_names_the_selected_chain_and_local_record_is_untouched(
+    tmp_path, mod
+):
+    ok = _hook_file(tmp_path, "ok_hook", OK_HOOK)
+    drv = make_sync_driver(
+        tmp_path,
+        mod.SyncDriver,
+        postfinish_hooks={"experiment": {"s3_upload": ["*"], ok: ["*"]}},
+    )
+    try:
+        sent = []
+        _capture(drv, sent)
+        _no_requeue(drv)
+        uuid = mk_uuid(1)
+        exp_yml = make_exp_tree(tmp_path, "RUNS", uuid)
+        before = exp_yml.read_bytes()
+        await asyncio.wait_for(drv.sync_yml(yml_path=exp_yml, rank=1), timeout=15)
+        meta = dict(sent)[f"experiment/{uuid}.json"]
+        assert meta["postfinish_hooks"] == ["s3_upload", ok]
+        assert exp_yml.read_bytes() == before
+    finally:
+        await teardown_driver(drv)

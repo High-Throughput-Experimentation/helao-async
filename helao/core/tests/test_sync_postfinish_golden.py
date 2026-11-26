@@ -134,6 +134,7 @@ ACT0_EXPECTED = {
     "technique_name": "test_tech",
     "process_finish": False,
     "process_contrib": ["action_params"],
+    "postfinish_hooks": ["s3_upload"],
     "error_code": "none",
     "sync_data": True,
     "start_condition": 3,
@@ -161,6 +162,7 @@ ACT1_EXPECTED = {
     "technique_name": "tech_b",
     "process_finish": True,
     "process_contrib": ["action_params"],
+    "postfinish_hooks": ["s3_upload"],
     "error_code": "none",
     "sync_data": True,
     "start_condition": 3,
@@ -210,6 +212,7 @@ EXP_EXPECTED = {
     "sequence_uuid": SEQ_UUID,
     "process_list": [PUUID_PLACEHOLDER],
     "sync_data": True,
+    "postfinish_hooks": ["s3_upload"],
     "sequence_label": "noLabel",
     "manual_action": False,
 }
@@ -224,6 +227,7 @@ SEQ_EXPECTED = {
     "sequence_uuid": SEQ_UUID,
     "sync_data": True,
     "manual_action": False,
+    "postfinish_hooks": ["s3_upload", "dispatch_analysis"],
 }
 
 

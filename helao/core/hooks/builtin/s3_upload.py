@@ -247,6 +247,13 @@ class Hook(FinishHook):
                     if isinstance(d, dict) and d.get(fold[2])
                 )
             )
+        level = prog.yml.type
+        if level in syncer.postfinish:
+            chain_name = prog.yml.meta.get(f"{level}_name", "NA")
+            patched_meta["postfinish_hooks"] = [
+                hook_name
+                for hook_name, _, _ in syncer.postfinish[level].select(chain_name)
+            ]
         meta = MOD_MAP[prog.yml.type](**patched_meta).record_dict(strip_private=True)
 
         # patch technique lists in meta
