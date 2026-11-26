@@ -85,6 +85,34 @@ async def test_request_stop_mid_experiment_finishes_record_aborted(rig, monkeypa
     assert any(r["type"] == "experiment" for r in orch.runs)
 
 
+@pytest.mark.asyncio
+async def test_plan_write_failure_does_not_end_the_run(rig, monkeypatch):
+    orch, fake = rig
+    import helao.core.runners.micro_orch as mo
+
+    async def boom(*a, **k):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(mo, "write_plan_once", boom)
+    monkeypatch.setattr(mo, "experiment_plan", lambda *a, **k: 1 / 0)
+    real = orch.dispatch_action
+    calls = {"n": 0}
+
+    async def stop_after_first(action, *a, **k):
+        if calls["n"] == 1:
+            orch.request_stop()
+        calls["n"] += 1
+        return await real(action, *a, **k)
+
+    monkeypatch.setattr(orch, "dispatch_action", stop_after_first)
+    with pytest.raises(RunnerStopped):
+        await orch.run_experiment(
+            _three_pings, experiment=Experiment(experiment_name="e")
+        )
+    assert len(fake.action_calls) == 1  # the run went on past the plan failure
+    assert not any("plan" in n for n in (orch.last_experiment.aux_files or []))
+
+
 class _ActiveServer(_FakeDataActionServer):
     """``ping`` replies ``active``; the test finishes it later, like update_status."""
 
@@ -188,6 +216,8 @@ async def test_stop_waits_for_active_action_before_writing_aborted_record(
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
     assert len(plan["planned"]) == 2  # both staged, one ran
     assert all("action_params" not in e for e in plan["planned"])
+    assert "dispatched_actions_abbr" not in rec
+    assert plan_path.name in rec["aux_files"]
     done = orch.last_experiment.dispatched_actions[0]
     assert "finished" in [str(getattr(s, "value", s)) for s in done.action_status]
 
@@ -216,7 +246,8 @@ async def test_stop_during_sequence_aborts_sequence_and_keeps_the_experiment(
     (plan_path,) = list(Path(orch.runs[-1]["yml_path"]).parent.glob("*-seq.plan.json"))
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
     assert [e["experiment_name"] for e in plan["planned"]] == ["demo", "demo"]
-    assert "planned_experiments" not in rec
+    assert "dispatched_experiments_abbr" not in rec
+    assert plan_path.name in rec["aux_files"]
 
 
 @pytest.mark.asyncio

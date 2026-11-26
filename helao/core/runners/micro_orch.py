@@ -929,7 +929,9 @@ class MicroOrch:
         for i, act in enumerate(actions):
             self._stage_action(act, order=i)
         await self._write_plan(
-            experiment, experiment_plan(experiment.experiment_uuid, actions), "exp"
+            experiment,
+            lambda: experiment_plan(experiment.experiment_uuid, actions),
+            "exp",
         )
         self.active_experiment = experiment
         self.planned_actions = list(actions)
@@ -1062,7 +1064,7 @@ class MicroOrch:
 
         planned = list(seq_func(**supplied))  # a generator must not be spent twice
         await self._write_plan(
-            sequence, sequence_plan(sequence.sequence_uuid, planned), "seq"
+            sequence, lambda: sequence_plan(sequence.sequence_uuid, planned), "seq"
         )
         self.active_sequence = sequence
         self.finished_experiments = []
@@ -1371,15 +1373,19 @@ class MicroOrch:
             root, rel, f"{stamp.strftime('%y%m%d.%H%M%S%f')}-{kind}.json"
         )
 
-    async def _write_plan(self, record, payload: dict, kind: str) -> None:
-        """Write-once plan sidecar beside the record, listed in ``aux_files``."""
-        record_file = self._record_file(record, kind)
-        target = os.path.join(os.path.dirname(record_file), plan_name(record_file))
+    async def _write_plan(self, record, make_payload: Callable[[], dict], kind: str):
+        """Write-once plan sidecar beside the record, listed in ``aux_files``.
+
+        A failure is logged, never fatal: the plan is an aid, the run goes on.
+        """
         owner = getattr(record, f"{'sequence' if kind == 'seq' else 'experiment'}_uuid")
+        target = "<unresolved>"
         try:
+            record_file = self._record_file(record, kind)
+            target = os.path.join(os.path.dirname(record_file), plan_name(record_file))
             await write_plan_once(
                 target,
-                payload,
+                make_payload(),
                 self._write_meta_atomic,
                 kind=f"{kind}_plan",
                 owner_uuid=owner,
