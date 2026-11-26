@@ -23,7 +23,7 @@ from collections import defaultdict
 from contextvars import ContextVar
 from copy import deepcopy
 from socket import gethostname
-from typing import Optional
+from typing import ClassVar, Optional
 from uuid import UUID
 
 from pydantic import Field
@@ -211,6 +211,11 @@ class Experiment(Sequence, ExperimentModel):
             experiment, used to rebuild ``samples_in``/``samples_out`` and
             ``files`` aggregates.
     """
+
+    # MRO would pick SequenceModel's set only; a premodel record drops both.
+    RECORD_EXCLUDE: ClassVar[frozenset[str]] = (
+        SequenceModel.RECORD_EXCLUDE | ExperimentModel.RECORD_EXCLUDE
+    )
 
     # not in ExperimentModel, dispatched_actions is a list of completed ActionModels:
     dispatched_actions: list[ActionModel] = []

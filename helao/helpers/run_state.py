@@ -311,8 +311,8 @@ _PARENT_KIND = {"action": "experiment", "experiment": "sequence"}
 #: action carries its own uuid on line 3 and its parent's on line 19, but a
 #: sequence's own uuid sits near the *end* of the file, after
 #: ``sequence_params`` (records written before 2026-11 also carried
-#: ``planned_experiments`` there and ran to hundreds of thousands of lines) -- and an experiment's
-#: parent ``sequence_uuid`` lands ~20 lines from its end for the same reason.
+#: ``planned_experiments`` there and ran to hundreds of thousands of lines) -- and
+#: an experiment's parent ``sequence_uuid`` lands ~20 lines from its end for the same reason.
 #: Measured across the 26.03-26.05 production archive, where seq ymls run
 #: 427k-560k lines: a head-only read would recover no sequence uuid at all.
 _HEAD_BYTES = 4096

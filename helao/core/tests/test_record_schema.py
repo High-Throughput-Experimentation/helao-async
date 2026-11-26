@@ -45,8 +45,20 @@ class _Rec(HelaoDict):
 
 
 def test_record_dict_passes_strip_private_through():
+    """Stub: pydantic record models carry no top-level ``_`` keys, so strip_private
+    is a no-op on them and a SequenceModel version cannot fail."""
     assert _Rec().record_dict() == {"_hidden": 1, "keep": 2}
     assert _Rec().record_dict(strip_private=True) == {"keep": 2}
+
+
+def test_experiment_premodel_record_dict_drops_both_lists():
+    exp = Experiment(
+        experiment_name="e",
+        planned_actions=[{"action_name": "a"}],
+        dispatched_actions_abbr=[{"action_uuid": U1}],
+    )
+    rec = exp.record_dict()
+    assert "planned_actions" not in rec and "dispatched_actions_abbr" not in rec
 
 
 def test_get_seq_fills_experiment_list_in_dispatch_order():
