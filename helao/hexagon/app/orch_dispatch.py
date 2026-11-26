@@ -526,6 +526,10 @@ class DispatchRunner:
         if rc is not None:
             return rc
 
+        await self._record_plan(
+            orch.active_experiment,
+            lambda: orch.write_exp_plan(orch.active_experiment, staged_acts),
+        )
         await self._upload_exp_meta_s3()
 
         rc = await self._verify_experiment_plate()
@@ -687,6 +691,16 @@ class DispatchRunner:
 
         return None, staged_acts
 
+    async def _record_plan(self, record, write) -> None:
+        """Write a plan sidecar and list it in ``aux_files``; never stop the run."""
+        try:
+            name = await write()
+        except Exception:
+            LOGGER.error(f"could not write plan sidecar for {record!r}", exc_info=True)
+            return
+        if name not in record.aux_files:
+            record.aux_files.append(name)
+
     async def _upload_exp_meta_s3(self) -> None:
         """Write the temporary experiment and upload its meta json to S3 (:729-746), verbatim."""
         orch = self.orch
@@ -700,7 +714,7 @@ class DispatchRunner:
                     f"uploading initial active experiment json to s3 ({meta_s3_key})"
                 )
                 await orch.hexagon_wiring.sync.to_s3(
-                    orch.exp_model.clean_dict(strip_private=True), meta_s3_key
+                    orch.exp_model.record_dict(strip_private=True), meta_s3_key
                 )
             except Exception as e:
                 LOGGER.error(
@@ -848,6 +862,10 @@ class DispatchRunner:
                             new_planned_experiments
                         )
 
+            await self._record_plan(
+                orch.active_sequence,
+                lambda: orch.write_seq_plan(orch.active_sequence),
+            )
             orch.seq_model = orch.active_sequence.get_seq()
             await orch.write_seq(orch.active_sequence)
             if self._sequence_gone(activated):
@@ -860,7 +878,7 @@ class DispatchRunner:
                         f"uploading initial active sequence json to s3 ({meta_s3_key})"
                     )
                     await orch.hexagon_wiring.sync.to_s3(
-                        orch.seq_model.clean_dict(strip_private=True), meta_s3_key
+                        orch.seq_model.record_dict(strip_private=True), meta_s3_key
                     )
                 except Exception as e:
                     LOGGER.error(

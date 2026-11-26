@@ -6,6 +6,8 @@ that experiment is finalized.
 """
 
 import asyncio
+import json
+from pathlib import Path
 
 import pytest
 
@@ -57,10 +59,9 @@ async def test_each_sequence_files_only_its_own_experiments(tmp_path):
         assert len(owner) == 4, owner
         for s in seqs:
             su = str(s.sequence_uuid)
-            filed = {
-                str(e["experiment_uuid"])
-                for e in recs[su]["dispatched_experiments_abbr"]
-            }
+            filed = {str(u) for u in recs[su]["experiment_list"]}
+            assert "planned_experiments" not in recs[su]
+            assert "dispatched_experiments_abbr" not in recs[su]
             own = {u for u, o in owner.items() if o == su}
             assert len(own) == 2 and filed == own, (su, filed, own)
         # in-memory: the last finished sequence is B and owns only its own
@@ -68,3 +69,25 @@ async def test_each_sequence_files_only_its_own_experiments(tmp_path):
         assert {str(e.sequence_uuid) for e in last.dispatched_experiments} == {
             str(last.sequence_uuid)
         }
+        # plan sidecars: one per sequence and per experiment, stripped
+        seq_dirs = {
+            str(read_meta(p)["sequence_uuid"]): Path(p).parent
+            for p in meta_glob(tmp_path, "seq", "**/*")
+        }
+        for s in seqs:
+            sdir = seq_dirs[str(s.sequence_uuid)]
+            (plan_path,) = list(sdir.glob("*-seq.plan.json"))
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            assert len(plan["planned"]) == 2
+            assert all("experiment_params" not in e for e in plan["planned"])
+            assert plan_path.name in recs[str(s.sequence_uuid)]["aux_files"]
+        for p in meta_glob(tmp_path, "exp", "**/*"):
+            d = read_meta(p)
+            (plan_path,) = list(Path(p).parent.glob("*-exp.plan.json"))
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            assert {e["action_uuid"] for e in plan["planned"]} == {
+                str(u) for u in d["action_list"]
+            }
+            assert all("action_params" not in e for e in plan["planned"])
+            assert plan_path.name in d["aux_files"]
+            assert "planned_actions" not in d
