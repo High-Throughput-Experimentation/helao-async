@@ -154,6 +154,7 @@ async def _mid_run_pck(tmp_path, loop_intent=LoopIntent.stop, strip=False):
         await _stop(drainer)
     (old_uuid,) = src.globalstatusmodel.active_dict
     assert src.globalstatusmodel.active_dict[old_uuid].action_name == "a1"
+    src.globalstatusmodel.active_dict[old_uuid].prefinish_hooks.append("ran")
     assert [a.action_name for a in src.action_dq] == ["a2"]
     assert src.active_experiment is not None and src.active_sequence is not None
     assert len(src.sequence_dq) == 0  # popped, as in a real mid-run export
@@ -200,6 +201,7 @@ def test_restore_then_start_reruns_inflight_action_and_finishes(tmp_path):
         assert [a.action_name for a in dst.action_dq] == ["a1", "a2"]
         assert dst.action_dq[0].action_uuid is None
         assert dst.action_dq[0].action_retry == 1
+        assert dst.action_dq[0].prefinish_hooks == []
         assert dst.last_action_uuid != str(old_uuid)
 
         trace: list = []

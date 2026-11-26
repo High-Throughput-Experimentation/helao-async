@@ -7,13 +7,16 @@ the port for everything that touches ``STATES``. Paths are ``os.path`` strings
 throughout: ``/export_queues`` and ``/import_queues`` return them on the wire.
 """
 
+import asyncio
 import os
 import pickle
 from pathlib import Path
 
 from helao.core.tests.test_orch_dispatch_golden_master import _make_orch
 from helao.core.models.orchstatus import LoopStatus
-from helao.helpers.premodels import Sequence
+from helao.core.hooks import FinishHook, HookSet
+from helao.core.hooks.prefinish import run_prefinish
+from helao.helpers.premodels import Experiment, Sequence
 from helao.hexagon.adapters.shared.state_persistence import QueuePckStore
 from helao.hexagon.app.orch_persist import QUEUE_PCK_SCHEMA
 
@@ -214,3 +217,30 @@ def _payload_of(orch) -> dict:
     orch.hexagon_wiring.state_persistence = rec
     orch.export_queues()
     return rec.calls[0][1]
+
+
+class _Noop(FinishHook):
+    async def run(self, ctx):
+        pass
+
+
+def test_restore_backfills_fields_added_since_the_pickle(tmp_path):
+    """An old queues.pck lacks newer model fields; finish must still run."""
+    a = _orch(tmp_path / "a")
+    seq = Sequence(sequence_name="seq1", sequence_params={})
+    exp = Experiment(experiment_name="exp1", experiment_params={})
+    new_fields = ("prefinish_hooks", "action_list", "experiment_list")
+    for m in (seq, exp):
+        for f in new_fields:
+            m.__dict__.pop(f, None)
+    a.sequence_dq.append(seq)
+    a.experiment_dq.append(exp)
+    pck = a.export_queues()
+
+    b = _orch(tmp_path / "b")
+    b.import_queues(pck)
+    hs = HookSet(cfg={"h": {"*": None}}, hooks={"h": _Noop()})
+    for rec in (b.sequence_dq[0], b.experiment_dq[0]):
+        assert "prefinish_hooks" in rec.__dict__
+        asyncio.run(run_prefinish(hs, rec, "n", tmp_path, server=object()))
+        assert rec.prefinish_hooks == ["h"]

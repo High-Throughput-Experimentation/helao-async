@@ -102,6 +102,20 @@ _EXPERIMENT_LINK_FIELDS = (
 )
 
 
+def _backfill_model_fields(obj) -> None:
+    """Give an unpickled model the fields added since it was pickled.
+
+    Pydantic v2 unpickling restores ``__dict__`` as written, so a queue pickled
+    before a field existed lacks it; the schema stamp is not bumped for added
+    fields, so the restored object must carry the default.
+    """
+    if obj is None or not hasattr(type(obj), "model_fields"):
+        return
+    for name, field in type(obj).model_fields.items():
+        if name not in obj.__dict__:
+            obj.__dict__[name] = field.get_default(call_default_factory=True)
+
+
 class QueuePersister:
     """Pickle export/import of an ``Orch``'s run queues and related state.
 
@@ -273,6 +287,18 @@ class QueuePersister:
                 f"matches."
             )
             return save_path
+        # Top-level queue entries and active/last objects only; nested models
+        # (e.g. a sequence's planned experiments) are not walked.
+        for x in (
+            *queue_dict.get("act", []),
+            *queue_dict.get("exp", []),
+            *queue_dict.get("seq", []),
+            *(
+                queue_dict.get(k)
+                for k in ("active_exp", "last_exp", "active_seq", "last_seq")
+            ),
+        ):
+            _backfill_model_fields(x)
         if orch.sequence_dq or orch.experiment_dq or orch.action_dq:
             LOGGER.info("Existing queues are not empty. Cannot restore.")
         else:
