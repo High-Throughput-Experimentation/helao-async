@@ -13,6 +13,7 @@ from helao.helpers.run_state import DONE
 from helao.hexagon.tests.sync_fixtures import (
     make_action,
     make_exp_tree,
+    exp_meta,
     make_sync_driver,
     mk_uuid,
     teardown_driver,
@@ -283,3 +284,70 @@ async def test_dispatch_analysis_refused_at_action_level(tmp_path, mod):
             },
         )
     assert "dispatch_analysis" in str(ei.value)
+
+
+def _capture(drv, sent):
+    async def capture(msg=None, target=None, compress=False, retries=5):
+        sent.append((target, msg))
+        return True
+
+    drv.to_s3 = capture
+
+
+@pytest.mark.parametrize("mod", MODS)
+@pytest.mark.asyncio
+async def test_experiment_push_strips_lists_and_ships_plan_first(tmp_path, mod):
+    drv = make_sync_driver(
+        tmp_path, mod.SyncDriver, postfinish_hooks={"experiment": {"s3_upload": ["*"]}}
+    )
+    try:
+        sent = []
+        _capture(drv, sent)
+        _no_requeue(drv)
+        uuid = mk_uuid(1)
+        exp_yml = make_exp_tree(tmp_path, "RUNS", uuid)
+        plan = exp_yml.parent / f"{ts(0)}-exp.plan.json"
+        plan.write_text(
+            '{"file_type": "experiment_plan", "planned": []}\n', encoding="utf-8"
+        )
+        write_yml(
+            exp_yml,
+            {
+                **exp_meta(uuid),
+                "aux_files": [plan.name],
+                "planned_actions": [{"action_name": "legacy"}],
+                "dispatched_actions_abbr": [{"action_uuid": mk_uuid(2)}],
+            },
+        )
+        await asyncio.wait_for(drv.sync_yml(yml_path=exp_yml, rank=1), timeout=15)
+        targets = [t for t, _ in sent]
+        assert targets.index(f"experiment/{uuid}.plan.json") < targets.index(
+            f"experiment/{uuid}.json"
+        )
+        by_target = dict(sent)
+        assert Path(by_target[f"experiment/{uuid}.plan.json"]) == plan
+        meta = by_target[f"experiment/{uuid}.json"]
+        assert "planned_actions" not in meta and "dispatched_actions_abbr" not in meta
+    finally:
+        await teardown_driver(drv)
+
+
+@pytest.mark.parametrize("mod", MODS)
+@pytest.mark.asyncio
+async def test_missing_plan_file_does_not_block_the_meta_push(tmp_path, mod):
+    drv = make_sync_driver(
+        tmp_path, mod.SyncDriver, postfinish_hooks={"experiment": {"s3_upload": ["*"]}}
+    )
+    try:
+        sent = []
+        _capture(drv, sent)
+        _no_requeue(drv)
+        uuid = mk_uuid(1)
+        exp_yml = make_exp_tree(tmp_path, "RUNS", uuid)
+        write_yml(exp_yml, {**exp_meta(uuid), "aux_files": [f"{ts(0)}-exp.plan.json"]})
+        await asyncio.wait_for(drv.sync_yml(yml_path=exp_yml, rank=1), timeout=15)
+        targets = [t for t, _ in sent]
+        assert f"experiment/{uuid}.json" in targets
+        assert f"experiment/{uuid}.plan.json" not in targets
+    finally:
+        await teardown_driver(drv)

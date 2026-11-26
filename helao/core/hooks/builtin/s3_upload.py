@@ -229,7 +229,7 @@ class Hook(FinishHook):
 
         LOGGER.debug(f"Patching model for {prog.yml.target.name}")
         patched_meta = {MOD_PATCH.get(k, k): v for k, v in meta.items()}
-        meta = MOD_MAP[prog.yml.type](**patched_meta).clean_dict(strip_private=True)
+        meta = MOD_MAP[prog.yml.type](**patched_meta).record_dict(strip_private=True)
 
         # patch technique lists in meta
         tech_name = meta.get("technique_name", "NA")
@@ -241,6 +241,22 @@ class Hook(FinishHook):
         if not prog.s3_done or force_s3:
             LOGGER.debug(f"Pushing prog.yml->json to S3 for {prog.yml.target.name}")
             uuid_key = patched_meta[f"{prog.yml.type}_uuid"]
+            # plan sidecars named in aux_files go up first (spec §3.3); a
+            # missing one is reported, never retried forever
+            if prog.yml.type in ("experiment", "sequence"):
+                for name in meta.get("aux_files") or []:
+                    if not str(name).endswith(".plan.json"):
+                        continue
+                    plan_path = prog.yml.targetdir / name
+                    if not plan_path.is_file():
+                        LOGGER.warning(
+                            f"plan sidecar {name} named by {prog.yml.target.name} "
+                            "is not on disk; skipped"
+                        )
+                        continue
+                    plan_key = f"{prog.yml.type}/{uuid_key}.plan.json"
+                    if not await syncer.to_s3(plan_path, plan_key):
+                        raise RuntimeError(f"Failed to upload {plan_key}")
             meta_s3_key = f"{prog.yml.type}/{uuid_key}.json"
             s3_success = await syncer.to_s3(meta, meta_s3_key)
             if not s3_success:
